@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/experiment_result.schema.json",
+  "title": "HPC AI Experiment Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "experiment",
+    "workload",
+    "model",
+    "mode",
+    "gpus",
+    "precision",
+    "status",
+    "started_at",
+    "completed_at",
+    "runtime_seconds",
+    "metrics",
+    "environment",
+    "config"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "experiment_id": { "type": "string" },
+    "experiment": { "type": "string" },
+    "workload": { "type": "string" },
+    "model": { "type": "string" },
+    "mode": { "enum": ["training", "inference", "profiling"] },
+    "gpus": { "type": "integer", "minimum": 0 },
+    "precision": { "enum": ["fp32", "fp16", "bf16", "fp8", "int8", "int4"] },
+    "status": { "enum": ["completed", "failed"] },
+    "started_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "runtime_seconds": { "type": "number", "minimum": 0 },
+    "throughput_tokens_sec": { "type": ["number", "null"], "minimum": 0 },
+    "throughput_samples_sec": { "type": ["number", "null"], "minimum": 0 },
+    "gpu_utilization": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+    "memory_used_gb": { "type": ["number", "null"], "minimum": 0 },
+    "latency_p50_ms": { "type": ["number", "null"], "minimum": 0 },
+    "latency_p95_ms": { "type": ["number", "null"], "minimum": 0 },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": { "type": ["number", "integer", "string", "boolean", "null"] }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": { "type": ["number", "integer", "string", "boolean", "null"] }
+    },
+    "config": {
+      "type": "object"
+    },
+    "error": {
+      "type": ["string", "null"]
+    }
+  }
+}
+

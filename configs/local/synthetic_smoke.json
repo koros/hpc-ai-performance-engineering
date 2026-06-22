@@ -1,0 +1,41 @@
+{
+  "experiment_id": "local_synthetic_smoke",
+  "experiment": "local_execution_smoke_test",
+  "mode": "training",
+  "workload": {
+    "name": "synthetic",
+    "model": "synthetic-transformer",
+    "dataset": "synthetic",
+    "parameters": {
+      "tokens_per_step": 2048,
+      "sleep_seconds": 0.001
+    }
+  },
+  "hardware": {
+    "platform": "local",
+    "gpus": 0,
+    "gpu_model": null,
+    "interconnect": null
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 0,
+    "backend": "gloo"
+  },
+  "runtime": {
+    "precision": "fp32",
+    "max_steps": 5,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": false,
+    "profilers": [],
+    "parameters": {}
+  },
+  "metadata": {
+    "purpose": "Validate local config loading, runner execution, and result writing."
+  }
+}
+
