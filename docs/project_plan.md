@@ -215,130 +215,22 @@ How do H100 and L40S platforms compare for AI workloads?
 
 ---
 
-# Work Packages
+# Proposal-Aligned Work Packages
 
-## WP1 – Literature Review
-
-Activities:
-
-- Review distributed training research
-- Review scaling studies
-- Review HPC performance engineering literature
-
-Outputs:
-
-- Literature review chapter
-- Reference database
-
----
-
-## WP2 – Environment Preparation
-
-Activities:
-
-- HPC access setup
-- Software installation
-- Repository preparation
-
-Outputs:
-
-- Reproducible environment
-
----
-
-## WP3 – Baseline Benchmarking
-
-Activities:
-
-- Single-GPU experiments
-- Initial profiling
-
-Outputs:
-
-- Baseline dataset
-
----
-
-## WP4 – Scaling Analysis
-
-Activities:
-
-- Strong scaling
-- Weak scaling
-
-Outputs:
-
-- Scaling curves
-- Efficiency analysis
-
----
-
-## WP5 – Distributed Training Evaluation
-
-Activities:
-
-- DDP
-- FSDP
-- DeepSpeed
-
-Outputs:
-
-- Comparative evaluation
-
----
-
-## WP6 – Performance Optimisation
-
-Activities:
-
-- Precision experiments
-- Memory optimisation
-- Input pipeline optimisation
-
-Outputs:
-
-- Optimisation recommendations
-
----
-
-## WP7 – Communication and Data Movement Analysis
-
-Activities:
-
-- NCCL profiling
-- Synchronisation analysis
-- Data movement analysis
-
-Outputs:
-
-- Bottleneck analysis
-
----
-
-## WP8 – Dashboard Development
-
-Activities:
-
-- Data model design
-- Visualisation implementation
-
-Outputs:
-
-- Interactive dashboard
-
----
-
-## WP9 – Dissertation Writing
-
-Activities:
-
-- Results chapter
-- Discussion chapter
-- Final editing
-
-Outputs:
-
-- Final dissertation
+| Work package | Proposal section | Matrix coverage | Main output |
+|--------------|------------------|-----------------|-------------|
+| WP1 | Environment validation | E001-E007 | Verified CUDA, PyTorch, NCCL, distributed launch, and inference environment |
+| WP2 | Benchmark selection | Benchmark catalogue | Final workload set: GPT-2 Small, DistilBERT, TinyLlama |
+| WP3 | Baseline profiling | E008-E019 | Single-GPU training and inference baselines with repeat variance |
+| WP4 | Precision studies | E083-E096; E149-E200 selected inference precision runs | Precision-performance trade-off analysis |
+| WP5 | Scaling studies | E032-E046; E035-E043 | Strong and weak scaling curves on 1, 2, and 4 H100 GPUs |
+| WP6 | Distributed training strategies | E047-E062 | DDP, FSDP, and ZeRO comparison |
+| WP7 | Memory optimisation | E063-E082 | Activation checkpointing, micro-batch, and accumulation analysis |
+| WP8 | Data movement and communication | E097-E120 | DataLoader, pinned memory, prefetch, NCCL, and synchronisation bottleneck analysis |
+| WP9 | Hardware comparison | E121-E128 | Selected H100 vs L40S comparison |
+| WP10 | Inference studies | E129-E200 | Serving framework, batching, concurrency, prompt length, multi-GPU, and quantisation results |
+| WP11 | Integrated analysis and dashboard | A01-A07 | Dashboard, bottleneck classification, GPU-hour and throughput/Watt synthesis |
+| WP12 | Recommendations | A08 | Practical guidance for efficient training and serving |
 
 ---
 

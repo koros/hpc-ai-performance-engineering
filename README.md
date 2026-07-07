@@ -1,326 +1,121 @@
-# Performance Engineering of Distributed Transformer Training and Inference on Multi-GPU H100 Systems
+# Performance Engineering of Transformer Training and Inference on Multi-GPU H100 Systems
 
-## Overview
+This repository contains the research artefacts, experiment framework, tracking documents, analysis outputs, and dashboard work for an MSc Artificial Intelligence dissertation at the University of Plymouth.
 
-This repository contains the research artefacts, experimental framework, benchmarking workloads, performance analysis tools, and dashboard developed as part of an MSc Artificial Intelligence dissertation at the University of Plymouth.
+The project studies how transformer workloads behave on NVIDIA H100 systems in the Lovelace HPC facility, with selected NVIDIA L40S comparisons. Training is the core dissertation scope; inference is retained as a secondary high-impact scope because serving cost and latency often dominate long-term deployment.
 
-The project investigates how modern transformer-based AI workloads behave on large-scale GPU systems, with a particular focus on distributed training and inference on NVIDIA H100 GPUs within the Lovelace High Performance Computing (HPC) facility.
+## Current Experiment Plan
 
-The research combines principles from:
+The latest plan is based on `Appendix_A_Comprehensive_Experiment_Matrix.docx` and uses a controlled factorial design across workload, GPU count, distributed strategy, precision, memory settings, data movement, inference framework, serving load, and hardware.
 
-- High Performance Computing (HPC)
-- Deep Learning
-- Distributed Systems
-- Performance Engineering
-- Large Language Models (LLMs)
-- GPU Computing
+Primary planning documents:
 
-The goal is to identify practical strategies that improve throughput, scalability, resource utilisation, and overall efficiency when training and serving transformer models on modern multi-GPU infrastructure.
+- [Comprehensive experiment matrix](docs/experiment_matrix.md): full source-of-truth matrix with `E001` to `E200`, priority levels, metrics, and GPU-hour estimates.
+- [Experiment tracker](docs/experiment_tracker.md): editable run-status table for every planned experiment and analysis task.
+- [Experiment workspace](experiments/README.md): phase folders aligned with the dissertation proposal outline.
+- [Experiment configs](configs/README.md): reusable config templates and concrete run configs.
 
----
+## Proposal Outline
 
-## Research Motivation
+The repository now mirrors the project proposal structure:
 
-Large transformer models have become the foundation of modern AI systems. However, training and deploying these models requires significant computational resources and can be prohibitively expensive.
-
-Although modern hardware platforms provide enormous computational capabilities, achieving efficient utilisation remains a challenge due to:
-
-- Communication overheads between GPUs
-- Memory limitations
-- Data movement bottlenecks
-- Input pipeline inefficiencies
-- Poor scaling beyond a small number of devices
-- Complex distributed training strategies
-
-This project aims to provide a systematic study of these factors and produce reproducible recommendations for researchers and practitioners.
-
----
-
-## Research Objectives
-
-### Primary Objectives
-
-- Quantify training scalability on 1–4 NVIDIA H100 GPUs
-- Measure strong and weak scaling efficiency
-- Evaluate distributed training frameworks
-- Identify major performance bottlenecks
-- Measure communication and data movement costs
-- Develop practical optimisation guidelines
-
-### Secondary Objectives
-
-- Evaluate transformer inference performance
-- Investigate quantisation approaches
-- Compare H100 and L40S GPU platforms
-- Develop automated performance reporting tools
-
-### Deliverables
-
-- Reproducible experiment suite
-- Benchmark dataset catalogue
-- Performance dashboard
-- Research dissertation
-- Publication-quality figures and results
-- Experiment recommendations and best practices
-
----
-
-## Experimental Platform
-
-Experiments are designed around the University of Plymouth Lovelace HPC facility.
-
-### Hardware
-
-- NVIDIA H100 SXM GPUs
-- NVIDIA L40S GPUs (comparison studies)
-- AMD EPYC CPUs
-- High-speed GPU interconnects
-- Shared parallel storage
-
-### Software Stack
-
-- Ubuntu Linux
-- Slurm Workload Manager
-- CUDA
-- NCCL
-- PyTorch
-- DeepSpeed
-- Hugging Face Transformers
-- TensorBoard
-- Weights & Biases (optional)
-- JupyterLab
-
----
+| Proposal section | Matrix coverage |
+| --- | --- |
+| Environment validation | `E001-E007` |
+| Benchmark selection | GPT-2 Small, DistilBERT, TinyLlama |
+| Baseline profiling | `E008-E019` |
+| Precision studies | `E083-E096`, selected inference precision in `E149-E200` |
+| Scaling studies | `E032-E046` strong scaling and `E035-E043` weak scaling |
+| Distributed training strategies | `E047-E062` DDP, FSDP, ZeRO-1, ZeRO-2, ZeRO-3 |
+| Memory optimisation | `E063-E082` |
+| Data movement and communication | `E097-E120` |
+| Hardware comparison | `E121-E128` H100 vs L40S |
+| Inference studies | `E129-E200`, subject to time and platform stability |
+| Integrated analysis and dashboard | `A01-A07` |
+| Recommendations | `A08` |
 
 ## Research Questions
 
 1. How efficiently do transformer workloads scale from one to four H100 GPUs?
-2. Which distributed training strategy provides the best performance-to-memory trade-off?
-3. What impact do precision formats have on performance and model quality?
-4. How significant are communication and data movement bottlenecks?
-5. Which configuration achieves the highest throughput per GPU hour?
-6. How do H100 and L40S platforms compare for AI workloads?
-7. Can performance bottlenecks be automatically identified and visualised?
+2. Which distributed training strategy provides the best throughput-to-memory trade-off?
+3. What impact do FP32, FP16, BF16, FP8, and selected quantized inference formats have on performance and quality?
+4. How significant are communication, synchronisation, and data movement bottlenecks?
+5. Which configurations produce the best useful work per GPU-hour and per Watt?
+6. How do H100 and L40S platforms compare for selected AI workloads?
+7. Can experiment results be integrated into a dashboard that identifies bottlenecks and supports practical recommendations?
 
----
+## Workloads
 
-## Experiment Categories
+| Workload | Type | Primary use |
+| --- | --- | --- |
+| GPT-2 Small | Decoder transformer | Training and inference baseline |
+| DistilBERT | Encoder transformer | Training and inference comparison |
+| TinyLlama | Small modern LLM | Primarily inference; optional training |
 
-### Baseline Experiments
+## Priority and Budget
 
-- Single-GPU training baseline
-- Single-GPU inference baseline
-- Resource utilisation profiling
-- Model size sensitivity analysis
+| Priority | Meaning | Estimated GPU-hours |
+| --- | --- | --- |
+| Must Have | Required for a complete dissertation | 89.4 |
+| Should Have | Important for stronger impact | 46.1 |
+| Optional | Stretch goal | 12.1 |
+| Total | Full planned matrix | 147.6 |
 
-### Scaling Experiments
-
-- Strong scaling
-- Weak scaling
-- Multi-GPU efficiency analysis
-- Communication overhead measurement
-
-### Distributed Training Experiments
-
-- Distributed Data Parallel (DDP)
-- Fully Sharded Data Parallel (FSDP)
-- DeepSpeed ZeRO-1
-- DeepSpeed ZeRO-2
-- DeepSpeed ZeRO-3
-- Pipeline Parallelism
-- Tensor Parallelism
-
-### Precision Experiments
-
-- FP32
-- FP16
-- BF16
-- FP8
-
-### Memory Optimisation Experiments
-
-- Activation checkpointing
-- Gradient accumulation
-- Sequence length scaling
-- Model sharding
-
-### Data Movement Experiments
-
-- DataLoader optimisation
-- Prefetching
-- Dataset sharding
-- Storage performance analysis
-
-### Inference Experiments
-
-- Batch size scaling
-- Prompt length scaling
-- Quantised inference
-- Throughput vs latency analysis
-
-### Hardware Comparison Experiments
-
-- H100 vs L40S training
-- H100 vs L40S inference
-- Cost efficiency comparison
-- Memory efficiency comparison
-
----
+The reduced feasible scope in the appendix is approximately 95-118 GPU-hours, prioritising environment validation, GPT-2 and DistilBERT baselines, scaling, distributed strategy comparison, precision and memory studies, data movement, communication analysis, and a focused inference subset.
 
 ## Repository Structure
 
 ```text
 hpc-ai-performance-engineering/
-│
-├── README.md
-├── requirements.txt
-├── .gitignore
-│
-├── docs/
-│   ├── proposal/
-│   ├── dissertation/
-│   ├── experiment_matrix/
-│   └── papers/
-│
-├── configs/
-│   ├── training/
+├── configs/                  # JSON/YAML experiment configurations
+│   ├── distributed/
 │   ├── inference/
-│   └── distributed/
-│
-├── experiments/
-│   ├── baseline/
-│   ├── scaling/
-│   ├── precision/
-│   ├── memory/
-│   ├── communication/
-│   └── inference/
-│
-├── src/
-│   ├── training/
-│   ├── inference/
+│   ├── local/
 │   ├── profiling/
-│   └── analysis/
-│
-├── dashboard/
-│
-├── notebooks/
-│
-├── results/
-│
-└── slurm/
-    ├── training/
-    ├── profiling/
-    └── benchmarking/
+│   └── training/
+├── docs/                     # Project plan, matrix, tracker, architecture, hardware notes
+├── experiments/              # Phase folders aligned with the proposal outline
+├── results/                  # Raw results, processed outputs, and figures
+├── schemas/                  # Result schema definitions
+├── scripts/                  # Utility scripts
+├── slurm/                    # Slurm submission templates
+├── src/hpc_ai_perf/          # Experiment config, runner, profiling, results, workload code
+├── tests/                    # Local validation tests
+└── workloads/                # Workload-specific assets and notes
 ```
 
----
+## Metrics
 
-## Metrics Collected
+The matrix tracks runtime, samples/sec, tokens/sec, loss, GPU-hours, GPU utilisation, GPU memory, CPU utilisation, data-loading time, speedup, scaling efficiency, NCCL bandwidth, AllReduce time, synchronisation overhead, NVLink utilisation, tokens/sec, time-to-first-token, p50 and p95 latency, power draw, energy consumption, throughput/GPU-hour, and throughput/Watt.
 
-### Training Metrics
+## Local Validation
 
-- Samples per second
-- Tokens per second
-- Time per epoch
-- GPU utilisation
-- GPU memory utilisation
-- Validation loss
-- Training loss
-- Convergence time
+Install the package in editable mode and run the smoke tests:
 
-### Scaling Metrics
+```bash
+pip install -e ".[dev]"
+pytest
+```
 
-- Speedup
-- Parallel efficiency
-- Strong scaling efficiency
-- Weak scaling efficiency
+Run the local synthetic smoke benchmark:
 
-### Communication Metrics
+```bash
+python -m hpc_ai_perf.cli --config configs/local/synthetic_smoke.json
+```
 
-- NCCL communication time
-- All-reduce overhead
-- Synchronisation delays
-- Communication/computation ratio
+## Expected Outputs
 
-### Inference Metrics
-
-- Throughput
-- P50 latency
-- P95 latency
-- Memory usage
-- Tokens per second
-
-### Cost Metrics
-
-- GPU hours consumed
-- Cost per experiment
-- Cost per million tokens
-- Throughput per GPU hour
-
----
-
-## Dashboard
-
-A custom dashboard will be developed to:
-
-- Visualise scaling curves
-- Compare experiment configurations
-- Track resource utilisation
-- Highlight bottlenecks
-- Compare hardware platforms
-- Generate publication-ready figures
-
----
-
-## Reproducibility
-
-The project emphasises reproducible research.
-
-All experiments will include:
-
-- Version-controlled source code
-- Configuration files
-- Experiment metadata
-- Software environment specifications
-- Hardware descriptions
-- Logged performance metrics
-
----
-
-## Potential Publications
-
-### Primary Paper
-
-Understanding Scaling Limits and Performance Bottlenecks of Distributed Transformer Training on Multi-GPU H100 Systems
-
-### Secondary Paper (Stretch Goal)
-
-Automated Performance Analysis and Optimisation Recommendations for Transformer Workloads on Modern GPU Systems
-
----
-
-## Sustainable Development Goals
-
-This work contributes indirectly to:
-
-- SDG 4 – Quality Education
-- SDG 9 – Industry, Innovation and Infrastructure
-- SDG 12 – Responsible Consumption and Production
-- SDG 13 – Climate Action
-
-by promoting more efficient use of computational resources and reducing unnecessary energy consumption during AI development.
-
----
+- Reproducible experiment suite and configuration catalogue
+- Baseline, scaling, precision, memory, communication, hardware, and inference results
+- Integrated analysis and dashboard
+- Dissertation figures and tables
+- Practical recommendations for efficient transformer training and serving on modern GPU systems
 
 ## Author
 
 Geoffrey Koros
-
 MSc Artificial Intelligence
-
 University of Plymouth
-
----
 
 ## License
 
