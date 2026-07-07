@@ -1,0 +1,44 @@
+{
+  "experiment_id": "template_profiling",
+  "experiment": "workload_characterisation",
+  "mode": "profiling",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "openwebtext_or_synthetic_subset",
+    "parameters": {
+      "profile_target": "compute",
+      "batch_size": 16,
+      "sequence_length": 1024
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 50,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "torch_profiler"],
+    "parameters": {
+      "schedule": "wait_1_warmup_1_active_3"
+    }
+  },
+  "metadata": {
+    "template": "profiling",
+    "priority": "Must Have"
+  }
+}

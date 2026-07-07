@@ -1,0 +1,48 @@
+{
+  "experiment_id": "E002",
+  "experiment": "environment_validation_ddp_nccl_2gpu",
+  "mode": "training",
+  "workload": {
+    "name": "environment_validation",
+    "model": "all",
+    "dataset": null,
+    "parameters": {
+      "validation_target": "ddp_nccl_allreduce",
+      "expected_checks": ["torchrun_launch", "process_group_init", "allreduce"],
+      "expected_gpus": 2
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 2,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 1,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "nccl"],
+    "parameters": {}
+  },
+  "metadata": {
+    "matrix_id": "E002",
+    "template": "environment_validation",
+    "phase": "Environment validation",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.5,
+    "matrix_precision_config": "N/A",
+    "objective": "Confirm two-GPU distributed launch and NCCL communication",
+    "key_metrics": ["allreduce_success", "bandwidth", "errors"]
+  }
+}

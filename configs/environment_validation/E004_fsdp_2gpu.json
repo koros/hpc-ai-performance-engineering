@@ -1,0 +1,48 @@
+{
+  "experiment_id": "E004",
+  "experiment": "environment_validation_fsdp_2gpu",
+  "mode": "training",
+  "workload": {
+    "name": "environment_validation",
+    "model": "all",
+    "dataset": null,
+    "parameters": {
+      "validation_target": "fsdp_smoke",
+      "expected_checks": ["torchrun_launch", "fsdp_init", "single_train_step"],
+      "expected_gpus": 2
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 2,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "fsdp",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 1,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "torch_memory"],
+    "parameters": {}
+  },
+  "metadata": {
+    "matrix_id": "E004",
+    "template": "environment_validation",
+    "phase": "Environment validation",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.5,
+    "matrix_precision_config": "N/A",
+    "objective": "Confirm FSDP script executes correctly on two GPUs",
+    "key_metrics": ["successful_run", "memory_trace"]
+  }
+}

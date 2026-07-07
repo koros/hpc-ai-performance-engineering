@@ -12,6 +12,18 @@ def test_load_synthetic_config() -> None:
     assert config.runtime.precision == "fp32"
 
 
+def test_all_json_configs_load() -> None:
+    config_paths = sorted(Path("configs").rglob("*.json"))
+
+    assert config_paths
+    for config_path in config_paths:
+        config = load_experiment_config(config_path)
+
+        assert config.experiment_id
+        assert config.experiment
+        assert config.workload.name
+
+
 def test_local_runner_writes_standard_result(tmp_path: Path) -> None:
     config = load_experiment_config(Path("configs/local/synthetic_smoke.json"))
 
@@ -21,4 +33,3 @@ def test_local_runner_writes_standard_result(tmp_path: Path) -> None:
     assert result.status == "completed"
     assert result.throughput_tokens_sec is not None
     assert result_path.exists()
-

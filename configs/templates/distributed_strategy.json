@@ -1,0 +1,42 @@
+{
+  "experiment_id": "template_distributed_strategy",
+  "experiment": "distributed_training_strategy",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "openwebtext_or_synthetic_subset",
+    "parameters": {
+      "batch_size": 16,
+      "sequence_length": 1024
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 2,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "fsdp",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "nccl"],
+    "parameters": {}
+  },
+  "metadata": {
+    "template": "distributed_strategy",
+    "strategy_detail": "fsdp_full_shard",
+    "priority": "Must Have"
+  }
+}

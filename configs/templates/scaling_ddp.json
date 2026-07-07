@@ -1,0 +1,42 @@
+{
+  "experiment_id": "template_scaling_ddp",
+  "experiment": "scaling_study",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "openwebtext_or_synthetic_subset",
+    "parameters": {
+      "scaling_type": "strong",
+      "global_batch_size": 64,
+      "sequence_length": 1024
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 2,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "nccl"],
+    "parameters": {}
+  },
+  "metadata": {
+    "template": "scaling_ddp",
+    "priority": "Must Have"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "experiment_id": "E005",
+  "experiment": "environment_validation_deepspeed_zero_2gpu",
+  "mode": "training",
+  "workload": {
+    "name": "environment_validation",
+    "model": "all",
+    "dataset": null,
+    "parameters": {
+      "validation_target": "deepspeed_zero_smoke",
+      "expected_checks": ["deepspeed_launch", "zero_init", "single_train_step"],
+      "expected_gpus": 2
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 2,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "deepspeed_zero2",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 1,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "torch_memory"],
+    "parameters": {}
+  },
+  "metadata": {
+    "matrix_id": "E005",
+    "template": "environment_validation",
+    "phase": "Environment validation",
+    "priority": "Should Have",
+    "gpu_hours_estimate": 0.5,
+    "matrix_precision_config": "N/A",
+    "strategy_detail": "DeepSpeed ZeRO smoke test",
+    "objective": "Confirm DeepSpeed launcher and ZeRO configuration work",
+    "key_metrics": ["successful_run", "memory_trace"]
+  }
+}

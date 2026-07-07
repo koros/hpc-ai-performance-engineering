@@ -1,0 +1,42 @@
+{
+  "experiment_id": "template_environment_validation",
+  "experiment": "environment_validation",
+  "mode": "training",
+  "workload": {
+    "name": "environment_validation",
+    "model": "all",
+    "dataset": null,
+    "parameters": {
+      "validation_target": "cuda_pytorch",
+      "expected_checks": ["cuda_visible", "torch_import", "gpu_count"]
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 1,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi"],
+    "parameters": {}
+  },
+  "metadata": {
+    "template": "environment_validation",
+    "matrix_precision_config": "N/A",
+    "priority": "Must Have"
+  }
+}

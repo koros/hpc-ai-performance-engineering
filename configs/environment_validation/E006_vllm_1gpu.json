@@ -1,0 +1,49 @@
+{
+  "experiment_id": "E006",
+  "experiment": "environment_validation_vllm_1gpu",
+  "mode": "inference",
+  "workload": {
+    "name": "environment_validation",
+    "model": "all",
+    "dataset": "prompt_set_v1",
+    "parameters": {
+      "validation_target": "vllm_serving",
+      "expected_checks": ["vllm_import", "server_start", "request_served"],
+      "expected_gpus": 1
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 1,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "serving_latency"],
+    "parameters": {}
+  },
+  "metadata": {
+    "matrix_id": "E006",
+    "template": "environment_validation",
+    "phase": "Environment validation",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.5,
+    "matrix_precision_config": "N/A",
+    "framework": "vLLM",
+    "objective": "Confirm vLLM serving and benchmark tooling work",
+    "key_metrics": ["requests_served", "tokens_sec", "time_to_first_token"]
+  }
+}

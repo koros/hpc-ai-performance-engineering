@@ -1,0 +1,49 @@
+{
+  "experiment_id": "E007",
+  "experiment": "environment_validation_tensorrt_llm_1gpu",
+  "mode": "inference",
+  "workload": {
+    "name": "environment_validation",
+    "model": "all",
+    "dataset": "prompt_set_v1",
+    "parameters": {
+      "validation_target": "tensorrt_llm_serving",
+      "expected_checks": ["tensorrt_llm_import", "engine_build", "request_served"],
+      "expected_gpus": 1
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 1,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "serving_latency"],
+    "parameters": {}
+  },
+  "metadata": {
+    "matrix_id": "E007",
+    "template": "environment_validation",
+    "phase": "Environment validation",
+    "priority": "Optional",
+    "gpu_hours_estimate": 0.8,
+    "matrix_precision_config": "N/A",
+    "framework": "TensorRT-LLM",
+    "objective": "Confirm TensorRT-LLM environment if available",
+    "key_metrics": ["engine_build", "served_requests"]
+  }
+}
