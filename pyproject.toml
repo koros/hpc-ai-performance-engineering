@@ -10,7 +10,11 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = [
+    "pre-commit>=3.7",
+    "pytest>=8.0",
+    "ruff>=0.5",
+]
 yaml = ["PyYAML>=6.0"]
 
 [project.scripts]
@@ -19,3 +23,31 @@ hpc-ai-run = "hpc_ai_perf.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "SIM",
+]
+ignore = []
+extend-ignore = [
+    "B024", # Base classes are used as lightweight extension interfaces.
+    "B027", # Some hooks intentionally default to no-op implementations.
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

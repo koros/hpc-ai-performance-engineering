@@ -12,4 +12,3 @@ set -euo pipefail
 CONFIG_PATH="${1:?Usage: sbatch run_config.sbatch <config-path>}"
 
 python -m hpc_ai_perf.cli --config "${CONFIG_PATH}"
-

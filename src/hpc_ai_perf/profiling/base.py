@@ -36,4 +36,3 @@ class CompositeProfiler(Profiler):
             for key, value in profiler.stop().items():
                 metrics[f"{profiler.name}.{key}"] = value
         return metrics
-

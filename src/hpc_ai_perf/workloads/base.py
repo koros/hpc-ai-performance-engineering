@@ -23,4 +23,3 @@ class Workload(ABC):
     @abstractmethod
     def run(self, config: ExperimentConfig) -> WorkloadRunOutput:
         """Execute the configured workload and return machine-readable metrics."""
-

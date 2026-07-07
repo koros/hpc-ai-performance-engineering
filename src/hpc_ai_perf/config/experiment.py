@@ -62,7 +62,7 @@ class ExperimentConfig:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_mapping(cls, data: dict[str, Any]) -> "ExperimentConfig":
+    def from_mapping(cls, data: dict[str, Any]) -> ExperimentConfig:
         return cls(
             experiment_id=str(data["experiment_id"]),
             experiment=str(data["experiment"]),
@@ -97,4 +97,3 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
         raise ValueError(f"Experiment config must be a mapping: {config_path}")
 
     return ExperimentConfig.from_mapping(data)
-

@@ -47,7 +47,7 @@ class ExperimentResult:
         metrics: dict[str, int | float | str | bool | None] | None = None,
         environment: dict[str, int | float | str | bool | None] | None = None,
         error: str | None = None,
-    ) -> "ExperimentResult":
+    ) -> ExperimentResult:
         metrics = metrics or {}
         return cls(
             schema_version="1.0.0",
@@ -88,7 +88,6 @@ class ExperimentResult:
 def _optional_float(value: object) -> float | None:
     if value is None:
         return None
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return float(value)
     return None
-

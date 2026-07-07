@@ -61,4 +61,3 @@ def _environment() -> dict[str, int | float | str | bool | None]:
         "python_version": platform.python_version(),
         "platform": platform.platform(),
     }
-

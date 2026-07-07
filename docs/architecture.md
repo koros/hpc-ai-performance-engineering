@@ -37,4 +37,3 @@ notebooks/      Exploratory analysis.
 ## Current Scope
 
 The first executable path uses a synthetic workload to validate configuration, result writing, and local execution without requiring GPUs. Concrete NanoGPT, GPT-2, and Llama 3.2 adapters should be added next.
-

@@ -41,4 +41,3 @@ class SlurmJob:
         lines.append(self.command)
         lines.append("")
         return "\n".join(lines)
-

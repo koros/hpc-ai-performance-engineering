@@ -29,4 +29,3 @@ class SyntheticWorkload(Workload):
                 "throughput_tokens_sec": total_tokens / elapsed,
             }
         )
-

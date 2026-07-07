@@ -30,4 +30,3 @@ def default_registry() -> WorkloadRegistry:
     registry = WorkloadRegistry()
     registry.register(SyntheticWorkload())
     return registry
-
