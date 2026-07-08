@@ -1,0 +1,66 @@
+{
+  "experiment_id": "E148",
+  "experiment": "inference_multi_gpu_gpt2_small_4gpu",
+  "mode": "inference",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "prompt_set_v1",
+    "parameters": {
+      "inference_study_type": "multi_gpu",
+      "framework": "vllm",
+      "tensor_parallel_size": 4,
+      "batch_size": 1,
+      "concurrent_requests": 1,
+      "prompt_length": 128,
+      "max_new_tokens": 128
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 4,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 4,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "serving_latency",
+      "nccl"
+    ],
+    "parameters": {
+      "collect_latency_distribution": true,
+      "collect_tensor_parallel_scaling": true,
+      "collect_memory_trace": true,
+      "collect_nccl_bandwidth": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E148",
+    "template": "inference_serving",
+    "phase": "Inference multi-GPU",
+    "priority": "Should Have",
+    "gpu_hours_estimate": 1.6,
+    "matrix_stack_strategy": "vLLM tensor parallel",
+    "objective": "Multi-GPU inference serving on 4 GPUs",
+    "key_metrics": [
+      "scaling",
+      "tokens_sec",
+      "latency",
+      "memory"
+    ]
+  }
+}
