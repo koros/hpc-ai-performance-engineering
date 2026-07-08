@@ -360,6 +360,7 @@ def test_refresh_outputs_rebuilds_derived_files(tmp_path: Path) -> None:
     analysis_dir = tmp_path / "analysis"
     tracker_csv = tmp_path / "processed" / "experiment_tracker.csv"
     tracker_markdown = tmp_path / "processed" / "experiment_tracker.md"
+    readiness_report = tmp_path / "processed" / "readiness_report.md"
 
     result = ExperimentResult.from_config(
         config,
@@ -378,6 +379,7 @@ def test_refresh_outputs_rebuilds_derived_files(tmp_path: Path) -> None:
         analysis_dir=str(analysis_dir),
         tracker_csv=str(tracker_csv),
         tracker_markdown=str(tracker_markdown),
+        readiness_report=str(readiness_report),
         skip_validation=False,
     )
 
@@ -385,3 +387,4 @@ def test_refresh_outputs_rebuilds_derived_files(tmp_path: Path) -> None:
     assert (analysis_dir / "phase_summary.csv").exists()
     assert tracker_csv.exists()
     assert tracker_markdown.exists()
+    assert readiness_report.exists()

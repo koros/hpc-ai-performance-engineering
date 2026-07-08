@@ -118,6 +118,7 @@ def main() -> None:
             analysis_dir=args.analysis_dir,
             tracker_csv=args.tracker_csv,
             tracker_markdown=args.tracker_markdown,
+            readiness_report=args.readiness_report,
             skip_validation=args.skip_validation,
         )
         return
@@ -236,6 +237,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default="results/processed/experiment_tracker.md",
         help="Path for the generated tracker Markdown.",
     )
+    refresh_parser.add_argument(
+        "--readiness-report",
+        default="results/processed/readiness_report.md",
+        help="Path for the generated readiness report.",
+    )
     refresh_parser.add_argument("--skip-validation", action="store_true", help="Rebuild outputs without validation.")
 
     readiness_parser = subparsers.add_parser("readiness-report", help="Write an HPC submission readiness report.")
@@ -289,6 +295,7 @@ def _refresh_outputs(
     analysis_dir: str,
     tracker_csv: str,
     tracker_markdown: str,
+    readiness_report: str,
     skip_validation: bool,
 ) -> None:
     if not skip_validation:
@@ -312,6 +319,13 @@ def _refresh_outputs(
     )
     LOGGER.info("Wrote tracker CSV to %s", tracker_csv_path)
     LOGGER.info("Wrote tracker Markdown to %s", tracker_markdown_path)
+
+    readiness_path = write_readiness_report(
+        readiness_report,
+        config_root=config_root,
+        result_dir=result_dir,
+    )
+    LOGGER.info("Wrote readiness report to %s", readiness_path)
 
 
 def _render_slurm_config(

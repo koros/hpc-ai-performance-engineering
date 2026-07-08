@@ -178,7 +178,7 @@ Validate experiment configs and raw results:
 python -m hpc_ai_perf.cli validate
 ```
 
-Refresh validation, aggregation, analysis, and tracker outputs in one pass:
+Refresh validation, aggregation, analysis, tracker outputs, and readiness reporting in one pass:
 
 ```bash
 python -m hpc_ai_perf.cli refresh
