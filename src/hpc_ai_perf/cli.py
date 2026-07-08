@@ -12,6 +12,7 @@ from hpc_ai_perf.config import (
     filter_config_entries,
     load_experiment_config,
 )
+from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script
@@ -121,6 +122,16 @@ def main() -> None:
         )
         return
 
+    if args.command == "readiness-report":
+        report_path = write_readiness_report(
+            args.output,
+            config_root=args.config_root,
+            result_dir=args.result_dir,
+            slurm_smoke_dir=args.slurm_smoke_dir,
+        )
+        LOGGER.info("Wrote readiness report to %s", report_path)
+        return
+
     parser.error("A command is required.")
 
 
@@ -226,6 +237,24 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path for the generated tracker Markdown.",
     )
     refresh_parser.add_argument("--skip-validation", action="store_true", help="Rebuild outputs without validation.")
+
+    readiness_parser = subparsers.add_parser("readiness-report", help="Write an HPC submission readiness report.")
+    readiness_parser.add_argument(
+        "--config-root", default="configs", help="Root directory containing experiment configs."
+    )
+    readiness_parser.add_argument(
+        "--result-dir", default="results/raw", help="Directory containing raw result JSON files."
+    )
+    readiness_parser.add_argument(
+        "--slurm-smoke-dir",
+        default="slurm/smoke",
+        help="Directory containing Slurm smoke preset scripts.",
+    )
+    readiness_parser.add_argument(
+        "--output",
+        default="results/processed/readiness_report.md",
+        help="Path for the generated readiness report.",
+    )
     return parser
 
 

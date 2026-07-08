@@ -4,6 +4,7 @@ from pathlib import Path
 from hpc_ai_perf.analysis import analyze_results
 from hpc_ai_perf.cli import _refresh_outputs, _render_slurm_bulk
 from hpc_ai_perf.config import discover_experiment_configs, filter_config_entries, load_experiment_config
+from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script
@@ -292,6 +293,16 @@ def test_hpc_smoke_runbook_exists() -> None:
     assert "sbatch slurm/smoke/gpt2_small_smoke.sbatch" in runbook
     assert "python -m hpc_ai_perf.cli refresh" in runbook
     assert "make serve-dashboard" in runbook
+
+
+def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
+    report_path = write_readiness_report(tmp_path / "readiness_report.md")
+    report = report_path.read_text(encoding="utf-8")
+
+    assert "Matrix configs discovered: 200" in report
+    assert "`gpt2_small`" in report
+    assert "slurm/smoke/gpt2_small_smoke.sbatch" in report
+    assert "Submission Gate" in report
 
 
 def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:

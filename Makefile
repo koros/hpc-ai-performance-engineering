@@ -1,4 +1,4 @@
-.PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have list-slurm-smoke aggregate-results analyze-results track-progress validate refresh serve-dashboard
+.PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have list-slurm-smoke aggregate-results analyze-results track-progress validate readiness-report refresh serve-dashboard
 
 install-dev:
 	python -m pip install -e ".[dev,yaml]"
@@ -42,6 +42,9 @@ track-progress:
 
 validate:
 	python -m hpc_ai_perf.cli validate
+
+readiness-report:
+	python -m hpc_ai_perf.cli readiness-report
 
 refresh:
 	python -m hpc_ai_perf.cli refresh

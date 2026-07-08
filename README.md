@@ -184,6 +184,12 @@ Refresh validation, aggregation, analysis, and tracker outputs in one pass:
 python -m hpc_ai_perf.cli refresh
 ```
 
+Generate an HPC submission readiness report:
+
+```bash
+python -m hpc_ai_perf.cli readiness-report
+```
+
 Serve the static dashboard:
 
 ```bash
