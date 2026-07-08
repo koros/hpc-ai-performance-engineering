@@ -1,7 +1,7 @@
 SLURM_PROFILE ?=
 SLURM_PROFILE_ARG := $(if $(SLURM_PROFILE),--slurm-profile $(SLURM_PROFILE),)
 
-.PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-baseline-must-have render-slurm-first-batches list-slurm-smoke aggregate-results analyze-results track-progress validate readiness-report refresh serve-dashboard
+.PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches list-slurm-smoke aggregate-results analyze-results track-progress validate readiness-report refresh serve-dashboard
 
 install-dev:
 	python -m pip install -e ".[dev,yaml]"
@@ -38,6 +38,14 @@ render-slurm-baseline-must-have:
 	python -m hpc_ai_perf.cli render-slurm-bulk --phase "Baseline profiling" --priority "Must Have" --output-dir slurm/generated/baseline_profiling_must_have $(SLURM_PROFILE_ARG)
 
 render-slurm-first-batches: render-slurm-env-validation render-slurm-baseline-must-have
+
+plan-slurm-env-validation: render-slurm-env-validation
+	python -m hpc_ai_perf.cli plan-slurm-submission --script-dir slurm/generated/environment_validation_must_have --output slurm/generated/environment_validation_must_have/SUBMISSION_PLAN.md --batch-name "Environment Validation Must Have"
+
+plan-slurm-baseline-must-have: render-slurm-baseline-must-have
+	python -m hpc_ai_perf.cli plan-slurm-submission --script-dir slurm/generated/baseline_profiling_must_have --output slurm/generated/baseline_profiling_must_have/SUBMISSION_PLAN.md --batch-name "Baseline Profiling Must Have"
+
+plan-slurm-first-batches: plan-slurm-env-validation plan-slurm-baseline-must-have
 
 list-slurm-smoke:
 	ls slurm/smoke/*.sbatch

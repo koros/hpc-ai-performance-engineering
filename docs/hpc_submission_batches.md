@@ -39,6 +39,12 @@ Use the profile while rendering:
 SLURM_PROFILE=slurm/profiles/cluster.local.json make render-slurm-first-batches
 ```
 
+Generate reviewable submission manifests:
+
+```bash
+SLURM_PROFILE=slurm/profiles/cluster.local.json make plan-slurm-first-batches
+```
+
 ## Batch 1: Environment Validation
 
 Purpose: confirm CUDA, PyTorch DDP/NCCL, FSDP, and inference serving dependencies on the target cluster.
@@ -69,6 +75,7 @@ Review before submission:
 
 ```bash
 ls slurm/generated/environment_validation_must_have/*.sbatch
+sed -n '1,160p' slurm/generated/environment_validation_must_have/SUBMISSION_PLAN.md
 ```
 
 ## Batch 2: Baseline Profiling
@@ -99,6 +106,7 @@ Review before submission:
 
 ```bash
 ls slurm/generated/baseline_profiling_must_have/*.sbatch
+sed -n '1,160p' slurm/generated/baseline_profiling_must_have/SUBMISSION_PLAN.md
 ```
 
 ## Batch 1 + 2 Convenience Target
@@ -107,6 +115,12 @@ Generate both batches:
 
 ```bash
 make render-slurm-first-batches
+```
+
+Generate scripts and submission manifests:
+
+```bash
+make plan-slurm-first-batches
 ```
 
 ## After Each Batch

@@ -17,7 +17,7 @@ from hpc_ai_perf.config import (
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
-from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script
+from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script, write_submission_plan
 from hpc_ai_perf.tracking import track_experiment_progress
 from hpc_ai_perf.validation import format_validation_issues, validate_project
 
@@ -90,6 +90,15 @@ def main() -> None:
             env_values=args.env,
             profile_path=args.slurm_profile,
         )
+        return
+
+    if args.command == "plan-slurm-submission":
+        plan_path = write_submission_plan(
+            args.script_dir,
+            args.output,
+            batch_name=args.batch_name,
+        )
+        LOGGER.info("Wrote Slurm submission plan to %s", plan_path)
         return
 
     if args.command == "aggregate-results":
@@ -180,6 +189,14 @@ def _build_parser() -> argparse.ArgumentParser:
     bulk_parser.add_argument("--workload", default=None, help="Filter by workload name.")
     bulk_parser.add_argument("--experiment-id", default=None, help="Filter by experiment ID, such as E001.")
     _add_slurm_options(bulk_parser)
+
+    plan_slurm_parser = subparsers.add_parser(
+        "plan-slurm-submission",
+        help="Write a reviewable submission plan for generated sbatch scripts.",
+    )
+    plan_slurm_parser.add_argument("--script-dir", required=True, help="Directory containing generated sbatch scripts.")
+    plan_slurm_parser.add_argument("--output", required=True, help="Path for the generated Markdown submission plan.")
+    plan_slurm_parser.add_argument("--batch-name", default=None, help="Optional display name for the batch.")
 
     aggregate_parser = subparsers.add_parser("aggregate-results", help="Aggregate raw result JSON files into CSV.")
     aggregate_parser.add_argument(

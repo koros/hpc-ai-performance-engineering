@@ -7,7 +7,7 @@ from hpc_ai_perf.config import discover_experiment_configs, filter_config_entrie
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
-from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script
+from hpc_ai_perf.slurm import build_submission_plan, render_slurm_script, write_slurm_script, write_submission_plan
 from hpc_ai_perf.tracking import track_experiment_progress
 from hpc_ai_perf.validation import validate_experiment_configs, validate_result_records
 from hpc_ai_perf.workloads import (
@@ -93,6 +93,27 @@ def test_write_slurm_script(tmp_path: Path) -> None:
 
     assert script_path == tmp_path / "E001.sbatch"
     assert script_path.read_text(encoding="utf-8") == "#!/bin/bash\n"
+
+
+def test_build_submission_plan(tmp_path: Path) -> None:
+    write_slurm_script("#!/bin/bash\n", tmp_path, "E002")
+    write_slurm_script("#!/bin/bash\n", tmp_path, "E001")
+
+    plan = build_submission_plan(tmp_path, batch_name="Environment Validation")
+
+    assert "# Slurm Submission Plan: Environment Validation" in plan
+    assert "Total jobs: 2" in plan
+    assert "sbatch" in plan
+    assert plan.index("E001.sbatch") < plan.index("E002.sbatch")
+
+
+def test_write_submission_plan(tmp_path: Path) -> None:
+    write_slurm_script("#!/bin/bash\n", tmp_path, "E001")
+
+    plan_path = write_submission_plan(tmp_path, tmp_path / "SUBMISSION_PLAN.md")
+
+    assert plan_path == tmp_path / "SUBMISSION_PLAN.md"
+    assert "`E001.sbatch`" in plan_path.read_text(encoding="utf-8")
 
 
 def test_render_slurm_bulk(tmp_path: Path) -> None:
@@ -374,6 +395,7 @@ def test_hpc_submission_batches_doc_exists() -> None:
 
     assert "make render-slurm-env-validation" in batches
     assert "make render-slurm-baseline-must-have" in batches
+    assert "make plan-slurm-first-batches" in batches
     assert "E008-E011" in batches
 
 
