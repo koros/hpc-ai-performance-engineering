@@ -1,4 +1,4 @@
-.PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have
+.PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have aggregate-results
 
 install-dev:
 	python -m pip install -e ".[dev,yaml]"
@@ -27,3 +27,6 @@ render-slurm-example:
 
 render-slurm-must-have:
 	python -m hpc_ai_perf.cli render-slurm-bulk --priority "Must Have"
+
+aggregate-results:
+	python -m hpc_ai_perf.cli aggregate-results

@@ -121,6 +121,12 @@ Render Slurm scripts for a filtered group:
 python -m hpc_ai_perf.cli render-slurm-bulk --phase "Environment validation" --priority "Must Have"
 ```
 
+Aggregate raw JSON results into a processed experiment table:
+
+```bash
+python -m hpc_ai_perf.cli aggregate-results
+```
+
 ## Expected Outputs
 
 - Reproducible experiment suite and configuration catalogue

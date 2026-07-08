@@ -1,7 +1,9 @@
+import csv
 from pathlib import Path
 
 from hpc_ai_perf.cli import _render_slurm_bulk
 from hpc_ai_perf.config import discover_experiment_configs, filter_config_entries, load_experiment_config
+from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script
 
@@ -97,3 +99,32 @@ def test_local_runner_writes_standard_result(tmp_path: Path) -> None:
     assert result.status == "completed"
     assert result.throughput_tokens_sec is not None
     assert result_path.exists()
+
+
+def test_aggregate_results_writes_processed_csv(tmp_path: Path) -> None:
+    config = load_experiment_config(Path("configs/scaling_studies/E033_gpt2_small_strong_2gpu.json"))
+    raw_dir = tmp_path / "raw"
+    output_path = tmp_path / "processed" / "experiments.csv"
+
+    result = ExperimentResult.from_config(
+        config,
+        status="completed",
+        started_at="2026-01-01T00:00:00Z",
+        completed_at="2026-01-01T00:10:00Z",
+        runtime_seconds=600.0,
+        metrics={"throughput_tokens_sec": 1234.5},
+    )
+    result.write_json(raw_dir)
+
+    csv_path = aggregate_results(raw_dir, output_path)
+
+    with csv_path.open(encoding="utf-8", newline="") as file_obj:
+        rows = list(csv.DictReader(file_obj))
+
+    assert csv_path == output_path
+    assert len(rows) == 1
+    assert rows[0]["experiment_id"] == "E033"
+    assert rows[0]["phase"] == "Strong scaling"
+    assert rows[0]["priority"] == "Must Have"
+    assert rows[0]["strategy"] == "ddp"
+    assert rows[0]["metric_throughput_tokens_sec"]

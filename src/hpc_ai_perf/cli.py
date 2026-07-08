@@ -10,6 +10,7 @@ from hpc_ai_perf.config import (
     filter_config_entries,
     load_experiment_config,
 )
+from hpc_ai_perf.results import aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script
 
@@ -73,6 +74,11 @@ def main() -> None:
         )
         return
 
+    if args.command == "aggregate-results":
+        result_path = aggregate_results(args.input_dir, args.output)
+        LOGGER.info("Wrote aggregated results to %s", result_path)
+        return
+
     parser.error("A command is required.")
 
 
@@ -107,6 +113,16 @@ def _build_parser() -> argparse.ArgumentParser:
     bulk_parser.add_argument("--workload", default=None, help="Filter by workload name.")
     bulk_parser.add_argument("--experiment-id", default=None, help="Filter by experiment ID, such as E001.")
     _add_slurm_options(bulk_parser)
+
+    aggregate_parser = subparsers.add_parser("aggregate-results", help="Aggregate raw result JSON files into CSV.")
+    aggregate_parser.add_argument(
+        "--input-dir", default="results/raw", help="Directory containing raw result JSON files."
+    )
+    aggregate_parser.add_argument(
+        "--output",
+        default="results/processed/experiments.csv",
+        help="Path for the processed experiment CSV.",
+    )
     return parser
 
 
