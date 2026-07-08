@@ -109,6 +109,12 @@ List matrix experiment configs:
 python -m hpc_ai_perf.cli list-configs
 ```
 
+Render a Slurm submission script for a config:
+
+```bash
+python -m hpc_ai_perf.cli render-slurm --config configs/environment_validation/E001_cuda_pytorch_1gpu.json
+```
+
 ## Expected Outputs
 
 - Reproducible experiment suite and configuration catalogue

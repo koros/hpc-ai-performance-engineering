@@ -17,3 +17,5 @@ results/figures/*
 
 *.out
 *.err
+
+slurm/generated/
