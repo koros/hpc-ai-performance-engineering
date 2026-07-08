@@ -1,12 +1,14 @@
 const state = {
   results: [],
   phaseSummary: [],
+  readinessReport: "",
   sort: { table: "rankingTable", key: "throughput_tokens_sec", direction: -1 },
 };
 
 const paths = {
   results: "../results/processed/experiments.csv",
   phaseSummary: "../results/analysis/phase_summary.csv",
+  readinessReport: "../results/processed/readiness_report.md",
 };
 
 const rankingColumns = [
@@ -62,12 +64,24 @@ function bindInputs() {
       render();
     });
   });
+
+  document.getElementById("readinessFile").addEventListener("change", (event) => {
+    readFile(event.target.files[0]).then((text) => {
+      state.readinessReport = text;
+      render();
+    });
+  });
 }
 
 async function loadDefaultData() {
-  const [results, phaseSummary] = await Promise.all([fetchCsv(paths.results), fetchCsv(paths.phaseSummary)]);
+  const [results, phaseSummary, readinessReport] = await Promise.all([
+    fetchCsv(paths.results),
+    fetchCsv(paths.phaseSummary),
+    fetchText(paths.readinessReport),
+  ]);
   state.results = results;
   state.phaseSummary = phaseSummary;
+  state.readinessReport = readinessReport;
   rebuildFilters();
   render();
 }
@@ -81,6 +95,18 @@ async function fetchCsv(path) {
     return parseCsv(await response.text());
   } catch {
     return [];
+  }
+}
+
+async function fetchText(path) {
+  try {
+    const response = await fetch(path, { cache: "no-store" });
+    if (!response.ok) {
+      return "";
+    }
+    return response.text();
+  } catch {
+    return "";
   }
 }
 
@@ -169,12 +195,56 @@ function render() {
   const filtered = filteredResults();
   renderKpis(filtered);
   renderBars(filtered);
+  renderReadiness();
   renderTable("rankingTable", filtered, rankingColumns);
   renderPhaseTable();
   document.getElementById("dataStatus").textContent = state.results.length
     ? `${filtered.length} of ${state.results.length} experiments`
     : "No data loaded";
   document.getElementById("rankingCount").textContent = `${filtered.length} rows`;
+}
+
+function renderReadiness() {
+  const container = document.getElementById("readinessSummary");
+  const status = document.getElementById("readinessStatus");
+  const summary = parseReadinessSummary(state.readinessReport);
+
+  container.replaceChildren();
+  if (!summary.length) {
+    status.textContent = "No report loaded";
+    container.append(emptyState("Run python -m hpc_ai_perf.cli refresh, then reload the dashboard."));
+    return;
+  }
+
+  status.textContent = `${summary.length} checks`;
+  summary.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "readiness-item";
+    card.innerHTML = `<span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong>`;
+    container.append(card);
+  });
+}
+
+function parseReadinessSummary(markdown) {
+  const lines = markdown.split(/\r?\n/);
+  const summaryStart = lines.findIndex((line) => line.trim() === "## Summary");
+  if (summaryStart === -1) {
+    return [];
+  }
+
+  const items = [];
+  for (let index = summaryStart + 1; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    if (line.startsWith("## ") && index > summaryStart + 1) {
+      break;
+    }
+    if (!line.startsWith("- ")) {
+      continue;
+    }
+    const [label, ...rest] = line.slice(2).split(":");
+    items.push({ label: label.trim(), value: rest.join(":").trim() });
+  }
+  return items;
 }
 
 function filteredResults() {

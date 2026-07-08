@@ -285,6 +285,8 @@ def test_dashboard_static_assets_exist() -> None:
     assert 'id="rankingTable"' in html
     assert "../results/processed/experiments.csv" in script
     assert "../results/analysis/phase_summary.csv" in script
+    assert "../results/processed/readiness_report.md" in script
+    assert 'id="readinessSummary"' in html
 
 
 def test_hpc_smoke_runbook_exists() -> None:

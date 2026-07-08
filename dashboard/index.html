@@ -21,6 +21,10 @@
           Phase CSV
           <input id="phaseFile" type="file" accept=".csv" />
         </label>
+        <label class="file-button">
+          Readiness MD
+          <input id="readinessFile" type="file" accept=".md,text/markdown,text/plain" />
+        </label>
       </div>
     </header>
 
@@ -61,6 +65,14 @@
           <span>Best tokens/s</span>
           <strong id="kpiBestThroughput">0</strong>
         </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Submission Readiness</h2>
+          <span id="readinessStatus">No report loaded</span>
+        </div>
+        <div id="readinessSummary" class="readiness-grid"></div>
       </section>
 
       <section class="content-grid">
