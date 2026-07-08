@@ -92,37 +92,7 @@ class GPT2SmallWorkload(TransformerWorkload):
         )
 
     def _run_inference(self, config: ExperimentConfig) -> WorkloadRunOutput:
-        torch, auto_model, auto_tokenizer = _load_causal_lm_stack()
-        device = _device(torch)
-        dtype = _torch_dtype(torch, config.runtime.precision, device)
-        parameters = config.workload.parameters
-        model_name = str(parameters.get("hf_model_name", config.workload.model))
-        prompt = str(parameters.get("prompt", "Benchmarking transformer inference on H100 systems."))
-        max_new_tokens = int(parameters.get("max_new_tokens", 32))
-
-        tokenizer = auto_tokenizer.from_pretrained(model_name)
-        model = auto_model.from_pretrained(model_name, torch_dtype=dtype).to(device)
-        model.eval()
-        inputs = tokenizer(prompt, return_tensors="pt").to(device)
-
-        start = time.perf_counter()
-        with torch.no_grad():
-            outputs = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
-        elapsed = max(time.perf_counter() - start, 1e-9)
-        generated_tokens = int(outputs.shape[-1] - inputs["input_ids"].shape[-1])
-
-        return WorkloadRunOutput(
-            metrics={
-                "prompt_tokens": int(inputs["input_ids"].shape[-1]),
-                "generated_tokens": generated_tokens,
-                "total_tokens": generated_tokens,
-                "throughput_tokens_sec": generated_tokens / elapsed,
-                "latency_p50_ms": elapsed * 1000,
-                "latency_p95_ms": elapsed * 1000,
-                "device": str(device),
-                "hf_model_name": model_name,
-            }
-        )
+        return _run_causal_lm_inference(config)
 
 
 class DistilBERTWorkload(TransformerWorkload):

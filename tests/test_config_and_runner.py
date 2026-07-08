@@ -9,7 +9,14 @@ from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script
 from hpc_ai_perf.tracking import track_experiment_progress
 from hpc_ai_perf.validation import validate_experiment_configs, validate_result_records
-from hpc_ai_perf.workloads import TransformerWorkload, WorkloadRegistry, default_registry
+from hpc_ai_perf.workloads import (
+    GPT2SmallWorkload,
+    TinyLlamaWorkload,
+    TransformerWorkload,
+    WorkloadRegistry,
+    default_registry,
+)
+from hpc_ai_perf.workloads import transformer as transformer_module
 
 
 def test_load_synthetic_config() -> None:
@@ -128,6 +135,55 @@ def test_transformer_workload_skeleton_fails_gracefully() -> None:
     assert result.error is not None
     assert "GPT-2 Small" in result.error
     assert "optional dependencies" in result.error
+
+
+def test_gpt2_inference_dispatches_to_causal_lm_helper(monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/local/gpt2_small_smoke.json"))
+    config = config.__class__(
+        experiment_id=config.experiment_id,
+        experiment=config.experiment,
+        mode="inference",
+        workload=config.workload,
+        hardware=config.hardware,
+        distributed=config.distributed,
+        runtime=config.runtime,
+        profiling=config.profiling,
+        metadata=config.metadata,
+    )
+    calls = []
+
+    def fake_inference(dispatched_config):
+        calls.append(dispatched_config.experiment_id)
+        return transformer_module.WorkloadRunOutput(metrics={"throughput_tokens_sec": 1.0})
+
+    monkeypatch.setattr(transformer_module, "_run_causal_lm_inference", fake_inference)
+
+    output = GPT2SmallWorkload().run(config)
+
+    assert calls == ["local_gpt2_small_smoke"]
+    assert output.metrics["throughput_tokens_sec"] == 1.0
+
+
+def test_tinyllama_training_is_explicitly_unsupported() -> None:
+    config = load_experiment_config(Path("configs/local/tinyllama_inference_smoke.json"))
+    training_config = config.__class__(
+        experiment_id=config.experiment_id,
+        experiment=config.experiment,
+        mode="training",
+        workload=config.workload,
+        hardware=config.hardware,
+        distributed=config.distributed,
+        runtime=config.runtime,
+        profiling=config.profiling,
+        metadata=config.metadata,
+    )
+
+    try:
+        TinyLlamaWorkload().run(training_config)
+    except NotImplementedError as exc:
+        assert "TinyLlama training is not implemented" in str(exc)
+    else:
+        raise AssertionError("Expected TinyLlama training to be unsupported")
 
 
 def test_aggregate_results_writes_processed_csv(tmp_path: Path) -> None:
