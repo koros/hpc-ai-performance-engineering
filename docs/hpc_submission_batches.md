@@ -36,6 +36,7 @@ Edit the local profile for the target site:
 Use the profile while rendering:
 
 ```bash
+SLURM_PROFILE=slurm/profiles/cluster.local.json make check-slurm-profile
 SLURM_PROFILE=slurm/profiles/cluster.local.json make render-slurm-first-batches
 ```
 

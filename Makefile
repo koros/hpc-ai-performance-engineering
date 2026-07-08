@@ -1,7 +1,7 @@
 SLURM_PROFILE ?=
 SLURM_PROFILE_ARG := $(if $(SLURM_PROFILE),--slurm-profile $(SLURM_PROFILE),)
 
-.PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress validate readiness-report refresh serve-dashboard
+.PHONY: install-dev lint format test check hooks list-configs check-slurm-profile render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress validate readiness-report refresh serve-dashboard
 
 install-dev:
 	python -m pip install -e ".[dev,yaml]"
@@ -24,6 +24,10 @@ hooks:
 
 list-configs:
 	python -m hpc_ai_perf.cli list-configs
+
+check-slurm-profile:
+	test -n "$(SLURM_PROFILE)" || (echo "Set SLURM_PROFILE=slurm/profiles/cluster.local.json" && exit 1)
+	python -m hpc_ai_perf.cli check-slurm-profile --slurm-profile $(SLURM_PROFILE)
 
 render-slurm-example:
 	python -m hpc_ai_perf.cli render-slurm --config configs/environment_validation/E001_cuda_pytorch_1gpu.json $(SLURM_PROFILE_ARG)

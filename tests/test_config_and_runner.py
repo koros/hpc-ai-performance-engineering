@@ -2,7 +2,7 @@ import csv
 from pathlib import Path
 
 from hpc_ai_perf.analysis import analyze_results
-from hpc_ai_perf.cli import _load_slurm_profile, _refresh_outputs, _render_slurm_bulk
+from hpc_ai_perf.cli import _check_slurm_profile, _load_slurm_profile, _refresh_outputs, _render_slurm_bulk
 from hpc_ai_perf.config import discover_experiment_configs, filter_config_entries, load_experiment_config
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
@@ -244,6 +244,31 @@ def test_slurm_profile_example_loads() -> None:
     assert "cuda/12.4" in profile["modules"]
 
 
+def test_check_slurm_profile_reports_placeholders() -> None:
+    issues = _check_slurm_profile("slurm/profiles/example.json")
+
+    assert any("account" in issue for issue in issues)
+    assert any("placeholder" in issue for issue in issues)
+
+
+def test_check_slurm_profile_accepts_ready_profile(tmp_path: Path) -> None:
+    profile_path = tmp_path / "profile.json"
+    profile_path.write_text(
+        """{
+  "partition": "gpu",
+  "account": "project123",
+  "cpus_per_task": 8,
+  "setup_commands": ["module purge", "source /path/to/venv/bin/activate"],
+  "modules": ["cuda/12.4"],
+  "environment": {"TOKENIZERS_PARALLELISM": "false"}
+}
+""",
+        encoding="utf-8",
+    )
+
+    assert _check_slurm_profile(str(profile_path)) == []
+
+
 def test_slurm_smoke_presets_exist() -> None:
     expected_scripts = {
         "distilbert_smoke.sbatch": "configs/local/distilbert_smoke.json",
@@ -462,6 +487,7 @@ def test_readme_documents_hpc_submission_workflow() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
 
     assert "## HPC Submission Workflow" in readme
+    assert "make check-slurm-profile" in readme
     assert "SLURM_PROFILE=slurm/profiles/cluster.local.json make plan-slurm-first-batches" in readme
     assert "make init-slurm-first-status" in readme
     assert "record-slurm-job" in readme

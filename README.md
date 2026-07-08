@@ -173,6 +173,7 @@ cp slurm/profiles/example.json slurm/profiles/cluster.local.json
 Generate the first environment-validation and baseline batches with site-specific settings:
 
 ```bash
+SLURM_PROFILE=slurm/profiles/cluster.local.json make check-slurm-profile
 SLURM_PROFILE=slurm/profiles/cluster.local.json make plan-slurm-first-batches
 ```
 

@@ -38,6 +38,7 @@ SLURM_PROFILE_KEYS = {
     "setup_commands",
     "time",
 }
+SLURM_PROFILE_PLACEHOLDERS = ("replace-with", "TODO", "changeme", "<")
 
 
 def main() -> None:
@@ -134,6 +135,16 @@ def main() -> None:
     if args.command == "report-slurm-status":
         report_path = write_job_status_report(args.status, args.output)
         LOGGER.info("Wrote Slurm job status report to %s", report_path)
+        return
+
+    if args.command == "check-slurm-profile":
+        issues = _check_slurm_profile(args.slurm_profile)
+        if issues:
+            print("Slurm profile is not ready:\n", end="")
+            for issue in issues:
+                print(f"- {issue}")
+            raise SystemExit(1)
+        print(f"Slurm profile is ready: {args.slurm_profile}")
         return
 
     if args.command == "aggregate-results":
@@ -266,6 +277,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     report_status_parser.add_argument("--status", required=True, help="Path to a Slurm job status CSV.")
     report_status_parser.add_argument("--output", required=True, help="Path for the generated Markdown report.")
+
+    check_profile_parser = subparsers.add_parser(
+        "check-slurm-profile",
+        help="Validate that a Slurm profile is ready for real cluster rendering.",
+    )
+    check_profile_parser.add_argument("--slurm-profile", required=True, help="Path to a Slurm profile JSON file.")
 
     aggregate_parser = subparsers.add_parser("aggregate-results", help="Aggregate raw result JSON files into CSV.")
     aggregate_parser.add_argument(
@@ -579,6 +596,38 @@ def _load_slurm_profile(profile_path: str) -> dict[str, Any]:
     _validate_string_list(profile, "setup_commands", profile_path)
     _validate_string_dict(profile, "environment", profile_path)
     return profile
+
+
+def _check_slurm_profile(profile_path: str) -> list[str]:
+    profile = _load_slurm_profile(profile_path)
+    issues: list[str] = []
+
+    for key in ("partition", "account"):
+        value = profile.get(key)
+        if not value:
+            issues.append(f"`{key}` must be set.")
+        elif _contains_placeholder(value):
+            issues.append(f"`{key}` still contains a placeholder: {value}")
+
+    modules = profile.get("modules", [])
+    if not modules:
+        issues.append("`modules` should list the CUDA/Python stack required on the cluster.")
+
+    setup_commands = profile.get("setup_commands", [])
+    for index, command in enumerate(setup_commands, start=1):
+        if _contains_placeholder(command):
+            issues.append(f"`setup_commands[{index}]` still contains a placeholder: {command}")
+
+    environment = profile.get("environment", {})
+    for key, value in environment.items():
+        if _contains_placeholder(value):
+            issues.append(f"`environment.{key}` still contains a placeholder: {value}")
+
+    return issues
+
+
+def _contains_placeholder(value: str) -> bool:
+    return any(token.lower() in value.lower() for token in SLURM_PROFILE_PLACEHOLDERS)
 
 
 def _validate_string_or_none(profile: dict[str, Any], key: str, profile_path: str) -> None:
