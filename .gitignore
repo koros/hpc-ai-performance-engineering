@@ -21,3 +21,4 @@ results/figures/*
 *.err
 
 slurm/generated/
+slurm/profiles/*.local.json

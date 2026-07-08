@@ -17,6 +17,28 @@ python -m hpc_ai_perf.cli refresh
 python -m hpc_ai_perf.cli readiness-report
 ```
 
+## Cluster Profile
+
+Create a local Slurm profile from the tracked example:
+
+```bash
+cp slurm/profiles/example.json slurm/profiles/cluster.local.json
+```
+
+Edit the local profile for the target site:
+
+- `partition`
+- `account`
+- `setup_commands`
+- `modules`
+- `environment`
+
+Use the profile while rendering:
+
+```bash
+SLURM_PROFILE=slurm/profiles/cluster.local.json make render-slurm-first-batches
+```
+
 ## Batch 1: Environment Validation
 
 Purpose: confirm CUDA, PyTorch DDP/NCCL, FSDP, and inference serving dependencies on the target cluster.
@@ -25,6 +47,12 @@ Generate scripts:
 
 ```bash
 make render-slurm-env-validation
+```
+
+Or with site defaults:
+
+```bash
+SLURM_PROFILE=slurm/profiles/cluster.local.json make render-slurm-env-validation
 ```
 
 Expected scripts:
@@ -51,6 +79,12 @@ Generate scripts:
 
 ```bash
 make render-slurm-baseline-must-have
+```
+
+Or with site defaults:
+
+```bash
+SLURM_PROFILE=slurm/profiles/cluster.local.json make render-slurm-baseline-must-have
 ```
 
 Expected scripts:

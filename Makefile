@@ -1,3 +1,6 @@
+SLURM_PROFILE ?=
+SLURM_PROFILE_ARG := $(if $(SLURM_PROFILE),--slurm-profile $(SLURM_PROFILE),)
+
 .PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-baseline-must-have render-slurm-first-batches list-slurm-smoke aggregate-results analyze-results track-progress validate readiness-report refresh serve-dashboard
 
 install-dev:
@@ -23,16 +26,16 @@ list-configs:
 	python -m hpc_ai_perf.cli list-configs
 
 render-slurm-example:
-	python -m hpc_ai_perf.cli render-slurm --config configs/environment_validation/E001_cuda_pytorch_1gpu.json
+	python -m hpc_ai_perf.cli render-slurm --config configs/environment_validation/E001_cuda_pytorch_1gpu.json $(SLURM_PROFILE_ARG)
 
 render-slurm-must-have:
-	python -m hpc_ai_perf.cli render-slurm-bulk --priority "Must Have"
+	python -m hpc_ai_perf.cli render-slurm-bulk --priority "Must Have" $(SLURM_PROFILE_ARG)
 
 render-slurm-env-validation:
-	python -m hpc_ai_perf.cli render-slurm-bulk --phase "Environment validation" --priority "Must Have" --output-dir slurm/generated/environment_validation_must_have
+	python -m hpc_ai_perf.cli render-slurm-bulk --phase "Environment validation" --priority "Must Have" --output-dir slurm/generated/environment_validation_must_have $(SLURM_PROFILE_ARG)
 
 render-slurm-baseline-must-have:
-	python -m hpc_ai_perf.cli render-slurm-bulk --phase "Baseline profiling" --priority "Must Have" --output-dir slurm/generated/baseline_profiling_must_have
+	python -m hpc_ai_perf.cli render-slurm-bulk --phase "Baseline profiling" --priority "Must Have" --output-dir slurm/generated/baseline_profiling_must_have $(SLURM_PROFILE_ARG)
 
 render-slurm-first-batches: render-slurm-env-validation render-slurm-baseline-must-have
 

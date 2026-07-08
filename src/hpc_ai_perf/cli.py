@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+from pathlib import Path
+from typing import Any
 
 from hpc_ai_perf.analysis import analyze_results
 from hpc_ai_perf.config import (
@@ -20,6 +22,15 @@ from hpc_ai_perf.tracking import track_experiment_progress
 from hpc_ai_perf.validation import format_validation_issues, validate_project
 
 LOGGER = logging.getLogger(__name__)
+SLURM_PROFILE_KEYS = {
+    "account",
+    "cpus_per_task",
+    "environment",
+    "modules",
+    "partition",
+    "setup_commands",
+    "time",
+}
 
 
 def main() -> None:
@@ -57,6 +68,7 @@ def main() -> None:
             cpus_per_task=args.cpus_per_task,
             modules=args.module,
             env_values=args.env,
+            profile_path=args.slurm_profile,
             print_script=args.print,
         )
         return
@@ -76,6 +88,7 @@ def main() -> None:
             cpus_per_task=args.cpus_per_task,
             modules=args.module,
             env_values=args.env,
+            profile_path=args.slurm_profile,
         )
         return
 
@@ -266,10 +279,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _add_slurm_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--output-dir", default="slurm/generated", help="Directory for generated sbatch scripts.")
+    parser.add_argument("--slurm-profile", default=None, help="Optional JSON file with reusable Slurm defaults.")
     parser.add_argument("--partition", default=None, help="Optional Slurm partition.")
     parser.add_argument("--account", default=None, help="Optional Slurm account.")
     parser.add_argument("--time", default=None, help="Override Slurm time limit, for example 02:00:00.")
-    parser.add_argument("--cpus-per-task", type=int, default=8)
+    parser.add_argument("--cpus-per-task", type=int, default=None)
     parser.add_argument("--module", action="append", default=[], help="Module to load; can be repeated.")
     parser.add_argument(
         "--env",
@@ -335,21 +349,32 @@ def _render_slurm_config(
     partition: str | None,
     account: str | None,
     time_limit: str | None,
-    cpus_per_task: int,
+    cpus_per_task: int | None,
     modules: list[str],
     env_values: list[str],
+    profile_path: str | None,
     print_script: bool,
 ) -> None:
-    config = load_experiment_config(config_path)
-    script = render_slurm_script(
-        config,
-        config_path,
+    slurm_options = _resolve_slurm_options(
+        profile_path=profile_path,
         partition=partition,
         account=account,
         time_limit=time_limit,
         cpus_per_task=cpus_per_task,
         modules=modules,
-        environment=_parse_environment(env_values),
+        env_values=env_values,
+    )
+    config = load_experiment_config(config_path)
+    script = render_slurm_script(
+        config,
+        config_path,
+        partition=slurm_options["partition"],
+        account=slurm_options["account"],
+        time_limit=slurm_options["time_limit"],
+        cpus_per_task=slurm_options["cpus_per_task"],
+        modules=slurm_options["modules"],
+        environment=slurm_options["environment"],
+        setup_commands=slurm_options["setup_commands"],
     )
     if print_script:
         print(script, end="")
@@ -371,9 +396,10 @@ def _render_slurm_bulk(
     partition: str | None,
     account: str | None,
     time_limit: str | None,
-    cpus_per_task: int,
+    cpus_per_task: int | None,
     modules: list[str],
     env_values: list[str],
+    profile_path: str | None,
 ) -> None:
     entries = discover_experiment_configs(config_root)
     entries = filter_config_entries(
@@ -388,17 +414,26 @@ def _render_slurm_bulk(
         LOGGER.warning("No configs matched the requested filters.")
         return
 
-    environment = _parse_environment(env_values)
+    slurm_options = _resolve_slurm_options(
+        profile_path=profile_path,
+        partition=partition,
+        account=account,
+        time_limit=time_limit,
+        cpus_per_task=cpus_per_task,
+        modules=modules,
+        env_values=env_values,
+    )
     for entry in entries:
         script = render_slurm_script(
             entry.config,
             entry.path,
-            partition=partition,
-            account=account,
-            time_limit=time_limit,
-            cpus_per_task=cpus_per_task,
-            modules=modules,
-            environment=environment,
+            partition=slurm_options["partition"],
+            account=slurm_options["account"],
+            time_limit=slurm_options["time_limit"],
+            cpus_per_task=slurm_options["cpus_per_task"],
+            modules=slurm_options["modules"],
+            environment=slurm_options["environment"],
+            setup_commands=slurm_options["setup_commands"],
         )
         write_slurm_script(script, output_dir, entry.config.experiment_id)
 
@@ -415,6 +450,75 @@ def _parse_environment(values: list[str]) -> dict[str, str]:
             raise ValueError(f"Environment key cannot be empty: {value}")
         environment[key] = env_value
     return environment
+
+
+def _resolve_slurm_options(
+    *,
+    profile_path: str | None,
+    partition: str | None,
+    account: str | None,
+    time_limit: str | None,
+    cpus_per_task: int | None,
+    modules: list[str],
+    env_values: list[str],
+) -> dict[str, Any]:
+    profile = _load_slurm_profile(profile_path) if profile_path else {}
+    profile_environment = profile.get("environment", {})
+
+    return {
+        "partition": partition or profile.get("partition"),
+        "account": account or profile.get("account"),
+        "time_limit": time_limit or profile.get("time"),
+        "cpus_per_task": cpus_per_task or profile.get("cpus_per_task", 8),
+        "modules": [*profile.get("modules", []), *modules],
+        "environment": {**profile_environment, **_parse_environment(env_values)},
+        "setup_commands": profile.get("setup_commands", []),
+    }
+
+
+def _load_slurm_profile(profile_path: str) -> dict[str, Any]:
+    profile = json.loads(Path(profile_path).read_text(encoding="utf-8"))
+    if not isinstance(profile, dict):
+        raise ValueError(f"Slurm profile must be a JSON object: {profile_path}")
+
+    unknown_keys = sorted(set(profile) - SLURM_PROFILE_KEYS)
+    if unknown_keys:
+        raise ValueError(f"Unknown Slurm profile keys in {profile_path}: {', '.join(unknown_keys)}")
+
+    _validate_string_or_none(profile, "partition", profile_path)
+    _validate_string_or_none(profile, "account", profile_path)
+    _validate_string_or_none(profile, "time", profile_path)
+    _validate_int_or_none(profile, "cpus_per_task", profile_path)
+    _validate_string_list(profile, "modules", profile_path)
+    _validate_string_list(profile, "setup_commands", profile_path)
+    _validate_string_dict(profile, "environment", profile_path)
+    return profile
+
+
+def _validate_string_or_none(profile: dict[str, Any], key: str, profile_path: str) -> None:
+    if key in profile and profile[key] is not None and not isinstance(profile[key], str):
+        raise ValueError(f"Slurm profile key '{key}' must be a string: {profile_path}")
+
+
+def _validate_int_or_none(profile: dict[str, Any], key: str, profile_path: str) -> None:
+    if key in profile and profile[key] is not None and not isinstance(profile[key], int):
+        raise ValueError(f"Slurm profile key '{key}' must be an integer: {profile_path}")
+
+
+def _validate_string_list(profile: dict[str, Any], key: str, profile_path: str) -> None:
+    if key not in profile:
+        return
+    value = profile[key]
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"Slurm profile key '{key}' must be a list of strings: {profile_path}")
+
+
+def _validate_string_dict(profile: dict[str, Any], key: str, profile_path: str) -> None:
+    if key not in profile:
+        return
+    value = profile[key]
+    if not isinstance(value, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()):
+        raise ValueError(f"Slurm profile key '{key}' must be an object of string values: {profile_path}")
 
 
 if __name__ == "__main__":

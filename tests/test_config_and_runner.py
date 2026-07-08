@@ -2,7 +2,7 @@ import csv
 from pathlib import Path
 
 from hpc_ai_perf.analysis import analyze_results
-from hpc_ai_perf.cli import _refresh_outputs, _render_slurm_bulk
+from hpc_ai_perf.cli import _load_slurm_profile, _refresh_outputs, _render_slurm_bulk
 from hpc_ai_perf.config import discover_experiment_configs, filter_config_entries, load_experiment_config
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
@@ -73,6 +73,21 @@ def test_render_slurm_script_from_config() -> None:
     assert "python -m hpc_ai_perf.cli run --config configs/scaling_studies/E033_gpt2_small_strong_2gpu.json" in script
 
 
+def test_render_slurm_script_with_setup_commands() -> None:
+    config_path = Path("configs/environment_validation/E001_cuda_pytorch_1gpu.json")
+    config = load_experiment_config(config_path)
+
+    script = render_slurm_script(
+        config,
+        config_path,
+        setup_commands=["module purge", "source .venv/bin/activate"],
+        environment={"TOKENIZERS_PARALLELISM": "false"},
+    )
+
+    assert "set -euo pipefail\nmodule purge\nsource .venv/bin/activate" in script
+    assert "export TOKENIZERS_PARALLELISM=false" in script
+
+
 def test_write_slurm_script(tmp_path: Path) -> None:
     script_path = write_slurm_script("#!/bin/bash\n", tmp_path, "E001")
 
@@ -95,11 +110,60 @@ def test_render_slurm_bulk(tmp_path: Path) -> None:
         cpus_per_task=8,
         modules=[],
         env_values=[],
+        profile_path=None,
     )
 
     generated = sorted(path.name for path in tmp_path.glob("*.sbatch"))
 
     assert generated == ["E001.sbatch", "E002.sbatch", "E003.sbatch", "E004.sbatch", "E006.sbatch"]
+
+
+def test_render_slurm_bulk_with_profile(tmp_path: Path) -> None:
+    profile_path = tmp_path / "profile.json"
+    profile_path.write_text(
+        """{
+  "partition": "gpu",
+  "account": "project",
+  "cpus_per_task": 12,
+  "setup_commands": ["module purge"],
+  "modules": ["cuda/12.4"],
+  "environment": {"TOKENIZERS_PARALLELISM": "false"}
+}
+""",
+        encoding="utf-8",
+    )
+
+    _render_slurm_bulk(
+        config_root="configs",
+        output_dir=str(tmp_path),
+        phase="Environment validation",
+        priority="Must Have",
+        mode=None,
+        workload=None,
+        experiment_id="E001",
+        partition=None,
+        account=None,
+        time_limit=None,
+        cpus_per_task=None,
+        modules=[],
+        env_values=[],
+        profile_path=str(profile_path),
+    )
+
+    script = (tmp_path / "E001.sbatch").read_text(encoding="utf-8")
+
+    assert "#SBATCH --partition=gpu" in script
+    assert "#SBATCH --account=project" in script
+    assert "#SBATCH --cpus-per-task=12" in script
+    assert "module purge\nmodule load cuda/12.4" in script
+    assert "export TOKENIZERS_PARALLELISM=false" in script
+
+
+def test_slurm_profile_example_loads() -> None:
+    profile = _load_slurm_profile("slurm/profiles/example.json")
+
+    assert profile["partition"] == "gpu"
+    assert "cuda/12.4" in profile["modules"]
 
 
 def test_slurm_smoke_presets_exist() -> None:

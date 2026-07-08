@@ -1,0 +1,16 @@
+{
+  "partition": "gpu",
+  "account": "replace-with-project-account",
+  "cpus_per_task": 8,
+  "time": null,
+  "setup_commands": [
+    "module purge",
+    "source .venv/bin/activate"
+  ],
+  "modules": [
+    "cuda/12.4"
+  ],
+  "environment": {
+    "TOKENIZERS_PARALLELISM": "false"
+  }
+}

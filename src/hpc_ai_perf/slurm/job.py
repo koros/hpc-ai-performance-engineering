@@ -19,6 +19,7 @@ class SlurmJob:
     account: str | None = None
     modules: list[str] = field(default_factory=list)
     environment: dict[str, str] = field(default_factory=dict)
+    setup_commands: list[str] = field(default_factory=list)
 
     @classmethod
     def from_config(
@@ -32,6 +33,7 @@ class SlurmJob:
         cpus_per_task: int = 8,
         modules: list[str] | None = None,
         environment: dict[str, str] | None = None,
+        setup_commands: list[str] | None = None,
     ) -> SlurmJob:
         gpus_per_node = config.distributed.gpus_per_node or config.hardware.gpus
         command = f"python -m hpc_ai_perf.cli run --config {quote(str(config_path))}"
@@ -46,6 +48,7 @@ class SlurmJob:
             account=account,
             modules=modules or [],
             environment=environment or {},
+            setup_commands=setup_commands or [],
         )
 
     def render(self) -> str:
@@ -66,6 +69,8 @@ class SlurmJob:
             lines.append(f"#SBATCH --account={self.account}")
         lines.append("")
         lines.append("set -euo pipefail")
+        for command in self.setup_commands:
+            lines.append(command)
         for module in self.modules:
             lines.append(f"module load {quote(module)}")
         for key, value in self.environment.items():
@@ -86,6 +91,7 @@ def render_slurm_script(
     cpus_per_task: int = 8,
     modules: list[str] | None = None,
     environment: dict[str, str] | None = None,
+    setup_commands: list[str] | None = None,
 ) -> str:
     return SlurmJob.from_config(
         config,
@@ -96,6 +102,7 @@ def render_slurm_script(
         cpus_per_task=cpus_per_task,
         modules=modules,
         environment=environment,
+        setup_commands=setup_commands,
     ).render()
 
 
