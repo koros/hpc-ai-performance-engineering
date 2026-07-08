@@ -52,6 +52,8 @@ The repository now mirrors the project proposal structure:
 | DistilBERT | Encoder transformer | Training and inference comparison |
 | TinyLlama | Small modern LLM | Primarily inference; optional training |
 
+Current adapter implementation status is tracked in [workload catalog](docs/workload_catalog.md).
+
 ## Priority and Budget
 
 | Priority | Meaning | Estimated GPU-hours |

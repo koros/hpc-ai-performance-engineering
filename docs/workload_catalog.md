@@ -18,6 +18,21 @@ The workloads are organised into Primary, Secondary, and Stretch categories.
 
 ---
 
+# Current Adapter Status
+
+The executable framework currently distinguishes between validated smoke paths and full dissertation-scale runs. Smoke paths are intentionally small and are used to confirm configuration loading, runner behavior, result writing, and dependency wiring before moving to Slurm jobs.
+
+| Workload adapter | Current state | Local smoke config | Notes |
+| --- | --- | --- | --- |
+| `synthetic` | Ready | `configs/local/synthetic_smoke.json` | CPU-only path used by tests and local validation. |
+| `gpt2_small` | Optional smoke-ready | `configs/local/gpt2_small_smoke.json` | Requires `pip install -e ".[workloads]"`; supports tiny Hugging Face causal-LM training and inference plumbing. |
+| `distilbert` | Optional smoke-ready | `configs/local/distilbert_smoke.json` | Requires `pip install -e ".[workloads]"`; supports tiny Hugging Face sequence-classification training and inference plumbing. |
+| `tinyllama` | Optional inference smoke-ready | `configs/local/tinyllama_inference_smoke.json` | Requires `pip install -e ".[workloads]"`; inference path only. Training remains intentionally unsupported. |
+
+Full H100/L40S experiment runs still require the matrix configs, Slurm rendering, and the appropriate GPU software stack on the target platform. A missing optional dependency should produce a structured failed result rather than an unhandled crash.
+
+---
+
 # Workload Selection Criteria
 
 Each workload was evaluated according to:
