@@ -1,0 +1,49 @@
+{
+  "experiment_id": "E012",
+  "experiment": "baseline_profiling_distilbert_training",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "dataset": "glue_sst2_or_synthetic_subset",
+    "parameters": {
+      "baseline_kind": "training",
+      "batch_size": 32,
+      "sequence_length": 512,
+      "repeat_index": 1,
+      "stack": "pytorch_single_gpu"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi"],
+    "parameters": {}
+  },
+  "metadata": {
+    "matrix_id": "E012",
+    "template": "baseline_training",
+    "phase": "Baseline profiling",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 1.0,
+    "objective": "Establish single-GPU training baseline for encoder",
+    "key_metrics": ["throughput", "runtime", "memory", "loss", "gpu_util", "gpu_hours"]
+  }
+}

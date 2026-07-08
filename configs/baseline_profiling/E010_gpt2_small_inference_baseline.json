@@ -1,0 +1,50 @@
+{
+  "experiment_id": "E010",
+  "experiment": "baseline_profiling_gpt2_small_inference",
+  "mode": "inference",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "prompt_set_v1",
+    "parameters": {
+      "baseline_kind": "inference",
+      "framework": "pytorch_eager",
+      "batch_size": 1,
+      "prompt_length": 128,
+      "max_new_tokens": 128,
+      "repeat_index": 1
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "serving_latency"],
+    "parameters": {}
+  },
+  "metadata": {
+    "matrix_id": "E010",
+    "template": "baseline_inference",
+    "phase": "Baseline profiling",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.5,
+    "objective": "Establish single-GPU inference baseline",
+    "key_metrics": ["tokens_sec", "latency", "time_to_first_token", "memory"]
+  }
+}

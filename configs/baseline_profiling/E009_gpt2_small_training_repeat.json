@@ -1,0 +1,49 @@
+{
+  "experiment_id": "E009",
+  "experiment": "baseline_profiling_gpt2_small_training_repeat",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "openwebtext_or_synthetic_subset",
+    "parameters": {
+      "baseline_kind": "training_repeat",
+      "batch_size": 16,
+      "sequence_length": 1024,
+      "repeat_index": 2,
+      "stack": "pytorch_single_gpu"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1338,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi"],
+    "parameters": {}
+  },
+  "metadata": {
+    "matrix_id": "E009",
+    "template": "baseline_training",
+    "phase": "Baseline profiling",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.7,
+    "objective": "Repeat baseline to estimate run-to-run variance",
+    "key_metrics": ["mean", "std_dev", "coefficient_of_variation"]
+  }
+}

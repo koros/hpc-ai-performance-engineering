@@ -1,0 +1,49 @@
+{
+  "experiment_id": "E015",
+  "experiment": "baseline_profiling_distilbert_inference_repeat",
+  "mode": "inference",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "dataset": "prompt_set_v1",
+    "parameters": {
+      "baseline_kind": "inference_repeat",
+      "framework": "pytorch_eager",
+      "batch_size": 1,
+      "prompt_length": 128,
+      "repeat_index": 2
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1338,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "serving_latency"],
+    "parameters": {}
+  },
+  "metadata": {
+    "matrix_id": "E015",
+    "template": "baseline_inference",
+    "phase": "Baseline profiling",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.4,
+    "objective": "Repeat inference baseline to estimate variance",
+    "key_metrics": ["mean", "p50", "p95", "std_dev"]
+  }
+}
