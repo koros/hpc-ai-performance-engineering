@@ -1,0 +1,63 @@
+{
+  "experiment_id": "E105",
+  "experiment": "data_movement_distilbert_num_workers_2",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "dataset": "glue_sst2_or_synthetic_subset",
+    "parameters": {
+      "data_movement_study_type": "num_workers",
+      "batch_size": 32,
+      "sequence_length": 512,
+      "num_workers": 2,
+      "pinned_memory": true,
+      "prefetch_factor": 4
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "dataloader_timing"
+    ],
+    "parameters": {
+      "collect_batch_load_time": true,
+      "collect_cpu_to_gpu_transfer": false,
+      "collect_gpu_idle_time": true,
+      "collect_cpu_utilisation": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E105",
+    "template": "data_movement",
+    "phase": "Data movement",
+    "priority": "Should Have",
+    "gpu_hours_estimate": 0.4,
+    "objective": "DataLoader num_workers=2",
+    "key_metrics": [
+      "batch_load_time",
+      "gpu_idle",
+      "cpu_util",
+      "throughput"
+    ]
+  }
+}

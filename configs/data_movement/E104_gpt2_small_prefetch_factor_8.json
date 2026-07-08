@@ -1,0 +1,62 @@
+{
+  "experiment_id": "E104",
+  "experiment": "data_movement_gpt2_small_prefetch_factor_8",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "openwebtext_or_synthetic_subset",
+    "parameters": {
+      "data_movement_study_type": "prefetch_factor",
+      "batch_size": 16,
+      "sequence_length": 1024,
+      "num_workers": 4,
+      "pinned_memory": true,
+      "prefetch_factor": 8
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "dataloader_timing"
+    ],
+    "parameters": {
+      "collect_batch_load_time": true,
+      "collect_cpu_to_gpu_transfer": true,
+      "collect_gpu_idle_time": true,
+      "collect_cpu_utilisation": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E104",
+    "template": "data_movement",
+    "phase": "Data movement",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.4,
+    "objective": "Evaluate prefetch_factor high",
+    "key_metrics": [
+      "cpu_to_gpu_transfer",
+      "gpu_idle",
+      "throughput"
+    ]
+  }
+}

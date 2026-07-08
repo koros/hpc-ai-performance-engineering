@@ -11,6 +11,7 @@ This directory contains runnable experiment configs and reusable templates.
 | `scaling_studies/` | Concrete `E032-E046` strong and weak scaling configs |
 | `memory_optimisation/` | Concrete `E063-E082` checkpointing, micro-batch, and gradient accumulation configs |
 | `precision_studies/` | Concrete `E083-E096` training and inference precision configs |
+| `data_movement/` | Concrete `E097-E112` DataLoader, pinned memory, and prefetch configs |
 | `local/` | Local smoke-test configs that do not require HPC GPUs |
 | `training/` | Concrete training configs |
 | `inference/` | Concrete inference configs |
