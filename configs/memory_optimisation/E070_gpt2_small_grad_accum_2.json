@@ -1,0 +1,63 @@
+{
+  "experiment_id": "E070",
+  "experiment": "memory_optimisation_gpt2_small_grad_accum_2",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "openwebtext_or_synthetic_subset",
+    "parameters": {
+      "memory_study_type": "gradient_accumulation",
+      "batch_size": 16,
+      "micro_batch_size": 16,
+      "sequence_length": 1024,
+      "activation_checkpointing": false,
+      "gradient_accumulation_steps": 2,
+      "effective_batch_size": 64
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 2,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory"
+    ],
+    "parameters": {
+      "collect_memory_trace": true,
+      "collect_oom_risk": false,
+      "collect_effective_batch_metrics": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E070",
+    "template": "memory_optimisation",
+    "phase": "Memory optimisation",
+    "priority": "Optional",
+    "gpu_hours_estimate": 0.7,
+    "objective": "Gradient accumulation steps 2",
+    "key_metrics": [
+      "effective_batch",
+      "throughput",
+      "memory",
+      "stability"
+    ]
+  }
+}
