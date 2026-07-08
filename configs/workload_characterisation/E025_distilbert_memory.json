@@ -1,0 +1,57 @@
+{
+  "experiment_id": "E025",
+  "experiment": "workload_characterisation_distilbert_memory",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "dataset": "glue_sst2_or_synthetic_subset",
+    "parameters": {
+      "profile_target": "memory",
+      "batch_size": 32,
+      "sequence_length": 512,
+      "stack": "memory_profiler"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 50,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory"
+    ],
+    "parameters": {
+      "collect_memory_trace": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E025",
+    "template": "profiling",
+    "phase": "Workload characterisation",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.7,
+    "objective": "Identify memory pressure and peak memory behaviour",
+    "key_metrics": [
+      "peak_memory",
+      "allocation_pattern",
+      "oom_risk"
+    ]
+  }
+}

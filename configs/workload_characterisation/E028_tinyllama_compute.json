@@ -1,0 +1,57 @@
+{
+  "experiment_id": "E028",
+  "experiment": "workload_characterisation_tinyllama_compute",
+  "mode": "training",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "dataset": "openwebtext_or_synthetic_subset",
+    "parameters": {
+      "profile_target": "compute",
+      "batch_size": 4,
+      "sequence_length": 1024,
+      "stack": "profiler"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 50,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_profiler"
+    ],
+    "parameters": {
+      "schedule": "wait_1_warmup_1_active_3"
+    }
+  },
+  "metadata": {
+    "matrix_id": "E028",
+    "template": "profiling",
+    "phase": "Workload characterisation",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.7,
+    "objective": "Identify compute intensity and kernel utilisation",
+    "key_metrics": [
+      "gpu_util",
+      "sm_occupancy_proxy",
+      "kernel_time"
+    ]
+  }
+}
