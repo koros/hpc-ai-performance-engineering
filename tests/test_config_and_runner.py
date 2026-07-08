@@ -2,7 +2,7 @@ import csv
 from pathlib import Path
 
 from hpc_ai_perf.analysis import analyze_results
-from hpc_ai_perf.cli import _render_slurm_bulk
+from hpc_ai_perf.cli import _refresh_outputs, _render_slurm_bulk
 from hpc_ai_perf.config import discover_experiment_configs, filter_config_entries, load_experiment_config
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
@@ -235,3 +235,37 @@ def test_result_validation_reports_bad_record(tmp_path: Path) -> None:
     assert any("missing required result field" in issue.message for issue in issues)
     assert any("unsupported status" in issue.message for issue in issues)
     assert any("runtime_seconds" in issue.message for issue in issues)
+
+
+def test_refresh_outputs_rebuilds_derived_files(tmp_path: Path) -> None:
+    config = load_experiment_config(Path("configs/scaling_studies/E033_gpt2_small_strong_2gpu.json"))
+    raw_dir = tmp_path / "raw"
+    processed_results = tmp_path / "processed" / "experiments.csv"
+    analysis_dir = tmp_path / "analysis"
+    tracker_csv = tmp_path / "processed" / "experiment_tracker.csv"
+    tracker_markdown = tmp_path / "processed" / "experiment_tracker.md"
+
+    result = ExperimentResult.from_config(
+        config,
+        status="completed",
+        started_at="2026-01-01T00:00:00Z",
+        completed_at="2026-01-01T00:10:00Z",
+        runtime_seconds=600.0,
+        metrics={"throughput_tokens_sec": 1200.0},
+    )
+    result.write_json(raw_dir)
+
+    _refresh_outputs(
+        config_root="configs",
+        result_dir=str(raw_dir),
+        processed_results=str(processed_results),
+        analysis_dir=str(analysis_dir),
+        tracker_csv=str(tracker_csv),
+        tracker_markdown=str(tracker_markdown),
+        skip_validation=False,
+    )
+
+    assert processed_results.exists()
+    assert (analysis_dir / "phase_summary.csv").exists()
+    assert tracker_csv.exists()
+    assert tracker_markdown.exists()

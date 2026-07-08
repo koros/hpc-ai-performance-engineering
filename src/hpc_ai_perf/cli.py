@@ -109,6 +109,18 @@ def main() -> None:
             raise SystemExit(1)
         return
 
+    if args.command == "refresh":
+        _refresh_outputs(
+            config_root=args.config_root,
+            result_dir=args.result_dir,
+            processed_results=args.processed_results,
+            analysis_dir=args.analysis_dir,
+            tracker_csv=args.tracker_csv,
+            tracker_markdown=args.tracker_markdown,
+            skip_validation=args.skip_validation,
+        )
+        return
+
     parser.error("A command is required.")
 
 
@@ -189,6 +201,31 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     validate_parser.add_argument("--skip-results", action="store_true", help="Only validate experiment configs.")
     validate_parser.add_argument("--format", choices=["table", "json"], default="table")
+
+    refresh_parser = subparsers.add_parser("refresh", help="Validate and rebuild processed project outputs.")
+    refresh_parser.add_argument(
+        "--config-root", default="configs", help="Root directory containing experiment configs."
+    )
+    refresh_parser.add_argument(
+        "--result-dir", default="results/raw", help="Directory containing raw result JSON files."
+    )
+    refresh_parser.add_argument(
+        "--processed-results",
+        default="results/processed/experiments.csv",
+        help="Path for the aggregated experiment CSV.",
+    )
+    refresh_parser.add_argument("--analysis-dir", default="results/analysis", help="Directory for analysis CSV tables.")
+    refresh_parser.add_argument(
+        "--tracker-csv",
+        default="results/processed/experiment_tracker.csv",
+        help="Path for the generated tracker CSV.",
+    )
+    refresh_parser.add_argument(
+        "--tracker-markdown",
+        default="results/processed/experiment_tracker.md",
+        help="Path for the generated tracker Markdown.",
+    )
+    refresh_parser.add_argument("--skip-validation", action="store_true", help="Rebuild outputs without validation.")
     return parser
 
 
@@ -213,6 +250,39 @@ def _run_local_config(config_path: str, output_dir: str | None) -> None:
     result = runner.run(config)
     result_path = result.write_json(output_dir or config.runtime.output_dir)
     LOGGER.info("Wrote result to %s", result_path)
+
+
+def _refresh_outputs(
+    *,
+    config_root: str,
+    result_dir: str,
+    processed_results: str,
+    analysis_dir: str,
+    tracker_csv: str,
+    tracker_markdown: str,
+    skip_validation: bool,
+) -> None:
+    if not skip_validation:
+        issues = validate_project(config_root, result_dir)
+        if issues:
+            print(format_validation_issues(issues), end="")
+            raise SystemExit(1)
+        LOGGER.info("Validation passed.")
+
+    result_path = aggregate_results(result_dir, processed_results)
+    LOGGER.info("Wrote aggregated results to %s", result_path)
+
+    analysis_paths = analyze_results(result_path, analysis_dir)
+    LOGGER.info("Wrote %d analysis tables to %s", len(analysis_paths), analysis_dir)
+
+    tracker_csv_path, tracker_markdown_path = track_experiment_progress(
+        config_root,
+        result_dir,
+        tracker_csv,
+        tracker_markdown,
+    )
+    LOGGER.info("Wrote tracker CSV to %s", tracker_csv_path)
+    LOGGER.info("Wrote tracker Markdown to %s", tracker_markdown_path)
 
 
 def _render_slurm_config(
