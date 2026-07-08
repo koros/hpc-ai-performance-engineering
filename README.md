@@ -100,7 +100,13 @@ pytest
 Run the local synthetic smoke benchmark:
 
 ```bash
-python -m hpc_ai_perf.cli --config configs/local/synthetic_smoke.json
+python -m hpc_ai_perf.cli run --config configs/local/synthetic_smoke.json
+```
+
+List matrix experiment configs:
+
+```bash
+python -m hpc_ai_perf.cli list-configs
 ```
 
 ## Expected Outputs

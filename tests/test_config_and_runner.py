@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from hpc_ai_perf.config import load_experiment_config
+from hpc_ai_perf.config import discover_experiment_configs, filter_config_entries, load_experiment_config
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 
 
@@ -22,6 +22,26 @@ def test_all_json_configs_load() -> None:
         assert config.experiment_id
         assert config.experiment
         assert config.workload.name
+
+
+def test_discover_matrix_configs() -> None:
+    entries = discover_experiment_configs()
+    experiment_ids = {entry.config.experiment_id for entry in entries}
+
+    assert len(entries) == 200
+    assert experiment_ids == {f"E{index:03d}" for index in range(1, 201)}
+
+
+def test_filter_config_entries_by_phase_priority_and_workload() -> None:
+    entries = discover_experiment_configs()
+    filtered = filter_config_entries(
+        entries,
+        phase="Inference concurrency",
+        priority="Must Have",
+        workload="gpt2_small",
+    )
+
+    assert [entry.config.experiment_id for entry in filtered] == ["E138", "E140", "E141"]
 
 
 def test_local_runner_writes_standard_result(tmp_path: Path) -> None:
