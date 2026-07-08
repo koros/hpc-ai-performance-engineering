@@ -467,6 +467,13 @@ def test_readme_documents_hpc_submission_workflow() -> None:
     assert "record-slurm-job" in readme
 
 
+def test_slurm_status_make_targets_do_not_rerender_scripts() -> None:
+    makefile = Path("Makefile").read_text(encoding="utf-8")
+
+    assert "init-slurm-env-status:\n\tpython -m hpc_ai_perf.cli init-slurm-status" in makefile
+    assert "init-slurm-baseline-status:\n\tpython -m hpc_ai_perf.cli init-slurm-status" in makefile
+
+
 def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
     report_path = write_readiness_report(tmp_path / "readiness_report.md")
     report = report_path.read_text(encoding="utf-8")

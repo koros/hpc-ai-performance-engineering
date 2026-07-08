@@ -47,10 +47,10 @@ plan-slurm-baseline-must-have: render-slurm-baseline-must-have
 
 plan-slurm-first-batches: plan-slurm-env-validation plan-slurm-baseline-must-have
 
-init-slurm-env-status: render-slurm-env-validation
+init-slurm-env-status:
 	python -m hpc_ai_perf.cli init-slurm-status --script-dir slurm/generated/environment_validation_must_have --output results/processed/slurm_environment_validation_status.csv --batch-name "Environment Validation Must Have"
 
-init-slurm-baseline-status: render-slurm-baseline-must-have
+init-slurm-baseline-status:
 	python -m hpc_ai_perf.cli init-slurm-status --script-dir slurm/generated/baseline_profiling_must_have --output results/processed/slurm_baseline_profiling_status.csv --batch-name "Baseline Profiling Must Have"
 
 init-slurm-first-status: init-slurm-env-status init-slurm-baseline-status
