@@ -109,6 +109,12 @@ Run the optional GPT-2 Small smoke workload after installing those dependencies:
 python -m hpc_ai_perf.cli run --config configs/local/gpt2_small_smoke.json
 ```
 
+Run the optional DistilBERT smoke workload:
+
+```bash
+python -m hpc_ai_perf.cli run --config configs/local/distilbert_smoke.json
+```
+
 Run the local synthetic smoke benchmark:
 
 ```bash
