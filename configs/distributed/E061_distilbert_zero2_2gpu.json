@@ -1,0 +1,64 @@
+{
+  "experiment_id": "E061",
+  "experiment": "distributed_strategy_distilbert_zero2_2gpu",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "dataset": "glue_sst2_or_synthetic_subset",
+    "parameters": {
+      "batch_size": 32,
+      "sequence_length": 512,
+      "distributed_strategy": "ZeRO-2",
+      "strategy_detail": "zero_stage_2",
+      "deepspeed_config": {
+        "zero_optimization_stage": 2,
+        "bf16_enabled": true
+      }
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 2,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "deepspeed_zero2",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "nccl"
+    ],
+    "parameters": {
+      "collect_communication_overhead": true,
+      "collect_memory_trace": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E061",
+    "template": "distributed_strategy",
+    "phase": "Distributed training strategy",
+    "priority": "Should Have",
+    "gpu_hours_estimate": 1.2,
+    "strategy_detail": "zero_stage_2",
+    "objective": "Compare distributed strategy against baseline",
+    "key_metrics": [
+      "throughput",
+      "memory",
+      "communication_overhead",
+      "gpu_hours"
+    ]
+  }
+}

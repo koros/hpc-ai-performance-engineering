@@ -12,7 +12,7 @@ This directory contains runnable experiment configs and reusable templates.
 | `local/` | Local smoke-test configs that do not require HPC GPUs |
 | `training/` | Concrete training configs |
 | `inference/` | Concrete inference configs |
-| `distributed/` | Distributed strategy configs and generated variants |
+| `distributed/` | Concrete `E047-E062` DDP, FSDP, and DeepSpeed ZeRO strategy configs |
 | `profiling/` | Profiling-focused configs and generated variants |
 
 Concrete experiment configs should preserve the matrix ID in both `experiment_id` and `metadata.matrix_id`.

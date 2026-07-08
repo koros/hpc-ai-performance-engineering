@@ -1,0 +1,59 @@
+{
+  "experiment_id": "E056",
+  "experiment": "distributed_strategy_distilbert_ddp_4gpu",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "dataset": "glue_sst2_or_synthetic_subset",
+    "parameters": {
+      "batch_size": 32,
+      "sequence_length": 512,
+      "distributed_strategy": "DDP"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 4,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 4,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "nccl"
+    ],
+    "parameters": {
+      "collect_communication_overhead": true,
+      "collect_memory_trace": false
+    }
+  },
+  "metadata": {
+    "matrix_id": "E056",
+    "template": "distributed_strategy",
+    "phase": "Distributed training strategy",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 2.4,
+    "strategy_detail": "DDP",
+    "objective": "Compare distributed strategy against baseline",
+    "key_metrics": [
+      "throughput",
+      "memory",
+      "communication_overhead",
+      "gpu_hours"
+    ]
+  }
+}
