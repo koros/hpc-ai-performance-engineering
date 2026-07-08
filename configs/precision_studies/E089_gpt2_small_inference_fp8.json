@@ -1,0 +1,68 @@
+{
+  "experiment_id": "E089",
+  "experiment": "precision_study_gpt2_small_inference_fp8",
+  "mode": "inference",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "prompt_set_v1",
+    "parameters": {
+      "precision_label": "FP8",
+      "frameworks": [
+        "pytorch_eager",
+        "vllm"
+      ],
+      "batch_size": 1,
+      "prompt_length": 128,
+      "max_new_tokens": 128,
+      "quality_sanity_check": true,
+      "requires_transformer_engine_or_supported_inference_backend": true
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "fp8",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "serving_latency"
+    ],
+    "parameters": {
+      "collect_power": true,
+      "collect_memory_trace": true,
+      "collect_latency_distribution": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E089",
+    "template": "precision_study",
+    "phase": "Precision study",
+    "priority": "Should Have",
+    "gpu_hours_estimate": 0.5,
+    "matrix_precision_config": "FP8",
+    "objective": "Compare inference precision FP8",
+    "key_metrics": [
+      "tokens_sec",
+      "time_to_first_token",
+      "p95_latency",
+      "memory",
+      "power"
+    ]
+  }
+}

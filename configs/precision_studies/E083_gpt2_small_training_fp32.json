@@ -1,0 +1,63 @@
+{
+  "experiment_id": "E083",
+  "experiment": "precision_study_gpt2_small_training_fp32",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "openwebtext_or_synthetic_subset",
+    "parameters": {
+      "precision_label": "FP32",
+      "batch_size": 16,
+      "sequence_length": 1024,
+      "stack": "pytorch_transformer_engine",
+      "collect_loss": true,
+      "quality_sanity_check": true
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "fp32",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi"
+    ],
+    "parameters": {
+      "collect_power": true,
+      "collect_memory_trace": true,
+      "collect_latency_distribution": false
+    }
+  },
+  "metadata": {
+    "matrix_id": "E083",
+    "template": "precision_study",
+    "phase": "Precision study",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.8,
+    "matrix_precision_config": "FP32",
+    "objective": "Compare training precision FP32",
+    "key_metrics": [
+      "throughput",
+      "memory",
+      "power",
+      "loss",
+      "stability"
+    ]
+  }
+}

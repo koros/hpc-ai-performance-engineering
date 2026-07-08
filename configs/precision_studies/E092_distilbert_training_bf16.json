@@ -1,0 +1,63 @@
+{
+  "experiment_id": "E092",
+  "experiment": "precision_study_distilbert_training_bf16",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "dataset": "glue_sst2_or_synthetic_subset",
+    "parameters": {
+      "precision_label": "BF16",
+      "batch_size": 32,
+      "sequence_length": 512,
+      "stack": "pytorch_transformer_engine",
+      "collect_loss": true,
+      "quality_sanity_check": true
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi"
+    ],
+    "parameters": {
+      "collect_power": true,
+      "collect_memory_trace": true,
+      "collect_latency_distribution": false
+    }
+  },
+  "metadata": {
+    "matrix_id": "E092",
+    "template": "precision_study",
+    "phase": "Precision study",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.8,
+    "matrix_precision_config": "BF16",
+    "objective": "Compare training precision BF16",
+    "key_metrics": [
+      "throughput",
+      "memory",
+      "power",
+      "loss",
+      "stability"
+    ]
+  }
+}
