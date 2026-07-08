@@ -133,6 +133,12 @@ Build analysis tables for phase summaries, rankings, scaling, and precision comp
 python -m hpc_ai_perf.cli analyze-results
 ```
 
+Serve the static dashboard:
+
+```bash
+make serve-dashboard
+```
+
 ## Expected Outputs
 
 - Reproducible experiment suite and configuration catalogue

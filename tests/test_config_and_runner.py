@@ -167,3 +167,21 @@ def test_analyze_results_writes_summary_tables(tmp_path: Path) -> None:
     assert phase_rows[0]["avg_throughput_tokens_sec"] == "1200.0"
     assert ranking_rows[0]["experiment_id"] == "E033"
     assert ranking_rows[0]["throughput_tokens_per_gpu"] == "600.0"
+
+
+def test_dashboard_static_assets_exist() -> None:
+    dashboard_files = [
+        Path("dashboard/index.html"),
+        Path("dashboard/styles.css"),
+        Path("dashboard/app.js"),
+    ]
+
+    for dashboard_file in dashboard_files:
+        assert dashboard_file.exists()
+
+    html = Path("dashboard/index.html").read_text(encoding="utf-8")
+    script = Path("dashboard/app.js").read_text(encoding="utf-8")
+
+    assert 'id="rankingTable"' in html
+    assert "../results/processed/experiments.csv" in script
+    assert "../results/analysis/phase_summary.csv" in script

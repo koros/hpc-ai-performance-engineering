@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HPC AI Performance Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">H100 and L40S experiment results</p>
+        <h1>HPC AI Performance Dashboard</h1>
+      </div>
+      <div class="header-actions">
+        <label class="file-button">
+          Results CSV
+          <input id="resultsFile" type="file" accept=".csv" />
+        </label>
+        <label class="file-button">
+          Phase CSV
+          <input id="phaseFile" type="file" accept=".csv" />
+        </label>
+      </div>
+    </header>
+
+    <main>
+      <section class="toolbar" aria-label="Dashboard filters">
+        <label>
+          Phase
+          <select id="phaseFilter"></select>
+        </label>
+        <label>
+          Workload
+          <select id="workloadFilter"></select>
+        </label>
+        <label>
+          Priority
+          <select id="priorityFilter"></select>
+        </label>
+        <label>
+          Status
+          <select id="statusFilter"></select>
+        </label>
+      </section>
+
+      <section class="kpi-grid" aria-label="Summary metrics">
+        <article>
+          <span>Experiments</span>
+          <strong id="kpiExperiments">0</strong>
+        </article>
+        <article>
+          <span>Completed</span>
+          <strong id="kpiCompleted">0</strong>
+        </article>
+        <article>
+          <span>GPU-hours</span>
+          <strong id="kpiGpuHours">0.0</strong>
+        </article>
+        <article>
+          <span>Best tokens/s</span>
+          <strong id="kpiBestThroughput">0</strong>
+        </article>
+      </section>
+
+      <section class="content-grid">
+        <article class="panel chart-panel">
+          <div class="panel-heading">
+            <h2>Phase Throughput</h2>
+            <span id="dataStatus">No data loaded</span>
+          </div>
+          <div id="phaseBars" class="bar-list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <h2>Top Experiments</h2>
+            <span id="rankingCount">0 rows</span>
+          </div>
+          <div class="table-wrap">
+            <table id="rankingTable">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Phase Summary</h2>
+          <span id="phaseCount">0 rows</span>
+        </div>
+        <div class="table-wrap">
+          <table id="phaseTable">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

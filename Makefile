@@ -1,4 +1,4 @@
-.PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have aggregate-results analyze-results
+.PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have aggregate-results analyze-results serve-dashboard
 
 install-dev:
 	python -m pip install -e ".[dev,yaml]"
@@ -33,3 +33,6 @@ aggregate-results:
 
 analyze-results:
 	python -m hpc_ai_perf.cli analyze-results
+
+serve-dashboard:
+	python -m http.server 8000

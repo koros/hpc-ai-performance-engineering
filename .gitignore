@@ -10,9 +10,11 @@ venv/
 
 results/raw/*
 results/processed/*
+results/analysis/*
 results/figures/*
 !results/raw/.gitkeep
 !results/processed/.gitkeep
+!results/analysis/.gitkeep
 !results/figures/.gitkeep
 
 *.out
