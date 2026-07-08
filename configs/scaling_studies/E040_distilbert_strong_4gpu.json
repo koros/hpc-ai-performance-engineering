@@ -1,0 +1,62 @@
+{
+  "experiment_id": "E040",
+  "experiment": "strong_scaling_distilbert_4gpu",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "dataset": "glue_sst2_or_synthetic_subset",
+    "parameters": {
+      "scaling_type": "strong",
+      "per_gpu_batch_size": 32,
+      "global_batch_size": 128,
+      "sequence_length": 512,
+      "fixed_workload": true,
+      "stack": "ddp"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 4,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 4,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "nccl"
+    ],
+    "parameters": {
+      "collect_scaling_metrics": true,
+      "collect_gpu_utilisation": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E040",
+    "template": "scaling_ddp",
+    "phase": "Strong scaling",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 2.0,
+    "strategy_detail": "ddp",
+    "objective": "Train fixed workload while increasing GPU count",
+    "key_metrics": [
+      "runtime",
+      "speedup",
+      "parallel_efficiency",
+      "throughput"
+    ]
+  }
+}

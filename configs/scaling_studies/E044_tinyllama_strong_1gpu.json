@@ -1,0 +1,62 @@
+{
+  "experiment_id": "E044",
+  "experiment": "strong_scaling_tinyllama_1gpu",
+  "mode": "training",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "dataset": "openwebtext_or_synthetic_subset",
+    "parameters": {
+      "scaling_type": "strong",
+      "per_gpu_batch_size": 16,
+      "global_batch_size": 16,
+      "sequence_length": 1024,
+      "fixed_workload": true,
+      "stack": "ddp_or_fsdp"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "nccl"
+    ],
+    "parameters": {
+      "collect_scaling_metrics": true,
+      "collect_gpu_utilisation": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E044",
+    "template": "scaling_ddp",
+    "phase": "Strong scaling",
+    "priority": "Optional",
+    "gpu_hours_estimate": 1.0,
+    "strategy_detail": "DDP or FSDP per matrix; default config chooses DDP for 1 GPU and FSDP for multi-GPU TinyLlama.",
+    "objective": "Optional fixed-workload training scaling if time permits",
+    "key_metrics": [
+      "runtime",
+      "speedup",
+      "memory",
+      "oom_risk"
+    ]
+  }
+}
