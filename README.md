@@ -123,6 +123,12 @@ Run the optional TinyLlama-style inference smoke workload:
 python -m hpc_ai_perf.cli run --config configs/local/tinyllama_inference_smoke.json
 ```
 
+Review the Slurm smoke presets for running these checks on an HPC GPU node:
+
+```bash
+make list-slurm-smoke
+```
+
 Run the local synthetic smoke benchmark:
 
 ```bash

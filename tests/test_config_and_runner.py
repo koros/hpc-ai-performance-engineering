@@ -101,6 +101,21 @@ def test_render_slurm_bulk(tmp_path: Path) -> None:
     assert generated == ["E001.sbatch", "E002.sbatch", "E003.sbatch", "E004.sbatch", "E006.sbatch"]
 
 
+def test_slurm_smoke_presets_exist() -> None:
+    expected_scripts = {
+        "distilbert_smoke.sbatch": "configs/local/distilbert_smoke.json",
+        "gpt2_small_smoke.sbatch": "configs/local/gpt2_small_smoke.json",
+        "tinyllama_inference_smoke.sbatch": "configs/local/tinyllama_inference_smoke.json",
+    }
+
+    for script_name, config_path in expected_scripts.items():
+        script_path = Path("slurm/smoke") / script_name
+        script = script_path.read_text(encoding="utf-8")
+
+        assert "#SBATCH --gres=gpu:1" in script
+        assert config_path in script
+
+
 def test_local_runner_writes_standard_result(tmp_path: Path) -> None:
     config = load_experiment_config(Path("configs/local/synthetic_smoke.json"))
 
