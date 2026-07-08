@@ -1,0 +1,63 @@
+{
+  "experiment_id": "E184",
+  "experiment": "inference_batching_tinyllama_batch_16",
+  "mode": "inference",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "dataset": "prompt_set_v1",
+    "parameters": {
+      "inference_study_type": "batching",
+      "framework": "vllm",
+      "batch_size": 16,
+      "prompt_length": 128,
+      "max_new_tokens": 128,
+      "concurrent_requests": 1
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "serving_latency"
+    ],
+    "parameters": {
+      "collect_latency_distribution": true,
+      "collect_saturation_point": true,
+      "collect_memory_trace": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E184",
+    "template": "inference_serving",
+    "phase": "Inference batching",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.5,
+    "matrix_stack_strategy": "vLLM",
+    "objective": "Serving batch size 16",
+    "key_metrics": [
+      "tokens_sec",
+      "latency",
+      "memory",
+      "saturation_point"
+    ]
+  }
+}

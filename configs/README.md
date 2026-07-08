@@ -16,7 +16,7 @@ This directory contains runnable experiment configs and reusable templates.
 | `hardware_comparison/` | Concrete `E121-E128` H100 and L40S training/inference comparison configs |
 | `local/` | Local smoke-test configs that do not require HPC GPUs |
 | `training/` | Concrete training configs |
-| `inference/` | Concrete inference configs, starting with framework comparisons for `E129-E131`, `E153-E155`, and `E177-E179` |
+| `inference/` | Concrete inference configs, including framework and batching studies |
 | `distributed/` | Concrete `E047-E062` DDP, FSDP, and DeepSpeed ZeRO strategy configs |
 | `profiling/` | Profiling-focused configs and generated variants |
 
