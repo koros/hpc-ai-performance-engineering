@@ -133,6 +133,12 @@ Build analysis tables for phase summaries, rankings, scaling, and precision comp
 python -m hpc_ai_perf.cli analyze-results
 ```
 
+Generate progress tracker reports from configs and raw results:
+
+```bash
+python -m hpc_ai_perf.cli track-progress
+```
+
 Serve the static dashboard:
 
 ```bash

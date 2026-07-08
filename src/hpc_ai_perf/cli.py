@@ -14,6 +14,7 @@ from hpc_ai_perf.config import (
 from hpc_ai_perf.results import aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script
+from hpc_ai_perf.tracking import track_experiment_progress
 
 LOGGER = logging.getLogger(__name__)
 
@@ -85,6 +86,17 @@ def main() -> None:
         LOGGER.info("Wrote %d analysis tables to %s", len(written_paths), args.output_dir)
         return
 
+    if args.command == "track-progress":
+        csv_path, markdown_path = track_experiment_progress(
+            args.config_root,
+            args.result_dir,
+            args.output_csv,
+            args.output_markdown,
+        )
+        LOGGER.info("Wrote tracker CSV to %s", csv_path)
+        LOGGER.info("Wrote tracker Markdown to %s", markdown_path)
+        return
+
     parser.error("A command is required.")
 
 
@@ -137,6 +149,24 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Processed experiment CSV created by aggregate-results.",
     )
     analyze_parser.add_argument("--output-dir", default="results/analysis", help="Directory for analysis CSV tables.")
+
+    tracker_parser = subparsers.add_parser("track-progress", help="Build tracker reports from configs and raw results.")
+    tracker_parser.add_argument(
+        "--config-root", default="configs", help="Root directory containing experiment configs."
+    )
+    tracker_parser.add_argument(
+        "--result-dir", default="results/raw", help="Directory containing raw result JSON files."
+    )
+    tracker_parser.add_argument(
+        "--output-csv",
+        default="results/processed/experiment_tracker.csv",
+        help="Path for the generated tracker CSV.",
+    )
+    tracker_parser.add_argument(
+        "--output-markdown",
+        default="results/processed/experiment_tracker.md",
+        help="Path for the generated tracker Markdown.",
+    )
     return parser
 
 

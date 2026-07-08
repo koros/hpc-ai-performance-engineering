@@ -7,6 +7,7 @@ from hpc_ai_perf.config import discover_experiment_configs, filter_config_entrie
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script
+from hpc_ai_perf.tracking import track_experiment_progress
 
 
 def test_load_synthetic_config() -> None:
@@ -185,3 +186,35 @@ def test_dashboard_static_assets_exist() -> None:
     assert 'id="rankingTable"' in html
     assert "../results/processed/experiments.csv" in script
     assert "../results/analysis/phase_summary.csv" in script
+
+
+def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
+    config = load_experiment_config(Path("configs/scaling_studies/E033_gpt2_small_strong_2gpu.json"))
+    raw_dir = tmp_path / "raw"
+    output_csv = tmp_path / "processed" / "experiment_tracker.csv"
+    output_markdown = tmp_path / "processed" / "experiment_tracker.md"
+
+    result = ExperimentResult.from_config(
+        config,
+        status="completed",
+        started_at="2026-01-01T00:00:00Z",
+        completed_at="2026-01-01T00:10:00Z",
+        runtime_seconds=600.0,
+        metrics={"throughput_tokens_sec": 1200.0},
+    )
+    result.write_json(raw_dir)
+
+    csv_path, markdown_path = track_experiment_progress("configs", raw_dir, output_csv, output_markdown)
+
+    with csv_path.open(encoding="utf-8", newline="") as file_obj:
+        rows = list(csv.DictReader(file_obj))
+    e033 = next(row for row in rows if row["experiment_id"] == "E033")
+    e034 = next(row for row in rows if row["experiment_id"] == "E034")
+
+    assert csv_path == output_csv
+    assert markdown_path == output_markdown
+    assert len(rows) == 200
+    assert e033["status"] == "Completed"
+    assert e033["runtime_seconds"] == "600.0"
+    assert e034["status"] == "Configured"
+    assert "| Completed | 1 |" in markdown_path.read_text(encoding="utf-8")
