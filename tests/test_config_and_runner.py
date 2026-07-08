@@ -286,6 +286,14 @@ def test_dashboard_static_assets_exist() -> None:
     assert "../results/analysis/phase_summary.csv" in script
 
 
+def test_hpc_smoke_runbook_exists() -> None:
+    runbook = Path("docs/hpc_smoke_runbook.md").read_text(encoding="utf-8")
+
+    assert "sbatch slurm/smoke/gpt2_small_smoke.sbatch" in runbook
+    assert "python -m hpc_ai_perf.cli refresh" in runbook
+    assert "make serve-dashboard" in runbook
+
+
 def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
     config = load_experiment_config(Path("configs/scaling_studies/E033_gpt2_small_strong_2gpu.json"))
     raw_dir = tmp_path / "raw"

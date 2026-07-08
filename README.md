@@ -12,6 +12,7 @@ Primary planning documents:
 
 - [Comprehensive experiment matrix](docs/experiment_matrix.md): full source-of-truth matrix with `E001` to `E200`, priority levels, metrics, and GPU-hour estimates.
 - [Experiment tracker](docs/experiment_tracker.md): editable run-status table for every planned experiment and analysis task.
+- [HPC smoke runbook](docs/hpc_smoke_runbook.md): checklist for validating the cluster environment before full matrix submission.
 - [Experiment workspace](experiments/README.md): phase folders aligned with the dissertation proposal outline.
 - [Experiment configs](configs/README.md): reusable config templates and concrete run configs.
 

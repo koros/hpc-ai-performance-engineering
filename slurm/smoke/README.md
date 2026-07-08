@@ -2,6 +2,8 @@
 
 These scripts run the optional transformer smoke configs on an HPC GPU node. They are intended for quick dependency and scheduler validation before submitting the full `E001-E200` experiment matrix.
 
+See the full checklist in [`docs/hpc_smoke_runbook.md`](../../docs/hpc_smoke_runbook.md).
+
 Before submitting, prepare the environment on the cluster:
 
 ```bash

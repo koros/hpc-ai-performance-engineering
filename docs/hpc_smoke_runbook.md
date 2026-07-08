@@ -1,0 +1,135 @@
+# HPC Smoke Runbook
+
+Use this checklist before submitting the full experiment matrix. The goal is to verify the Python environment, optional transformer dependencies, Slurm submission, raw result writing, and dashboard refresh path on the target GPU platform.
+
+## 1. Prepare Environment
+
+Clone or update the project on the cluster login node:
+
+```bash
+git pull
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev,yaml,workloads]"
+```
+
+If the cluster uses modules, load the required CUDA/Python stack before creating or activating the environment:
+
+```bash
+module load cuda/12.4
+```
+
+## 2. Validate Repository State
+
+Run local checks on the login node:
+
+```bash
+python -m hpc_ai_perf.cli validate --skip-results
+python -m hpc_ai_perf.cli list-configs --phase "Environment validation"
+make list-slurm-smoke
+```
+
+## 3. Edit Slurm Presets
+
+Review the smoke scripts and set site-specific fields:
+
+- `#SBATCH --partition=...`
+- `#SBATCH --account=...`
+- module load commands
+- virtual environment activation path
+
+Smoke scripts:
+
+```bash
+slurm/smoke/gpt2_small_smoke.sbatch
+slurm/smoke/distilbert_smoke.sbatch
+slurm/smoke/tinyllama_inference_smoke.sbatch
+```
+
+## 4. Submit Smoke Jobs
+
+Submit one job at a time until the environment is known to be stable:
+
+```bash
+sbatch slurm/smoke/gpt2_small_smoke.sbatch
+squeue -u "$USER"
+```
+
+Then submit the remaining smoke jobs:
+
+```bash
+sbatch slurm/smoke/distilbert_smoke.sbatch
+sbatch slurm/smoke/tinyllama_inference_smoke.sbatch
+```
+
+## 5. Inspect Raw Results
+
+Expected result files:
+
+```bash
+results/raw/local_gpt2_small_smoke.json
+results/raw/local_distilbert_smoke.json
+results/raw/local_tinyllama_inference_smoke.json
+```
+
+Check status and errors:
+
+```bash
+python -m hpc_ai_perf.cli validate
+python -m hpc_ai_perf.cli aggregate-results
+```
+
+A dependency or model-download problem should appear as a structured failed result with an `error` field. A successful smoke result should include throughput metrics.
+
+## 6. Refresh Derived Outputs
+
+After smoke results are present:
+
+```bash
+python -m hpc_ai_perf.cli refresh
+```
+
+Generated outputs:
+
+- `results/processed/experiments.csv`
+- `results/processed/experiment_tracker.csv`
+- `results/processed/experiment_tracker.md`
+- `results/analysis/*.csv`
+
+## 7. Review Dashboard
+
+Serve the static dashboard from the project root:
+
+```bash
+make serve-dashboard
+```
+
+Open:
+
+```text
+http://localhost:8000/dashboard/
+```
+
+If running on a remote cluster, use SSH port forwarding from your local machine:
+
+```bash
+ssh -L 8000:localhost:8000 <cluster-host>
+```
+
+## 8. Gate Before Full Matrix
+
+Proceed to full matrix Slurm generation only when:
+
+- all three smoke jobs write JSON result records;
+- validation passes;
+- aggregation and analysis complete;
+- tracker output reflects completed or failed smoke runs;
+- dashboard loads the processed CSV;
+- GPU job logs contain no environment or import errors.
+
+Next command for a filtered matrix batch:
+
+```bash
+python -m hpc_ai_perf.cli render-slurm-bulk --priority "Must Have"
+```
