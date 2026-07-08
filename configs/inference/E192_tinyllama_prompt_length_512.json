@@ -1,0 +1,64 @@
+{
+  "experiment_id": "E192",
+  "experiment": "inference_prompt_length_tinyllama_512",
+  "mode": "inference",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "dataset": "prompt_set_v1",
+    "parameters": {
+      "inference_study_type": "prompt_length",
+      "framework": "vllm",
+      "batch_size": 1,
+      "concurrent_requests": 1,
+      "prompt_length": 512,
+      "max_new_tokens": 128
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "serving_latency"
+    ],
+    "parameters": {
+      "collect_time_to_first_token": true,
+      "collect_generation_rate": true,
+      "collect_latency_distribution": true,
+      "collect_memory_trace": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E192",
+    "template": "inference_serving",
+    "phase": "Inference prompt length",
+    "priority": "Should Have",
+    "gpu_hours_estimate": 0.5,
+    "matrix_stack_strategy": "vLLM",
+    "objective": "Prompt length 512 tokens",
+    "key_metrics": [
+      "time_to_first_token",
+      "generation_rate",
+      "memory",
+      "p95_latency"
+    ]
+  }
+}
