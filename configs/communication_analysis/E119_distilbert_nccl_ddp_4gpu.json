@@ -1,0 +1,65 @@
+{
+  "experiment_id": "E119",
+  "experiment": "communication_analysis_distilbert_nccl_ddp_4gpu",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "dataset": "glue_sst2_or_synthetic_subset",
+    "parameters": {
+      "communication_study_type": "nccl_ddp",
+      "batch_size": 32,
+      "sequence_length": 512,
+      "collect_gradient_synchronization": true,
+      "collect_sharded_communication": false
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 4,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 4,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "nccl",
+      "torch_profiler"
+    ],
+    "parameters": {
+      "collect_allreduce_time": true,
+      "collect_nccl_bandwidth": true,
+      "collect_comm_compute_ratio": true,
+      "collect_gpu_idle_time": true,
+      "collect_nvlink_utilisation": true,
+      "collect_fsdp_exchange_time": false
+    }
+  },
+  "metadata": {
+    "matrix_id": "E119",
+    "template": "communication_analysis",
+    "phase": "Communication analysis",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 1.6,
+    "strategy_detail": "NCCL/DDP",
+    "objective": "Profile distributed gradient synchronization",
+    "key_metrics": [
+      "allreduce_time",
+      "bandwidth",
+      "comm_compute_ratio"
+    ]
+  }
+}

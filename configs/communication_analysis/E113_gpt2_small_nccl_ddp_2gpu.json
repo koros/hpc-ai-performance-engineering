@@ -1,0 +1,65 @@
+{
+  "experiment_id": "E113",
+  "experiment": "communication_analysis_gpt2_small_nccl_ddp_2gpu",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "openwebtext_or_synthetic_subset",
+    "parameters": {
+      "communication_study_type": "nccl_ddp",
+      "batch_size": 16,
+      "sequence_length": 1024,
+      "collect_gradient_synchronization": true,
+      "collect_sharded_communication": false
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 2,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "nccl",
+      "torch_profiler"
+    ],
+    "parameters": {
+      "collect_allreduce_time": true,
+      "collect_nccl_bandwidth": true,
+      "collect_comm_compute_ratio": true,
+      "collect_gpu_idle_time": true,
+      "collect_nvlink_utilisation": true,
+      "collect_fsdp_exchange_time": false
+    }
+  },
+  "metadata": {
+    "matrix_id": "E113",
+    "template": "communication_analysis",
+    "phase": "Communication analysis",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.8,
+    "strategy_detail": "NCCL/DDP",
+    "objective": "Profile distributed gradient synchronization",
+    "key_metrics": [
+      "allreduce_time",
+      "bandwidth",
+      "comm_compute_ratio"
+    ]
+  }
+}

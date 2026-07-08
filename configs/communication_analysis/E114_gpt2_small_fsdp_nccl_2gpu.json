@@ -1,0 +1,69 @@
+{
+  "experiment_id": "E114",
+  "experiment": "communication_analysis_gpt2_small_fsdp_nccl_2gpu",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "openwebtext_or_synthetic_subset",
+    "parameters": {
+      "communication_study_type": "fsdp_nccl",
+      "batch_size": 16,
+      "sequence_length": 1024,
+      "collect_gradient_synchronization": false,
+      "collect_sharded_communication": true,
+      "fsdp_config": {
+        "sharding_strategy": "full_shard",
+        "mixed_precision": "bf16"
+      }
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 2,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "fsdp",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "nccl",
+      "torch_profiler"
+    ],
+    "parameters": {
+      "collect_allreduce_time": false,
+      "collect_nccl_bandwidth": true,
+      "collect_comm_compute_ratio": false,
+      "collect_gpu_idle_time": true,
+      "collect_nvlink_utilisation": true,
+      "collect_fsdp_exchange_time": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E114",
+    "template": "communication_analysis",
+    "phase": "Communication analysis",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.8,
+    "strategy_detail": "FSDP/NCCL",
+    "objective": "Profile sharded communication and memory exchange",
+    "key_metrics": [
+      "communication_overhead",
+      "idle_time",
+      "nvlink_utilisation"
+    ]
+  }
+}
