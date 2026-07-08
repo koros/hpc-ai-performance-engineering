@@ -13,6 +13,7 @@ This directory contains runnable experiment configs and reusable templates.
 | `precision_studies/` | Concrete `E083-E096` training and inference precision configs |
 | `data_movement/` | Concrete `E097-E112` DataLoader, pinned memory, and prefetch configs |
 | `communication_analysis/` | Concrete `E113-E120` NCCL/DDP and FSDP/NCCL communication profiling configs |
+| `hardware_comparison/` | Concrete `E121-E128` H100 and L40S training/inference comparison configs |
 | `local/` | Local smoke-test configs that do not require HPC GPUs |
 | `training/` | Concrete training configs |
 | `inference/` | Concrete inference configs |

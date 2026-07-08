@@ -1,0 +1,61 @@
+{
+  "experiment_id": "E127",
+  "experiment": "hardware_comparison_distilbert_training_l40s",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "dataset": "glue_sst2_or_synthetic_subset",
+    "parameters": {
+      "comparison_axis": "gpu_model",
+      "hardware_label": "L40S",
+      "batch_size": 32,
+      "sequence_length": 512,
+      "stack": "pytorch_single_gpu"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpus": 1,
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi"
+    ],
+    "parameters": {
+      "collect_power": true,
+      "collect_memory_trace": true,
+      "collect_latency_distribution": false
+    }
+  },
+  "metadata": {
+    "matrix_id": "E127",
+    "template": "hardware_comparison",
+    "phase": "Hardware comparison",
+    "priority": "Should Have",
+    "gpu_hours_estimate": 0.8,
+    "matrix_stack_strategy": "L40S",
+    "objective": "Single-GPU L40S baseline comparison",
+    "key_metrics": [
+      "throughput",
+      "memory",
+      "power",
+      "gpu_hours"
+    ]
+  }
+}
