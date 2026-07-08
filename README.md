@@ -115,6 +115,12 @@ Render a Slurm submission script for a config:
 python -m hpc_ai_perf.cli render-slurm --config configs/environment_validation/E001_cuda_pytorch_1gpu.json
 ```
 
+Render Slurm scripts for a filtered group:
+
+```bash
+python -m hpc_ai_perf.cli render-slurm-bulk --phase "Environment validation" --priority "Must Have"
+```
+
 ## Expected Outputs
 
 - Reproducible experiment suite and configuration catalogue

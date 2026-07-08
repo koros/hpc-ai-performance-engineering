@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from hpc_ai_perf.cli import _render_slurm_bulk
 from hpc_ai_perf.config import discover_experiment_configs, filter_config_entries, load_experiment_config
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script
@@ -63,6 +64,28 @@ def test_write_slurm_script(tmp_path: Path) -> None:
 
     assert script_path == tmp_path / "E001.sbatch"
     assert script_path.read_text(encoding="utf-8") == "#!/bin/bash\n"
+
+
+def test_render_slurm_bulk(tmp_path: Path) -> None:
+    _render_slurm_bulk(
+        config_root="configs",
+        output_dir=str(tmp_path),
+        phase="Environment validation",
+        priority="Must Have",
+        mode=None,
+        workload=None,
+        experiment_id=None,
+        partition="gpu",
+        account=None,
+        time_limit=None,
+        cpus_per_task=8,
+        modules=[],
+        env_values=[],
+    )
+
+    generated = sorted(path.name for path in tmp_path.glob("*.sbatch"))
+
+    assert generated == ["E001.sbatch", "E002.sbatch", "E003.sbatch", "E004.sbatch", "E006.sbatch"]
 
 
 def test_local_runner_writes_standard_result(tmp_path: Path) -> None:

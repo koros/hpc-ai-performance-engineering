@@ -55,6 +55,24 @@ def main() -> None:
         )
         return
 
+    if args.command == "render-slurm-bulk":
+        _render_slurm_bulk(
+            config_root=args.config_root,
+            output_dir=args.output_dir,
+            phase=args.phase,
+            priority=args.priority,
+            mode=args.mode,
+            workload=args.workload,
+            experiment_id=args.experiment_id,
+            partition=args.partition,
+            account=args.account,
+            time_limit=args.time,
+            cpus_per_task=args.cpus_per_task,
+            modules=args.module,
+            env_values=args.env,
+        )
+        return
+
     parser.error("A command is required.")
 
 
@@ -78,20 +96,33 @@ def _build_parser() -> argparse.ArgumentParser:
 
     slurm_parser = subparsers.add_parser("render-slurm", help="Render an sbatch script for an experiment config.")
     slurm_parser.add_argument("--config", required=True, help="Path to a JSON or YAML experiment config.")
-    slurm_parser.add_argument("--output-dir", default="slurm/generated", help="Directory for generated sbatch scripts.")
-    slurm_parser.add_argument("--partition", default=None, help="Optional Slurm partition.")
-    slurm_parser.add_argument("--account", default=None, help="Optional Slurm account.")
-    slurm_parser.add_argument("--time", default=None, help="Override Slurm time limit, for example 02:00:00.")
-    slurm_parser.add_argument("--cpus-per-task", type=int, default=8)
-    slurm_parser.add_argument("--module", action="append", default=[], help="Module to load; can be repeated.")
-    slurm_parser.add_argument(
+    _add_slurm_options(slurm_parser)
+    slurm_parser.add_argument("--print", action="store_true", help="Print rendered script instead of writing it.")
+
+    bulk_parser = subparsers.add_parser("render-slurm-bulk", help="Render sbatch scripts for filtered configs.")
+    bulk_parser.add_argument("--config-root", default="configs", help="Root directory containing config files.")
+    bulk_parser.add_argument("--phase", default=None, help="Filter by metadata phase.")
+    bulk_parser.add_argument("--priority", default=None, help="Filter by metadata priority.")
+    bulk_parser.add_argument("--mode", choices=["training", "inference", "profiling"], default=None)
+    bulk_parser.add_argument("--workload", default=None, help="Filter by workload name.")
+    bulk_parser.add_argument("--experiment-id", default=None, help="Filter by experiment ID, such as E001.")
+    _add_slurm_options(bulk_parser)
+    return parser
+
+
+def _add_slurm_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--output-dir", default="slurm/generated", help="Directory for generated sbatch scripts.")
+    parser.add_argument("--partition", default=None, help="Optional Slurm partition.")
+    parser.add_argument("--account", default=None, help="Optional Slurm account.")
+    parser.add_argument("--time", default=None, help="Override Slurm time limit, for example 02:00:00.")
+    parser.add_argument("--cpus-per-task", type=int, default=8)
+    parser.add_argument("--module", action="append", default=[], help="Module to load; can be repeated.")
+    parser.add_argument(
         "--env",
         action="append",
         default=[],
         help="Environment variable KEY=VALUE; can be repeated.",
     )
-    slurm_parser.add_argument("--print", action="store_true", help="Print rendered script instead of writing it.")
-    return parser
 
 
 def _run_local_config(config_path: str, output_dir: str | None) -> None:
@@ -131,6 +162,52 @@ def _render_slurm_config(
 
     script_path = write_slurm_script(script, output_dir, config.experiment_id)
     LOGGER.info("Wrote Slurm script to %s", script_path)
+
+
+def _render_slurm_bulk(
+    *,
+    config_root: str,
+    output_dir: str,
+    phase: str | None,
+    priority: str | None,
+    mode: str | None,
+    workload: str | None,
+    experiment_id: str | None,
+    partition: str | None,
+    account: str | None,
+    time_limit: str | None,
+    cpus_per_task: int,
+    modules: list[str],
+    env_values: list[str],
+) -> None:
+    entries = discover_experiment_configs(config_root)
+    entries = filter_config_entries(
+        entries,
+        phase=phase,
+        priority=priority,
+        mode=mode,
+        workload=workload,
+        experiment_id=experiment_id,
+    )
+    if not entries:
+        LOGGER.warning("No configs matched the requested filters.")
+        return
+
+    environment = _parse_environment(env_values)
+    for entry in entries:
+        script = render_slurm_script(
+            entry.config,
+            entry.path,
+            partition=partition,
+            account=account,
+            time_limit=time_limit,
+            cpus_per_task=cpus_per_task,
+            modules=modules,
+            environment=environment,
+        )
+        write_slurm_script(script, output_dir, entry.config.experiment_id)
+
+    LOGGER.info("Wrote %d Slurm scripts to %s", len(entries), output_dir)
 
 
 def _parse_environment(values: list[str]) -> dict[str, str]:
