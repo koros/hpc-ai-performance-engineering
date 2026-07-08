@@ -1,7 +1,7 @@
 SLURM_PROFILE ?=
 SLURM_PROFILE_ARG := $(if $(SLURM_PROFILE),--slurm-profile $(SLURM_PROFILE),)
 
-.PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches list-slurm-smoke aggregate-results analyze-results track-progress validate readiness-report refresh serve-dashboard
+.PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress validate readiness-report refresh serve-dashboard
 
 install-dev:
 	python -m pip install -e ".[dev,yaml]"
@@ -46,6 +46,22 @@ plan-slurm-baseline-must-have: render-slurm-baseline-must-have
 	python -m hpc_ai_perf.cli plan-slurm-submission --script-dir slurm/generated/baseline_profiling_must_have --output slurm/generated/baseline_profiling_must_have/SUBMISSION_PLAN.md --batch-name "Baseline Profiling Must Have"
 
 plan-slurm-first-batches: plan-slurm-env-validation plan-slurm-baseline-must-have
+
+init-slurm-env-status: render-slurm-env-validation
+	python -m hpc_ai_perf.cli init-slurm-status --script-dir slurm/generated/environment_validation_must_have --output results/processed/slurm_environment_validation_status.csv --batch-name "Environment Validation Must Have"
+
+init-slurm-baseline-status: render-slurm-baseline-must-have
+	python -m hpc_ai_perf.cli init-slurm-status --script-dir slurm/generated/baseline_profiling_must_have --output results/processed/slurm_baseline_profiling_status.csv --batch-name "Baseline Profiling Must Have"
+
+init-slurm-first-status: init-slurm-env-status init-slurm-baseline-status
+
+report-slurm-env-status:
+	python -m hpc_ai_perf.cli report-slurm-status --status results/processed/slurm_environment_validation_status.csv --output results/processed/slurm_environment_validation_status.md
+
+report-slurm-baseline-status:
+	python -m hpc_ai_perf.cli report-slurm-status --status results/processed/slurm_baseline_profiling_status.csv --output results/processed/slurm_baseline_profiling_status.md
+
+report-slurm-first-status: report-slurm-env-status report-slurm-baseline-status
 
 list-slurm-smoke:
 	ls slurm/smoke/*.sbatch

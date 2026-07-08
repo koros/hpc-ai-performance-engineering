@@ -45,6 +45,12 @@ Generate reviewable submission manifests:
 SLURM_PROFILE=slurm/profiles/cluster.local.json make plan-slurm-first-batches
 ```
 
+Initialize job-status tracking before submission:
+
+```bash
+make init-slurm-first-status
+```
+
 ## Batch 1: Environment Validation
 
 Purpose: confirm CUDA, PyTorch DDP/NCCL, FSDP, and inference serving dependencies on the target cluster.
@@ -76,6 +82,7 @@ Review before submission:
 ```bash
 ls slurm/generated/environment_validation_must_have/*.sbatch
 sed -n '1,160p' slurm/generated/environment_validation_must_have/SUBMISSION_PLAN.md
+sed -n '1,20p' results/processed/slurm_environment_validation_status.csv
 ```
 
 ## Batch 2: Baseline Profiling
@@ -107,6 +114,7 @@ Review before submission:
 ```bash
 ls slurm/generated/baseline_profiling_must_have/*.sbatch
 sed -n '1,160p' slurm/generated/baseline_profiling_must_have/SUBMISSION_PLAN.md
+sed -n '1,20p' results/processed/slurm_baseline_profiling_status.csv
 ```
 
 ## Batch 1 + 2 Convenience Target
@@ -121,6 +129,29 @@ Generate scripts and submission manifests:
 
 ```bash
 make plan-slurm-first-batches
+```
+
+Generate status CSVs:
+
+```bash
+make init-slurm-first-status
+```
+
+## Recording Job IDs
+
+After each `sbatch` command, record the returned job ID against the experiment:
+
+```bash
+python -m hpc_ai_perf.cli record-slurm-job \
+  --status results/processed/slurm_environment_validation_status.csv \
+  --experiment-id E001 \
+  --sbatch-output "Submitted batch job 123456"
+```
+
+Generate Markdown status reports:
+
+```bash
+make report-slurm-first-status
 ```
 
 ## After Each Batch

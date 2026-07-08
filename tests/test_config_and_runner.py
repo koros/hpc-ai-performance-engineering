@@ -7,7 +7,17 @@ from hpc_ai_perf.config import discover_experiment_configs, filter_config_entrie
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
-from hpc_ai_perf.slurm import build_submission_plan, render_slurm_script, write_slurm_script, write_submission_plan
+from hpc_ai_perf.slurm import (
+    build_job_status_report,
+    build_job_status_rows,
+    build_submission_plan,
+    record_job_submission,
+    render_slurm_script,
+    write_job_status_csv,
+    write_job_status_report,
+    write_slurm_script,
+    write_submission_plan,
+)
 from hpc_ai_perf.tracking import track_experiment_progress
 from hpc_ai_perf.validation import validate_experiment_configs, validate_result_records
 from hpc_ai_perf.workloads import (
@@ -114,6 +124,53 @@ def test_write_submission_plan(tmp_path: Path) -> None:
 
     assert plan_path == tmp_path / "SUBMISSION_PLAN.md"
     assert "`E001.sbatch`" in plan_path.read_text(encoding="utf-8")
+
+
+def test_build_job_status_rows(tmp_path: Path) -> None:
+    write_slurm_script("#!/bin/bash\n", tmp_path, "E002")
+    write_slurm_script("#!/bin/bash\n", tmp_path, "E001")
+
+    rows = build_job_status_rows(tmp_path, batch_name="Environment Validation")
+
+    assert [row["experiment_id"] for row in rows] == ["E001", "E002"]
+    assert rows[0]["batch_name"] == "Environment Validation"
+    assert rows[0]["state"] == "PLANNED"
+    assert rows[0]["job_id"] == ""
+
+
+def test_record_job_submission_and_report(tmp_path: Path) -> None:
+    write_slurm_script("#!/bin/bash\n", tmp_path, "E001")
+    status_path = write_job_status_csv(tmp_path, tmp_path / "slurm_status.csv", batch_name="Environment Validation")
+
+    record_job_submission(
+        status_path,
+        experiment_id="E001",
+        sbatch_output="Submitted batch job 123456",
+        notes="first smoke submission",
+    )
+
+    with status_path.open(encoding="utf-8", newline="") as file_obj:
+        rows = list(csv.DictReader(file_obj))
+
+    assert rows[0]["job_id"] == "123456"
+    assert rows[0]["state"] == "SUBMITTED"
+    assert rows[0]["submitted_at"]
+    assert rows[0]["notes"] == "first smoke submission"
+
+    report = build_job_status_report(status_path)
+
+    assert "| SUBMITTED | 1 |" in report
+    assert "| E001 | 123456 | SUBMITTED |" in report
+
+
+def test_write_job_status_report(tmp_path: Path) -> None:
+    write_slurm_script("#!/bin/bash\n", tmp_path, "E001")
+    status_path = write_job_status_csv(tmp_path, tmp_path / "slurm_status.csv")
+
+    report_path = write_job_status_report(status_path, tmp_path / "slurm_status.md")
+
+    assert report_path == tmp_path / "slurm_status.md"
+    assert "# Slurm Job Status" in report_path.read_text(encoding="utf-8")
 
 
 def test_render_slurm_bulk(tmp_path: Path) -> None:
@@ -396,6 +453,8 @@ def test_hpc_submission_batches_doc_exists() -> None:
     assert "make render-slurm-env-validation" in batches
     assert "make render-slurm-baseline-must-have" in batches
     assert "make plan-slurm-first-batches" in batches
+    assert "make init-slurm-first-status" in batches
+    assert "record-slurm-job" in batches
     assert "E008-E011" in batches
 
 

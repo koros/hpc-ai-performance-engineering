@@ -17,7 +17,14 @@ from hpc_ai_perf.config import (
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
-from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script, write_submission_plan
+from hpc_ai_perf.slurm import (
+    record_job_submission,
+    render_slurm_script,
+    write_job_status_csv,
+    write_job_status_report,
+    write_slurm_script,
+    write_submission_plan,
+)
 from hpc_ai_perf.tracking import track_experiment_progress
 from hpc_ai_perf.validation import format_validation_issues, validate_project
 
@@ -99,6 +106,34 @@ def main() -> None:
             batch_name=args.batch_name,
         )
         LOGGER.info("Wrote Slurm submission plan to %s", plan_path)
+        return
+
+    if args.command == "init-slurm-status":
+        status_path = write_job_status_csv(
+            args.script_dir,
+            args.output,
+            batch_name=args.batch_name,
+        )
+        LOGGER.info("Wrote Slurm job status CSV to %s", status_path)
+        return
+
+    if args.command == "record-slurm-job":
+        status_path = record_job_submission(
+            args.status,
+            experiment_id=args.experiment_id,
+            script_path=args.script_path,
+            job_id=args.job_id,
+            sbatch_output=args.sbatch_output,
+            state=args.state,
+            submitted_at=args.submitted_at,
+            notes=args.notes,
+        )
+        LOGGER.info("Updated Slurm job status CSV at %s", status_path)
+        return
+
+    if args.command == "report-slurm-status":
+        report_path = write_job_status_report(args.status, args.output)
+        LOGGER.info("Wrote Slurm job status report to %s", report_path)
         return
 
     if args.command == "aggregate-results":
@@ -197,6 +232,40 @@ def _build_parser() -> argparse.ArgumentParser:
     plan_slurm_parser.add_argument("--script-dir", required=True, help="Directory containing generated sbatch scripts.")
     plan_slurm_parser.add_argument("--output", required=True, help="Path for the generated Markdown submission plan.")
     plan_slurm_parser.add_argument("--batch-name", default=None, help="Optional display name for the batch.")
+
+    init_status_parser = subparsers.add_parser(
+        "init-slurm-status",
+        help="Initialize a CSV for tracking generated sbatch scripts through Slurm submission.",
+    )
+    init_status_parser.add_argument(
+        "--script-dir", required=True, help="Directory containing generated sbatch scripts."
+    )
+    init_status_parser.add_argument("--output", required=True, help="Path for the generated status CSV.")
+    init_status_parser.add_argument("--batch-name", default=None, help="Optional display name for the batch.")
+
+    record_status_parser = subparsers.add_parser(
+        "record-slurm-job",
+        help="Record a Slurm job ID against an experiment in a status CSV.",
+    )
+    record_status_parser.add_argument("--status", required=True, help="Path to a Slurm job status CSV.")
+    record_status_parser.add_argument("--experiment-id", default=None, help="Experiment ID to update, such as E001.")
+    record_status_parser.add_argument("--script-path", default=None, help="Script path to update.")
+    record_status_parser.add_argument("--job-id", default=None, help="Slurm job ID.")
+    record_status_parser.add_argument(
+        "--sbatch-output",
+        default=None,
+        help="Raw sbatch output, for example 'Submitted batch job 12345'.",
+    )
+    record_status_parser.add_argument("--state", default="SUBMITTED", help="State to record for the job.")
+    record_status_parser.add_argument("--submitted-at", default=None, help="Optional submission timestamp.")
+    record_status_parser.add_argument("--notes", default=None, help="Optional notes for the status row.")
+
+    report_status_parser = subparsers.add_parser(
+        "report-slurm-status",
+        help="Write a Markdown report from a Slurm job status CSV.",
+    )
+    report_status_parser.add_argument("--status", required=True, help="Path to a Slurm job status CSV.")
+    report_status_parser.add_argument("--output", required=True, help="Path for the generated Markdown report.")
 
     aggregate_parser = subparsers.add_parser("aggregate-results", help="Aggregate raw result JSON files into CSV.")
     aggregate_parser.add_argument(
