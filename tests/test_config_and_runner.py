@@ -8,6 +8,7 @@ from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script
 from hpc_ai_perf.tracking import track_experiment_progress
+from hpc_ai_perf.validation import validate_experiment_configs, validate_result_records
 
 
 def test_load_synthetic_config() -> None:
@@ -218,3 +219,19 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
     assert e033["runtime_seconds"] == "600.0"
     assert e034["status"] == "Configured"
     assert "| Completed | 1 |" in markdown_path.read_text(encoding="utf-8")
+
+
+def test_experiment_configs_validate() -> None:
+    assert validate_experiment_configs("configs") == []
+
+
+def test_result_validation_reports_bad_record(tmp_path: Path) -> None:
+    bad_result = tmp_path / "bad.json"
+    bad_result.write_text('{"experiment_id": "E999", "status": "done", "runtime_seconds": -1}\n', encoding="utf-8")
+
+    issues = validate_result_records(tmp_path)
+
+    assert issues
+    assert any("missing required result field" in issue.message for issue in issues)
+    assert any("unsupported status" in issue.message for issue in issues)
+    assert any("runtime_seconds" in issue.message for issue in issues)

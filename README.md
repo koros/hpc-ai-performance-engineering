@@ -139,6 +139,12 @@ Generate progress tracker reports from configs and raw results:
 python -m hpc_ai_perf.cli track-progress
 ```
 
+Validate experiment configs and raw results:
+
+```bash
+python -m hpc_ai_perf.cli validate
+```
+
 Serve the static dashboard:
 
 ```bash

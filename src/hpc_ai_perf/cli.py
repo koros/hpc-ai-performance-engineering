@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 
 from hpc_ai_perf.analysis import analyze_results
@@ -15,6 +16,7 @@ from hpc_ai_perf.results import aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script
 from hpc_ai_perf.tracking import track_experiment_progress
+from hpc_ai_perf.validation import format_validation_issues, validate_project
 
 LOGGER = logging.getLogger(__name__)
 
@@ -97,6 +99,16 @@ def main() -> None:
         LOGGER.info("Wrote tracker Markdown to %s", markdown_path)
         return
 
+    if args.command == "validate":
+        issues = validate_project(args.config_root, args.result_dir, include_results=not args.skip_results)
+        if args.format == "json":
+            print(json.dumps([issue.to_dict() for issue in issues], indent=2) + "\n", end="")
+        else:
+            print(format_validation_issues(issues), end="")
+        if issues:
+            raise SystemExit(1)
+        return
+
     parser.error("A command is required.")
 
 
@@ -167,6 +179,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default="results/processed/experiment_tracker.md",
         help="Path for the generated tracker Markdown.",
     )
+
+    validate_parser = subparsers.add_parser("validate", help="Validate experiment configs and raw result records.")
+    validate_parser.add_argument(
+        "--config-root", default="configs", help="Root directory containing experiment configs."
+    )
+    validate_parser.add_argument(
+        "--result-dir", default="results/raw", help="Directory containing raw result JSON files."
+    )
+    validate_parser.add_argument("--skip-results", action="store_true", help="Only validate experiment configs.")
+    validate_parser.add_argument("--format", choices=["table", "json"], default="table")
     return parser
 
 
