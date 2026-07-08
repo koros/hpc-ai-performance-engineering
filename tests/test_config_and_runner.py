@@ -13,6 +13,7 @@ from hpc_ai_perf.slurm import (
     build_submission_plan,
     record_job_submission,
     render_slurm_script,
+    submit_job_scripts,
     write_job_status_csv,
     write_job_status_report,
     write_slurm_script,
@@ -171,6 +172,45 @@ def test_write_job_status_report(tmp_path: Path) -> None:
 
     assert report_path == tmp_path / "slurm_status.md"
     assert "# Slurm Job Status" in report_path.read_text(encoding="utf-8")
+
+
+def test_submit_job_scripts_dry_run(tmp_path: Path) -> None:
+    write_slurm_script("#!/bin/bash\n", tmp_path, "E001")
+    status_path = write_job_status_csv(tmp_path, tmp_path / "slurm_status.csv")
+
+    submissions = submit_job_scripts(tmp_path, status_path, dry_run=True)
+
+    assert submissions == [
+        {
+            "experiment_id": "E001",
+            "script_path": str(tmp_path / "E001.sbatch"),
+            "command": f"sbatch {tmp_path / 'E001.sbatch'}",
+            "job_id": "",
+            "state": "DRY_RUN",
+            "output": "",
+        }
+    ]
+    with status_path.open(encoding="utf-8", newline="") as file_obj:
+        rows = list(csv.DictReader(file_obj))
+    assert rows[0]["state"] == "PLANNED"
+
+
+def test_submit_job_scripts_records_mocked_sbatch_output(tmp_path: Path) -> None:
+    write_slurm_script("#!/bin/bash\n", tmp_path, "E001")
+    status_path = write_job_status_csv(tmp_path, tmp_path / "slurm_status.csv")
+
+    submissions = submit_job_scripts(
+        tmp_path,
+        status_path,
+        runner=lambda script: "Submitted batch job 123456",
+    )
+
+    assert submissions[0]["job_id"] == "123456"
+    assert submissions[0]["state"] == "SUBMITTED"
+    with status_path.open(encoding="utf-8", newline="") as file_obj:
+        rows = list(csv.DictReader(file_obj))
+    assert rows[0]["job_id"] == "123456"
+    assert rows[0]["state"] == "SUBMITTED"
 
 
 def test_render_slurm_bulk(tmp_path: Path) -> None:
@@ -490,6 +530,7 @@ def test_readme_documents_hpc_submission_workflow() -> None:
     assert "make check-slurm-profile" in readme
     assert "SLURM_PROFILE=slurm/profiles/cluster.local.json make plan-slurm-first-batches" in readme
     assert "make init-slurm-first-status" in readme
+    assert "submit-slurm-batch" in readme
     assert "record-slurm-job" in readme
 
 

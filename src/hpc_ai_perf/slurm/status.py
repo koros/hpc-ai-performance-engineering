@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import csv
 import re
+import subprocess
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -75,6 +77,56 @@ def record_job_submission(
     return status
 
 
+def submit_job_scripts(
+    script_dir: str | Path,
+    status_path: str | Path,
+    *,
+    dry_run: bool = False,
+    limit: int | None = None,
+    runner: Callable[[Path], str] | None = None,
+) -> list[dict[str, str]]:
+    scripts = sorted(Path(script_dir).glob("*.sbatch"))
+    if limit is not None:
+        scripts = scripts[:limit]
+
+    submissions: list[dict[str, str]] = []
+    for script in scripts:
+        command = f"sbatch {script}"
+        if dry_run:
+            submissions.append(
+                {
+                    "experiment_id": script.stem,
+                    "script_path": str(script),
+                    "command": command,
+                    "job_id": "",
+                    "state": "DRY_RUN",
+                    "output": "",
+                }
+            )
+            continue
+
+        output = (runner or _run_sbatch)(script)
+        job_id = _parse_sbatch_job_id(output)
+        if not job_id:
+            raise ValueError(f"Could not parse Slurm job ID from sbatch output for {script}: {output}")
+        record_job_submission(
+            status_path,
+            experiment_id=script.stem,
+            sbatch_output=output,
+        )
+        submissions.append(
+            {
+                "experiment_id": script.stem,
+                "script_path": str(script),
+                "command": command,
+                "job_id": job_id,
+                "state": "SUBMITTED",
+                "output": output,
+            }
+        )
+    return submissions
+
+
 def build_job_status_report(status_path: str | Path) -> str:
     rows = _read_rows(Path(status_path))
     state_counts: dict[str, int] = {}
@@ -146,6 +198,16 @@ def _find_status_row(
 def _parse_sbatch_job_id(output: str) -> str:
     match = SBATCH_JOB_ID_PATTERN.search(output)
     return match.group("job_id") if match else ""
+
+
+def _run_sbatch(script: Path) -> str:
+    completed = subprocess.run(
+        ["sbatch", str(script)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
 
 
 def _read_rows(path: Path) -> list[dict[str, str]]:

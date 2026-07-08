@@ -181,9 +181,18 @@ Initialize job-status CSVs before submitting jobs:
 
 ```bash
 make init-slurm-first-status
+make dry-run-submit-slurm-first
 ```
 
-After each `sbatch` command, record the returned Slurm job ID:
+On the cluster, submit a batch and record returned Slurm job IDs automatically:
+
+```bash
+python -m hpc_ai_perf.cli submit-slurm-batch \
+  --script-dir slurm/generated/environment_validation_must_have \
+  --status results/processed/slurm_environment_validation_status.csv
+```
+
+Or after a manual `sbatch` command, record the returned Slurm job ID:
 
 ```bash
 python -m hpc_ai_perf.cli record-slurm-job \

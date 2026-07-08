@@ -50,6 +50,7 @@ Initialize job-status tracking before submission:
 
 ```bash
 make init-slurm-first-status
+make dry-run-submit-slurm-first
 ```
 
 ## Batch 1: Environment Validation
@@ -140,7 +141,21 @@ make init-slurm-first-status
 
 ## Recording Job IDs
 
-After each `sbatch` command, record the returned job ID against the experiment:
+Dry-run the first submission commands:
+
+```bash
+make dry-run-submit-slurm-first
+```
+
+On the cluster, submit a generated batch and automatically record returned job IDs:
+
+```bash
+python -m hpc_ai_perf.cli submit-slurm-batch \
+  --script-dir slurm/generated/environment_validation_must_have \
+  --status results/processed/slurm_environment_validation_status.csv
+```
+
+After a manual `sbatch` command, record the returned job ID against the experiment:
 
 ```bash
 python -m hpc_ai_perf.cli record-slurm-job \

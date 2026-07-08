@@ -5,6 +5,7 @@ from hpc_ai_perf.slurm.status import (
     build_job_status_report,
     build_job_status_rows,
     record_job_submission,
+    submit_job_scripts,
     write_job_status_csv,
     write_job_status_report,
 )
@@ -17,6 +18,7 @@ __all__ = [
     "build_submission_plan",
     "record_job_submission",
     "render_slurm_script",
+    "submit_job_scripts",
     "write_job_status_csv",
     "write_job_status_report",
     "write_slurm_script",

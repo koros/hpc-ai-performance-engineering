@@ -20,6 +20,7 @@ from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.slurm import (
     record_job_submission,
     render_slurm_script,
+    submit_job_scripts,
     write_job_status_csv,
     write_job_status_report,
     write_slurm_script,
@@ -135,6 +136,26 @@ def main() -> None:
     if args.command == "report-slurm-status":
         report_path = write_job_status_report(args.status, args.output)
         LOGGER.info("Wrote Slurm job status report to %s", report_path)
+        return
+
+    if args.command == "submit-slurm-batch":
+        submissions = submit_job_scripts(
+            args.script_dir,
+            args.status,
+            dry_run=args.dry_run,
+            limit=args.limit,
+        )
+        for submission in submissions:
+            if args.dry_run:
+                print(submission["command"])
+            else:
+                print(
+                    "{experiment_id}: {job_id} ({script_path})".format(
+                        experiment_id=submission["experiment_id"],
+                        job_id=submission["job_id"],
+                        script_path=submission["script_path"],
+                    )
+                )
         return
 
     if args.command == "check-slurm-profile":
@@ -277,6 +298,17 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     report_status_parser.add_argument("--status", required=True, help="Path to a Slurm job status CSV.")
     report_status_parser.add_argument("--output", required=True, help="Path for the generated Markdown report.")
+
+    submit_batch_parser = subparsers.add_parser(
+        "submit-slurm-batch",
+        help="Submit generated sbatch scripts and record returned Slurm job IDs.",
+    )
+    submit_batch_parser.add_argument(
+        "--script-dir", required=True, help="Directory containing generated sbatch scripts."
+    )
+    submit_batch_parser.add_argument("--status", required=True, help="Path to a Slurm job status CSV.")
+    submit_batch_parser.add_argument("--dry-run", action="store_true", help="Print sbatch commands without submitting.")
+    submit_batch_parser.add_argument("--limit", type=int, default=None, help="Submit only the first N scripts.")
 
     check_profile_parser = subparsers.add_parser(
         "check-slurm-profile",
