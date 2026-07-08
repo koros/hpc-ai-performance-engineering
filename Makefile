@@ -1,4 +1,4 @@
-.PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have list-slurm-smoke aggregate-results analyze-results track-progress validate readiness-report refresh serve-dashboard
+.PHONY: install-dev lint format test check hooks list-configs render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-baseline-must-have render-slurm-first-batches list-slurm-smoke aggregate-results analyze-results track-progress validate readiness-report refresh serve-dashboard
 
 install-dev:
 	python -m pip install -e ".[dev,yaml]"
@@ -27,6 +27,14 @@ render-slurm-example:
 
 render-slurm-must-have:
 	python -m hpc_ai_perf.cli render-slurm-bulk --priority "Must Have"
+
+render-slurm-env-validation:
+	python -m hpc_ai_perf.cli render-slurm-bulk --phase "Environment validation" --priority "Must Have" --output-dir slurm/generated/environment_validation_must_have
+
+render-slurm-baseline-must-have:
+	python -m hpc_ai_perf.cli render-slurm-bulk --phase "Baseline profiling" --priority "Must Have" --output-dir slurm/generated/baseline_profiling_must_have
+
+render-slurm-first-batches: render-slurm-env-validation render-slurm-baseline-must-have
 
 list-slurm-smoke:
 	ls slurm/smoke/*.sbatch

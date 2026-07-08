@@ -305,6 +305,14 @@ def test_current_status_snapshot_exists() -> None:
     assert "python -m hpc_ai_perf.cli refresh" in status
 
 
+def test_hpc_submission_batches_doc_exists() -> None:
+    batches = Path("docs/hpc_submission_batches.md").read_text(encoding="utf-8")
+
+    assert "make render-slurm-env-validation" in batches
+    assert "make render-slurm-baseline-must-have" in batches
+    assert "E008-E011" in batches
+
+
 def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
     report_path = write_readiness_report(tmp_path / "readiness_report.md")
     report = report_path.read_text(encoding="utf-8")
