@@ -1,6 +1,7 @@
 import csv
 from pathlib import Path
 
+from hpc_ai_perf.analysis import analyze_results
 from hpc_ai_perf.cli import _render_slurm_bulk
 from hpc_ai_perf.config import discover_experiment_configs, filter_config_entries, load_experiment_config
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
@@ -128,3 +129,41 @@ def test_aggregate_results_writes_processed_csv(tmp_path: Path) -> None:
     assert rows[0]["priority"] == "Must Have"
     assert rows[0]["strategy"] == "ddp"
     assert rows[0]["metric_throughput_tokens_sec"]
+
+
+def test_analyze_results_writes_summary_tables(tmp_path: Path) -> None:
+    config = load_experiment_config(Path("configs/scaling_studies/E033_gpt2_small_strong_2gpu.json"))
+    raw_dir = tmp_path / "raw"
+    processed_path = tmp_path / "processed" / "experiments.csv"
+    analysis_dir = tmp_path / "analysis"
+
+    result = ExperimentResult.from_config(
+        config,
+        status="completed",
+        started_at="2026-01-01T00:00:00Z",
+        completed_at="2026-01-01T00:10:00Z",
+        runtime_seconds=600.0,
+        metrics={"throughput_tokens_sec": 1200.0, "throughput_samples_sec": 30.0, "memory_used_gb": 42.0},
+    )
+    result.write_json(raw_dir)
+    aggregate_results(raw_dir, processed_path)
+
+    written_paths = analyze_results(processed_path, analysis_dir)
+
+    assert sorted(path.name for path in written_paths) == [
+        "experiment_rankings.csv",
+        "phase_summary.csv",
+        "precision_summary.csv",
+        "scaling_summary.csv",
+    ]
+
+    with (analysis_dir / "phase_summary.csv").open(encoding="utf-8", newline="") as file_obj:
+        phase_rows = list(csv.DictReader(file_obj))
+    with (analysis_dir / "experiment_rankings.csv").open(encoding="utf-8", newline="") as file_obj:
+        ranking_rows = list(csv.DictReader(file_obj))
+
+    assert phase_rows[0]["phase"] == "Strong scaling"
+    assert phase_rows[0]["completed"] == "1"
+    assert phase_rows[0]["avg_throughput_tokens_sec"] == "1200.0"
+    assert ranking_rows[0]["experiment_id"] == "E033"
+    assert ranking_rows[0]["throughput_tokens_per_gpu"] == "600.0"

@@ -127,6 +127,12 @@ Aggregate raw JSON results into a processed experiment table:
 python -m hpc_ai_perf.cli aggregate-results
 ```
 
+Build analysis tables for phase summaries, rankings, scaling, and precision comparisons:
+
+```bash
+python -m hpc_ai_perf.cli analyze-results
+```
+
 ## Expected Outputs
 
 - Reproducible experiment suite and configuration catalogue

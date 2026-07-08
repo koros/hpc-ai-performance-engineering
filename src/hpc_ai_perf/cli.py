@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 
+from hpc_ai_perf.analysis import analyze_results
 from hpc_ai_perf.config import (
     discover_experiment_configs,
     entries_to_json,
@@ -79,6 +80,11 @@ def main() -> None:
         LOGGER.info("Wrote aggregated results to %s", result_path)
         return
 
+    if args.command == "analyze-results":
+        written_paths = analyze_results(args.input, args.output_dir)
+        LOGGER.info("Wrote %d analysis tables to %s", len(written_paths), args.output_dir)
+        return
+
     parser.error("A command is required.")
 
 
@@ -123,6 +129,14 @@ def _build_parser() -> argparse.ArgumentParser:
         default="results/processed/experiments.csv",
         help="Path for the processed experiment CSV.",
     )
+
+    analyze_parser = subparsers.add_parser("analyze-results", help="Build analysis tables from processed results.")
+    analyze_parser.add_argument(
+        "--input",
+        default="results/processed/experiments.csv",
+        help="Processed experiment CSV created by aggregate-results.",
+    )
+    analyze_parser.add_argument("--output-dir", default="results/analysis", help="Directory for analysis CSV tables.")
     return parser
 
 
