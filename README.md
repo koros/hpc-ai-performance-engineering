@@ -73,17 +73,23 @@ The reduced feasible scope in the appendix is approximately 95-118 GPU-hours, pr
 ```text
 hpc-ai-performance-engineering/
 ├── configs/                  # JSON/YAML experiment configurations
+│   ├── baseline_profiling/
+│   ├── environment_validation/
 │   ├── distributed/
 │   ├── inference/
 │   ├── local/
-│   ├── profiling/
-│   └── training/
+│   ├── precision_studies/
+│   ├── scaling_studies/
+│   ├── templates/
+│   └── workload_characterisation/
+├── dashboard/                # Static dashboard for processed results
 ├── docs/                     # Project plan, matrix, tracker, architecture, hardware notes
 ├── experiments/              # Phase folders aligned with the proposal outline
+├── notebooks/                # Exploratory analysis notebooks
 ├── results/                  # Raw results, processed outputs, and figures
 ├── schemas/                  # Result schema definitions
 ├── scripts/                  # Utility scripts
-├── slurm/                    # Slurm submission templates
+├── slurm/                    # Slurm scripts, profiles, generated plans, and smoke presets
 ├── src/hpc_ai_perf/          # Experiment config, runner, profiling, results, workload code
 ├── tests/                    # Local validation tests
 └── workloads/                # Workload-specific assets and notes
@@ -155,6 +161,43 @@ Render Slurm scripts for a filtered group:
 ```bash
 python -m hpc_ai_perf.cli render-slurm-bulk --phase "Environment validation" --priority "Must Have"
 ```
+
+## HPC Submission Workflow
+
+Prepare a local Slurm profile from the tracked example and edit it for the target cluster:
+
+```bash
+cp slurm/profiles/example.json slurm/profiles/cluster.local.json
+```
+
+Generate the first environment-validation and baseline batches with site-specific settings:
+
+```bash
+SLURM_PROFILE=slurm/profiles/cluster.local.json make plan-slurm-first-batches
+```
+
+Initialize job-status CSVs before submitting jobs:
+
+```bash
+make init-slurm-first-status
+```
+
+After each `sbatch` command, record the returned Slurm job ID:
+
+```bash
+python -m hpc_ai_perf.cli record-slurm-job \
+  --status results/processed/slurm_environment_validation_status.csv \
+  --experiment-id E001 \
+  --sbatch-output "Submitted batch job 123456"
+```
+
+Generate Markdown status reports:
+
+```bash
+make report-slurm-first-status
+```
+
+Detailed submission instructions are tracked in [HPC submission batches](docs/hpc_submission_batches.md).
 
 Aggregate raw JSON results into a processed experiment table:
 

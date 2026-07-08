@@ -458,6 +458,15 @@ def test_hpc_submission_batches_doc_exists() -> None:
     assert "E008-E011" in batches
 
 
+def test_readme_documents_hpc_submission_workflow() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert "## HPC Submission Workflow" in readme
+    assert "SLURM_PROFILE=slurm/profiles/cluster.local.json make plan-slurm-first-batches" in readme
+    assert "make init-slurm-first-status" in readme
+    assert "record-slurm-job" in readme
+
+
 def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
     report_path = write_readiness_report(tmp_path / "readiness_report.md")
     report = report_path.read_text(encoding="utf-8")
