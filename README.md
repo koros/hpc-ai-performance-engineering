@@ -115,6 +115,12 @@ Run the optional DistilBERT smoke workload:
 python -m hpc_ai_perf.cli run --config configs/local/distilbert_smoke.json
 ```
 
+Run the optional TinyLlama-style inference smoke workload:
+
+```bash
+python -m hpc_ai_perf.cli run --config configs/local/tinyllama_inference_smoke.json
+```
+
 Run the local synthetic smoke benchmark:
 
 ```bash

@@ -226,11 +226,23 @@ class DistilBERTWorkload(TransformerWorkload):
         )
 
 
+class TinyLlamaWorkload(TransformerWorkload):
+    """Minimal TinyLlama-style causal LM inference workload."""
+
+    def __init__(self) -> None:
+        super().__init__(name="tinyllama", display_name="TinyLlama")
+
+    def run(self, config: ExperimentConfig) -> WorkloadRunOutput:
+        if config.mode == "inference":
+            return _run_causal_lm_inference(config)
+        raise NotImplementedError("TinyLlama training is not implemented yet; use inference configs for this adapter.")
+
+
 def transformer_workloads() -> list[TransformerWorkload]:
     return [
         GPT2SmallWorkload(),
         DistilBERTWorkload(),
-        TransformerWorkload(name="tinyllama", display_name="TinyLlama"),
+        TinyLlamaWorkload(),
     ]
 
 
@@ -248,6 +260,40 @@ def _load_sequence_classification_stack() -> tuple[Any, Any, Any]:
     return torch, AutoModelForSequenceClassification, AutoTokenizer
 
 
+def _run_causal_lm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
+    torch, auto_model, auto_tokenizer = _load_causal_lm_stack()
+    device = _device(torch)
+    dtype = _torch_dtype(torch, config.runtime.precision, device)
+    parameters = config.workload.parameters
+    model_name = str(parameters.get("hf_model_name", config.workload.model))
+    prompt = str(parameters.get("prompt", "Benchmarking transformer inference on H100 systems."))
+    max_new_tokens = int(parameters.get("max_new_tokens", 32))
+
+    tokenizer = auto_tokenizer.from_pretrained(model_name)
+    model = auto_model.from_pretrained(model_name, torch_dtype=dtype).to(device)
+    model.eval()
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+
+    start = time.perf_counter()
+    with torch.no_grad():
+        outputs = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+    elapsed = max(time.perf_counter() - start, 1e-9)
+    generated_tokens = int(outputs.shape[-1] - inputs["input_ids"].shape[-1])
+
+    return WorkloadRunOutput(
+        metrics={
+            "prompt_tokens": int(inputs["input_ids"].shape[-1]),
+            "generated_tokens": generated_tokens,
+            "total_tokens": generated_tokens,
+            "throughput_tokens_sec": generated_tokens / elapsed,
+            "latency_p50_ms": elapsed * 1000,
+            "latency_p95_ms": elapsed * 1000,
+            "device": str(device),
+            "hf_model_name": model_name,
+        }
+    )
+
+
 def _device(torch: Any) -> Any:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -259,4 +305,4 @@ def _torch_dtype(torch: Any, precision: str, device: Any) -> Any:
         return torch.float16 if device.type == "cuda" else torch.float32
     if precision == "bf16":
         return torch.bfloat16 if device.type == "cuda" else torch.float32
-    raise NotImplementedError(f"GPT-2 Small does not support precision yet: {precision}")
+    raise NotImplementedError(f"Transformer workload does not support precision yet: {precision}")

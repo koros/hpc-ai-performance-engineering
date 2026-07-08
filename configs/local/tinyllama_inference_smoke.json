@@ -1,0 +1,41 @@
+{
+  "experiment_id": "local_tinyllama_inference_smoke",
+  "experiment": "local_tinyllama_inference_smoke_test",
+  "mode": "inference",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "dataset": "prompt_smoke",
+    "parameters": {
+      "hf_model_name": "hf-internal-testing/tiny-random-LlamaForCausalLM",
+      "prompt": "Summarise why GPU benchmarking matters.",
+      "max_new_tokens": 8
+    }
+  },
+  "hardware": {
+    "platform": "local",
+    "gpus": 0,
+    "gpu_model": null,
+    "interconnect": null
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 0,
+    "backend": "gloo"
+  },
+  "runtime": {
+    "precision": "fp32",
+    "max_steps": 1,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": false,
+    "profilers": [],
+    "parameters": {}
+  },
+  "metadata": {
+    "purpose": "Validate the optional Hugging Face TinyLlama-style inference path with a tiny random model."
+  }
+}

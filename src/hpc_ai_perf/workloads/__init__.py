@@ -5,6 +5,7 @@ from hpc_ai_perf.workloads.registry import WorkloadRegistry, default_registry
 from hpc_ai_perf.workloads.transformer import (
     DistilBERTWorkload,
     GPT2SmallWorkload,
+    TinyLlamaWorkload,
     TransformerWorkload,
     transformer_workloads,
 )
@@ -12,6 +13,7 @@ from hpc_ai_perf.workloads.transformer import (
 __all__ = [
     "DistilBERTWorkload",
     "GPT2SmallWorkload",
+    "TinyLlamaWorkload",
     "TransformerWorkload",
     "Workload",
     "WorkloadRegistry",
