@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from hpc_ai_perf.workloads.base import Workload
 from hpc_ai_perf.workloads.synthetic import SyntheticWorkload
+from hpc_ai_perf.workloads.transformer import transformer_workloads
 
 
 @dataclass
@@ -29,4 +30,6 @@ class WorkloadRegistry:
 def default_registry() -> WorkloadRegistry:
     registry = WorkloadRegistry()
     registry.register(SyntheticWorkload())
+    for workload in transformer_workloads():
+        registry.register(workload)
     return registry

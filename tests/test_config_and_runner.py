@@ -9,6 +9,7 @@ from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.slurm import render_slurm_script, write_slurm_script
 from hpc_ai_perf.tracking import track_experiment_progress
 from hpc_ai_perf.validation import validate_experiment_configs, validate_result_records
+from hpc_ai_perf.workloads import default_registry
 
 
 def test_load_synthetic_config() -> None:
@@ -102,6 +103,23 @@ def test_local_runner_writes_standard_result(tmp_path: Path) -> None:
     assert result.status == "completed"
     assert result.throughput_tokens_sec is not None
     assert result_path.exists()
+
+
+def test_default_registry_includes_transformer_workload_skeletons() -> None:
+    registry = default_registry()
+
+    assert registry.names() == ["distilbert", "gpt2_small", "synthetic", "tinyllama"]
+
+
+def test_transformer_workload_skeleton_fails_gracefully() -> None:
+    config = load_experiment_config(Path("configs/scaling_studies/E033_gpt2_small_strong_2gpu.json"))
+
+    result = LocalBenchmarkRunner().run(config)
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert "GPT-2 Small" in result.error
+    assert "optional dependencies" in result.error or "not implemented yet" in result.error
 
 
 def test_aggregate_results_writes_processed_csv(tmp_path: Path) -> None:

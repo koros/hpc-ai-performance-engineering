@@ -97,6 +97,12 @@ pip install -e ".[dev]"
 pytest
 ```
 
+Install optional transformer workload dependencies when moving beyond the synthetic smoke path:
+
+```bash
+pip install -e ".[workloads]"
+```
+
 Run the local synthetic smoke benchmark:
 
 ```bash
