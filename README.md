@@ -10,6 +10,7 @@ The latest plan is based on `Appendix_A_Comprehensive_Experiment_Matrix.docx` an
 
 Primary planning documents:
 
+- [Current project status](docs/current_status.md): high-level snapshot of completed infrastructure, smoke-ready workloads, and remaining HPC submission tasks.
 - [Comprehensive experiment matrix](docs/experiment_matrix.md): full source-of-truth matrix with `E001` to `E200`, priority levels, metrics, and GPU-hour estimates.
 - [Experiment tracker](docs/experiment_tracker.md): editable run-status table for every planned experiment and analysis task.
 - [HPC smoke runbook](docs/hpc_smoke_runbook.md): checklist for validating the cluster environment before full matrix submission.

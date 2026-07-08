@@ -297,6 +297,14 @@ def test_hpc_smoke_runbook_exists() -> None:
     assert "make serve-dashboard" in runbook
 
 
+def test_current_status_snapshot_exists() -> None:
+    status = Path("docs/current_status.md").read_text(encoding="utf-8")
+
+    assert "Total matrix configs | 200" in status
+    assert "Smoke-Ready Workloads" in status
+    assert "python -m hpc_ai_perf.cli refresh" in status
+
+
 def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
     report_path = write_readiness_report(tmp_path / "readiness_report.md")
     report = report_path.read_text(encoding="utf-8")
