@@ -103,6 +103,12 @@ Install optional transformer workload dependencies when moving beyond the synthe
 pip install -e ".[workloads]"
 ```
 
+Run the optional GPT-2 Small smoke workload after installing those dependencies:
+
+```bash
+python -m hpc_ai_perf.cli run --config configs/local/gpt2_small_smoke.json
+```
+
 Run the local synthetic smoke benchmark:
 
 ```bash

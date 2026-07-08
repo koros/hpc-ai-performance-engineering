@@ -1,0 +1,42 @@
+{
+  "experiment_id": "local_gpt2_small_smoke",
+  "experiment": "local_gpt2_small_smoke_test",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "synthetic_tokens",
+    "parameters": {
+      "hf_model_name": "sshleifer/tiny-gpt2",
+      "micro_batch_size": 1,
+      "sequence_length": 32,
+      "learning_rate": 0.00005
+    }
+  },
+  "hardware": {
+    "platform": "local",
+    "gpus": 0,
+    "gpu_model": null,
+    "interconnect": null
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 0,
+    "backend": "gloo"
+  },
+  "runtime": {
+    "precision": "fp32",
+    "max_steps": 1,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": false,
+    "profilers": [],
+    "parameters": {}
+  },
+  "metadata": {
+    "purpose": "Validate the optional Hugging Face GPT-2 workload path with a tiny model."
+  }
+}
