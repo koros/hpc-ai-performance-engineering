@@ -1,0 +1,69 @@
+{
+  "experiment_id": "E197",
+  "experiment": "inference_precision_quantization_tinyllama_fp16",
+  "mode": "inference",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "dataset": "prompt_set_v1",
+    "parameters": {
+      "inference_study_type": "precision_quantization",
+      "frameworks": [
+        "vllm",
+        "tensorrt_llm"
+      ],
+      "precision_label": "FP16",
+      "batch_size": 1,
+      "concurrent_requests": 1,
+      "prompt_length": 128,
+      "max_new_tokens": 128,
+      "quality_sanity_check": true
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "fp16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "serving_latency"
+    ],
+    "parameters": {
+      "collect_latency_distribution": true,
+      "collect_memory_trace": true,
+      "collect_quality_sanity_check": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E197",
+    "template": "inference_serving",
+    "phase": "Inference precision/quantization",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.5,
+    "matrix_stack_strategy": "vLLM or TensorRT-LLM",
+    "matrix_precision_config": "FP16",
+    "objective": "Inference using FP16",
+    "key_metrics": [
+      "latency",
+      "tokens_sec",
+      "memory",
+      "quality_sanity_check"
+    ]
+  }
+}
