@@ -7,8 +7,14 @@ See the full checklist in [`docs/hpc_smoke_runbook.md`](../../docs/hpc_smoke_run
 Before submitting, prepare the environment on the cluster:
 
 ```bash
-python -m pip install -e ".[workloads]"
+cd ~/hpc-ai-performance-engineering
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev,yaml,workloads]"
 ```
+
+The scripts assume they are submitted from the project root. They load cluster modules from
+`slurm/modules_for_hpc_ai` and then activate `.venv`.
 
 Submit one smoke job:
 
@@ -18,4 +24,4 @@ sbatch slurm/smoke/distilbert_smoke.sbatch
 sbatch slurm/smoke/tinyllama_inference_smoke.sbatch
 ```
 
-Edit partition, account, module, and virtual environment lines for the target HPC site.
+Edit the partition if needed, and add an account line only if the target HPC site requires one.

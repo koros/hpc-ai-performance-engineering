@@ -4,9 +4,10 @@ Use this checklist before submitting the full experiment matrix. The goal is to 
 
 ## 1. Prepare Environment
 
-Clone or update the project on the cluster login node:
+Clone or update the project on the cluster login node, then work from the project root:
 
 ```bash
+cd ~/hpc-ai-performance-engineering
 git pull
 python -m venv .venv
 source .venv/bin/activate
@@ -14,11 +15,13 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev,yaml,workloads]"
 ```
 
-If the cluster uses modules, load the required CUDA/Python stack before creating or activating the environment:
+The Slurm scripts assume jobs are submitted from the project root. Cluster modules are loaded through:
 
 ```bash
-module load cuda/12.4
+slurm/modules_for_hpc_ai
 ```
+
+Review that file on the cluster and adjust module names if Lovelace has changed since the last working examples.
 
 ## 2. Validate Repository State
 
@@ -32,12 +35,12 @@ make list-slurm-smoke
 
 ## 3. Edit Slurm Presets
 
-Review the smoke scripts and set site-specific fields:
+Review the smoke scripts and site setup:
 
 - `#SBATCH --partition=...`
-- `#SBATCH --account=...`
-- module load commands
-- virtual environment activation path
+- add `#SBATCH --account=...` only if the cluster requires it
+- `source slurm/modules_for_hpc_ai`
+- `source .venv/bin/activate`
 
 Smoke scripts:
 
@@ -52,6 +55,7 @@ slurm/smoke/tinyllama_inference_smoke.sbatch
 Submit one job at a time until the environment is known to be stable:
 
 ```bash
+cd ~/hpc-ai-performance-engineering
 sbatch slurm/smoke/gpt2_small_smoke.sbatch
 squeue -u "$USER"
 ```
