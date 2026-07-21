@@ -28,10 +28,19 @@ cp slurm/profiles/example.json slurm/profiles/cluster.local.json
 Edit the local profile for the target site:
 
 - `partition`
-- `account`
+- `account`, only if required by the cluster
 - `setup_commands`
-- `modules`
+- `modules`, only if not using a project-local setup script
 - `environment`
+
+The default local profile assumes jobs are submitted from the project root and uses:
+
+```bash
+source slurm/modules_for_hpc_ai
+source .venv/bin/activate
+```
+
+Review `slurm/modules_for_hpc_ai` on the cluster before submitting.
 
 Use the profile while rendering:
 

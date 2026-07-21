@@ -634,18 +634,20 @@ def _check_slurm_profile(profile_path: str) -> list[str]:
     profile = _load_slurm_profile(profile_path)
     issues: list[str] = []
 
-    for key in ("partition", "account"):
-        value = profile.get(key)
-        if not value:
-            issues.append(f"`{key}` must be set.")
-        elif _contains_placeholder(value):
-            issues.append(f"`{key}` still contains a placeholder: {value}")
+    partition = profile.get("partition")
+    if not partition:
+        issues.append("`partition` must be set.")
+    elif _contains_placeholder(partition):
+        issues.append(f"`partition` still contains a placeholder: {partition}")
+
+    account = profile.get("account")
+    if account and _contains_placeholder(account):
+        issues.append(f"`account` still contains a placeholder: {account}")
 
     modules = profile.get("modules", [])
-    if not modules:
-        issues.append("`modules` should list the CUDA/Python stack required on the cluster.")
-
     setup_commands = profile.get("setup_commands", [])
+    if not modules and not setup_commands:
+        issues.append("`modules` or `setup_commands` should load the CUDA/Python stack required on the cluster.")
     for index, command in enumerate(setup_commands, start=1):
         if _contains_placeholder(command):
             issues.append(f"`setup_commands[{index}]` still contains a placeholder: {command}")

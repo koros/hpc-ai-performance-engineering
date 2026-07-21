@@ -27,7 +27,7 @@ def build_submission_plan(script_dir: str | Path, *, batch_name: str | None = No
         [
             "## Review Checklist",
             "",
-            "- Confirm `#SBATCH --partition` and `#SBATCH --account` are correct.",
+            "- Confirm `#SBATCH --partition` is correct, and add `#SBATCH --account` only if the cluster requires it.",
             "- Confirm module, virtual environment, and environment-variable setup is correct.",
             "- Confirm output/error paths point to writable storage.",
             "- Submit Batch 1 before Batch 2 and inspect logs before continuing.",
