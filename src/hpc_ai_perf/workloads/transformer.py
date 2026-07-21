@@ -120,7 +120,12 @@ class DistilBERTWorkload(TransformerWorkload):
         num_labels = int(parameters.get("num_labels", 2))
         learning_rate = float(parameters.get("learning_rate", 5e-5))
 
-        model = auto_model.from_pretrained(model_name, num_labels=num_labels, torch_dtype=dtype).to(device)
+        model = auto_model.from_pretrained(
+            model_name,
+            num_labels=num_labels,
+            torch_dtype=dtype,
+            ignore_mismatched_sizes=True,
+        ).to(device)
         model.train()
         optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
         input_ids = torch.randint(
@@ -170,7 +175,12 @@ class DistilBERTWorkload(TransformerWorkload):
         num_labels = int(parameters.get("num_labels", 2))
 
         tokenizer = auto_tokenizer.from_pretrained(model_name)
-        model = auto_model.from_pretrained(model_name, num_labels=num_labels, torch_dtype=dtype).to(device)
+        model = auto_model.from_pretrained(
+            model_name,
+            num_labels=num_labels,
+            torch_dtype=dtype,
+            ignore_mismatched_sizes=True,
+        ).to(device)
         model.eval()
         inputs = tokenizer(text, return_tensors="pt", truncation=True).to(device)
 
