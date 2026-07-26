@@ -12,6 +12,7 @@ Primary planning documents:
 
 - [Current project status](docs/current_status.md): high-level snapshot of completed infrastructure, smoke-ready workloads, and remaining HPC submission tasks.
 - [Comprehensive experiment matrix](docs/experiment_matrix.md): full source-of-truth matrix with `E001` to `E200`, priority levels, metrics, and GPU-hour estimates.
+- [Local dev runbook](docs/local_dev_runbook.md): Mac/local baseline-style runs for development while HPC access is unavailable.
 - [Experiment tracker](docs/experiment_tracker.md): editable run-status table for every planned experiment and analysis task.
 - [HPC smoke runbook](docs/hpc_smoke_runbook.md): checklist for validating the cluster environment before full matrix submission.
 - [HPC submission batches](docs/hpc_submission_batches.md): first environment-validation and baseline Slurm batches after smoke tests pass.
@@ -143,6 +144,15 @@ Run the local synthetic smoke benchmark:
 ```bash
 python -m hpc_ai_perf.cli run --config configs/local/synthetic_smoke.json
 ```
+
+Run local dev baselines on a Mac or workstation while HPC is unavailable:
+
+```bash
+make run-dev-baselines
+python -m hpc_ai_perf.cli refresh
+```
+
+These `dev_` runs are workflow checks, not H100 measurements.
 
 List matrix experiment configs:
 

@@ -1,0 +1,46 @@
+{
+  "experiment_id": "dev_distilbert_inference_baseline",
+  "experiment": "dev_distilbert_inference_baseline",
+  "mode": "inference",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "dataset": "prompt_dev",
+    "parameters": {
+      "device": "auto",
+      "hf_model_name": "distilbert-base-uncased",
+      "text": "Efficient transformer benchmarking helps compare systems and identify bottlenecks.",
+      "num_labels": 2
+    }
+  },
+  "hardware": {
+    "platform": "mac_m1_dev",
+    "gpus": 0,
+    "gpu_model": null,
+    "interconnect": null
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 0,
+    "backend": "gloo"
+  },
+  "runtime": {
+    "precision": "fp32",
+    "max_steps": 1,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": false,
+    "profilers": [],
+    "parameters": {}
+  },
+  "metadata": {
+    "profile": "dev",
+    "phase": "Dev baseline",
+    "priority": "Dev",
+    "purpose": "Run a lightweight DistilBERT baseline-style inference experiment on a local Mac while HPC is unavailable.",
+    "hpc_equivalent": "E014"
+  }
+}

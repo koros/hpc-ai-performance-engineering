@@ -1,0 +1,48 @@
+{
+  "experiment_id": "dev_distilbert_training_baseline",
+  "experiment": "dev_distilbert_training_baseline",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "dataset": "synthetic_classification",
+    "parameters": {
+      "device": "auto",
+      "hf_model_name": "distilbert-base-uncased",
+      "micro_batch_size": 2,
+      "sequence_length": 128,
+      "num_labels": 2,
+      "learning_rate": 0.00005
+    }
+  },
+  "hardware": {
+    "platform": "mac_m1_dev",
+    "gpus": 0,
+    "gpu_model": null,
+    "interconnect": null
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 0,
+    "backend": "gloo"
+  },
+  "runtime": {
+    "precision": "fp32",
+    "max_steps": 5,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": false,
+    "profilers": [],
+    "parameters": {}
+  },
+  "metadata": {
+    "profile": "dev",
+    "phase": "Dev baseline",
+    "priority": "Dev",
+    "purpose": "Run a lightweight DistilBERT baseline-style training experiment on a local Mac while HPC is unavailable.",
+    "hpc_equivalent": "E012"
+  }
+}
