@@ -47,9 +47,9 @@ class GPT2SmallWorkload(TransformerWorkload):
 
     def _run_training(self, config: ExperimentConfig) -> WorkloadRunOutput:
         torch, auto_model, _ = _load_causal_lm_stack()
-        device = _device(torch)
-        dtype = _torch_dtype(torch, config.runtime.precision, device)
         parameters = config.workload.parameters
+        device = _device(torch, parameters)
+        dtype = _torch_dtype(torch, config.runtime.precision, device)
         model_name = str(parameters.get("hf_model_name", config.workload.model))
         steps = config.runtime.max_steps or int(parameters.get("steps", 1))
         batch_size = int(parameters.get("micro_batch_size", parameters.get("per_gpu_batch_size", 1)))
@@ -110,9 +110,9 @@ class DistilBERTWorkload(TransformerWorkload):
 
     def _run_training(self, config: ExperimentConfig) -> WorkloadRunOutput:
         torch, auto_model, _ = _load_sequence_classification_stack()
-        device = _device(torch)
-        dtype = _torch_dtype(torch, config.runtime.precision, device)
         parameters = config.workload.parameters
+        device = _device(torch, parameters)
+        dtype = _torch_dtype(torch, config.runtime.precision, device)
         model_name = str(parameters.get("hf_model_name", config.workload.model))
         steps = config.runtime.max_steps or int(parameters.get("steps", 1))
         batch_size = int(parameters.get("micro_batch_size", parameters.get("per_gpu_batch_size", 1)))
@@ -167,9 +167,9 @@ class DistilBERTWorkload(TransformerWorkload):
 
     def _run_inference(self, config: ExperimentConfig) -> WorkloadRunOutput:
         torch, auto_model, auto_tokenizer = _load_sequence_classification_stack()
-        device = _device(torch)
-        dtype = _torch_dtype(torch, config.runtime.precision, device)
         parameters = config.workload.parameters
+        device = _device(torch, parameters)
+        dtype = _torch_dtype(torch, config.runtime.precision, device)
         model_name = str(parameters.get("hf_model_name", config.workload.model))
         text = str(parameters.get("text", "Transformer inference benchmark sentence."))
         num_labels = int(parameters.get("num_labels", 2))
@@ -242,9 +242,9 @@ def _load_sequence_classification_stack() -> tuple[Any, Any, Any]:
 
 def _run_causal_lm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     torch, auto_model, auto_tokenizer = _load_causal_lm_stack()
-    device = _device(torch)
-    dtype = _torch_dtype(torch, config.runtime.precision, device)
     parameters = config.workload.parameters
+    device = _device(torch, parameters)
+    dtype = _torch_dtype(torch, config.runtime.precision, device)
     model_name = str(parameters.get("hf_model_name", config.workload.model))
     prompt = str(parameters.get("prompt", "Benchmarking transformer inference on H100 systems."))
     max_new_tokens = int(parameters.get("max_new_tokens", 32))
@@ -274,8 +274,26 @@ def _run_causal_lm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     )
 
 
-def _device(torch: Any) -> Any:
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def _device(torch: Any, parameters: dict[str, Any] | None = None) -> Any:
+    requested_device = str((parameters or {}).get("device", "auto")).lower()
+    if requested_device == "auto":
+        if torch.cuda.is_available():
+            return torch.device("cuda")
+        if _mps_available(torch):
+            return torch.device("mps")
+        return torch.device("cpu")
+    if requested_device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("Requested CUDA device, but CUDA is not available.")
+    if requested_device == "mps" and not _mps_available(torch):
+        raise RuntimeError("Requested MPS device, but Apple MPS is not available.")
+    if requested_device not in {"cpu", "cuda", "mps"}:
+        raise ValueError(f"Unsupported device setting: {requested_device}")
+    return torch.device(requested_device)
+
+
+def _mps_available(torch: Any) -> bool:
+    mps_backend = getattr(getattr(torch, "backends", None), "mps", None)
+    return bool(mps_backend and mps_backend.is_available())
 
 
 def _torch_dtype(torch: Any, precision: str, device: Any) -> Any:

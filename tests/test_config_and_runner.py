@@ -409,6 +409,30 @@ def test_tinyllama_training_is_explicitly_unsupported() -> None:
         raise AssertionError("Expected TinyLlama training to be unsupported")
 
 
+def test_transformer_device_auto_prefers_mps_when_cuda_is_unavailable() -> None:
+    class FakeMpsBackend:
+        @staticmethod
+        def is_available() -> bool:
+            return True
+
+    class FakeCuda:
+        @staticmethod
+        def is_available() -> bool:
+            return False
+
+    class FakeTorch:
+        cuda = FakeCuda()
+
+        class backends:
+            mps = FakeMpsBackend()
+
+        @staticmethod
+        def device(name: str) -> str:
+            return name
+
+    assert transformer_module._device(FakeTorch, {"device": "auto"}) == "mps"
+
+
 def test_aggregate_results_writes_processed_csv(tmp_path: Path) -> None:
     config = load_experiment_config(Path("configs/scaling_studies/E033_gpt2_small_strong_2gpu.json"))
     raw_dir = tmp_path / "raw"
