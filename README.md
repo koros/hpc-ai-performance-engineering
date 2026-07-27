@@ -145,14 +145,14 @@ Run the local synthetic smoke benchmark:
 python -m hpc_ai_perf.cli run --config configs/local/synthetic_smoke.json
 ```
 
-Run local dev baselines on a Mac or workstation while HPC is unavailable:
+Run local dev experiments on a Mac or workstation while HPC is unavailable:
 
 ```bash
-make run-dev-baselines
+make run-dev-experiments
 python -m hpc_ai_perf.cli refresh
 ```
 
-These `dev_` runs are workflow checks, not H100 measurements.
+These `dev_` runs are workflow checks and small local sweeps, not H100 measurements.
 
 List matrix experiment configs:
 

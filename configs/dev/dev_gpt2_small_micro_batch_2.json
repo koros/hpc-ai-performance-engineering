@@ -1,0 +1,48 @@
+{
+  "experiment_id": "dev_gpt2_small_micro_batch_2",
+  "experiment": "dev_gpt2_small_micro_batch_2",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "synthetic_tokens",
+    "parameters": {
+      "device": "auto",
+      "hf_model_name": "gpt2",
+      "micro_batch_size": 2,
+      "sequence_length": 128,
+      "learning_rate": 0.00005
+    }
+  },
+  "hardware": {
+    "platform": "mac_m1_dev",
+    "gpus": 0,
+    "gpu_model": null,
+    "interconnect": null
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 0,
+    "backend": "gloo"
+  },
+  "runtime": {
+    "precision": "fp32",
+    "max_steps": 5,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": false,
+    "profilers": [],
+    "parameters": {}
+  },
+  "metadata": {
+    "profile": "dev",
+    "phase": "Dev memory",
+    "priority": "Dev",
+    "purpose": "Exercise a local GPT-2 micro-batch size variation while HPC is unavailable.",
+    "dev_factor": "micro_batch_size",
+    "hpc_equivalent": "E065-E068"
+  }
+}

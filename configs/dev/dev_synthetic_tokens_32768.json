@@ -1,0 +1,45 @@
+{
+  "experiment_id": "dev_synthetic_tokens_32768",
+  "experiment": "dev_synthetic_tokens_32768",
+  "mode": "training",
+  "workload": {
+    "name": "synthetic",
+    "model": "synthetic-transformer",
+    "dataset": "synthetic",
+    "parameters": {
+      "tokens_per_step": 32768,
+      "sleep_seconds": 0.001
+    }
+  },
+  "hardware": {
+    "platform": "mac_m1_dev",
+    "gpus": 0,
+    "gpu_model": null,
+    "interconnect": null
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 0,
+    "backend": "gloo"
+  },
+  "runtime": {
+    "precision": "fp32",
+    "max_steps": 10,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": false,
+    "profilers": [],
+    "parameters": {}
+  },
+  "metadata": {
+    "profile": "dev",
+    "phase": "Dev synthetic",
+    "priority": "Dev",
+    "purpose": "Exercise a larger synthetic local throughput run while HPC is unavailable.",
+    "dev_factor": "tokens_per_step",
+    "hpc_equivalent": "local_synthetic_smoke"
+  }
+}

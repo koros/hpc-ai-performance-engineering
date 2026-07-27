@@ -1,0 +1,47 @@
+{
+  "experiment_id": "dev_gpt2_small_inference_tokens_16",
+  "experiment": "dev_gpt2_small_inference_tokens_16",
+  "mode": "inference",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "dataset": "prompt_dev",
+    "parameters": {
+      "device": "auto",
+      "hf_model_name": "gpt2",
+      "prompt": "Benchmark local text generation.",
+      "max_new_tokens": 16
+    }
+  },
+  "hardware": {
+    "platform": "mac_m1_dev",
+    "gpus": 0,
+    "gpu_model": null,
+    "interconnect": null
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 0,
+    "backend": "gloo"
+  },
+  "runtime": {
+    "precision": "fp32",
+    "max_steps": 1,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": false,
+    "profilers": [],
+    "parameters": {}
+  },
+  "metadata": {
+    "profile": "dev",
+    "phase": "Dev inference",
+    "priority": "Dev",
+    "purpose": "Exercise a shorter GPT-2 local generation length while HPC is unavailable.",
+    "dev_factor": "max_new_tokens",
+    "hpc_equivalent": "E143-E146"
+  }
+}

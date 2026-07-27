@@ -1,0 +1,49 @@
+{
+  "experiment_id": "dev_distilbert_sequence_length_256",
+  "experiment": "dev_distilbert_sequence_length_256",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "dataset": "synthetic_classification",
+    "parameters": {
+      "device": "auto",
+      "hf_model_name": "distilbert-base-uncased",
+      "micro_batch_size": 2,
+      "sequence_length": 256,
+      "num_labels": 2,
+      "learning_rate": 0.00005
+    }
+  },
+  "hardware": {
+    "platform": "mac_m1_dev",
+    "gpus": 0,
+    "gpu_model": null,
+    "interconnect": null
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 0,
+    "backend": "gloo"
+  },
+  "runtime": {
+    "precision": "fp32",
+    "max_steps": 5,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": false,
+    "profilers": [],
+    "parameters": {}
+  },
+  "metadata": {
+    "profile": "dev",
+    "phase": "Dev workload shape",
+    "priority": "Dev",
+    "purpose": "Exercise a longer local DistilBERT sequence length while HPC is unavailable.",
+    "dev_factor": "sequence_length",
+    "hpc_equivalent": "E024-E026"
+  }
+}

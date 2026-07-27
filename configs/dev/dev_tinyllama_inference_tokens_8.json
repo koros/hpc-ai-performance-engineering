@@ -1,0 +1,47 @@
+{
+  "experiment_id": "dev_tinyllama_inference_tokens_8",
+  "experiment": "dev_tinyllama_inference_tokens_8",
+  "mode": "inference",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "dataset": "prompt_dev",
+    "parameters": {
+      "device": "auto",
+      "hf_model_name": "hf-internal-testing/tiny-random-LlamaForCausalLM",
+      "prompt": "Explain local dev benchmarking.",
+      "max_new_tokens": 8
+    }
+  },
+  "hardware": {
+    "platform": "mac_m1_dev",
+    "gpus": 0,
+    "gpu_model": null,
+    "interconnect": null
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 0,
+    "backend": "gloo"
+  },
+  "runtime": {
+    "precision": "fp32",
+    "max_steps": 1,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": false,
+    "profilers": [],
+    "parameters": {}
+  },
+  "metadata": {
+    "profile": "dev",
+    "phase": "Dev inference",
+    "priority": "Dev",
+    "purpose": "Exercise a short TinyLlama-style local generation length while HPC is unavailable.",
+    "dev_factor": "max_new_tokens",
+    "hpc_equivalent": "E191-E194"
+  }
+}

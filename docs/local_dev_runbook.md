@@ -7,7 +7,7 @@ Use the dev profile when HPC is unavailable and you want to exercise baseline-sh
 | Profile | Purpose | Config path | Result meaning |
 | --- | --- | --- | --- |
 | Smoke | Minimal plumbing checks | `configs/local/` | Confirms the smallest runnable paths work. |
-| Dev | Lightweight local baseline-style runs | `configs/dev/` | Confirms baseline workflows on Mac/CPU/MPS. |
+| Dev | Lightweight local baseline-style runs and small sweeps | `configs/dev/` | Confirms baseline, memory-shape, inference-length, and synthetic workflows on Mac/CPU/MPS. |
 | HPC | Real Lovelace experiments | `configs/*/E*.json` | Dissertation experiment measurements. |
 
 ## Setup
@@ -24,12 +24,18 @@ The dev configs use `device: auto`. The workload runner selects CUDA if availabl
 "device": "cpu"
 ```
 
-## Run Dev Baselines
+## Run Dev Experiments
 
-Run all dev configs:
+Run only the baseline-shaped dev configs:
 
 ```bash
 make run-dev-baselines
+```
+
+Run all dev configs, including small sweeps:
+
+```bash
+make run-dev-experiments
 ```
 
 Run one config directly:
