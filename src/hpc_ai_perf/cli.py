@@ -184,6 +184,7 @@ def main() -> None:
             args.result_dir,
             args.output_csv,
             args.output_markdown,
+            profile=args.profile,
         )
         LOGGER.info("Wrote tracker CSV to %s", csv_path)
         LOGGER.info("Wrote tracker Markdown to %s", markdown_path)
@@ -350,6 +351,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-markdown",
         default="results/processed/experiment_tracker.md",
         help="Path for the generated tracker Markdown.",
+    )
+    tracker_parser.add_argument(
+        "--profile",
+        choices=["matrix", "dev", "all"],
+        default="matrix",
+        help="Config/result profile to include in the generated tracker.",
     )
 
     validate_parser = subparsers.add_parser("validate", help="Validate experiment configs and raw result records.")

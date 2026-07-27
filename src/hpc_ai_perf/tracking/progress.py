@@ -35,9 +35,10 @@ def track_experiment_progress(
     result_dir: str | Path = "results/raw",
     output_csv: str | Path = "results/processed/experiment_tracker.csv",
     output_markdown: str | Path = "results/processed/experiment_tracker.md",
+    profile: str = "matrix",
 ) -> tuple[Path, Path]:
-    entries = discover_experiment_configs(config_root)
-    result_index = _latest_result_by_experiment_id(result_dir)
+    entries = _discover_profile_entries(config_root, profile)
+    result_index = _latest_result_by_experiment_id(result_dir, profile)
     rows = build_progress_rows(entries, result_index)
 
     csv_path = write_tracker_csv(rows, output_csv)
@@ -124,16 +125,39 @@ def write_tracker_markdown(rows: list[dict[str, Any]], output_markdown: str | Pa
     return markdown_path
 
 
-def _latest_result_by_experiment_id(result_dir: str | Path) -> dict[str, tuple[Path, dict[str, Any]]]:
+def _latest_result_by_experiment_id(result_dir: str | Path, profile: str) -> dict[str, tuple[Path, dict[str, Any]]]:
     indexed: dict[str, tuple[Path, dict[str, Any]]] = {}
     for result_path, result in load_result_records(result_dir):
         experiment_id = str(result.get("experiment_id", ""))
-        if not experiment_id.startswith("E"):
+        if not _result_matches_profile(experiment_id, profile):
             continue
         current = indexed.get(experiment_id)
         if current is None or _result_sort_key(result_path, result) > _result_sort_key(*current):
             indexed[experiment_id] = (result_path, result)
     return indexed
+
+
+def _discover_profile_entries(config_root: str | Path, profile: str) -> list[ConfigCatalogEntry]:
+    if profile == "matrix":
+        return discover_experiment_configs(config_root)
+
+    entries = discover_experiment_configs(config_root, matrix_only=False)
+    if profile == "all":
+        return entries
+
+    return [entry for entry in entries if str(entry.config.metadata.get("profile", "")).lower() == profile]
+
+
+def _result_matches_profile(experiment_id: str, profile: str) -> bool:
+    if profile == "matrix":
+        return _is_matrix_experiment_id(experiment_id)
+    if profile == "all":
+        return True
+    return experiment_id.startswith(f"{profile}_")
+
+
+def _is_matrix_experiment_id(experiment_id: str) -> bool:
+    return len(experiment_id) == 4 and experiment_id.startswith("E") and experiment_id[1:].isdigit()
 
 
 def _result_sort_key(result_path: Path, result: dict[str, Any]) -> tuple[str, str]:

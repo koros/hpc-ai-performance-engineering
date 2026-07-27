@@ -607,6 +607,44 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
     assert "| Completed | 1 |" in markdown_path.read_text(encoding="utf-8")
 
 
+def test_track_dev_experiment_progress_writes_separate_reports(tmp_path: Path) -> None:
+    config = load_experiment_config(Path("configs/dev/dev_synthetic_tokens_8192.json"))
+    raw_dir = tmp_path / "raw"
+    output_csv = tmp_path / "processed" / "dev_experiment_tracker.csv"
+    output_markdown = tmp_path / "processed" / "dev_experiment_tracker.md"
+
+    result = ExperimentResult.from_config(
+        config,
+        status="completed",
+        started_at="2026-01-01T00:00:00Z",
+        completed_at="2026-01-01T00:00:01Z",
+        runtime_seconds=1.0,
+        metrics={"throughput_tokens_sec": 8192.0},
+    )
+    result.write_json(raw_dir)
+
+    csv_path, markdown_path = track_experiment_progress(
+        "configs",
+        raw_dir,
+        output_csv,
+        output_markdown,
+        profile="dev",
+    )
+
+    with csv_path.open(encoding="utf-8", newline="") as file_obj:
+        rows = list(csv.DictReader(file_obj))
+    completed = next(row for row in rows if row["experiment_id"] == "dev_synthetic_tokens_8192")
+    configured = next(row for row in rows if row["experiment_id"] == "dev_synthetic_tokens_32768")
+
+    assert csv_path == output_csv
+    assert markdown_path == output_markdown
+    assert len(rows) == 15
+    assert completed["status"] == "Completed"
+    assert completed["runtime_seconds"] == "1.0"
+    assert configured["status"] == "Configured"
+    assert "| Completed | 1 |" in markdown_path.read_text(encoding="utf-8")
+
+
 def test_experiment_configs_validate() -> None:
     assert validate_experiment_configs("configs") == []
 

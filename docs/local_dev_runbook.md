@@ -48,6 +48,7 @@ Refresh processed outputs after the runs:
 
 ```bash
 python -m hpc_ai_perf.cli refresh
+make track-dev-progress
 ```
 
 ## Inspect Results
@@ -62,9 +63,9 @@ Processed outputs are written to:
 
 ```text
 results/processed/experiments.csv
-results/processed/experiment_tracker.csv
-results/processed/experiment_tracker.md
+results/processed/dev_experiment_tracker.csv
+results/processed/dev_experiment_tracker.md
 results/analysis/*.csv
 ```
 
-Keep `dev_` results separate in your interpretation. They validate workflow readiness; they do not replace Lovelace H100 or L40S measurements.
+Keep `dev_` results separate in your interpretation. The default `experiment_tracker.*` files remain the real `E001-E200` HPC matrix tracker; the `dev_experiment_tracker.*` files summarize local Mac readiness only.
