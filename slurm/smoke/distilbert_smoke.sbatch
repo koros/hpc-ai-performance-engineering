@@ -10,6 +10,8 @@
 
 set -euo pipefail
 
+# Submit this script from the repository root so relative paths resolve.
+# Replace this helper with site-specific module loads if Lovelace changes.
 source slurm/modules_for_hpc_ai
 source .venv/bin/activate
 export TOKENIZERS_PARALLELISM=false

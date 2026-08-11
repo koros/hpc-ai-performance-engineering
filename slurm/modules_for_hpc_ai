@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+# Lovelace module stack used by the Slurm smoke scripts and generated profiles.
+# Update these module names on the cluster if the site-provided stack changes.
+
 module purge
 module load spack-modules/293
 module load compilers/llvm/14.0.6-xpvm6vv
