@@ -37,6 +37,13 @@ def track_experiment_progress(
     output_markdown: str | Path = "results/processed/experiment_tracker.md",
     profile: str = "matrix",
 ) -> tuple[Path, Path]:
+    """Generate CSV and Markdown progress trackers for one experiment profile.
+
+    The default `matrix` profile tracks only real dissertation experiments with
+    E-number IDs. The `dev` profile is used for local Mac/workstation checks and
+    writes to separate output files via the Makefile so local readiness does not
+    change the official HPC progress view.
+    """
     entries = _discover_profile_entries(config_root, profile)
     result_index = _latest_result_by_experiment_id(result_dir, profile)
     rows = build_progress_rows(entries, result_index)
@@ -49,6 +56,12 @@ def track_experiment_progress(
 def build_progress_rows(
     entries: list[ConfigCatalogEntry], result_index: dict[str, tuple[Path, dict[str, Any]]]
 ) -> list[dict[str, Any]]:
+    """Combine config entries with latest raw results into tracker rows.
+
+    A config without a matching result is `Configured`. A matching completed or
+    failed result updates the row status, runtime, completion timestamp, and
+    notes. Failed runs surface their error message directly in the tracker.
+    """
     rows: list[dict[str, Any]] = []
     for entry in entries:
         config = entry.config
@@ -80,6 +93,7 @@ def build_progress_rows(
 
 
 def write_tracker_csv(rows: list[dict[str, Any]], output_csv: str | Path) -> Path:
+    """Write progress rows to a CSV file with a stable tracker schema."""
     csv_path = Path(output_csv)
     csv_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -93,6 +107,7 @@ def write_tracker_csv(rows: list[dict[str, Any]], output_csv: str | Path) -> Pat
 
 
 def write_tracker_markdown(rows: list[dict[str, Any]], output_markdown: str | Path) -> Path:
+    """Write progress rows to a human-readable Markdown report."""
     markdown_path = Path(output_markdown)
     markdown_path.parent.mkdir(parents=True, exist_ok=True)
     summary = _status_summary(rows)
@@ -126,6 +141,12 @@ def write_tracker_markdown(rows: list[dict[str, Any]], output_markdown: str | Pa
 
 
 def _latest_result_by_experiment_id(result_dir: str | Path, profile: str) -> dict[str, tuple[Path, dict[str, Any]]]:
+    """Return the newest raw result for each experiment ID in a profile.
+
+    If multiple raw result files exist for the same experiment ID, the latest
+    `completed_at` timestamp wins. The path is used as a deterministic tie-break
+    so output stays stable even when timestamps are identical.
+    """
     indexed: dict[str, tuple[Path, dict[str, Any]]] = {}
     for result_path, result in load_result_records(result_dir):
         experiment_id = str(result.get("experiment_id", ""))
@@ -138,6 +159,7 @@ def _latest_result_by_experiment_id(result_dir: str | Path, profile: str) -> dic
 
 
 def _discover_profile_entries(config_root: str | Path, profile: str) -> list[ConfigCatalogEntry]:
+    """Discover configs for matrix, dev, or all profiles."""
     if profile == "matrix":
         return discover_experiment_configs(config_root)
 
@@ -150,6 +172,7 @@ def _discover_profile_entries(config_root: str | Path, profile: str) -> list[Con
 
 
 def _result_matches_profile(experiment_id: str, profile: str) -> bool:
+    """Return whether a raw result ID belongs in the requested tracker profile."""
     if profile == "matrix":
         return _is_matrix_experiment_id(experiment_id)
     if profile == "all":
@@ -159,14 +182,17 @@ def _result_matches_profile(experiment_id: str, profile: str) -> bool:
 
 
 def _is_matrix_experiment_id(experiment_id: str) -> bool:
+    """Return whether an experiment ID is a canonical E-number matrix ID."""
     return len(experiment_id) == 4 and experiment_id.startswith("E") and experiment_id[1:].isdigit()
 
 
 def _result_sort_key(result_path: Path, result: dict[str, Any]) -> tuple[str, str]:
+    """Build the deterministic ordering key used to choose latest results."""
     return str(result.get("completed_at", "")), str(result_path)
 
 
 def _status_summary(rows: list[dict[str, Any]]) -> dict[str, int]:
+    """Count tracker rows by status label for the Markdown summary."""
     summary: dict[str, int] = {}
     for row in rows:
         status = str(row.get("status", ""))
@@ -175,11 +201,13 @@ def _status_summary(rows: list[dict[str, Any]]) -> dict[str, int]:
 
 
 def _csv_value(value: object) -> object:
+    """Convert missing values into empty CSV cells."""
     if value is None:
         return ""
     return value
 
 
 def _markdown_value(value: object) -> str:
+    """Escape pipe characters so dynamic values cannot break Markdown tables."""
     text = str(_csv_value(value))
     return text.replace("|", "\\|")

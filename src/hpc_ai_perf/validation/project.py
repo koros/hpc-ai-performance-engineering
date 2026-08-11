@@ -33,11 +33,14 @@ RESULT_REQUIRED_FIELDS = [
 
 @dataclass(frozen=True)
 class ValidationIssue:
+    """One validation problem found in a config or raw result file."""
+
     path: Path
     message: str
     severity: str = "error"
 
     def to_dict(self) -> dict[str, str]:
+        """Return a JSON-friendly representation for CLI automation."""
         return {"path": str(self.path), "severity": self.severity, "message": self.message}
 
 
@@ -47,6 +50,7 @@ def validate_project(
     *,
     include_results: bool = True,
 ) -> list[ValidationIssue]:
+    """Validate configs and, optionally, raw result records."""
     issues = validate_experiment_configs(config_root)
     if include_results:
         issues.extend(validate_result_records(result_dir))
@@ -54,6 +58,13 @@ def validate_project(
 
 
 def validate_experiment_configs(config_root: str | Path = "configs") -> list[ValidationIssue]:
+    """Validate every JSON experiment config under a root directory.
+
+    This pass checks required fields, enum-like values, non-negative hardware
+    counts, runtime settings, and matrix-specific metadata. It collects all
+    issues instead of failing fast so a user can repair many config files in one
+    editing pass.
+    """
     issues: list[ValidationIssue] = []
     for config_path in sorted(Path(config_root).rglob("*.json")):
         try:
@@ -102,6 +113,7 @@ def validate_experiment_configs(config_root: str | Path = "configs") -> list[Val
 
 
 def validate_result_records(result_dir: str | Path = "results/raw") -> list[ValidationIssue]:
+    """Validate every raw result JSON record under a result directory."""
     issues: list[ValidationIssue] = []
     for result_path in sorted(Path(result_dir).rglob("*.json")):
         try:
@@ -120,6 +132,7 @@ def validate_result_records(result_dir: str | Path = "results/raw") -> list[Vali
 
 
 def format_validation_issues(issues: list[ValidationIssue]) -> str:
+    """Format validation issues for terminal output."""
     if not issues:
         return "Validation passed.\n"
 
@@ -130,6 +143,7 @@ def format_validation_issues(issues: list[ValidationIssue]) -> str:
 
 
 def _validate_result_mapping(path: Path, data: dict[str, Any]) -> list[ValidationIssue]:
+    """Validate the schema and scalar metric shape of one parsed result record."""
     issues: list[ValidationIssue] = []
     for field in RESULT_REQUIRED_FIELDS:
         if field not in data:
@@ -169,26 +183,32 @@ def _validate_result_mapping(path: Path, data: dict[str, Any]) -> list[Validatio
 
 
 def _is_matrix_experiment_id(experiment_id: str) -> bool:
+    """Return whether an ID is part of the canonical dissertation matrix."""
     return len(experiment_id) == 4 and experiment_id.startswith("E") and experiment_id[1:].isdigit()
 
 
 def _is_non_negative_int(value: object) -> bool:
+    """Return whether a value is an integer greater than or equal to zero."""
     return isinstance(value, int) and value >= 0
 
 
 def _is_non_negative_number(value: object) -> bool:
+    """Return whether a value is a numeric value greater than or equal to zero."""
     return isinstance(value, int | float) and value >= 0
 
 
 def _is_optional_non_negative_number(value: object) -> bool:
+    """Return whether a value is null or a non-negative number."""
     return value is None or _is_non_negative_number(value)
 
 
 def _is_optional_percentage(value: object) -> bool:
+    """Return whether a value is null or a percentage in the inclusive range 0-100."""
     return value is None or (_is_non_negative_number(value) and value <= 100)
 
 
 def _is_scalar_mapping(value: object) -> bool:
+    """Return whether a mapping contains only scalar JSON-compatible values."""
     if not isinstance(value, dict):
         return False
     return all(item is None or isinstance(item, int | float | str | bool) for item in value.values())

@@ -23,6 +23,12 @@ def write_readiness_report(
     result_dir: str | Path = "results/raw",
     slurm_smoke_dir: str | Path = "slurm/smoke",
 ) -> Path:
+    """Write the repository readiness report to disk.
+
+    The readiness report is a pre-submission snapshot. It combines config
+    discovery, validation, workload registry status, and smoke-script presence
+    into one Markdown file that can be reviewed before spending HPC GPU budget.
+    """
     report_path = Path(output_path)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(
@@ -38,6 +44,13 @@ def build_readiness_report(
     result_dir: str | Path = "results/raw",
     slurm_smoke_dir: str | Path = "slurm/smoke",
 ) -> str:
+    """Build the Markdown readiness report content.
+
+    The report intentionally focuses on matrix readiness rather than local dev
+    performance. It answers: how many configs exist, whether validation passes,
+    which workloads are registered, whether smoke presets are present, and what
+    gates must be cleared before larger Slurm batches.
+    """
     entries = discover_experiment_configs(config_root)
     validation_issues = validate_project(config_root, result_dir)
     workload_counts = Counter(entry.config.workload.name for entry in entries)
@@ -135,4 +148,5 @@ def build_readiness_report(
 
 
 def _counter_rows(counter: Counter[str]) -> list[str]:
+    """Format sorted counter entries as Markdown table rows."""
     return [f"| {key or 'Unassigned'} | {counter[key]} |" for key in sorted(counter)]
