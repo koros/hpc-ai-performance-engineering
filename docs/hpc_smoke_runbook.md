@@ -15,13 +15,14 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev,yaml,workloads]"
 ```
 
-The Slurm scripts assume jobs are submitted from the project root. Cluster modules are loaded through:
+The Slurm scripts assume jobs are submitted from the project root. Load the required cluster modules for CUDA, Python, and PyTorch before activating the project virtual environment. On Lovelace, the project helper can be used:
 
 ```bash
-slurm/modules_for_hpc_ai
+source slurm/modules_for_hpc_ai
+source .venv/bin/activate
 ```
 
-Review that file on the cluster and adjust module names if Lovelace has changed since the last working examples.
+Review `slurm/modules_for_hpc_ai` on the cluster and adjust module names if Lovelace has changed since the last working examples. If the target HPC site uses a different module stack, replace the helper with the appropriate `module load ...` commands.
 
 ## 2. Validate Repository State
 
@@ -39,7 +40,7 @@ Review the smoke scripts and site setup:
 
 - `#SBATCH --partition=...`
 - add `#SBATCH --account=...` only if the cluster requires it
-- `source slurm/modules_for_hpc_ai`
+- module-loading commands, or `source slurm/modules_for_hpc_ai` on Lovelace
 - `source .venv/bin/activate`
 
 Smoke scripts:

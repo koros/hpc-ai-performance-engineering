@@ -33,14 +33,14 @@ Edit the local profile for the target site:
 - `modules`, only if not using a project-local setup script
 - `environment`
 
-The default local profile assumes jobs are submitted from the project root and uses:
+The default local profile assumes jobs are submitted from the project root. Load the site-required CUDA, Python, and PyTorch modules before activating `.venv`; on Lovelace the profile uses:
 
 ```bash
 source slurm/modules_for_hpc_ai
 source .venv/bin/activate
 ```
 
-Review `slurm/modules_for_hpc_ai` on the cluster before submitting.
+Review `slurm/modules_for_hpc_ai` on the cluster before submitting. If the module stack changes, edit that helper or replace it in `setup_commands` with the appropriate `module load ...` commands.
 
 Use the profile while rendering:
 

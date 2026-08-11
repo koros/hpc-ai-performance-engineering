@@ -13,8 +13,7 @@ source .venv/bin/activate
 python -m pip install -e ".[dev,yaml,workloads]"
 ```
 
-The scripts assume they are submitted from the project root. They load cluster modules from
-`slurm/modules_for_hpc_ai` and then activate `.venv`.
+The scripts assume they are submitted from the project root. Load the required cluster modules for the target HPC site before activating `.venv`. On Lovelace, the scripts use `source slurm/modules_for_hpc_ai` as the project helper.
 
 Submit one smoke job:
 
@@ -24,4 +23,4 @@ sbatch slurm/smoke/distilbert_smoke.sbatch
 sbatch slurm/smoke/tinyllama_inference_smoke.sbatch
 ```
 
-Edit the partition if needed, and add an account line only if the target HPC site requires one.
+Edit the partition if needed, replace the module-loading helper if the site stack changes, and add an account line only if the target HPC site requires one.

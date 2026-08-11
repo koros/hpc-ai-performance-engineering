@@ -42,7 +42,7 @@ This snapshot summarises the repository state before full HPC submission. It sho
    python -m pip install -e ".[dev,yaml,workloads]"
    ```
 
-2. Edit Slurm smoke presets for partition, account, modules, and virtual environment:
+2. Review Slurm smoke presets for partition, account, module loading, and virtual environment activation:
 
    ```bash
    slurm/smoke/gpt2_small_smoke.sbatch
