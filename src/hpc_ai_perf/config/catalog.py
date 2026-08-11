@@ -10,22 +10,33 @@ from hpc_ai_perf.config.experiment import ExperimentConfig, load_experiment_conf
 
 @dataclass(frozen=True)
 class ConfigCatalogEntry:
+    """Pair a config object with the path it was discovered from.
+
+    Reports need both the parsed experiment fields and a stable path back to the
+    source file. Keeping them together avoids reparsing configs during listing,
+    filtering, rendering, and tracking workflows.
+    """
+
     path: Path
     config: ExperimentConfig
 
     @property
     def phase(self) -> str:
+        """Return the human-readable experiment phase stored in metadata."""
         return str(self.config.metadata.get("phase", ""))
 
     @property
     def priority(self) -> str:
+        """Return the priority label used for staged HPC submission planning."""
         return str(self.config.metadata.get("priority", ""))
 
     @property
     def matrix_id(self) -> str:
+        """Return the matrix identifier, falling back to `experiment_id`."""
         return str(self.config.metadata.get("matrix_id", self.config.experiment_id))
 
     def to_summary(self) -> dict[str, Any]:
+        """Return a compact serializable summary for CLI table/JSON output."""
         return {
             "experiment_id": self.config.experiment_id,
             "matrix_id": self.matrix_id,
@@ -45,6 +56,12 @@ def discover_experiment_configs(
     *,
     matrix_only: bool = True,
 ) -> list[ConfigCatalogEntry]:
+    """Discover experiment config files beneath a root directory.
+
+    By default this returns only real matrix experiments with IDs like `E001`.
+    Passing `matrix_only=False` includes local smoke, dev, and template-style
+    configs, which is useful for profile-specific trackers and validation.
+    """
     root = Path(config_root)
     entries: list[ConfigCatalogEntry] = []
 
@@ -67,6 +84,12 @@ def filter_config_entries(
     workload: str | None = None,
     experiment_id: str | None = None,
 ) -> list[ConfigCatalogEntry]:
+    """Apply optional exact-match filters to discovered config entries.
+
+    The filters are deliberately simple and predictable: each supplied value
+    narrows the current list, phase and priority compare case-insensitively, and
+    workload/mode/experiment IDs match the canonical config values.
+    """
     filtered = entries
     if phase:
         filtered = [entry for entry in filtered if entry.phase.lower() == phase.lower()]
@@ -82,10 +105,12 @@ def filter_config_entries(
 
 
 def entries_to_json(entries: list[ConfigCatalogEntry]) -> str:
+    """Serialize catalog entries as pretty-printed JSON for automation."""
     return json.dumps([entry.to_summary() for entry in entries], indent=2) + "\n"
 
 
 def entries_to_table(entries: list[ConfigCatalogEntry]) -> str:
+    """Format catalog entries as a fixed-width table for terminal review."""
     headers = ["ID", "Phase", "Priority", "Mode", "Workload", "GPUs", "Precision", "Path"]
     rows = [
         [
@@ -104,10 +129,12 @@ def entries_to_table(entries: list[ConfigCatalogEntry]) -> str:
 
 
 def _is_matrix_experiment_id(experiment_id: str) -> bool:
+    """Return whether an ID has the canonical E-number matrix format."""
     return len(experiment_id) == 4 and experiment_id.startswith("E") and experiment_id[1:].isdigit()
 
 
 def _catalog_sort_key(entry: ConfigCatalogEntry) -> tuple[int, str]:
+    """Sort matrix configs numerically and keep non-matrix configs after them."""
     if _is_matrix_experiment_id(entry.config.experiment_id):
         return int(entry.config.experiment_id[1:]), str(entry.path)
     # Non-matrix configs sort after E001-E200 while remaining stable by path.
@@ -115,6 +142,7 @@ def _catalog_sort_key(entry: ConfigCatalogEntry) -> tuple[int, str]:
 
 
 def _format_table(headers: list[str], rows: list[list[str]]) -> str:
+    """Render a simple aligned table without adding a third-party dependency."""
     if not rows:
         return "No configs found.\n"
 
