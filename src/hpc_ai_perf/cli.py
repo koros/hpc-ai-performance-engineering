@@ -43,11 +43,21 @@ SLURM_PROFILE_PLACEHOLDERS = ("replace-with", "TODO", "changeme", "<")
 
 
 def main() -> None:
+    """Run the command-line entry point for the benchmark project.
+
+    The CLI is intentionally a thin orchestration layer. It parses the user's
+    command, delegates real work to the relevant package modules, logs where
+    generated artefacts were written, and exits early after each command branch.
+    Keeping this function as routing glue makes it easier to test the rendering,
+    tracking, validation, and analysis logic independently from argparse.
+    """
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     parser = _build_parser()
     args = parser.parse_args()
 
     if args.command == "list-configs":
+        # Config listing defaults to the real E001-E200 matrix. Templates and
+        # dev/local configs are only shown when the caller opts into them.
         entries = discover_experiment_configs(args.config_root, matrix_only=not args.include_templates)
         entries = filter_config_entries(
             entries,
@@ -139,6 +149,8 @@ def main() -> None:
         return
 
     if args.command == "submit-slurm-batch":
+        # Batch submission can either print sbatch commands for review or submit
+        # them and immediately record returned job IDs in the status CSV.
         submissions = submit_job_scripts(
             args.script_dir,
             args.status,
@@ -191,6 +203,8 @@ def main() -> None:
         return
 
     if args.command == "validate":
+        # Validation prints a human-readable report by default, but can emit JSON
+        # for automation in CI or cluster-side health checks.
         issues = validate_project(args.config_root, args.result_dir, include_results=not args.skip_results)
         if args.format == "json":
             print(json.dumps([issue.to_dict() for issue in issues], indent=2) + "\n", end="")
@@ -227,6 +241,14 @@ def main() -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """Construct the full argparse command tree used by the project CLI.
+
+    Each subcommand mirrors one operational workflow: local execution, Slurm
+    script rendering, submission tracking, result aggregation, analysis,
+    progress tracking, validation, or readiness reporting. Defaults point at the
+    repository's conventional `configs/`, `results/raw/`, and
+    `results/processed/` paths so common project commands stay short.
+    """
     parser = argparse.ArgumentParser(description="Manage and run HPC AI benchmark experiments.")
     subparsers = parser.add_subparsers(dest="command")
 
@@ -420,6 +442,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _add_slurm_options(parser: argparse.ArgumentParser) -> None:
+    """Attach shared Slurm rendering options to one parser.
+
+    Single-config and bulk rendering both need the same scheduler settings.
+    Centralising the options prevents the two commands from drifting apart when
+    new site-level fields such as modules, environment variables, or profiles
+    are added.
+    """
     parser.add_argument("--output-dir", default="slurm/generated", help="Directory for generated sbatch scripts.")
     parser.add_argument("--slurm-profile", default=None, help="Optional JSON file with reusable Slurm defaults.")
     parser.add_argument("--partition", default=None, help="Optional Slurm partition.")
@@ -436,6 +465,14 @@ def _add_slurm_options(parser: argparse.ArgumentParser) -> None:
 
 
 def _run_local_config(config_path: str, output_dir: str | None) -> None:
+    """Run one experiment configuration through the local benchmark runner.
+
+    This path is used for CPU/MPS development, smoke tests, and any simple
+    single-process workload execution. It does not submit anything to Slurm; it
+    loads the config, executes the registered workload locally, and writes the
+    resulting JSON record to either the override directory or the config's
+    configured output directory.
+    """
     config = load_experiment_config(config_path)
     runner = LocalBenchmarkRunner()
     result = runner.run(config)
@@ -454,6 +491,15 @@ def _refresh_outputs(
     readiness_report: str,
     skip_validation: bool,
 ) -> None:
+    """Rebuild the standard derived project outputs from configs and raw results.
+
+    The refresh command is the normal "make the repository reports current"
+    operation. It validates first unless explicitly skipped, aggregates raw JSON
+    records into the processed CSV, rebuilds analysis tables, refreshes the
+    matrix progress tracker, and writes the readiness report used before HPC
+    submission. Dev tracking is intentionally separate so local Mac results do
+    not change the status of the dissertation matrix.
+    """
     if not skip_validation:
         issues = validate_project(config_root, result_dir)
         if issues:
@@ -498,6 +544,13 @@ def _render_slurm_config(
     profile_path: str | None,
     print_script: bool,
 ) -> None:
+    """Render one Slurm script for one concrete experiment config.
+
+    CLI-provided scheduler values override profile defaults. The resolved
+    values are passed to the Slurm renderer along with the loaded experiment
+    config, and the rendered script is either printed for inspection or written
+    to the requested output directory.
+    """
     slurm_options = _resolve_slurm_options(
         profile_path=profile_path,
         partition=partition,
@@ -544,6 +597,13 @@ def _render_slurm_bulk(
     env_values: list[str],
     profile_path: str | None,
 ) -> None:
+    """Render Slurm scripts for every matrix config matching the supplied filters.
+
+    Bulk rendering is deliberately matrix-only because generated HPC batches
+    should correspond to real E001-E200 dissertation experiments. The filters
+    make it possible to render conservative batches, such as Must Have
+    environment-validation jobs, without touching the rest of the matrix.
+    """
     entries = discover_experiment_configs(config_root)
     entries = filter_config_entries(
         entries,
@@ -584,6 +644,12 @@ def _render_slurm_bulk(
 
 
 def _parse_environment(values: list[str]) -> dict[str, str]:
+    """Parse repeated `--env KEY=VALUE` options into a Slurm environment mapping.
+
+    The parser fails early for malformed values because an invalid environment
+    assignment would otherwise become a confusing scheduler or shell error after
+    the job has already been submitted.
+    """
     environment: dict[str, str] = {}
     for value in values:
         if "=" not in value:
@@ -605,6 +671,13 @@ def _resolve_slurm_options(
     modules: list[str],
     env_values: list[str],
 ) -> dict[str, Any]:
+    """Merge Slurm profile defaults with explicit command-line overrides.
+
+    Profiles capture stable site defaults such as the partition, setup commands,
+    module list, and environment variables. Direct CLI flags take precedence for
+    fields that are often adjusted per run, while modules and environment values
+    are additive so the caller can extend a profile without rewriting it.
+    """
     profile = _load_slurm_profile(profile_path) if profile_path else {}
     profile_environment = profile.get("environment", {})
 
@@ -620,6 +693,13 @@ def _resolve_slurm_options(
 
 
 def _load_slurm_profile(profile_path: str) -> dict[str, Any]:
+    """Load and type-check a JSON Slurm profile.
+
+    This validation is intentionally structural rather than cluster-aware: it
+    confirms the profile uses supported keys and value types, while
+    `_check_slurm_profile` performs readiness checks for placeholders and
+    missing operational settings.
+    """
     profile = json.loads(Path(profile_path).read_text(encoding="utf-8"))
     if not isinstance(profile, dict):
         raise ValueError(f"Slurm profile must be a JSON object: {profile_path}")
@@ -639,6 +719,13 @@ def _load_slurm_profile(profile_path: str) -> dict[str, Any]:
 
 
 def _check_slurm_profile(profile_path: str) -> list[str]:
+    """Return human-readable readiness issues for a Slurm profile.
+
+    A profile can be structurally valid JSON but still unsafe to use on a real
+    cluster if it contains placeholder values or no environment setup. This
+    helper performs that higher-level preflight check before rendering or
+    submitting HPC scripts.
+    """
     profile = _load_slurm_profile(profile_path)
     issues: list[str] = []
 
@@ -669,20 +756,24 @@ def _check_slurm_profile(profile_path: str) -> list[str]:
 
 
 def _contains_placeholder(value: str) -> bool:
+    """Detect common placeholder tokens that should not reach real sbatch files."""
     return any(token.lower() in value.lower() for token in SLURM_PROFILE_PLACEHOLDERS)
 
 
 def _validate_string_or_none(profile: dict[str, Any], key: str, profile_path: str) -> None:
+    """Require a profile key to be absent, null, or a string."""
     if key in profile and profile[key] is not None and not isinstance(profile[key], str):
         raise ValueError(f"Slurm profile key '{key}' must be a string: {profile_path}")
 
 
 def _validate_int_or_none(profile: dict[str, Any], key: str, profile_path: str) -> None:
+    """Require a profile key to be absent, null, or an integer."""
     if key in profile and profile[key] is not None and not isinstance(profile[key], int):
         raise ValueError(f"Slurm profile key '{key}' must be an integer: {profile_path}")
 
 
 def _validate_string_list(profile: dict[str, Any], key: str, profile_path: str) -> None:
+    """Require a profile key to be a list containing only strings when present."""
     if key not in profile:
         return
     value = profile[key]
@@ -691,6 +782,7 @@ def _validate_string_list(profile: dict[str, Any], key: str, profile_path: str) 
 
 
 def _validate_string_dict(profile: dict[str, Any], key: str, profile_path: str) -> None:
+    """Require a profile key to be an object with string keys and string values."""
     if key not in profile:
         return
     value = profile[key]
