@@ -4,6 +4,12 @@ from pathlib import Path
 
 
 def build_submission_plan(script_dir: str | Path, *, batch_name: str | None = None) -> str:
+    """Build a Markdown review checklist and ordered commands for sbatch scripts.
+
+    Generated Slurm scripts should be inspected before submission. This plan
+    file provides a lightweight human checkpoint with the exact `sbatch` commands
+    and reminders for partition/account/module/output-path review.
+    """
     scripts = sorted(Path(script_dir).glob("*.sbatch"))
     title = batch_name or Path(script_dir).name.replace("_", " ").title()
 
@@ -61,6 +67,7 @@ def write_submission_plan(
     *,
     batch_name: str | None = None,
 ) -> Path:
+    """Write a submission plan beside or near the generated Slurm scripts."""
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(build_submission_plan(script_dir, batch_name=batch_name), encoding="utf-8")

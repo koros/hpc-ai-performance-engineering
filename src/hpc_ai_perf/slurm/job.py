@@ -9,6 +9,14 @@ from hpc_ai_perf.config import ExperimentConfig
 
 @dataclass(frozen=True)
 class SlurmJob:
+    """Renderable representation of one `sbatch` script.
+
+    This dataclass separates scheduler intent from string rendering. The CLI and
+    bulk renderer fill these fields from experiment configs plus optional Slurm
+    profile defaults, and `render` turns the final values into a script that can
+    be reviewed before submission.
+    """
+
     job_name: str
     command: str
     partition: str | None = None
@@ -35,6 +43,13 @@ class SlurmJob:
         environment: dict[str, str] | None = None,
         setup_commands: list[str] | None = None,
     ) -> SlurmJob:
+        """Create a Slurm job description from an experiment config.
+
+        GPU count comes from the distributed section when available, otherwise
+        from the hardware section. The command always invokes the local runner
+        against the same config path, which keeps generated scripts simple and
+        reproducible.
+        """
         gpus_per_node = config.distributed.gpus_per_node or config.hardware.gpus
         command = f"python -m hpc_ai_perf.cli run --config {quote(str(config_path))}"
         return cls(
@@ -52,6 +67,14 @@ class SlurmJob:
         )
 
     def render(self) -> str:
+        """Render the job description as a bash `sbatch` script.
+
+        The script intentionally uses relative output paths and setup commands
+        because the project workflow assumes jobs are submitted from the repo
+        root. Optional directives such as partition and account are omitted when
+        not provided so clusters that do not require them can still accept the
+        script.
+        """
         lines = [
             "#!/bin/bash",
             f"#SBATCH --job-name={self.job_name}",
@@ -93,6 +116,7 @@ def render_slurm_script(
     environment: dict[str, str] | None = None,
     setup_commands: list[str] | None = None,
 ) -> str:
+    """Convenience wrapper that builds and renders one Slurm script."""
     return SlurmJob.from_config(
         config,
         config_path,
@@ -107,6 +131,7 @@ def render_slurm_script(
 
 
 def write_slurm_script(script: str, output_dir: str | Path, experiment_id: str) -> Path:
+    """Write a rendered Slurm script to `<output_dir>/<experiment_id>.sbatch`."""
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     script_path = output_path / f"{experiment_id}.sbatch"
@@ -115,10 +140,17 @@ def write_slurm_script(script: str, output_dir: str | Path, experiment_id: str) 
 
 
 def _job_name(config: ExperimentConfig) -> str:
+    """Create a scheduler-safe job name from the experiment ID."""
     return f"hpc-ai-{config.experiment_id}".lower().replace("_", "-")
 
 
 def _time_limit(config: ExperimentConfig) -> str:
+    """Estimate a conservative wall-clock limit from configured GPU-hours.
+
+    GPU-hour estimates describe total accelerator time. Dividing by the number
+    of GPUs gives approximate wall time; adding half an hour before rounding
+    gives the generated script a small buffer for startup and variance.
+    """
     gpu_hours = config.metadata.get("gpu_hours_estimate")
     if isinstance(gpu_hours, int | float) and config.hardware.gpus > 0:
         wall_hours = max(1, round((float(gpu_hours) / config.hardware.gpus) + 0.5))
