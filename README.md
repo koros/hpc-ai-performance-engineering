@@ -150,9 +150,10 @@ Run local dev experiments on a Mac or workstation while HPC is unavailable:
 ```bash
 make run-dev-experiments
 python -m hpc_ai_perf.cli refresh
+make track-dev-progress
 ```
 
-These `dev_` runs are workflow checks and small local sweeps, not H100 measurements.
+These `dev_` runs are workflow checks and small local sweeps, not H100 measurements. Their progress is tracked separately in `results/processed/dev_experiment_tracker.md`.
 
 List matrix experiment configs:
 

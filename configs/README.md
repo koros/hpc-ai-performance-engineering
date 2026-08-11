@@ -21,4 +21,4 @@ This directory contains runnable experiment configs and reusable templates.
 | `distributed/` | Concrete `E047-E062` DDP, FSDP, and DeepSpeed ZeRO strategy configs |
 | `profiling/` | Profiling-focused configs and generated variants |
 
-Concrete experiment configs should preserve the matrix ID in both `experiment_id` and `metadata.matrix_id`.
+Concrete matrix experiment configs should preserve the matrix ID in both `experiment_id` and `metadata.matrix_id`. Local dev configs use readable `dev_` IDs and `metadata.profile: dev` so they stay separate from the `E001-E200` HPC tracker.
