@@ -4,6 +4,7 @@ SLURM_PROFILE_ARG := $(if $(SLURM_PROFILE),--slurm-profile $(SLURM_PROFILE),)
 DEV_CONFIGS := $(sort $(wildcard configs/dev/*.json))
 DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
 
+# Dev targets run local Mac/workstation checks; matrix tracking stays separate.
 .PHONY: install-dev lint format test check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate readiness-report refresh serve-dashboard
 
 install-dev:

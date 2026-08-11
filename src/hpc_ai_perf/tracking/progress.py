@@ -141,6 +141,7 @@ def _discover_profile_entries(config_root: str | Path, profile: str) -> list[Con
     if profile == "matrix":
         return discover_experiment_configs(config_root)
 
+    # Dev/local trackers must include non-E IDs, while the default matrix tracker must not.
     entries = discover_experiment_configs(config_root, matrix_only=False)
     if profile == "all":
         return entries
@@ -153,6 +154,7 @@ def _result_matches_profile(experiment_id: str, profile: str) -> bool:
         return _is_matrix_experiment_id(experiment_id)
     if profile == "all":
         return True
+    # Local profiles use readable prefixes such as dev_ instead of matrix IDs.
     return experiment_id.startswith(f"{profile}_")
 
 

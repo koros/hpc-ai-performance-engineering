@@ -467,6 +467,7 @@ def _refresh_outputs(
     analysis_paths = analyze_results(result_path, analysis_dir)
     LOGGER.info("Wrote %d analysis tables to %s", len(analysis_paths), analysis_dir)
 
+    # Keep refresh focused on the real E001-E200 matrix tracker; dev has its own Make target.
     tracker_csv_path, tracker_markdown_path = track_experiment_progress(
         config_root,
         result_dir,

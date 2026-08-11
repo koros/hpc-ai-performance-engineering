@@ -50,6 +50,7 @@ def discover_experiment_configs(
 
     for config_path in sorted(root.rglob("*.json")):
         config = load_experiment_config(config_path)
+        # The default catalog is the dissertation matrix only; dev/local configs opt in explicitly.
         if matrix_only and not _is_matrix_experiment_id(config.experiment_id):
             continue
         entries.append(ConfigCatalogEntry(path=config_path, config=config))
@@ -109,6 +110,7 @@ def _is_matrix_experiment_id(experiment_id: str) -> bool:
 def _catalog_sort_key(entry: ConfigCatalogEntry) -> tuple[int, str]:
     if _is_matrix_experiment_id(entry.config.experiment_id):
         return int(entry.config.experiment_id[1:]), str(entry.path)
+    # Non-matrix configs sort after E001-E200 while remaining stable by path.
     return 10_000, str(entry.path)
 
 
