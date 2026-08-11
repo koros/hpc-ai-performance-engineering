@@ -56,6 +56,7 @@ class GPT2SmallWorkload(TransformerWorkload):
     """
 
     def __init__(self) -> None:
+        """Initialise the adapter with the registry name used by GPT-2 configs."""
         super().__init__(name="gpt2_small", display_name="GPT-2 Small")
 
     def run(self, config: ExperimentConfig) -> WorkloadRunOutput:
@@ -137,6 +138,7 @@ class DistilBERTWorkload(TransformerWorkload):
     """
 
     def __init__(self) -> None:
+        """Initialise the adapter with the registry name used by DistilBERT configs."""
         super().__init__(name="distilbert", display_name="DistilBERT")
 
     def run(self, config: ExperimentConfig) -> WorkloadRunOutput:
@@ -273,6 +275,7 @@ class TinyLlamaWorkload(TransformerWorkload):
     """
 
     def __init__(self) -> None:
+        """Initialise the adapter with the registry name used by TinyLlama configs."""
         super().__init__(name="tinyllama", display_name="TinyLlama")
 
     def run(self, config: ExperimentConfig) -> WorkloadRunOutput:
