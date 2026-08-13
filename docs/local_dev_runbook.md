@@ -2,6 +2,8 @@
 
 Use the dev profile when HPC is unavailable and you want to exercise baseline-shaped runs on a local Mac. These runs are useful for checking workload code, model loading, result writing, aggregation, and dashboard plumbing. They are not H100 performance results and should not be used as dissertation measurements.
 
+For the rationale, parameter choices, and the local-dev versus HPC-only matrix, see [`docs/dev_experiment_matrix.md`](dev_experiment_matrix.md).
+
 ## Profile Boundaries
 
 | Profile | Purpose | Config path | Result meaning |
