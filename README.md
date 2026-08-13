@@ -13,7 +13,8 @@ Primary planning documents:
 - [Current project status](docs/current_status.md): high-level snapshot of completed infrastructure, smoke-ready workloads, and remaining HPC submission tasks.
 - [Comprehensive experiment matrix](docs/experiment_matrix.md): full source-of-truth matrix with `E001` to `E200`, priority levels, metrics, and GPU-hour estimates.
 - [Local dev runbook](docs/local_dev_runbook.md): Mac/local baseline-style runs for development while HPC access is unavailable.
-- [Experiment tracker](docs/experiment_tracker.md): editable run-status table for every planned experiment and analysis task.
+- [Generated experiment tracker](results/processed/experiment_tracker.md): current `E001-E200` matrix status generated from configs and raw results.
+- [Editable experiment tracker](docs/experiment_tracker.md): planning notes for every planned experiment and analysis task.
 - [HPC smoke runbook](docs/hpc_smoke_runbook.md): checklist for validating the cluster environment before full matrix submission.
 - [HPC submission batches](docs/hpc_submission_batches.md): first environment-validation and baseline Slurm batches after smoke tests pass.
 - [Experiment workspace](experiments/README.md): phase folders aligned with the dissertation proposal outline.
@@ -75,13 +76,19 @@ The reduced feasible scope in the appendix is approximately 95-118 GPU-hours, pr
 hpc-ai-performance-engineering/
 ├── configs/                  # JSON/YAML experiment configurations
 │   ├── baseline_profiling/
-│   ├── environment_validation/
+│   ├── communication_analysis/
+│   ├── data_movement/
+│   ├── dev/
 │   ├── distributed/
+│   ├── environment_validation/
+│   ├── hardware_comparison/
 │   ├── inference/
 │   ├── local/
+│   ├── memory_optimisation/
 │   ├── precision_studies/
 │   ├── scaling_studies/
 │   ├── templates/
+│   ├── training/
 │   └── workload_characterisation/
 ├── dashboard/                # Static dashboard for processed results
 ├── docs/                     # Project plan, matrix, tracker, architecture, hardware notes
@@ -105,14 +112,14 @@ The matrix tracks runtime, samples/sec, tokens/sec, loss, GPU-hours, GPU utilisa
 Install the package in editable mode and run the smoke tests:
 
 ```bash
-pip install -e ".[dev]"
+python -m pip install -e ".[dev,yaml]"
 pytest
 ```
 
 Install optional transformer workload dependencies when moving beyond the synthetic smoke path:
 
 ```bash
-pip install -e ".[workloads]"
+python -m pip install -e ".[dev,yaml,workloads]"
 ```
 
 Run the optional GPT-2 Small smoke workload after installing those dependencies:
@@ -148,9 +155,7 @@ python -m hpc_ai_perf.cli run --config configs/local/synthetic_smoke.json
 Run local dev experiments on a Mac or workstation while HPC is unavailable:
 
 ```bash
-make run-dev-experiments
-python -m hpc_ai_perf.cli refresh
-make track-dev-progress
+make run-dev-refresh
 ```
 
 These `dev_` runs are workflow checks and small local sweeps, not H100 measurements. Their progress is tracked separately in `results/processed/dev_experiment_tracker.md`.
@@ -236,6 +241,7 @@ Generate progress tracker reports from configs and raw results:
 
 ```bash
 python -m hpc_ai_perf.cli track-progress
+make track-dev-progress
 ```
 
 Validate experiment configs and raw results:
