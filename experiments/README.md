@@ -17,3 +17,15 @@ The experiment workspace mirrors the dissertation proposal outline and the lates
 | `inference_studies/` | Inference Studies | E129-E200 |
 | `integrated_analysis_dashboard/` | Integrated Analysis and Dashboard | A01-A07 |
 | `recommendations/` | Recommendations | A08 |
+
+Concrete runnable configs live under `configs/`, while this `experiments/` tree is for notes, helper scripts, and phase-specific analysis artefacts. The current generated matrix status is written to `results/processed/experiment_tracker.md` by:
+
+```bash
+python -m hpc_ai_perf.cli refresh
+```
+
+Local Mac/workstation dev runs are tracked separately with:
+
+```bash
+make track-dev-progress
+```
