@@ -9,8 +9,11 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | Experiment matrix | 200 concrete matrix configs are present and load successfully. |
 | Validation | `python -m hpc_ai_perf.cli validate --skip-results` passes with 0 config issues. |
 | Local smoke runner | CPU-only synthetic workload is ready and covered by tests. |
-| Result pipeline | Raw JSON aggregation, analysis tables, progress tracker, readiness report, and dashboard refresh are wired into `python -m hpc_ai_perf.cli refresh`. |
-| Slurm support | Single-config rendering, filtered bulk rendering, and three transformer smoke presets are available. |
+| Semantic launch gate | `validate --research-ready` blocks unsupported precision/backend/framework combinations before Slurm rendering or execution. |
+| Result pipeline | Immutable matrix trials, aggregation, 11 objective-specific analysis tables, progress tracking, and readiness reporting are wired into `python -m hpc_ai_perf.cli refresh`. |
+| Distributed execution | One-process-per-GPU `torchrun`, DDP, FSDP, DeepSpeed ZeRO, rank binding, global work accounting, and rank-safe result writing are implemented. |
+| Profiling | nvidia-smi power/utilisation/memory/clock/temperature sampling, PyTorch traces, workload timing, and NCCL microbenchmark metrics are implemented. |
+| Slurm support | Semantic-gated single/bulk rendering, H100/L40S profile matching, CPU allocation checks, and three transformer smoke presets are available. |
 | Dashboard | Static dashboard reads processed results, analysis summaries, and readiness report output. |
 | Quality gates | `pytest`, `ruff`, and `pre-commit` are configured and passing. |
 
@@ -19,9 +22,9 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | Workload | Current execution support | Smoke config | Notes |
 | --- | --- | --- | --- |
 | `synthetic` | Ready | `configs/local/synthetic_smoke.json` | Runs without GPU or optional ML dependencies. |
-| `gpt2_small` | Optional training and inference smoke path | `configs/local/gpt2_small_smoke.json` | Requires `pip install -e ".[workloads]"`. |
-| `distilbert` | Optional training and inference smoke path | `configs/local/distilbert_smoke.json` | Requires `pip install -e ".[workloads]"`. |
-| `tinyllama` | Optional inference smoke path | `configs/local/tinyllama_inference_smoke.json` | Training is intentionally unsupported for now. |
+| `gpt2_small` | Training plus PyTorch/vLLM inference | `configs/local/gpt2_small_smoke.json` | Matrix GPU runs require the matching HPC extras and CUDA. |
+| `distilbert` | Training, PyTorch classification inference, concurrent CUDA streams, and multi-GPU data parallelism | `configs/local/distilbert_smoke.json` | Causal-generation adapters are deliberately rejected for this classifier. |
+| `tinyllama` | Training plus PyTorch/vLLM inference | `configs/local/tinyllama_inference_smoke.json` | Full-size training remains optional because of GPU-hour cost. |
 
 ## Current Matrix Breakdown
 
@@ -39,7 +42,7 @@ This snapshot summarises the repository state before full HPC submission. It sho
 1. Install the workload extra on the cluster:
 
    ```bash
-   python -m pip install -e ".[dev,yaml,workloads]"
+   python -m pip install -e ".[dev,yaml,workloads,distributed,serving]"
    ```
 
 2. Review Slurm smoke presets for partition, account, module loading, and virtual environment activation:
@@ -72,9 +75,14 @@ This snapshot summarises the repository state before full HPC submission. It sho
 
 | Area | Remaining work |
 | --- | --- |
-| HPC environment | Run and confirm the three Slurm smoke jobs on Lovelace. |
-| Real benchmark execution | Submit Must Have matrix batches after smoke jobs pass. |
-| Profiling | Add real GPU profiler adapters beyond the current null/local path. |
-| Distributed execution | Expand runner support for DDP/FSDP/ZeRO orchestration beyond config and Slurm generation. |
-| Metrics | Add power/energy and deeper communication metrics when platform tooling is confirmed. |
-| Dashboard | Add charts for scaling efficiency, precision comparisons, and hardware comparison once results exist. |
+| HPC verification | Run `E001-E006`, then baseline and 1/2/4-GPU pilots on Lovelace; local tests cannot validate CUDA/NCCL/Slurm behaviour. |
+| Independent trials | Submit each core comparison at least three times and inspect variance from preserved trial records. |
+| Backend-dependent rows | FP8, INT8, and TensorRT-LLM configs remain blocked until a named backend, calibration/engine artefact, and compatible cluster environment are supplied. |
+| Invalid DistilBERT framework rows | `E154-E155` must be removed from executable scope or redesigned around classification-compatible backends. |
+| Communication depth | The NCCL microbenchmark and PyTorch trace do not yet provide NVLink counters or full communication/compute attribution. |
+| Quality scope | Synthetic held-out checks detect instability; final RQ3 quality claims still need a preregistered real evaluation protocol. |
+| Dashboard | Connect the objective-specific tables to RQ views, confidence intervals, and explicit insufficient-data states. |
+
+## Known Research-Readiness Blockers
+
+Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative list. The remaining blockers are intentional: the runner refuses to fabricate FP8/INT8/TensorRT measurements or route DistilBERT classification through a causal-generation adapter.

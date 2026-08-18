@@ -22,3 +22,7 @@ This directory contains runnable experiment configs and reusable templates.
 | `workload_characterisation/` | Concrete `E020-E031` compute, memory, data pipeline, and inference profiler configs |
 
 Concrete matrix experiment configs should preserve the matrix ID in both `experiment_id` and `metadata.matrix_id`. Local dev configs use readable `dev_` IDs and `metadata.profile: dev` so they stay separate from the `E001-E200` HPC tracker.
+
+Matrix transformer configs pin `workload.model_revision` to a 40-character Hugging Face commit. Performance runs use deterministic `synthetic_tokens_v1`, `synthetic_classification_v1`, or `synthetic_token_prompts_v1` inputs so exact work is comparable across GPU counts and backends; DataLoader experiments use CPU-resident deterministic samples to isolate movement costs. These performance protocols must not be described as real-corpus convergence training.
+
+Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` before rendering. A backend-dependent config is intentionally rejected until it declares an executable precision/framework path and any required engine or quantized model artefact.

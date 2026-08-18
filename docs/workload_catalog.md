@@ -25,11 +25,11 @@ The executable framework currently distinguishes between validated smoke paths a
 | Workload adapter | Current state | Local smoke config | Notes |
 | --- | --- | --- | --- |
 | `synthetic` | Ready | `configs/local/synthetic_smoke.json` | CPU-only path used by tests and local validation. |
-| `gpt2_small` | Optional smoke-ready | `configs/local/gpt2_small_smoke.json` | Requires `pip install -e ".[workloads]"`; supports tiny Hugging Face causal-LM training and inference plumbing. |
-| `distilbert` | Optional smoke-ready | `configs/local/distilbert_smoke.json` | Requires `pip install -e ".[workloads]"`; supports tiny Hugging Face sequence-classification training and inference plumbing. |
-| `tinyllama` | Optional inference smoke-ready | `configs/local/tinyllama_inference_smoke.json` | Requires `pip install -e ".[workloads]"`; inference path only. Training remains intentionally unsupported. |
+| `gpt2_small` | Implemented; cluster verification pending | `configs/local/gpt2_small_smoke.json` | Causal-LM training, PyTorch inference, vLLM routing, DDP/FSDP/ZeRO, precision, and profiling paths are implemented. |
+| `distilbert` | Implemented; cluster verification pending | `configs/local/distilbert_smoke.json` | Classification training, eager/concurrent/data-parallel inference, SST-2 quality checks, and distributed training paths are implemented. |
+| `tinyllama` | Implemented; optional full-size scope | `configs/local/tinyllama_inference_smoke.json` | Causal training and PyTorch/vLLM inference are implemented; full-size training remains optional for cost reasons. |
 
-Full H100/L40S experiment runs still require the matrix configs, Slurm rendering, and the appropriate GPU software stack on the target platform. A missing optional dependency should produce a structured failed result rather than an unhandled crash.
+Full H100/L40S experiment runs still require the appropriate GPU software stack and cluster pilots. Semantic preflight rejects unsupported FP8, quantized, TensorRT-engine, and incompatible model/framework rows before scheduling; runtime failures are preserved as structured trial records.
 
 ---
 

@@ -12,7 +12,7 @@ git pull
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e ".[dev,yaml,workloads]"
+python -m pip install -e ".[dev,yaml,workloads,distributed,serving]"
 ```
 
 The Slurm scripts assume jobs are submitted from the project root. Load the required cluster modules for CUDA, Python, and PyTorch before activating the project virtual environment. On Lovelace, the project helper can be used:

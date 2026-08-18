@@ -11,6 +11,7 @@ The latest plan is based on `Appendix_A_Comprehensive_Experiment_Matrix.docx` an
 Primary planning documents:
 
 - [Current project status](docs/current_status.md): high-level snapshot of completed infrastructure, smoke-ready workloads, and remaining HPC submission tasks.
+- [Experiment remediation and readiness guide](docs/experiment_remediation_guide.md): objective-aligned changes, acceptance criteria, and launch gates required before the full matrix is submitted.
 - [Comprehensive experiment matrix](docs/experiment_matrix.md): full source-of-truth matrix with `E001` to `E200`, priority levels, metrics, and GPU-hour estimates.
 - [Local dev runbook](docs/local_dev_runbook.md): Mac/local baseline-style runs for development while HPC access is unavailable.
 - [Dev experiment matrix](docs/dev_experiment_matrix.md): rationale, parameters, and local-dev versus HPC-only experiment boundaries.
@@ -123,6 +124,14 @@ Install optional transformer workload dependencies when moving beyond the synthe
 python -m pip install -e ".[dev,yaml,workloads]"
 ```
 
+On the Linux GPU cluster, install the extras required by the selected batch:
+
+```bash
+python -m pip install -e ".[dev,yaml,workloads,distributed,serving]"
+```
+
+TensorRT-LLM and FP8/quantized model tooling remain vendor/backend-specific and are not silently substituted by these extras.
+
 Run the optional GPT-2 Small smoke workload after installing those dependencies:
 
 ```bash
@@ -187,6 +196,8 @@ Prepare a local Slurm profile from the tracked example and edit it for the targe
 cp slurm/profiles/example.json slurm/profiles/cluster.local.json
 ```
 
+Use `slurm/profiles/example_l40s.json` as the starting point for L40S jobs. Rendering fails when a profile platform does not match the config, preventing H100/L40S result mislabelling.
+
 Generate the first environment-validation and baseline batches with site-specific settings:
 
 ```bash
@@ -232,7 +243,7 @@ Aggregate raw JSON results into a processed experiment table:
 python -m hpc_ai_perf.cli aggregate-results
 ```
 
-Build analysis tables for phase summaries, rankings, scaling, and precision comparisons:
+Build analysis tables for trials, phase summaries, rankings, scaling, distributed strategies, precision, memory, communication, data movement, inference, and hardware comparisons:
 
 ```bash
 python -m hpc_ai_perf.cli analyze-results
@@ -250,6 +261,14 @@ Validate experiment configs and raw results:
 ```bash
 python -m hpc_ai_perf.cli validate
 ```
+
+Require semantic research readiness (implemented workload, strategy, profiler, precision, and framework):
+
+```bash
+python -m hpc_ai_perf.cli validate --skip-results --research-ready
+```
+
+This stricter command is expected to remain non-zero for explicitly unsupported FP8/INT8/TensorRT artefact rows and the incompatible DistilBERT causal-engine comparisons. Those rows cannot be rendered or run until their reported blocker is resolved; valid objective-aligned batches can be rendered independently.
 
 Refresh validation, aggregation, analysis, tracker outputs, and readiness reporting in one pass:
 

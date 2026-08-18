@@ -133,27 +133,27 @@ How efficiently do transformer workloads scale from one to four H100 GPUs?
 
 ## RQ2
 
-Which distributed training strategy provides the best balance between throughput and memory efficiency?
+Which distributed training strategy provides the best throughput-to-memory trade-off?
 
 ## RQ3
 
-What impact do different numerical precision formats have on performance and model quality?
+What impact do FP32, FP16, BF16, FP8, and selected quantized inference formats have on performance and quality?
 
 ## RQ4
 
-What are the major communication bottlenecks limiting scaling efficiency?
+How significant are communication, synchronisation, and data movement bottlenecks?
 
 ## RQ5
 
-How significant are data movement costs in distributed transformer training?
+Which configurations produce the best useful work per GPU-hour and per Watt?
 
 ## RQ6
 
-Can performance bottlenecks be automatically identified and visualised?
+How do H100 and L40S platforms compare for selected AI workloads?
 
 ## RQ7
 
-How do H100 and L40S platforms compare for AI workloads?
+Can experiment results be integrated into a dashboard that identifies bottlenecks and supports practical recommendations?
 
 ---
 
