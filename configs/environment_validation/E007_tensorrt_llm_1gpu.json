@@ -5,9 +5,9 @@
   "workload": {
     "name": "environment_validation",
     "model": "all",
-    "dataset": "prompt_set_v1",
+    "dataset": "synthetic_token_prompts_v1",
     "parameters": {
-      "validation_target": "tensorrt_llm_serving",
+      "validation_target": "tensorrt_llm",
       "expected_checks": ["tensorrt_llm_import", "engine_build", "request_served"],
       "expected_gpus": 1
     }

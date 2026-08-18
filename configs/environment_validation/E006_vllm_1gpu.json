@@ -5,7 +5,7 @@
   "workload": {
     "name": "environment_validation",
     "model": "all",
-    "dataset": "prompt_set_v1",
+    "dataset": "synthetic_token_prompts_v1",
     "parameters": {
       "validation_target": "vllm_serving",
       "expected_checks": ["vllm_import", "server_start", "request_served"],

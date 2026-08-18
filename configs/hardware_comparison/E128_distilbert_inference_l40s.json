@@ -5,7 +5,8 @@
   "workload": {
     "name": "distilbert",
     "model": "distilbert-base-uncased",
-    "dataset": "prompt_set_v1",
+    "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+    "dataset": "synthetic_token_prompts_v1",
     "parameters": {
       "comparison_axis": "gpu_model",
       "hardware_label": "L40S",
