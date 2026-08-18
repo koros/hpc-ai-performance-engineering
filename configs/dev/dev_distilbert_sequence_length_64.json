@@ -5,6 +5,7 @@
   "workload": {
     "name": "distilbert",
     "model": "distilbert-base-uncased",
+    "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
     "dataset": "synthetic_classification",
     "parameters": {
       "device": "auto",
