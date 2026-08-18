@@ -2,6 +2,7 @@ import csv
 from pathlib import Path
 
 from hpc_ai_perf.analysis import analyze_results
+from hpc_ai_perf.analysis.summaries import build_scaling_summary
 from hpc_ai_perf.cli import _check_slurm_profile, _load_slurm_profile, _refresh_outputs, _render_slurm_bulk
 from hpc_ai_perf.config import discover_experiment_configs, filter_config_entries, load_experiment_config
 from hpc_ai_perf.readiness import write_readiness_report
@@ -20,7 +21,7 @@ from hpc_ai_perf.slurm import (
     write_submission_plan,
 )
 from hpc_ai_perf.tracking import track_experiment_progress
-from hpc_ai_perf.validation import validate_experiment_configs, validate_result_records
+from hpc_ai_perf.validation import capability_issues, validate_experiment_configs, validate_result_records
 from hpc_ai_perf.workloads import (
     GPT2SmallWorkload,
     TinyLlamaWorkload,
@@ -81,7 +82,8 @@ def test_render_slurm_script_from_config() -> None:
     assert "#SBATCH --gres=gpu:2" in script
     assert "#SBATCH --partition=gpu" in script
     assert "module load cuda/12.4" in script
-    assert "python -m hpc_ai_perf.cli run --config configs/scaling_studies/E033_gpt2_small_strong_2gpu.json" in script
+    assert "torchrun --standalone --nnodes=1 --nproc-per-node=2" in script
+    assert "-m hpc_ai_perf.cli run --config configs/scaling_studies/E033_gpt2_small_strong_2gpu.json" in script
 
 
 def test_render_slurm_script_with_setup_commands() -> None:
@@ -241,6 +243,7 @@ def test_render_slurm_bulk_with_profile(tmp_path: Path) -> None:
     profile_path.write_text(
         """{
   "partition": "gpu",
+  "platform": "lovelace_h100",
   "account": "project",
   "cpus_per_task": 12,
   "setup_commands": ["module purge"],
@@ -296,6 +299,7 @@ def test_check_slurm_profile_accepts_ready_profile(tmp_path: Path) -> None:
     profile_path.write_text(
         """{
   "partition": "gpu",
+  "platform": "lovelace_h100",
   "account": "project123",
   "cpus_per_task": 8,
   "setup_commands": ["module purge", "source /path/to/venv/bin/activate"],
@@ -335,10 +339,23 @@ def test_local_runner_writes_standard_result(tmp_path: Path) -> None:
     assert result_path.exists()
 
 
+def test_preserved_trials_get_unique_paths(tmp_path: Path) -> None:
+    config = load_experiment_config(Path("configs/local/synthetic_smoke.json"))
+    first = LocalBenchmarkRunner().run(config)
+    second = LocalBenchmarkRunner().run(config)
+
+    first_path = first.write_json(tmp_path, preserve_trial=True)
+    second_path = second.write_json(tmp_path, preserve_trial=True)
+
+    assert first_path != second_path
+    assert first_path.parent == tmp_path / config.experiment_id
+    assert len(list(first_path.parent.glob("*.json"))) == 2
+
+
 def test_default_registry_includes_transformer_workload_skeletons() -> None:
     registry = default_registry()
 
-    assert registry.names() == ["distilbert", "gpt2_small", "synthetic", "tinyllama"]
+    assert registry.names() == ["distilbert", "environment_validation", "gpt2_small", "synthetic", "tinyllama"]
 
 
 def test_transformer_workload_skeleton_fails_gracefully() -> None:
@@ -387,7 +404,7 @@ def test_gpt2_inference_dispatches_to_causal_lm_helper(monkeypatch) -> None:
     assert output.metrics["throughput_tokens_sec"] == 1.0
 
 
-def test_tinyllama_training_is_explicitly_unsupported() -> None:
+def test_tinyllama_training_dispatches_to_causal_training(monkeypatch) -> None:
     config = load_experiment_config(Path("configs/local/tinyllama_inference_smoke.json"))
     training_config = config.__class__(
         experiment_id=config.experiment_id,
@@ -401,12 +418,18 @@ def test_tinyllama_training_is_explicitly_unsupported() -> None:
         metadata=config.metadata,
     )
 
-    try:
-        TinyLlamaWorkload().run(training_config)
-    except NotImplementedError as exc:
-        assert "TinyLlama training is not implemented" in str(exc)
-    else:
-        raise AssertionError("Expected TinyLlama training to be unsupported")
+    calls = []
+
+    def fake_training(dispatched_config):
+        calls.append(dispatched_config.experiment_id)
+        return transformer_module.WorkloadRunOutput(metrics={"loss": 1.0})
+
+    monkeypatch.setattr(transformer_module, "_run_causal_training", fake_training)
+
+    output = TinyLlamaWorkload().run(training_config)
+
+    assert calls == ["local_tinyllama_inference_smoke"]
+    assert output.metrics["loss"] == 1.0
 
 
 def test_transformer_device_auto_prefers_mps_when_cuda_is_unavailable() -> None:
@@ -482,10 +505,17 @@ def test_analyze_results_writes_summary_tables(tmp_path: Path) -> None:
     written_paths = analyze_results(processed_path, analysis_dir)
 
     assert sorted(path.name for path in written_paths) == [
+        "communication_summary.csv",
+        "data_movement_summary.csv",
         "experiment_rankings.csv",
+        "hardware_summary.csv",
+        "inference_summary.csv",
+        "memory_summary.csv",
         "phase_summary.csv",
         "precision_summary.csv",
         "scaling_summary.csv",
+        "strategy_summary.csv",
+        "trial_summary.csv",
     ]
 
     with (analysis_dir / "phase_summary.csv").open(encoding="utf-8", newline="") as file_obj:
@@ -587,7 +617,17 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
         started_at="2026-01-01T00:00:00Z",
         completed_at="2026-01-01T00:10:00Z",
         runtime_seconds=600.0,
-        metrics={"throughput_tokens_sec": 1200.0},
+        metrics={
+            "throughput_tokens_sec": 1200.0,
+            "measured_seconds": 590.0,
+            "gpu_hours": 1180.0 / 3600,
+            "total_tokens": 708000,
+        },
+        environment={
+            "config_sha256": "a" * 64,
+            "git_dirty": False,
+            "observed_gpu_model": "NVIDIA H100 SXM 80GB",
+        },
     )
     result.write_json(raw_dir)
 
@@ -597,6 +637,7 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
         rows = list(csv.DictReader(file_obj))
     e033 = next(row for row in rows if row["experiment_id"] == "E033")
     e034 = next(row for row in rows if row["experiment_id"] == "E034")
+    e086 = next(row for row in rows if row["experiment_id"] == "E086")
 
     assert csv_path == output_csv
     assert markdown_path == output_markdown
@@ -604,6 +645,8 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
     assert e033["status"] == "Completed"
     assert e033["runtime_seconds"] == "600.0"
     assert e034["status"] == "Configured"
+    assert e086["status"] == "Blocked"
+    assert "precision fp8" in e086["notes"]
     assert "| Completed | 1 |" in markdown_path.read_text(encoding="utf-8")
 
 
@@ -649,6 +692,75 @@ def test_experiment_configs_validate() -> None:
     assert validate_experiment_configs("configs") == []
 
 
+def test_research_preflight_rejects_unbuilt_backend_artifacts() -> None:
+    config = load_experiment_config(Path("configs/inference/E131_gpt2_small_framework_tensorrt_llm.json"))
+
+    assert "TensorRT-LLM config requires a built engine_path" in capability_issues(config)
+
+
+def test_research_preflight_has_only_documented_backend_blockers() -> None:
+    blocked = {entry.config.experiment_id for entry in discover_experiment_configs() if capability_issues(entry.config)}
+
+    assert blocked == {
+        "E086",
+        "E089",
+        "E093",
+        "E096",
+        "E131",
+        "E151",
+        "E152",
+        "E154",
+        "E155",
+        "E175",
+        "E176",
+        "E179",
+        "E199",
+        "E200",
+    }
+
+
+def test_matrix_transformer_models_are_pinned() -> None:
+    for entry in discover_experiment_configs():
+        if entry.config.workload.name == "environment_validation":
+            continue
+        assert entry.config.workload.model_revision is not None
+        assert len(entry.config.workload.model_revision) == 40
+
+
+def test_weak_scaling_efficiency_uses_constant_runtime_ideal() -> None:
+    rows = [
+        {
+            "status": "completed",
+            "phase": "Weak scaling",
+            "workload": "gpt2_small",
+            "model": "gpt2",
+            "precision": "bf16",
+            "strategy": "ddp",
+            "scaling_type": "weak",
+            "gpus": "1",
+            "metric_measured_seconds": "10",
+            "throughput_tokens_sec": "100",
+        },
+        {
+            "status": "completed",
+            "phase": "Weak scaling",
+            "workload": "gpt2_small",
+            "model": "gpt2",
+            "precision": "bf16",
+            "strategy": "ddp",
+            "scaling_type": "weak",
+            "gpus": "4",
+            "metric_measured_seconds": "10",
+            "throughput_tokens_sec": "400",
+        },
+    ]
+
+    summary = build_scaling_summary(rows)
+
+    assert summary[1]["speedup"] == 4.0
+    assert summary[1]["scaling_efficiency"] == 1.0
+
+
 def test_result_validation_reports_bad_record(tmp_path: Path) -> None:
     bad_result = tmp_path / "bad.json"
     bad_result.write_text('{"experiment_id": "E999", "status": "done", "runtime_seconds": -1}\n', encoding="utf-8")
@@ -676,7 +788,17 @@ def test_refresh_outputs_rebuilds_derived_files(tmp_path: Path) -> None:
         started_at="2026-01-01T00:00:00Z",
         completed_at="2026-01-01T00:10:00Z",
         runtime_seconds=600.0,
-        metrics={"throughput_tokens_sec": 1200.0},
+        metrics={
+            "throughput_tokens_sec": 1200.0,
+            "measured_seconds": 590.0,
+            "gpu_hours": 1180.0 / 3600,
+            "total_tokens": 708000,
+        },
+        environment={
+            "config_sha256": "a" * 64,
+            "git_dirty": False,
+            "observed_gpu_model": "NVIDIA H100 SXM 80GB",
+        },
     )
     result.write_json(raw_dir)
 
