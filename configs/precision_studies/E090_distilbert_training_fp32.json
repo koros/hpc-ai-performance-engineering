@@ -5,7 +5,8 @@
   "workload": {
     "name": "distilbert",
     "model": "distilbert-base-uncased",
-    "dataset": "glue_sst2_or_synthetic_subset",
+    "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+    "dataset": "synthetic_classification_v1",
     "parameters": {
       "precision_label": "FP32",
       "batch_size": 32,

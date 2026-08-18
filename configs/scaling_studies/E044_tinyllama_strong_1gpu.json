@@ -5,14 +5,15 @@
   "workload": {
     "name": "tinyllama",
     "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-    "dataset": "openwebtext_or_synthetic_subset",
+    "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+    "dataset": "synthetic_tokens_v1",
     "parameters": {
       "scaling_type": "strong",
       "per_gpu_batch_size": 16,
       "global_batch_size": 16,
       "sequence_length": 1024,
       "fixed_workload": true,
-      "stack": "ddp_or_fsdp"
+      "stack": "ddp"
     }
   },
   "hardware": {
@@ -50,7 +51,7 @@
     "phase": "Strong scaling",
     "priority": "Optional",
     "gpu_hours_estimate": 1.0,
-    "strategy_detail": "DDP or FSDP per matrix; default config chooses DDP for 1 GPU and FSDP for multi-GPU TinyLlama.",
+    "strategy_detail": "DDP is held constant across the 1/2/4-GPU strong-scaling curve.",
     "objective": "Optional fixed-workload training scaling if time permits",
     "key_metrics": [
       "runtime",

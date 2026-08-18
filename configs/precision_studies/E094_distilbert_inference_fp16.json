@@ -5,13 +5,11 @@
   "workload": {
     "name": "distilbert",
     "model": "distilbert-base-uncased",
-    "dataset": "prompt_set_v1",
+    "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+    "dataset": "synthetic_token_prompts_v1",
     "parameters": {
       "precision_label": "FP16",
-      "frameworks": [
-        "pytorch_eager",
-        "vllm"
-      ],
+      "framework": "pytorch_eager",
       "batch_size": 1,
       "prompt_length": 128,
       "max_new_tokens": 128,

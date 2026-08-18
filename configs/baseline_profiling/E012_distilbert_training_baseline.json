@@ -5,8 +5,10 @@
   "workload": {
     "name": "distilbert",
     "model": "distilbert-base-uncased",
-    "dataset": "glue_sst2_or_synthetic_subset",
+    "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+    "dataset": "synthetic_classification_v1",
     "parameters": {
+      "quality_sanity_check": true,
       "baseline_kind": "training",
       "batch_size": 32,
       "sequence_length": 512,
