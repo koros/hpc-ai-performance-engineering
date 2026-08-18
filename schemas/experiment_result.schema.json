@@ -23,6 +23,7 @@
   ],
   "properties": {
     "schema_version": { "type": "string" },
+    "run_id": { "type": "string" },
     "experiment_id": { "type": "string" },
     "experiment": { "type": "string" },
     "workload": { "type": "string" },

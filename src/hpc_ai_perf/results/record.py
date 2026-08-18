@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -21,6 +23,7 @@ class ExperimentResult:
     """
 
     schema_version: str
+    run_id: str
     experiment_id: str
     experiment: str
     workload: str
@@ -65,7 +68,8 @@ class ExperimentResult:
         """
         metrics = metrics or {}
         return cls(
-            schema_version="1.0.0",
+            schema_version="1.1.0",
+            run_id=_run_id(config.experiment_id, started_at),
             experiment_id=config.experiment_id,
             experiment=config.experiment,
             workload=config.workload.name,
@@ -93,16 +97,22 @@ class ExperimentResult:
         """Convert the immutable result object into JSON-serializable data."""
         return asdict(self)
 
-    def write_json(self, output_dir: str | Path) -> Path:
-        """Write this result as pretty-printed JSON named by experiment ID.
+    def write_json(self, output_dir: str | Path, *, preserve_trial: bool = False) -> Path:
+        """Write a result, optionally preserving it as an immutable trial.
 
-        Existing results for the same experiment ID are overwritten by design:
-        the project keeps the latest local/dev/smoke run at a predictable path,
-        while Slurm stdout/stderr logs keep job-specific scheduler context.
+        Local smoke runs retain the predictable ``<experiment_id>.json`` path.
+        Matrix execution uses ``preserve_trial=True`` and writes a unique file
+        under ``<experiment_id>/<run_id>.json`` so repeated jobs cannot replace
+        earlier research evidence.
         """
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
-        result_path = output_path / f"{self.experiment_id}.json"
+        if preserve_trial:
+            output_path = output_path / self.experiment_id
+            output_path.mkdir(parents=True, exist_ok=True)
+            result_path = output_path / f"{self.run_id}.json"
+        else:
+            result_path = output_path / f"{self.experiment_id}.json"
         result_path.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return result_path
 
@@ -114,3 +124,8 @@ def _optional_float(value: object) -> float | None:
     if isinstance(value, int | float):
         return float(value)
     return None
+
+
+def _run_id(experiment_id: str, started_at: str) -> str:
+    timestamp = re.sub(r"[^0-9]", "", started_at)[:20] or "unknown"
+    return f"{experiment_id}-{timestamp}-{uuid.uuid4().hex[:8]}"

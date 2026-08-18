@@ -8,6 +8,7 @@ from typing import Any
 
 BASE_COLUMNS = [
     "schema_version",
+    "run_id",
     "experiment_id",
     "matrix_id",
     "experiment",
@@ -21,6 +22,11 @@ BASE_COLUMNS = [
     "gpu_model",
     "platform",
     "strategy",
+    "scaling_type",
+    "framework",
+    "batch_size",
+    "global_batch_size",
+    "per_gpu_batch_size",
     "precision",
     "started_at",
     "completed_at",
@@ -32,6 +38,9 @@ BASE_COLUMNS = [
     "latency_p50_ms",
     "latency_p95_ms",
     "gpu_hours_estimate",
+    "actual_gpu_hours",
+    "energy_joules",
+    "observed_gpu_model",
     "source_path",
     "error",
 ]
@@ -82,9 +91,14 @@ def flatten_result_record(record: dict[str, Any], source_path: str | Path | None
     metadata = _mapping(config.get("metadata"))
     hardware = _mapping(config.get("hardware"))
     distributed = _mapping(config.get("distributed"))
+    workload_config = _mapping(config.get("workload"))
+    workload_parameters = _mapping(workload_config.get("parameters"))
+    metrics = _mapping(record.get("metrics"))
+    environment = _mapping(record.get("environment"))
 
     row: dict[str, Any] = {
         "schema_version": record.get("schema_version"),
+        "run_id": record.get("run_id"),
         "experiment_id": record.get("experiment_id"),
         "matrix_id": metadata.get("matrix_id", record.get("experiment_id")),
         "experiment": record.get("experiment"),
@@ -98,6 +112,13 @@ def flatten_result_record(record: dict[str, Any], source_path: str | Path | None
         "gpu_model": hardware.get("gpu_model"),
         "platform": hardware.get("platform"),
         "strategy": distributed.get("strategy"),
+        "scaling_type": workload_parameters.get("scaling_type"),
+        "framework": metrics.get("framework_observed", workload_parameters.get("framework")),
+        "batch_size": metrics.get(
+            "batch_size", metrics.get("batch_size_per_gpu", workload_parameters.get("batch_size"))
+        ),
+        "global_batch_size": metrics.get("effective_global_batch_size", workload_parameters.get("global_batch_size")),
+        "per_gpu_batch_size": metrics.get("batch_size_per_gpu", workload_parameters.get("per_gpu_batch_size")),
         "precision": record.get("precision"),
         "started_at": record.get("started_at"),
         "completed_at": record.get("completed_at"),
@@ -109,15 +130,20 @@ def flatten_result_record(record: dict[str, Any], source_path: str | Path | None
         "latency_p50_ms": record.get("latency_p50_ms"),
         "latency_p95_ms": record.get("latency_p95_ms"),
         "gpu_hours_estimate": metadata.get("gpu_hours_estimate"),
+        "actual_gpu_hours": metrics.get("gpu_hours"),
+        "energy_joules": metrics.get("energy_joules_estimate"),
+        "observed_gpu_model": environment.get("observed_gpu_model"),
         "source_path": str(source_path) if source_path else None,
         "error": record.get("error"),
     }
 
-    # Prefix dynamic metric/environment keys to avoid collisions with stable
+    # Prefix dynamic parameter/metric/environment keys to avoid collisions with stable
     # result columns while keeping the original information available.
-    for key, value in _mapping(record.get("metrics")).items():
+    for key, value in workload_parameters.items():
+        row[f"parameter_{_slugify(key)}"] = value
+    for key, value in metrics.items():
         row[f"metric_{_slugify(key)}"] = value
-    for key, value in _mapping(record.get("environment")).items():
+    for key, value in environment.items():
         row[f"environment_{_slugify(key)}"] = value
 
     return row
