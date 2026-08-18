@@ -4,15 +4,15 @@
   "mode": "inference",
   "workload": {
     "name": "distilbert",
-    "model": "distilbert-base-uncased",
-    "dataset": "prompt_set_v1",
+    "model": "distilbert-base-uncased-finetuned-sst-2-english",
+    "model_revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+    "dataset": "synthetic_token_prompts_v1",
     "parameters": {
       "inference_study_type": "concurrency",
-      "framework": "vllm",
+      "framework": "pytorch_eager",
       "batch_size": 1,
       "concurrent_requests": 2,
-      "prompt_length": 128,
-      "max_new_tokens": 128
+      "prompt_length": 128
     }
   },
   "hardware": {
@@ -52,7 +52,7 @@
     "phase": "Inference concurrency",
     "priority": "Should Have",
     "gpu_hours_estimate": 0.4,
-    "matrix_stack_strategy": "vLLM",
+    "matrix_stack_strategy": "PyTorch eager",
     "objective": "Concurrent requests 2",
     "key_metrics": [
       "throughput",

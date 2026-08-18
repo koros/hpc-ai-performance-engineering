@@ -1,17 +1,18 @@
 {
-  "experiment_id": "E193",
-  "experiment": "inference_prompt_length_tinyllama_1024",
+  "experiment_id": "E144",
+  "experiment": "inference_prompt_length_gpt2_small_384",
   "mode": "inference",
   "workload": {
-    "name": "tinyllama",
-    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-    "dataset": "prompt_set_v1",
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "dataset": "synthetic_token_prompts_v1",
     "parameters": {
       "inference_study_type": "prompt_length",
       "framework": "vllm",
       "batch_size": 1,
       "concurrent_requests": 1,
-      "prompt_length": 1024,
+      "prompt_length": 384,
       "max_new_tokens": 128
     }
   },
@@ -47,13 +48,13 @@
     }
   },
   "metadata": {
-    "matrix_id": "E193",
+    "matrix_id": "E144",
     "template": "inference_serving",
     "phase": "Inference prompt length",
-    "priority": "Must Have",
-    "gpu_hours_estimate": 0.5,
+    "priority": "Should Have",
+    "gpu_hours_estimate": 0.4,
     "matrix_stack_strategy": "vLLM",
-    "objective": "Prompt length 1024 tokens",
+    "objective": "Prompt length 384 tokens",
     "key_metrics": [
       "time_to_first_token",
       "generation_rate",

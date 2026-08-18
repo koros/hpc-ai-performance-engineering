@@ -1,18 +1,18 @@
 {
-  "experiment_id": "E169",
-  "experiment": "inference_prompt_length_distilbert_1024",
+  "experiment_id": "E168",
+  "experiment": "inference_prompt_length_distilbert_128",
   "mode": "inference",
   "workload": {
     "name": "distilbert",
-    "model": "distilbert-base-uncased",
-    "dataset": "prompt_set_v1",
+    "model": "distilbert-base-uncased-finetuned-sst-2-english",
+    "model_revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+    "dataset": "synthetic_token_prompts_v1",
     "parameters": {
       "inference_study_type": "prompt_length",
-      "framework": "vllm",
+      "framework": "pytorch_eager",
       "batch_size": 1,
       "concurrent_requests": 1,
-      "prompt_length": 1024,
-      "max_new_tokens": 128
+      "prompt_length": 128
     }
   },
   "hardware": {
@@ -40,23 +40,20 @@
       "serving_latency"
     ],
     "parameters": {
-      "collect_time_to_first_token": true,
-      "collect_generation_rate": true,
       "collect_latency_distribution": true,
       "collect_memory_trace": true
     }
   },
   "metadata": {
-    "matrix_id": "E169",
+    "matrix_id": "E168",
     "template": "inference_serving",
     "phase": "Inference prompt length",
-    "priority": "Must Have",
+    "priority": "Should Have",
     "gpu_hours_estimate": 0.4,
-    "matrix_stack_strategy": "vLLM",
-    "objective": "Prompt length 1024 tokens",
+    "matrix_stack_strategy": "PyTorch eager",
+    "objective": "Input length 128 tokens",
     "key_metrics": [
-      "time_to_first_token",
-      "generation_rate",
+      "throughput_samples_sec",
       "memory",
       "p95_latency"
     ]

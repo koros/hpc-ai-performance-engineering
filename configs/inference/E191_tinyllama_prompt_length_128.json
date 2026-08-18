@@ -5,7 +5,8 @@
   "workload": {
     "name": "tinyllama",
     "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-    "dataset": "prompt_set_v1",
+    "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+    "dataset": "synthetic_token_prompts_v1",
     "parameters": {
       "inference_study_type": "prompt_length",
       "framework": "vllm",

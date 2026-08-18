@@ -4,19 +4,16 @@
   "mode": "inference",
   "workload": {
     "name": "distilbert",
-    "model": "distilbert-base-uncased",
-    "dataset": "prompt_set_v1",
+    "model": "distilbert-base-uncased-finetuned-sst-2-english",
+    "model_revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+    "dataset": "synthetic_token_prompts_v1",
     "parameters": {
       "inference_study_type": "precision_quantization",
-      "frameworks": [
-        "vllm",
-        "tensorrt_llm"
-      ],
+      "framework": "pytorch_eager",
       "precision_label": "FP8",
       "batch_size": 1,
       "concurrent_requests": 1,
       "prompt_length": 128,
-      "max_new_tokens": 128,
       "quality_sanity_check": true,
       "requires_supported_fp8_backend": true
     }
@@ -57,7 +54,7 @@
     "phase": "Inference precision/quantization",
     "priority": "Should Have",
     "gpu_hours_estimate": 0.5,
-    "matrix_stack_strategy": "vLLM or TensorRT-LLM",
+    "matrix_stack_strategy": "PyTorch eager",
     "matrix_precision_config": "FP8",
     "objective": "Inference using FP8",
     "key_metrics": [
