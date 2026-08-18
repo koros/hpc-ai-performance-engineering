@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from hpc_ai_perf.config import load_experiment_config
+from hpc_ai_perf.validation.capabilities import capability_issues
 
 CONFIG_MODES = {"training", "inference", "profiling"}
 PRECISIONS = {"fp32", "fp16", "bf16", "fp8", "int8", "int4"}
@@ -49,15 +50,18 @@ def validate_project(
     result_dir: str | Path = "results/raw",
     *,
     include_results: bool = True,
+    research_ready: bool = False,
 ) -> list[ValidationIssue]:
     """Validate configs and, optionally, raw result records."""
-    issues = validate_experiment_configs(config_root)
+    issues = validate_experiment_configs(config_root, research_ready=research_ready)
     if include_results:
         issues.extend(validate_result_records(result_dir))
     return issues
 
 
-def validate_experiment_configs(config_root: str | Path = "configs") -> list[ValidationIssue]:
+def validate_experiment_configs(
+    config_root: str | Path = "configs", *, research_ready: bool = False
+) -> list[ValidationIssue]:
     """Validate every JSON experiment config under a root directory.
 
     This pass checks required fields, enum-like values, non-negative hardware
@@ -108,6 +112,10 @@ def validate_experiment_configs(config_root: str | Path = "configs") -> list[Val
                 issues.append(ValidationIssue(config_path, "metadata.phase is required for matrix configs"))
             if not config.metadata.get("priority"):
                 issues.append(ValidationIssue(config_path, "metadata.priority is required for matrix configs"))
+            if research_ready:
+                issues.extend(
+                    ValidationIssue(config_path, message, severity="error") for message in capability_issues(config)
+                )
 
     return issues
 
@@ -178,6 +186,36 @@ def _validate_result_mapping(path: Path, data: dict[str, Any]) -> list[Validatio
         issues.append(ValidationIssue(path, "environment must be an object containing scalar values"))
     if "config" in data and not isinstance(data["config"], dict):
         issues.append(ValidationIssue(path, "config must be an object"))
+
+    experiment_id = str(data.get("experiment_id", ""))
+    if _is_matrix_experiment_id(experiment_id) and data.get("status") == "completed":
+        metrics = data.get("metrics") if isinstance(data.get("metrics"), dict) else {}
+        environment = data.get("environment") if isinstance(data.get("environment"), dict) else {}
+        config = data.get("config") if isinstance(data.get("config"), dict) else {}
+        workload = config.get("workload") if isinstance(config.get("workload"), dict) else {}
+        if not data.get("run_id"):
+            issues.append(ValidationIssue(path, "completed matrix result must include run_id"))
+        if not environment.get("config_sha256"):
+            issues.append(ValidationIssue(path, "completed matrix result must include environment.config_sha256"))
+        if environment.get("git_dirty") is not False:
+            issues.append(ValidationIssue(path, "completed matrix evidence must come from a clean git worktree"))
+        if int(data.get("gpus", 0) or 0) > 0 and not environment.get("observed_gpu_model"):
+            issues.append(ValidationIssue(path, "completed GPU result must record environment.observed_gpu_model"))
+        hardware = config.get("hardware") if isinstance(config.get("hardware"), dict) else {}
+        requested_model = str(hardware.get("gpu_model", "")).lower()
+        observed_model = str(environment.get("observed_gpu_model", "")).lower()
+        expected_token = "h100" if "h100" in requested_model else "l40s" if "l40s" in requested_model else ""
+        if expected_token and observed_model and expected_token not in observed_model:
+            issues.append(
+                ValidationIssue(
+                    path,
+                    f"observed GPU model does not match requested hardware: {environment.get('observed_gpu_model')}",
+                )
+            )
+        if workload.get("name") != "environment_validation":
+            for metric in ["measured_seconds", "gpu_hours", "total_tokens"]:
+                if not _is_non_negative_number(metrics.get(metric)):
+                    issues.append(ValidationIssue(path, f"completed matrix result must include metric: {metric}"))
 
     return issues
 

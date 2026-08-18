@@ -1,5 +1,6 @@
 {
   "partition": "gpu",
+  "platform": "lovelace_h100",
   "account": "replace-with-project-account",
   "cpus_per_task": 8,
   "time": null,

@@ -9,10 +9,10 @@ from hpc_ai_perf.workloads import default_registry
 
 WORKLOAD_STATUS = {
     "synthetic": "Ready",
-    "environment_validation": "Validation-only",
-    "gpt2_small": "Optional smoke-ready",
-    "distilbert": "Optional smoke-ready",
-    "tinyllama": "Optional inference smoke-ready",
+    "environment_validation": "Implemented; cluster verification required",
+    "gpt2_small": "PyTorch training/inference and vLLM routing implemented",
+    "distilbert": "PyTorch training/inference implemented",
+    "tinyllama": "PyTorch training/inference and vLLM routing implemented",
 }
 
 
@@ -53,6 +53,7 @@ def build_readiness_report(
     """
     entries = discover_experiment_configs(config_root)
     validation_issues = validate_project(config_root, result_dir)
+    research_issues = validate_project(config_root, result_dir, include_results=False, research_ready=True)
     workload_counts = Counter(entry.config.workload.name for entry in entries)
     phase_counts = Counter(entry.phase for entry in entries)
     priority_counts = Counter(entry.priority for entry in entries)
@@ -69,6 +70,7 @@ def build_readiness_report(
         "",
         f"- Matrix configs discovered: {len(entries)}",
         f"- Validation issues: {len(validation_issues)}",
+        f"- Research-readiness blockers: {len(research_issues)}",
         f"- Registered workloads: {', '.join(registry.names())}",
         f"- Slurm smoke presets: {len(smoke_scripts)}",
         "",
@@ -82,6 +84,14 @@ def build_readiness_report(
             lines.append(f"| {issue.severity} | `{issue.path}` | {issue.message} |")
     else:
         lines.append("Validation passed for configs and current raw result records.")
+
+    lines.extend(["", "## Research Readiness", ""])
+    if research_issues:
+        lines.extend(["| Severity | Path | Message |", "| --- | --- | --- |"])
+        for issue in research_issues:
+            lines.append(f"| {issue.severity} | `{issue.path}` | {issue.message} |")
+    else:
+        lines.append("All matrix configs have a semantically valid execution path.")
 
     lines.extend(
         [
@@ -138,6 +148,7 @@ def build_readiness_report(
             "## Submission Gate",
             "",
             "- Run `python -m hpc_ai_perf.cli validate` before submission.",
+            "- Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the selected batch.",
             "- Run the three Slurm smoke presets before rendering the full matrix.",
             "- Run `python -m hpc_ai_perf.cli refresh` after smoke results complete.",
             "- Review `results/processed/experiment_tracker.md` and the dashboard before larger batches.",

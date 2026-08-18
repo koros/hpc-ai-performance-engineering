@@ -6,6 +6,7 @@ from typing import Any
 
 from hpc_ai_perf.config import ConfigCatalogEntry, discover_experiment_configs
 from hpc_ai_perf.results import load_result_records
+from hpc_ai_perf.validation import capability_issues
 
 TRACKER_COLUMNS = [
     "experiment_id",
@@ -68,7 +69,10 @@ def build_progress_rows(
         result_path, result = result_index.get(config.experiment_id, (None, {}))
         status = RESULT_STATUS.get(str(result.get("status", "")).lower(), "Configured")
         error = str(result.get("error") or "")
-        notes = error if status == "Failed" else ""
+        semantic_issues = capability_issues(config) if not result else []
+        if semantic_issues:
+            status = "Blocked"
+        notes = error if status == "Failed" else "; ".join(semantic_issues)
 
         rows.append(
             {

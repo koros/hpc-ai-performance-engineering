@@ -27,7 +27,7 @@ from hpc_ai_perf.slurm import (
     write_submission_plan,
 )
 from hpc_ai_perf.tracking import track_experiment_progress
-from hpc_ai_perf.validation import format_validation_issues, validate_project
+from hpc_ai_perf.validation import capability_issues, format_validation_issues, validate_project
 
 LOGGER = logging.getLogger(__name__)
 SLURM_PROFILE_KEYS = {
@@ -36,6 +36,7 @@ SLURM_PROFILE_KEYS = {
     "environment",
     "modules",
     "partition",
+    "platform",
     "setup_commands",
     "time",
 }
@@ -205,7 +206,12 @@ def main() -> None:
     if args.command == "validate":
         # Validation prints a human-readable report by default, but can emit JSON
         # for automation in CI or cluster-side health checks.
-        issues = validate_project(args.config_root, args.result_dir, include_results=not args.skip_results)
+        issues = validate_project(
+            args.config_root,
+            args.result_dir,
+            include_results=not args.skip_results,
+            research_ready=args.research_ready,
+        )
         if args.format == "json":
             print(json.dumps([issue.to_dict() for issue in issues], indent=2) + "\n", end="")
         else:
@@ -389,6 +395,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--result-dir", default="results/raw", help="Directory containing raw result JSON files."
     )
     validate_parser.add_argument("--skip-results", action="store_true", help="Only validate experiment configs.")
+    validate_parser.add_argument(
+        "--research-ready",
+        action="store_true",
+        help="Also reject configs whose declared factors do not have a validated execution path.",
+    )
     validate_parser.add_argument("--format", choices=["table", "json"], default="table")
 
     refresh_parser = subparsers.add_parser("refresh", help="Validate and rebuild processed project outputs.")
@@ -474,10 +485,18 @@ def _run_local_config(config_path: str, output_dir: str | None) -> None:
     configured output directory.
     """
     config = load_experiment_config(config_path)
+    semantic_issues = capability_issues(config) if config.experiment_id.startswith("E") else []
+    if semantic_issues:
+        raise RuntimeError("Experiment is not research-ready:\n- " + "\n- ".join(semantic_issues))
     runner = LocalBenchmarkRunner()
     result = runner.run(config)
-    result_path = result.write_json(output_dir or config.runtime.output_dir)
-    LOGGER.info("Wrote result to %s", result_path)
+    rank = int(__import__("os").environ.get("RANK", "0"))
+    if rank == 0:
+        result_path = result.write_json(
+            output_dir or config.runtime.output_dir,
+            preserve_trial=config.experiment_id.startswith("E"),
+        )
+        LOGGER.info("Wrote result to %s", result_path)
 
 
 def _refresh_outputs(
@@ -561,6 +580,10 @@ def _render_slurm_config(
         env_values=env_values,
     )
     config = load_experiment_config(config_path)
+    semantic_issues = capability_issues(config)
+    if semantic_issues:
+        raise ValueError(f"{config.experiment_id} is not research-ready: {'; '.join(semantic_issues)}")
+    _verify_profile_platform(config, slurm_options.get("platform"), profile_path)
     script = render_slurm_script(
         config,
         config_path,
@@ -627,6 +650,10 @@ def _render_slurm_bulk(
         env_values=env_values,
     )
     for entry in entries:
+        semantic_issues = capability_issues(entry.config)
+        if semantic_issues:
+            raise ValueError(f"{entry.config.experiment_id} is not research-ready: {'; '.join(semantic_issues)}")
+        _verify_profile_platform(entry.config, slurm_options.get("platform"), profile_path)
         script = render_slurm_script(
             entry.config,
             entry.path,
@@ -689,6 +716,7 @@ def _resolve_slurm_options(
         "modules": [*profile.get("modules", []), *modules],
         "environment": {**profile_environment, **_parse_environment(env_values)},
         "setup_commands": profile.get("setup_commands", []),
+        "platform": profile.get("platform"),
     }
 
 
@@ -709,6 +737,7 @@ def _load_slurm_profile(profile_path: str) -> dict[str, Any]:
         raise ValueError(f"Unknown Slurm profile keys in {profile_path}: {', '.join(unknown_keys)}")
 
     _validate_string_or_none(profile, "partition", profile_path)
+    _validate_string_or_none(profile, "platform", profile_path)
     _validate_string_or_none(profile, "account", profile_path)
     _validate_string_or_none(profile, "time", profile_path)
     _validate_int_or_none(profile, "cpus_per_task", profile_path)
@@ -735,6 +764,12 @@ def _check_slurm_profile(profile_path: str) -> list[str]:
     elif _contains_placeholder(partition):
         issues.append(f"`partition` still contains a placeholder: {partition}")
 
+    platform_name = profile.get("platform")
+    if not platform_name:
+        issues.append("`platform` must identify the target hardware, such as lovelace_h100 or lovelace_l40s.")
+    elif _contains_placeholder(platform_name):
+        issues.append(f"`platform` still contains a placeholder: {platform_name}")
+
     account = profile.get("account")
     if account and _contains_placeholder(account):
         issues.append(f"`account` still contains a placeholder: {account}")
@@ -753,6 +788,18 @@ def _check_slurm_profile(profile_path: str) -> list[str]:
             issues.append(f"`environment.{key}` still contains a placeholder: {value}")
 
     return issues
+
+
+def _verify_profile_platform(config: Any, profile_platform: str | None, profile_path: str | None) -> None:
+    """Prevent hardware-labelled configs from using a profile for another GPU platform."""
+    if not profile_path:
+        return
+    if not profile_platform:
+        raise ValueError(f"Slurm profile {profile_path} must declare `platform` for research jobs")
+    if config.hardware.platform.startswith("lovelace_") and config.hardware.platform != profile_platform:
+        raise ValueError(
+            f"{config.experiment_id} targets {config.hardware.platform}, but {profile_path} targets {profile_platform}"
+        )
 
 
 def _contains_placeholder(value: str) -> bool:
