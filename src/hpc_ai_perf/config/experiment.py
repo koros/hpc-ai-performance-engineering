@@ -29,14 +29,15 @@ class HardwareConfig:
 class WorkloadConfig:
     """Model and dataset settings consumed by a workload adapter.
 
-    `name` selects the registered adapter, `model` records the human-readable or
-    canonical model target, `dataset` records the intended data source, and
+    `name` selects the registered adapter, `model` and `model_revision` identify
+    an immutable model target, `dataset` records the intended data source, and
     `parameters` carries adapter-specific knobs such as sequence length,
     micro-batch size, prompt text, or Hugging Face model overrides.
     """
 
     name: str
     model: str
+    model_revision: str | None = None
     dataset: str | None = None
     parameters: dict[str, Any] = field(default_factory=dict)
 

@@ -17,10 +17,12 @@ dev = [
 ]
 yaml = ["PyYAML>=6.0"]
 workloads = [
-    "datasets>=2.20",
-    "torch>=2.4",
-    "transformers>=4.44",
+    "datasets>=2.20,<5",
+    "torch>=2.4,<3",
+    "transformers>=4.44,<5",
 ]
+distributed = ["deepspeed>=0.15,<0.18"]
+serving = ["vllm>=0.6,<1; platform_system == 'Linux'"]
 
 [project.scripts]
 hpc-ai-run = "hpc_ai_perf.cli:main"

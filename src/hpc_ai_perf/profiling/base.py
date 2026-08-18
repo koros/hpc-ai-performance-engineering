@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
+from contextlib import suppress
 
 from hpc_ai_perf.config import ExperimentConfig
 
@@ -44,13 +45,31 @@ class CompositeProfiler(Profiler):
 
     def start(self, config: ExperimentConfig) -> None:
         """Start every profiler before the workload enters its measured region."""
-        for profiler in self._profilers:
-            profiler.start(config)
+        started: list[Profiler] = []
+        try:
+            for profiler in self._profilers:
+                profiler.start(config)
+                started.append(profiler)
+        except Exception:
+            # A later collector can fail after an earlier one has started a
+            # sampling thread. Stop those collectors immediately before the
+            # runner records the preflight failure.
+            for profiler in reversed(started):
+                with suppress(Exception):
+                    profiler.stop()
+            self._profilers = []
+            raise
 
     def stop(self) -> dict[str, int | float | str | bool | None]:
         """Stop every profiler and merge their scalar metrics with name prefixes."""
         metrics: dict[str, int | float | str | bool | None] = {}
-        for profiler in self._profilers:
-            for key, value in profiler.stop().items():
-                metrics[f"{profiler.name}.{key}"] = value
+        failures: list[str] = []
+        for profiler in reversed(self._profilers):
+            try:
+                for key, value in profiler.stop().items():
+                    metrics[f"{profiler.name}.{key}"] = value
+            except Exception as exc:
+                failures.append(f"{profiler.name}: {type(exc).__name__}: {exc}")
+        if failures:
+            raise RuntimeError("; ".join(failures))
         return metrics

@@ -46,19 +46,30 @@ class SlurmJob:
         """Create a Slurm job description from an experiment config.
 
         GPU count comes from the distributed section when available, otherwise
-        from the hardware section. The command always invokes the local runner
-        against the same config path, which keeps generated scripts simple and
-        reproducible.
+        from the hardware section. Multi-GPU training uses torchrun so every
+        allocated GPU receives one process; serving engines retain one launcher
+        process and manage tensor parallel workers internally.
         """
         gpus_per_node = config.distributed.gpus_per_node or config.hardware.gpus
-        command = f"python -m hpc_ai_perf.cli run --config {quote(str(config_path))}"
+        if config.distributed.nodes != 1 and config.hardware.gpus > 0:
+            raise ValueError("Multi-node rendering is outside this project's validated single-node scope")
+        base_command = f"-m hpc_ai_perf.cli run --config {quote(str(config_path))}"
+        distributed_training = (
+            config.mode in {"training", "profiling"} and config.distributed.strategy != "none" and gpus_per_node > 1
+        )
+        if distributed_training:
+            command = f"torchrun --standalone --nnodes=1 --nproc-per-node={gpus_per_node} {base_command}"
+        else:
+            command = f"python {base_command}"
+        workers = int(config.workload.parameters.get("num_workers", 0))
+        required_cpus = max(cpus_per_task, workers * max(1, gpus_per_node if distributed_training else 1))
         return cls(
             job_name=_job_name(config),
             command=command,
             partition=partition,
             nodes=config.distributed.nodes,
             gpus_per_node=gpus_per_node,
-            cpus_per_task=cpus_per_task,
+            cpus_per_task=required_cpus,
             time_limit=time_limit or _time_limit(config),
             account=account,
             modules=modules or [],

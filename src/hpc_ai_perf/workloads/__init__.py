@@ -1,6 +1,7 @@
 """Workload abstractions and registry."""
 
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
+from hpc_ai_perf.workloads.environment import EnvironmentValidationWorkload
 from hpc_ai_perf.workloads.registry import WorkloadRegistry, default_registry
 from hpc_ai_perf.workloads.transformer import (
     DistilBERTWorkload,
@@ -12,6 +13,7 @@ from hpc_ai_perf.workloads.transformer import (
 
 __all__ = [
     "DistilBERTWorkload",
+    "EnvironmentValidationWorkload",
     "GPT2SmallWorkload",
     "TinyLlamaWorkload",
     "TransformerWorkload",
