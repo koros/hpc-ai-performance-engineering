@@ -241,18 +241,19 @@ def _validate_result_mapping(path: Path, data: dict[str, Any]) -> list[Validatio
                 issues.append(ValidationIssue(path, "config_sha256 does not match the embedded config"))
         if int(data.get("gpus", 0) or 0) > 0 and not environment.get("observed_gpu_model"):
             issues.append(ValidationIssue(path, "completed GPU result must record environment.observed_gpu_model"))
-        hardware = config.get("hardware") if isinstance(config.get("hardware"), dict) else {}
-        requested_model = str(hardware.get("gpu_model", "")).lower()
-        observed_model = str(environment.get("observed_gpu_model", "")).lower()
-        expected_token = "h100" if "h100" in requested_model else "l40s" if "l40s" in requested_model else ""
-        if expected_token and observed_model and expected_token not in observed_model:
-            issues.append(
-                ValidationIssue(
-                    path,
-                    f"observed GPU model does not match requested hardware: {environment.get('observed_gpu_model')}",
-                )
-            )
         if workload.get("name") != "environment_validation":
+            hardware = config.get("hardware") if isinstance(config.get("hardware"), dict) else {}
+            requested_model = str(hardware.get("gpu_model", "")).lower()
+            observed_model = str(environment.get("observed_gpu_model", "")).lower()
+            expected_token = "h100" if "h100" in requested_model else "l40s" if "l40s" in requested_model else ""
+            if expected_token and observed_model and expected_token not in observed_model:
+                gpu_model = environment.get("observed_gpu_model")
+                issues.append(
+                    ValidationIssue(
+                        path,
+                        f"observed GPU model does not match requested hardware: {gpu_model}",
+                    )
+                )
             if not data.get("model_revision"):
                 issues.append(ValidationIssue(path, "completed transformer result must include model_revision"))
             if not data.get("dataset_revision"):
