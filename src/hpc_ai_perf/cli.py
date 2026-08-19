@@ -75,7 +75,7 @@ def main() -> None:
         return
 
     if args.command == "run":
-        _run_local_config(args.config, args.output_dir)
+        _run_local_config(args.config, args.output_dir, repetition_number=args.repetition)
         return
 
     if args.command == "render-slurm":
@@ -90,6 +90,7 @@ def main() -> None:
             env_values=args.env,
             profile_path=args.slurm_profile,
             print_script=args.print,
+            repetitions=args.repetitions,
         )
         return
 
@@ -109,6 +110,7 @@ def main() -> None:
             modules=args.module,
             env_values=args.env,
             profile_path=args.slurm_profile,
+            repetitions=args.repetitions,
         )
         return
 
@@ -261,6 +263,12 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser("run", help="Run an experiment config locally.")
     run_parser.add_argument("--config", required=True, help="Path to a JSON or YAML experiment config.")
     run_parser.add_argument("--output-dir", default=None, help="Override the configured output directory.")
+    run_parser.add_argument(
+        "--repetition",
+        type=int,
+        default=None,
+        help="One-based independent-trial number; Slurm arrays set this automatically.",
+    )
 
     list_parser = subparsers.add_parser("list-configs", help="List available experiment configs.")
     list_parser.add_argument("--config-root", default="configs", help="Root directory containing config files.")
@@ -466,6 +474,12 @@ def _add_slurm_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--account", default=None, help="Optional Slurm account.")
     parser.add_argument("--time", default=None, help="Override Slurm time limit, for example 02:00:00.")
     parser.add_argument("--cpus-per-task", type=int, default=None)
+    parser.add_argument(
+        "--repetitions",
+        type=int,
+        default=1,
+        help="Render each config as a Slurm array with this many independent trials.",
+    )
     parser.add_argument("--module", action="append", default=[], help="Module to load; can be repeated.")
     parser.add_argument(
         "--env",
@@ -475,7 +489,7 @@ def _add_slurm_options(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _run_local_config(config_path: str, output_dir: str | None) -> None:
+def _run_local_config(config_path: str, output_dir: str | None, *, repetition_number: int | None = None) -> None:
     """Run one experiment configuration through the local benchmark runner.
 
     This path is used for CPU/MPS development, smoke tests, and any simple
@@ -488,8 +502,10 @@ def _run_local_config(config_path: str, output_dir: str | None) -> None:
     semantic_issues = capability_issues(config) if config.experiment_id.startswith("E") else []
     if semantic_issues:
         raise RuntimeError("Experiment is not research-ready:\n- " + "\n- ".join(semantic_issues))
+    if repetition_number is not None and repetition_number < 1:
+        raise ValueError("--repetition must be at least 1")
     runner = LocalBenchmarkRunner()
-    result = runner.run(config)
+    result = runner.run(config, repetition_number=repetition_number)
     rank = int(__import__("os").environ.get("RANK", "0"))
     if rank == 0:
         result_path = result.write_json(
@@ -562,6 +578,7 @@ def _render_slurm_config(
     env_values: list[str],
     profile_path: str | None,
     print_script: bool,
+    repetitions: int = 1,
 ) -> None:
     """Render one Slurm script for one concrete experiment config.
 
@@ -594,6 +611,7 @@ def _render_slurm_config(
         modules=slurm_options["modules"],
         environment=slurm_options["environment"],
         setup_commands=slurm_options["setup_commands"],
+        repetitions=repetitions,
     )
     if print_script:
         print(script, end="")
@@ -619,6 +637,7 @@ def _render_slurm_bulk(
     modules: list[str],
     env_values: list[str],
     profile_path: str | None,
+    repetitions: int = 1,
 ) -> None:
     """Render Slurm scripts for every matrix config matching the supplied filters.
 
@@ -664,6 +683,7 @@ def _render_slurm_bulk(
             modules=slurm_options["modules"],
             environment=slurm_options["environment"],
             setup_commands=slurm_options["setup_commands"],
+            repetitions=repetitions,
         )
         write_slurm_script(script, output_dir, entry.config.experiment_id)
 

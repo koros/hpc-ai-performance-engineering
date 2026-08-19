@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections import Counter
+import json
+from collections import Counter, defaultdict
 from pathlib import Path
 
 from hpc_ai_perf.config import discover_experiment_configs
-from hpc_ai_perf.validation import validate_project
+from hpc_ai_perf.validation import ValidationIssue, validate_project
 from hpc_ai_perf.workloads import default_registry
 
 WORKLOAD_STATUS = {
@@ -14,6 +15,9 @@ WORKLOAD_STATUS = {
     "distilbert": "PyTorch training/inference implemented",
     "tinyllama": "PyTorch training/inference and vLLM routing implemented",
 }
+CORE_ENVIRONMENT_IDS = {"E001", "E002", "E003", "E004", "E006"}
+DEEPSPEED_ENVIRONMENT_ID = "E005"
+MINIMUM_CORE_TRIALS = 3
 
 
 def write_readiness_report(
@@ -60,6 +64,17 @@ def build_readiness_report(
     mode_counts = Counter(entry.config.mode for entry in entries)
     registry = default_registry()
     smoke_scripts = sorted(Path(slurm_smoke_dir).glob("*.sbatch"))
+    valid_completed = _valid_completed_trial_counts(result_dir, validation_issues)
+    completed_environment_ids = CORE_ENVIRONMENT_IDS & valid_completed.keys()
+    baseline_ids = {
+        entry.config.experiment_id
+        for entry in entries
+        if entry.phase == "Baseline profiling" and entry.priority == "Must Have"
+    }
+    sufficient_baseline_ids = {
+        experiment_id for experiment_id in baseline_ids if valid_completed.get(experiment_id, 0) >= MINIMUM_CORE_TRIALS
+    }
+    pilot_evidence_ready = completed_environment_ids == CORE_ENVIRONMENT_IDS and sufficient_baseline_ids == baseline_ids
 
     lines = [
         "# Experiment Readiness Report",
@@ -73,6 +88,10 @@ def build_readiness_report(
         f"- Research-readiness blockers: {len(research_issues)}",
         f"- Registered workloads: {', '.join(registry.names())}",
         f"- Slurm smoke presets: {len(smoke_scripts)}",
+        f"- Core environment checks completed: {len(completed_environment_ids)}/{len(CORE_ENVIRONMENT_IDS)}",
+        f"- Baseline definitions with at least {MINIMUM_CORE_TRIALS} trials: "
+        f"{len(sufficient_baseline_ids)}/{len(baseline_ids)}",
+        f"- Pilot evidence gate: {'READY' if pilot_evidence_ready else 'BLOCKED'}",
         "",
         "## Validation",
         "",
@@ -92,6 +111,21 @@ def build_readiness_report(
             lines.append(f"| {issue.severity} | `{issue.path}` | {issue.message} |")
     else:
         lines.append("All matrix configs have a semantically valid execution path.")
+
+    lines.extend(
+        [
+            "",
+            "## Cluster Evidence Gate",
+            "",
+            f"- Core environment validations: {_gate_list(CORE_ENVIRONMENT_IDS, valid_completed, 1)}",
+            f"- DeepSpeed environment validation: {_gate_list({DEEPSPEED_ENVIRONMENT_ID}, valid_completed, 1)}",
+            f"- Must Have baseline repetitions: {_gate_list(baseline_ids, valid_completed, MINIMUM_CORE_TRIALS)}",
+            "",
+            "The pilot gate remains blocked until every core environment check has one valid completion and every "
+            f"Must Have baseline definition has at least {MINIMUM_CORE_TRIALS} valid trials. E005 is an additional "
+            "gate before DeepSpeed strategy batches.",
+        ]
+    )
 
     lines.extend(
         [
@@ -161,3 +195,30 @@ def build_readiness_report(
 def _counter_rows(counter: Counter[str]) -> list[str]:
     """Format sorted counter entries as Markdown table rows."""
     return [f"| {key or 'Unassigned'} | {counter[key]} |" for key in sorted(counter)]
+
+
+def _valid_completed_trial_counts(result_dir: str | Path, validation_issues: list[ValidationIssue]) -> dict[str, int]:
+    invalid_paths = {issue.path for issue in validation_issues}
+    counts: dict[str, int] = defaultdict(int)
+    for source_path in sorted(Path(result_dir).rglob("*.json")):
+        if source_path in invalid_paths:
+            continue
+        try:
+            record = json.loads(source_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(record, dict) or record.get("status") != "completed":
+            continue
+        experiment_id = str(record.get("experiment_id", ""))
+        if experiment_id.startswith("E"):
+            counts[experiment_id] += 1
+    return dict(counts)
+
+
+def _gate_list(experiment_ids: set[str], counts: dict[str, int], required: int) -> str:
+    missing = [
+        f"{experiment_id} ({counts.get(experiment_id, 0)}/{required})"
+        for experiment_id in sorted(experiment_ids)
+        if counts.get(experiment_id, 0) < required
+    ]
+    return "passed" if not missing else "pending " + ", ".join(missing)

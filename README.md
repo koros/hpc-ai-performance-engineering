@@ -8,10 +8,13 @@ The project studies how transformer workloads behave on NVIDIA H100 systems in t
 
 The latest plan is based on `Appendix_A_Comprehensive_Experiment_Matrix.docx` and uses a controlled factorial design across workload, GPU count, distributed strategy, precision, memory settings, data movement, inference framework, serving load, and hardware.
 
+Matrix configs are normalized through a canonical phase map so every immutable result embeds validated `RQ1-RQ7` and `A01-A08` traceability identifiers alongside its source metadata.
+
 Primary planning documents:
 
 - [Current project status](docs/current_status.md): high-level snapshot of completed infrastructure, smoke-ready workloads, and remaining HPC submission tasks.
 - [Experiment remediation and readiness guide](docs/experiment_remediation_guide.md): objective-aligned changes, acceptance criteria, and launch gates required before the full matrix is submitted.
+- [Measurement and trial protocol](docs/measurement_protocol.md): repetition, warm-up, timing, provenance, uncertainty, and outlier rules for research evidence.
 - [Comprehensive experiment matrix](docs/experiment_matrix.md): full source-of-truth matrix with `E001` to `E200`, priority levels, metrics, and GPU-hour estimates.
 - [Local dev runbook](docs/local_dev_runbook.md): Mac/local baseline-style runs for development while HPC access is unavailable.
 - [Dev experiment matrix](docs/dev_experiment_matrix.md): rationale, parameters, and local-dev versus HPC-only experiment boundaries.
@@ -205,6 +208,8 @@ SLURM_PROFILE=slurm/profiles/cluster.local.json make check-slurm-profile
 SLURM_PROFILE=slurm/profiles/cluster.local.json make plan-slurm-first-batches
 ```
 
+The baseline scripts are three-task Slurm arrays. Each task writes an immutable trial with an explicit repetition number; see the [measurement protocol](docs/measurement_protocol.md).
+
 Initialize job-status CSVs before submitting jobs:
 
 ```bash
@@ -268,7 +273,7 @@ Require semantic research readiness (implemented workload, strategy, profiler, p
 python -m hpc_ai_perf.cli validate --skip-results --research-ready
 ```
 
-This stricter command is expected to remain non-zero for explicitly unsupported FP8/INT8/TensorRT artefact rows and the incompatible DistilBERT causal-engine comparisons. Those rows cannot be rendered or run until their reported blocker is resolved; valid objective-aligned batches can be rendered independently.
+This stricter command is expected to remain non-zero for explicitly unsupported FP8/INT8/TensorRT artefact rows, incompatible DistilBERT causal-engine comparisons, and vLLM multi-GPU rows that request unavailable request-path NCCL telemetry. Those rows cannot be rendered or run until their reported blocker is resolved; valid objective-aligned batches can be rendered independently.
 
 Refresh validation, aggregation, analysis, tracker outputs, and readiness reporting in one pass:
 

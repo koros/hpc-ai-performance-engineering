@@ -18,6 +18,10 @@ SUPPORTED_PROFILERS = {
     "torch_memory",
     "torch_profiler",
 }
+WORKLOAD_PROFILER_REQUIRED_METRICS = {
+    "dataloader_timing": {"data_loading_seconds", "cpu_to_gpu_transfer_seconds"},
+    "serving_latency": {"latency_p50_ms", "latency_p95_ms"},
+}
 
 
 class WorkloadMetricProfiler(Profiler):
@@ -212,6 +216,22 @@ def build_profiler(config: ExperimentConfig) -> Profiler:
             # execution path where their timing boundaries are well defined.
             profilers.append(WorkloadMetricProfiler(name))
     return CompositeProfiler(profilers) if profilers else NullProfiler()
+
+
+def missing_workload_profiler_metrics(
+    config: ExperimentConfig, metrics: dict[str, int | float | str | bool | None]
+) -> list[str]:
+    """Return required in-workload metrics absent from a completed adapter run."""
+    requirements = {name: set(required) for name, required in WORKLOAD_PROFILER_REQUIRED_METRICS.items()}
+    if config.hardware.gpus > 1 and config.mode in {"training", "profiling"}:
+        requirements["nccl"] = {"allreduce_time_seconds", "nccl_bandwidth_gbps"}
+
+    missing: list[str] = []
+    for profiler_name in config.profiling.profilers:
+        for metric_name in sorted(requirements.get(profiler_name, set())):
+            if metrics.get(metric_name) is None:
+                missing.append(f"{profiler_name} requires workload metric {metric_name}")
+    return missing
 
 
 def _rank() -> int:

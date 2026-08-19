@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 
 from hpc_ai_perf.config import ExperimentConfig
-from hpc_ai_perf.profiling import Profiler, build_profiler
+from hpc_ai_perf.profiling import Profiler, build_profiler, missing_workload_profiler_metrics
 from hpc_ai_perf.results import ExperimentResult
 from hpc_ai_perf.workloads import WorkloadRegistry, default_registry
 
@@ -37,7 +37,7 @@ class LocalBenchmarkRunner:
         self._registry = registry or default_registry()
         self._profiler = profiler
 
-    def run(self, config: ExperimentConfig) -> ExperimentResult:
+    def run(self, config: ExperimentConfig, *, repetition_number: int | None = None) -> ExperimentResult:
         """Execute one config and always return a structured result record.
 
         Workload preparation, profiler start, and workload execution are all
@@ -45,6 +45,8 @@ class LocalBenchmarkRunner:
         a readable error string and the result is marked `failed`, which is far
         more useful on HPC than losing the run to an unstructured traceback.
         """
+        if repetition_number is not None and repetition_number < 1:
+            raise ValueError("repetition_number must be at least 1")
         started_at = _now()
         start = time.perf_counter()
         metrics: dict[str, int | float | str | bool | None] = {}
@@ -61,6 +63,9 @@ class LocalBenchmarkRunner:
             profiler.start(config)
             output = workload.run(config)
             metrics.update(output.metrics)
+            missing_profiler_metrics = missing_workload_profiler_metrics(config, metrics)
+            if missing_profiler_metrics:
+                raise RuntimeError("; ".join(missing_profiler_metrics))
         except Exception as exc:
             status = "failed"
             error = f"{type(exc).__name__}: {exc}"
@@ -83,6 +88,7 @@ class LocalBenchmarkRunner:
 
         completed_at = _now()
         runtime_seconds = time.perf_counter() - start
+        environment = _environment(config, repetition_number=repetition_number)
         return ExperimentResult.from_config(
             config,
             status=status,  # type: ignore[arg-type]
@@ -90,7 +96,8 @@ class LocalBenchmarkRunner:
             completed_at=completed_at,
             runtime_seconds=runtime_seconds,
             metrics=metrics,
-            environment=_environment(config),
+            environment=environment,
+            repetition_number=repetition_number,
             error=error,
         )
 
@@ -100,7 +107,9 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def _environment(config: ExperimentConfig) -> dict[str, int | float | str | bool | None]:
+def _environment(
+    config: ExperimentConfig, *, repetition_number: int | None = None
+) -> dict[str, int | float | str | bool | None]:
     """Capture lightweight host metadata alongside every run."""
     environment: dict[str, int | float | str | bool | None] = {
         "hostname": socket.gethostname(),
@@ -110,6 +119,9 @@ def _environment(config: ExperimentConfig) -> dict[str, int | float | str | bool
         "local_rank": int(os.environ.get("LOCAL_RANK", "0")),
         "world_size": int(os.environ.get("WORLD_SIZE", "1")),
         "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
+        "slurm_array_job_id": os.environ.get("SLURM_ARRAY_JOB_ID"),
+        "slurm_array_task_id": os.environ.get("SLURM_ARRAY_TASK_ID"),
+        "repetition_number_requested": repetition_number,
         "requested_platform": config.hardware.platform,
         "requested_gpu_model": config.hardware.gpu_model,
         "command": " ".join(sys.argv),
@@ -117,6 +129,7 @@ def _environment(config: ExperimentConfig) -> dict[str, int | float | str | bool
             json.dumps(config.to_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest(),
         "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
+        "deterministic_algorithms_requested": config.runtime.deterministic,
     }
     try:
         import torch

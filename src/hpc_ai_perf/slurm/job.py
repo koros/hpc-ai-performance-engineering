@@ -28,6 +28,7 @@ class SlurmJob:
     modules: list[str] = field(default_factory=list)
     environment: dict[str, str] = field(default_factory=dict)
     setup_commands: list[str] = field(default_factory=list)
+    repetitions: int = 1
 
     @classmethod
     def from_config(
@@ -42,6 +43,7 @@ class SlurmJob:
         modules: list[str] | None = None,
         environment: dict[str, str] | None = None,
         setup_commands: list[str] | None = None,
+        repetitions: int = 1,
     ) -> SlurmJob:
         """Create a Slurm job description from an experiment config.
 
@@ -50,10 +52,14 @@ class SlurmJob:
         allocated GPU receives one process; serving engines retain one launcher
         process and manage tensor parallel workers internally.
         """
+        if repetitions < 1:
+            raise ValueError("repetitions must be at least 1")
         gpus_per_node = config.distributed.gpus_per_node or config.hardware.gpus
         if config.distributed.nodes != 1 and config.hardware.gpus > 0:
             raise ValueError("Multi-node rendering is outside this project's validated single-node scope")
         base_command = f"-m hpc_ai_perf.cli run --config {quote(str(config_path))}"
+        if repetitions > 1:
+            base_command += ' --repetition "${SLURM_ARRAY_TASK_ID}"'
         distributed_training = (
             config.mode in {"training", "profiling"} and config.distributed.strategy != "none" and gpus_per_node > 1
         )
@@ -75,6 +81,7 @@ class SlurmJob:
             modules=modules or [],
             environment=environment or {},
             setup_commands=setup_commands or [],
+            repetitions=repetitions,
         )
 
     def render(self) -> str:
@@ -86,15 +93,18 @@ class SlurmJob:
         not provided so clusters that do not require them can still accept the
         script.
         """
+        array_log_suffix = "%A_%a" if self.repetitions > 1 else "%j"
         lines = [
             "#!/bin/bash",
             f"#SBATCH --job-name={self.job_name}",
             f"#SBATCH --nodes={self.nodes}",
             f"#SBATCH --cpus-per-task={self.cpus_per_task}",
             f"#SBATCH --time={self.time_limit}",
-            "#SBATCH --output=results/raw/%x-%j.out",
-            "#SBATCH --error=results/raw/%x-%j.err",
+            f"#SBATCH --output=results/raw/%x-{array_log_suffix}.out",
+            f"#SBATCH --error=results/raw/%x-{array_log_suffix}.err",
         ]
+        if self.repetitions > 1:
+            lines.insert(3, f"#SBATCH --array=1-{self.repetitions}")
         if self.gpus_per_node > 0:
             lines.insert(4, f"#SBATCH --gres=gpu:{self.gpus_per_node}")
         if self.partition:
@@ -126,6 +136,7 @@ def render_slurm_script(
     modules: list[str] | None = None,
     environment: dict[str, str] | None = None,
     setup_commands: list[str] | None = None,
+    repetitions: int = 1,
 ) -> str:
     """Convenience wrapper that builds and renders one Slurm script."""
     return SlurmJob.from_config(
@@ -138,6 +149,7 @@ def render_slurm_script(
         modules=modules,
         environment=environment,
         setup_commands=setup_commands,
+        repetitions=repetitions,
     ).render()
 
 

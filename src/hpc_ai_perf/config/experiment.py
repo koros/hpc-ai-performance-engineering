@@ -5,6 +5,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+from hpc_ai_perf.config.traceability import enrich_matrix_metadata
+
 ExperimentMode = Literal["training", "inference", "profiling"]
 Precision = Literal["fp32", "fp16", "bf16", "fp8", "int8", "int4"]
 DistributedStrategy = Literal["none", "ddp", "fsdp", "deepspeed_zero1", "deepspeed_zero2", "deepspeed_zero3"]
@@ -69,6 +71,7 @@ class RuntimeConfig:
     precision: Precision = "bf16"
     max_steps: int | None = None
     seed: int = 1337
+    deterministic: bool = False
     output_dir: str = "results/raw"
 
 
@@ -116,8 +119,24 @@ class ExperimentConfig:
         project validation lives in `hpc_ai_perf.validation`, where errors can be
         collected across all configs instead of failing at the first file.
         """
+        _reject_unknown_keys(
+            data,
+            {
+                "experiment_id",
+                "experiment",
+                "mode",
+                "workload",
+                "hardware",
+                "distributed",
+                "runtime",
+                "profiling",
+                "metadata",
+            },
+            "experiment config",
+        )
+        experiment_id = str(data["experiment_id"])
         return cls(
-            experiment_id=str(data["experiment_id"]),
+            experiment_id=experiment_id,
             experiment=str(data["experiment"]),
             mode=data["mode"],
             workload=WorkloadConfig(**data["workload"]),
@@ -125,7 +144,7 @@ class ExperimentConfig:
             distributed=DistributedConfig(**data.get("distributed", {})),
             runtime=RuntimeConfig(**data.get("runtime", {})),
             profiling=ProfilingConfig(**data.get("profiling", {})),
-            metadata=dict(data.get("metadata", {})),
+            metadata=enrich_matrix_metadata(experiment_id, dict(data.get("metadata", {}))),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -158,3 +177,9 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
         raise ValueError(f"Experiment config must be a mapping: {config_path}")
 
     return ExperimentConfig.from_mapping(data)
+
+
+def _reject_unknown_keys(data: dict[str, Any], allowed: set[str], context: str) -> None:
+    unknown = sorted(set(data) - allowed)
+    if unknown:
+        raise ValueError(f"Unknown {context} field(s): {', '.join(unknown)}")

@@ -1,6 +1,7 @@
 const state = {
   results: [],
   phaseSummary: [],
+  trialSummary: [],
   readinessReport: "",
   sort: { table: "rankingTable", key: "throughput_tokens_sec", direction: -1 },
 };
@@ -8,6 +9,7 @@ const state = {
 const paths = {
   results: "../results/processed/experiments.csv",
   phaseSummary: "../results/analysis/phase_summary.csv",
+  trialSummary: "../results/analysis/trial_summary.csv",
   readinessReport: "../results/processed/readiness_report.md",
 };
 
@@ -21,6 +23,7 @@ const rankingColumns = [
   "precision",
   "strategy",
   "status",
+  "throughput_unit",
   "throughput_tokens_sec",
   "runtime_seconds",
   "gpu_hours_estimate",
@@ -31,12 +34,31 @@ const phaseColumns = [
   "priority",
   "mode",
   "workload",
+  "throughput_unit",
   "experiments",
   "completed",
   "failed",
   "avg_throughput_tokens_sec",
   "avg_runtime_seconds",
   "estimated_gpu_hours",
+];
+
+const trialColumns = [
+  "experiment_id",
+  "phase",
+  "workload",
+  "mode",
+  "throughput_unit",
+  "completed_trials",
+  "failed_trials",
+  "evidence_status",
+  "runtime_mean_seconds",
+  "runtime_median_seconds",
+  "runtime_ci95_low_seconds",
+  "runtime_ci95_high_seconds",
+  "throughput_tokens_mean",
+  "throughput_tokens_ci95_low",
+  "throughput_tokens_ci95_high",
 ];
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -46,7 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function bindInputs() {
-  ["phaseFilter", "workloadFilter", "priorityFilter", "statusFilter"].forEach((id) => {
+  ["phaseFilter", "workloadFilter", "throughputUnitFilter", "priorityFilter", "statusFilter"].forEach((id) => {
     document.getElementById(id).addEventListener("change", render);
   });
 
@@ -65,6 +87,13 @@ function bindInputs() {
     });
   });
 
+  document.getElementById("trialFile").addEventListener("change", (event) => {
+    readFile(event.target.files[0]).then((text) => {
+      state.trialSummary = parseCsv(text);
+      render();
+    });
+  });
+
   document.getElementById("readinessFile").addEventListener("change", (event) => {
     readFile(event.target.files[0]).then((text) => {
       state.readinessReport = text;
@@ -74,13 +103,15 @@ function bindInputs() {
 }
 
 async function loadDefaultData() {
-  const [results, phaseSummary, readinessReport] = await Promise.all([
+  const [results, phaseSummary, trialSummary, readinessReport] = await Promise.all([
     fetchCsv(paths.results),
     fetchCsv(paths.phaseSummary),
+    fetchCsv(paths.trialSummary),
     fetchText(paths.readinessReport),
   ]);
   state.results = results;
   state.phaseSummary = phaseSummary;
+  state.trialSummary = trialSummary;
   state.readinessReport = readinessReport;
   rebuildFilters();
   render();
@@ -168,6 +199,7 @@ function parseCsv(text) {
 function rebuildFilters() {
   setFilterOptions("phaseFilter", uniqueValues(state.results, "phase"));
   setFilterOptions("workloadFilter", uniqueValues(state.results, "workload"));
+  setFilterOptions("throughputUnitFilter", uniqueValues(state.results, "throughput_unit"));
   setFilterOptions("priorityFilter", uniqueValues(state.results, "priority"));
   setFilterOptions("statusFilter", uniqueValues(state.results, "status"));
 }
@@ -198,10 +230,28 @@ function render() {
   renderReadiness();
   renderTable("rankingTable", filtered, rankingColumns);
   renderPhaseTable();
+  renderTrialTable();
   document.getElementById("dataStatus").textContent = state.results.length
     ? `${filtered.length} of ${state.results.length} experiments`
     : "No data loaded";
   document.getElementById("rankingCount").textContent = `${filtered.length} rows`;
+}
+
+function renderTrialTable() {
+  const phase = document.getElementById("phaseFilter").value;
+  const workload = document.getElementById("workloadFilter").value;
+  const throughputUnit = document.getElementById("throughputUnitFilter").value;
+  const rows = state.trialSummary.filter(
+    (row) =>
+      (!phase || row.phase === phase) &&
+      (!workload || row.workload === workload) &&
+      (!throughputUnit || row.throughput_unit === throughputUnit),
+  );
+  renderTable("trialTable", rows, trialColumns);
+  const sufficient = rows.filter((row) => row.evidence_status === "sufficient").length;
+  document.getElementById("trialCount").textContent = rows.length
+    ? `${sufficient} of ${rows.length} sufficient`
+    : "No trial evidence";
 }
 
 function renderReadiness() {
@@ -251,6 +301,7 @@ function filteredResults() {
   const filters = {
     phase: document.getElementById("phaseFilter").value,
     workload: document.getElementById("workloadFilter").value,
+    throughput_unit: document.getElementById("throughputUnitFilter").value,
     priority: document.getElementById("priorityFilter").value,
     status: document.getElementById("statusFilter").value,
   };
@@ -264,19 +315,32 @@ function renderKpis(rows) {
   const completed = rows.filter((row) => row.status === "completed").length;
   const gpuHours = sum(rows.map((row) => number(row.gpu_hours_estimate)));
   const bestThroughput = max(rows.map((row) => throughput(row)));
+  const throughputUnits = uniqueValues(
+    rows.filter((row) => throughput(row) > 0),
+    "throughput_unit",
+  );
 
   document.getElementById("kpiExperiments").textContent = formatInteger(rows.length);
   document.getElementById("kpiCompleted").textContent = formatInteger(completed);
   document.getElementById("kpiGpuHours").textContent = formatDecimal(gpuHours, 1);
-  document.getElementById("kpiBestThroughput").textContent = formatInteger(bestThroughput);
+  document.getElementById("kpiBestThroughput").textContent =
+    throughputUnits.length > 1 ? "Mixed units" : formatInteger(bestThroughput);
 }
 
 function renderBars(rows) {
   const container = document.getElementById("phaseBars");
-  const grouped = groupBy(rows, "phase");
+  const grouped = rows.reduce((groups, row) => {
+    const phase = row.phase || "Unassigned";
+    const unit = row.throughput_unit || "unit_not_recorded";
+    const key = `${phase}\u0000${unit}`;
+    groups[key] = groups[key] || [];
+    groups[key].push(row);
+    return groups;
+  }, {});
   const entries = Object.entries(grouped)
-    .map(([phase, groupRows]) => ({
-      phase: phase || "Unassigned",
+    .map(([key, groupRows]) => ({
+      phase: key.split("\u0000")[0],
+      unit: key.split("\u0000")[1],
       value: average(groupRows.map((row) => throughput(row))),
     }))
     .filter((entry) => entry.value > 0)
@@ -294,7 +358,7 @@ function renderBars(rows) {
     const row = document.createElement("div");
     row.className = "bar-row";
     row.innerHTML = `
-      <div class="bar-meta"><strong>${escapeHtml(entry.phase)}</strong><span>${formatInteger(entry.value)} tokens/s</span></div>
+      <div class="bar-meta"><strong>${escapeHtml(entry.phase)}</strong><span>${formatInteger(entry.value)} ${escapeHtml(entry.unit)}</span></div>
       <div class="bar-track"><div class="bar-fill" style="width: ${Math.max(3, (entry.value / topValue) * 100)}%"></div></div>
     `;
     container.append(row);
@@ -383,6 +447,7 @@ function summarizePhases(rows) {
     priority: "",
     mode: "",
     workload: "",
+    throughput_unit: "",
     experiments: groupRows.length,
     completed: groupRows.filter((row) => row.status === "completed").length,
     failed: groupRows.filter((row) => row.status === "failed").length,

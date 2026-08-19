@@ -26,8 +26,9 @@ Still blocked or awaiting external evidence:
 
 - `E086`, `E089`, `E093`, `E096`, `E151`, `E175`, and `E199` require a selected, validated FP8 backend and model path.
 - `E152`, `E176`, and `E200` require a named quantization method, calibration protocol, and quantized artefact.
-- `E131`, `E155`, and `E179` require built TensorRT-LLM engines and an engine-specific adapter contract.
+- `E007`, `E131`, `E155`, and `E179` require built TensorRT-LLM engines and an engine-specific adapter contract.
 - `E154-E155` are not valid DistilBERT classification comparisons with the declared causal-LM engines and must be redesigned or excluded.
+- `E147-E148` and `E195-E196` request request-path NCCL metrics that the vLLM adapter cannot currently expose; add engine telemetry or remove that unsupported profiler claim before scheduling them.
 - Cluster execution must still prove CUDA/NCCL/Slurm behaviour, collect at least three independent core trials, and validate the measurement protocol on real H100/L40S nodes.
 - A preregistered real-data quality protocol is still needed before making final RQ3 model-quality claims; current held-out checks primarily detect numerical instability.
 
@@ -60,8 +61,8 @@ These changes support every research objective and should be completed first.
 - [x] Select one canonical list of research questions; `docs/project_plan.md` and `README.md` now use the same wording and numbering.
 - [x] Treat useful work per GPU-hour and per Watt as formal RQ5.
 - [x] Align the README and project plan wording and numbering.
-- [ ] Add an RQ identifier, such as `RQ1`, to every matrix config's metadata.
-- [ ] Add an analysis-task identifier, such as `A04`, where a config supplies evidence for a planned synthesis.
+- [x] Add validated RQ identifiers to every normalized matrix config's metadata through the canonical phase traceability map.
+- [x] Add validated analysis-task identifiers where each phase supplies evidence for a planned synthesis.
 
 Ready when: every experiment and analysis task traces to at least one agreed research objective or research question, and no document defines a conflicting set.
 
@@ -71,7 +72,7 @@ Ready when: every experiment and analysis task traces to at least one agreed res
 - [x] Validate profiler names against implemented profiler adapters.
 - [x] Validate precision against the selected workload and backend.
 - [x] Validate framework, distributed strategy, and hardware combinations against implemented capabilities.
-- [ ] Reject unknown or unused experimental parameters instead of silently accepting them.
+- [x] Reject unknown workload and structural config parameters instead of silently accepting typos; declarative factor labels are retained as analysis metadata.
 - [x] Validate `hardware.gpus == distributed.nodes * distributed.gpus_per_node`, except where an explicitly validated serving engine manages tensor parallelism.
 - [x] Validate that `batch_size`, `micro_batch_size`, `per_gpu_batch_size`, and `global_batch_size` have unambiguous meanings and consistent values.
 - [x] Validate Slurm CPU allocations against DataLoader workers and distributed process counts.
@@ -103,7 +104,7 @@ Ready when: `E001-E006` complete on Lovelace with all expected checks recorded a
 
 - [x] Stop overwriting the only JSON result for a matrix experiment ID.
 - [x] Store each matrix attempt under a unique `run_id`.
-- [ ] Add fields for repetition number, warm-up count, measured iteration count, git commit, dirty-worktree state, config hash, model revision, dataset revision, command, and observed software/hardware.
+- [x] Add fields for repetition number, warm-up count, measured iteration count, git commit, dirty-worktree state, config hash, model revision, dataset revision, command, and observed software/hardware.
 - [x] Record actual elapsed GPU-seconds and GPU-hours, not only the planning estimate.
 - [x] Record total useful samples/tokens so efficiency can be calculated dimensionally correctly.
 - [x] Make distributed result writing rank-safe so only rank zero writes the aggregate record.
@@ -114,13 +115,13 @@ Ready when: repeated runs are preserved, traceable to immutable code/config/mode
 ### P0-05: Standardise Measurement Practice
 
 - [x] Apply `runtime.seed` to Python, PyTorch CPU, and every CUDA device.
-- [ ] Define deterministic settings and document where determinism is intentionally disabled for realistic performance.
-- [ ] Separate setup/model download from warm-up and measured steady-state regions.
+- [x] Define deterministic settings and document where determinism is intentionally disabled for realistic performance.
+- [x] Separate setup/model download from warm-up and measured steady-state regions.
 - [x] Synchronize CUDA immediately before and after measured GPU regions.
-- [ ] Use CUDA events or another GPU-appropriate timer for kernel work, alongside end-to-end wall time where relevant.
-- [ ] Define a minimum independent-trial count. Use at least three trials for core comparisons; five is preferable where queue budget permits.
-- [ ] Report mean, median, standard deviation, coefficient of variation, and confidence intervals where appropriate.
-- [ ] Define an outlier policy before collecting the final dataset.
+- [x] Record CUDA-event duration alongside synchronized end-to-end wall time for transformer measured regions.
+- [x] Define a minimum independent-trial count. Use at least three trials for core comparisons; five is preferable where queue budget permits.
+- [x] Report mean, median, standard deviation, coefficient of variation, and confidence intervals where appropriate.
+- [x] Define an outlier policy before collecting the final dataset.
 - [x] Capture failures and OOMs as evidence without mixing their runtimes into completed-run averages.
 
 Ready when: the same measurement protocol is used across comparable experiments and the analysis can quantify uncertainty.
@@ -134,10 +135,10 @@ Objective 1 requires a trustworthy single-GPU reference for every later comparis
 - [x] Replace ambiguous datasets with fixed deterministic synthetic protocol names.
 - [x] Label the main suite as controlled model-performance benchmarks and the DataLoader phase as CPU-to-GPU pipeline benchmarks.
 - [x] Make the training adapters consume the configured batch-size field rather than falling back silently to batch size 1.
-- [ ] Define whether throughput is samples/s, input tokens/s, generated tokens/s, or total tokens/s for each workload and mode.
+- [x] Record an explicit throughput unit for training tokens, input/classification tokens, generated tokens, and synthetic smoke work.
 - [ ] Add validation loss or task-quality evaluation to the baseline protocol.
 - [x] Add peak GPU memory, sampled utilization/power, measured GPU-hours, and estimated energy.
-- [ ] Replace the two-run baseline/repeat pattern with explicit independent trials under one experiment definition.
+- [x] Render each retained baseline definition as a three-task Slurm array with explicit independent-trial numbers; legacy baseline/repeat rows remain separate matrix definitions.
 - [x] Require the observed device to be the requested H100 before accepting a baseline result.
 - [x] Implement the TinyLlama causal-training path while retaining it as optional scope.
 
@@ -216,7 +217,7 @@ Objective 4 supports RQ3 and must measure both speed and useful model quality.
 
 ### Acceptance Criteria
 
-- [ ] Unsupported precisions fail semantic preflight rather than starting a GPU job.
+- [x] Unsupported precisions fail semantic preflight rather than starting a GPU job.
 - [ ] Every completed precision result records the observed backend and compute/parameter dtype.
 - [ ] Performance comparisons include memory and quality change relative to FP32 or the declared reference.
 - [ ] The precision report identifies Pareto trade-offs instead of ranking throughput alone.
@@ -243,7 +244,7 @@ Objective 5 supports RQ4 and requires real communication and I/O paths.
 
 - [ ] Changing DataLoader parameters changes the instantiated DataLoader and is visible in observed runtime metadata.
 - [ ] Communication configs execute real multi-rank collectives and return non-empty communication metrics.
-- [ ] Profiler-enabled configs fail if required metrics cannot be collected; they cannot silently complete with empty profiler output.
+- [x] Profiler-enabled configs fail if required metrics cannot be collected; they cannot silently complete with empty profiler output.
 - [ ] The analysis can attribute measured time among compute, communication, synchronization, data loading, and transfer with documented limitations.
 
 ## Objective 6: Develop a Performance Visualisation Dashboard
@@ -257,10 +258,10 @@ Objective 6 supports RQ5 and RQ7 and should turn valid measurements into reprodu
 - [x] Add energy efficiency only from sampled power/energy fields.
 - [x] Add separate trial, scaling, strategy, memory, precision, communication, data-movement, inference, and hardware tables.
 - [ ] Implement an explicit bottleneck-classification method with documented features, thresholds, confidence, and an `insufficient_data` outcome.
-- [ ] Avoid comparing incompatible throughput units or unrelated workload types in one ranking.
-- [ ] Include trial counts, error bars, confidence intervals, and missing-data warnings in dashboard views.
+- [x] Carry explicit throughput units into analysis tables and dashboard filters; mixed-unit dashboard views do not report a single best-throughput value.
+- [x] Include trial counts, confidence intervals, and explicit insufficient-data warnings in the dashboard trial-evidence view; plot error bars remain future presentation work.
 - [ ] Add RQ-specific dashboard views and a trace from each conclusion to the underlying trial records.
-- [ ] Add automated integrity checks that block report generation when required evidence is missing or the observed execution differs from the requested config.
+- [x] Add automated integrity checks that block refresh on invalid evidence and mark missing cluster evidence explicitly in the readiness report.
 
 ### Acceptance Criteria
 
@@ -314,13 +315,13 @@ Do not submit all Must Have experiments until every applicable gate below passes
 - [ ] Research questions and metrics are consistent across the README, project plan, matrix, and analysis plan.
 - [ ] `validate --research-ready` reports zero issues for the selected batch.
 - [ ] `E001-E006` pass on Lovelace and record requested-versus-observed environment checks.
-- [ ] No H100/L40S experiment can fall back to CPU.
+- [x] No H100/L40S experiment can fall back to CPU.
 - [ ] The baseline pilot meets the repetition, timing, provenance, and required-metric protocol.
 - [ ] A 1/2/4-GPU pilot proves all allocated GPUs are active and global work is accounted for correctly.
-- [ ] Every enabled profiler returns its required metrics or fails the experiment.
+- [x] Every enabled profiler returns its required metrics or fails the experiment.
 - [ ] Every varied config parameter is asserted against observed runtime state.
-- [ ] Failed/OOM jobs are separated from completed-run performance statistics.
-- [ ] Previous trials are preserved and distributed ranks cannot overwrite result files.
+- [x] Failed/OOM jobs are separated from completed-run performance statistics.
+- [x] Previous trials are preserved and distributed ranks cannot overwrite result files.
 - [ ] Analysis unit tests cover strong scaling, weak scaling, actual GPU-hours, percentiles, uncertainty, and missing data.
 - [ ] H100 and L40S jobs use hardware-specific scheduling and verify the allocated GPU model.
 

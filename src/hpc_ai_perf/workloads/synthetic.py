@@ -44,6 +44,7 @@ class SyntheticWorkload(Workload):
             metrics={
                 "steps": steps,
                 "total_tokens": total_tokens,
+                "throughput_unit": "synthetic_tokens_per_second",
                 "throughput_tokens_sec": total_tokens / elapsed,
             }
         )

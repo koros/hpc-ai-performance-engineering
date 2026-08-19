@@ -256,12 +256,14 @@ def _run_training_loop(
     _sync(torch, device)
 
     step_times: list[float] = []
+    cuda_timer = _start_cuda_timer(torch)
     measured_start = time.perf_counter()
     for _ in range(steps):
         step_start = time.perf_counter()
         final_loss = one_optimizer_step(True)
         _sync(torch, device)
         step_times.append(time.perf_counter() - step_start)
+    cuda_event_seconds = _stop_cuda_timer(torch, cuda_timer)
     _sync(torch, device)
     measured_seconds = max(time.perf_counter() - measured_start, 1e-12)
     measured_seconds = _distributed_max(torch, measured_seconds, device, runtime)
@@ -278,6 +280,7 @@ def _run_training_loop(
         "sequence_length": sequence_length,
         "total_samples": total_samples,
         "total_tokens": total_tokens,
+        "throughput_unit": "training_tokens_per_second",
         "loss": final_loss,
         "measured_seconds": measured_seconds,
         "gpu_seconds": measured_seconds * runtime.world_size,
@@ -302,6 +305,8 @@ def _run_training_loop(
         "parameter_dtype_observed": str(next(model.parameters()).dtype),
         "dataset_execution": "cpu_dataloader" if data_iterator is not None else "synthetic_device_tensors",
     }
+    if cuda_event_seconds is not None:
+        metrics["cuda_event_seconds"] = cuda_event_seconds
     if torch.cuda.is_available():
         allocated_gb = torch.cuda.max_memory_allocated(device) / (1024**3)
         reserved_gb = torch.cuda.max_memory_reserved(device) / (1024**3)
@@ -398,6 +403,7 @@ def _run_causal_inference(config: ExperimentConfig) -> WorkloadRunOutput:
 
     latencies: list[float] = []
     generated_tokens = 0
+    cuda_timer = _start_cuda_timer(torch)
     measured_start = time.perf_counter()
     for _ in range(measured_batches):
         start = time.perf_counter()
@@ -406,6 +412,7 @@ def _run_causal_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         _sync(torch, device)
         latencies.append(time.perf_counter() - start)
         generated_tokens += int(outputs.shape[-1] - prompt_length) * batch_size
+    cuda_event_seconds = _stop_cuda_timer(torch, cuda_timer)
     measured_seconds = max(time.perf_counter() - measured_start, 1e-12)
 
     ttft_samples: list[float] = []
@@ -425,6 +432,7 @@ def _run_causal_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "prompt_tokens_per_request": prompt_length,
         "generated_tokens": generated_tokens,
         "total_tokens": generated_tokens,
+        "throughput_unit": "generated_tokens_per_second",
         "measured_seconds": measured_seconds,
         "gpu_seconds": measured_seconds,
         "gpu_hours": measured_seconds / 3600,
@@ -442,6 +450,8 @@ def _run_causal_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "compute_dtype_observed": str(dtype),
         "parameter_dtype_observed": str(next(model.parameters()).dtype),
     }
+    if cuda_event_seconds is not None:
+        metrics["cuda_event_seconds"] = cuda_event_seconds
     if bool(parameters.get("quality_sanity_check", False)):
         with torch.inference_mode():
             quality_loss = model(input_ids=inputs, attention_mask=attention_mask, labels=inputs).loss
@@ -508,6 +518,7 @@ def _run_classification_inference(config: ExperimentConfig) -> WorkloadRunOutput
         _classification_round(torch, model, inputs, attention_mask, device, concurrency)
     _sync(torch, device)
     latencies: list[float] = []
+    cuda_timer = _start_cuda_timer(torch)
     start_all = time.perf_counter()
     logits = None
     for _ in range(measured_batches):
@@ -521,6 +532,7 @@ def _run_classification_inference(config: ExperimentConfig) -> WorkloadRunOutput
         )
         logits = round_logits[-1]
         latencies.extend(round_latencies)
+    cuda_event_seconds = _stop_cuda_timer(torch, cuda_timer)
     measured_seconds = max(time.perf_counter() - start_all, 1e-12)
     total_samples = measured_batches * batch_size * concurrency
     total_tokens = total_samples * sequence_length
@@ -533,6 +545,7 @@ def _run_classification_inference(config: ExperimentConfig) -> WorkloadRunOutput
         "concurrent_requests": concurrency,
         "input_tokens": total_tokens,
         "total_tokens": total_tokens,
+        "throughput_unit": "input_tokens_per_second",
         "predicted_label": int(logits.argmax(dim=-1).detach().cpu()[0]) if logits is not None else None,
         "measured_seconds": measured_seconds,
         "gpu_seconds": measured_seconds * data_parallel_size,
@@ -551,6 +564,8 @@ def _run_classification_inference(config: ExperimentConfig) -> WorkloadRunOutput
         "compute_dtype_observed": str(dtype),
         "parameter_dtype_observed": str(next(model.parameters()).dtype),
     }
+    if cuda_event_seconds is not None:
+        metrics["cuda_event_seconds"] = cuda_event_seconds
     if torch.cuda.is_available():
         metrics["memory_used_gb"] = max(
             torch.cuda.max_memory_allocated(index) / (1024**3) for index in range(data_parallel_size)
@@ -701,6 +716,7 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     ttft_samples: list[float] = []
     queueing_samples: list[float] = []
     generated_tokens = 0
+    cuda_timer = _start_cuda_timer(torch)
     start_all = time.perf_counter()
     for _ in range(measured_rounds):
         start = time.perf_counter()
@@ -721,15 +737,19 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
                 latencies.append(elapsed)
             if arrival is not None and scheduled is not None:
                 queueing_samples.append(float(scheduled - arrival))
+    cuda_event_seconds = _stop_cuda_timer(torch, cuda_timer)
     measured_seconds = max(time.perf_counter() - start_all, 1e-12)
     request_count = measured_rounds * requests_per_round
     metrics: dict[str, int | float | str | bool | None] = {
         "requests": request_count,
+        "rounds": measured_rounds,
+        "warmup_rounds": warmup_rounds,
         "batch_size": batch_size,
         "concurrent_requests": concurrency,
         "prompt_tokens_per_request": prompt_length,
         "generated_tokens": generated_tokens,
         "total_tokens": generated_tokens,
+        "throughput_unit": "generated_tokens_per_second",
         "measured_seconds": measured_seconds,
         "gpu_seconds": measured_seconds * tensor_parallel_size,
         "gpu_hours": measured_seconds * tensor_parallel_size / 3600,
@@ -745,6 +765,8 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "hf_model_name": model_name,
         "hf_model_revision": _selected_model_revision(config, model_name),
     }
+    if cuda_event_seconds is not None:
+        metrics["cuda_event_seconds"] = cuda_event_seconds
     if ttft_samples:
         metrics["time_to_first_token_p50_ms"] = _percentile(ttft_samples, 50) * 1000
         metrics["time_to_first_token_p95_ms"] = _percentile(ttft_samples, 95) * 1000
@@ -796,7 +818,7 @@ def _prepare_runtime(
 
         if not dist.is_initialized():
             dist.init_process_group(backend=config.distributed.backend, init_method="env://")
-    _seed_everything(torch, config.runtime.seed, rank)
+    _seed_everything(torch, config.runtime.seed, rank, deterministic=config.runtime.deterministic)
     return DistributedRuntime(rank=rank, local_rank=local_rank, world_size=world_size, distributed=needs_process_group)
 
 
@@ -1141,18 +1163,44 @@ def _warmup_steps(parameters: dict[str, Any], measured_steps: int) -> int:
     return min(5, max(1, measured_steps // 10))
 
 
-def _seed_everything(torch: Any, seed: int, rank: int) -> None:
+def _seed_everything(torch: Any, seed: int, rank: int, *, deterministic: bool) -> None:
     import random
 
     random.seed(seed + rank)
     torch.manual_seed(seed + rank)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed + rank)
+    if hasattr(torch, "use_deterministic_algorithms"):
+        torch.use_deterministic_algorithms(deterministic)
+    cudnn = getattr(getattr(torch, "backends", None), "cudnn", None)
+    if cudnn is not None:
+        cudnn.deterministic = deterministic
+        cudnn.benchmark = not deterministic
 
 
 def _sync(torch: Any, device: Any) -> None:
     if getattr(device, "type", str(device)) == "cuda":
         torch.cuda.synchronize(device)
+
+
+def _start_cuda_timer(torch: Any) -> tuple[Any, Any] | None:
+    """Record the start of a CUDA-event timing region on the current device."""
+    if not torch.cuda.is_available():
+        return None
+    started = torch.cuda.Event(enable_timing=True)
+    completed = torch.cuda.Event(enable_timing=True)
+    started.record()
+    return started, completed
+
+
+def _stop_cuda_timer(torch: Any, timer: tuple[Any, Any] | None) -> float | None:
+    """Finish a CUDA-event region and return elapsed device time in seconds."""
+    if timer is None:
+        return None
+    started, completed = timer
+    completed.record()
+    completed.synchronize()
+    return max(float(started.elapsed_time(completed)) / 1000, 0.0)
 
 
 def _percentile(values: list[float], percentile: float) -> float:

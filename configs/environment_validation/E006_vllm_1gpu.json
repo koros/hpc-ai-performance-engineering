@@ -8,7 +8,11 @@
     "dataset": "synthetic_token_prompts_v1",
     "parameters": {
       "validation_target": "vllm_serving",
-      "expected_checks": ["vllm_import", "server_start", "request_served"],
+      "hf_model_name": "gpt2",
+      "hf_model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+      "prompt_token_id": 15496,
+      "max_new_tokens": 2,
+      "expected_checks": ["vllm_import", "engine_start", "request_served"],
       "expected_gpus": 1
     }
   },

@@ -31,6 +31,10 @@ class EnvironmentValidationWorkload(Workload):
         except KeyError as exc:
             raise ValueError(f"Unsupported environment validation target: {target}") from exc
         output = handler(config)
+        expected_checks = config.workload.parameters.get("expected_checks", [])
+        missing_checks = [str(check) for check in expected_checks if not output.get(str(check))]
+        if missing_checks:
+            raise RuntimeError(f"Environment validation did not satisfy checks: {', '.join(missing_checks)}")
         output["validation_target"] = target
         output["successful_run"] = True
         return WorkloadRunOutput(metrics=output)
@@ -47,6 +51,9 @@ class EnvironmentValidationWorkload(Workload):
         right = left * 2
         torch.cuda.synchronize()
         return {
+            "cuda_visible": True,
+            "torch_import": True,
+            "gpu_count": visible,
             "gpu_detected": True,
             "visible_gpu_count": visible,
             "cuda_version": str(torch.version.cuda),
@@ -79,6 +86,9 @@ class EnvironmentValidationWorkload(Workload):
             raise RuntimeError(f"AllReduce produced {observed}, expected {expected_value}")
         algorithmic_bytes = 2 * (world_size - 1) / world_size * tensor_bytes * iterations
         return {
+            "torchrun_launch": world_size > 1,
+            "process_group_init": dist.is_initialized(),
+            "allreduce": True,
             "allreduce_success": True,
             "allreduce_time_seconds": elapsed / iterations,
             "nccl_bandwidth_gbps": algorithmic_bytes / max(elapsed, 1e-12) / 1e9,
@@ -105,6 +115,7 @@ class EnvironmentValidationWorkload(Workload):
         optimizer.step()
         torch.cuda.synchronize(local_rank)
         return {
+            "torchrun_launch": world_size > 1,
             "fsdp_init": True,
             "single_train_step": True,
             "loss": float(loss.detach().cpu()),
@@ -151,12 +162,58 @@ class EnvironmentValidationWorkload(Workload):
 
     @staticmethod
     def _vllm_smoke(config: ExperimentConfig) -> dict[str, int | float | str | bool | None]:
-        _torch_with_cuda(config)
+        torch = _torch_with_cuda(config)
         if importlib.util.find_spec("vllm") is None:
             raise RuntimeError("vLLM is not installed")
         import vllm
+        from vllm import LLM, SamplingParams
 
-        return {"vllm_available": True, "vllm_version": str(getattr(vllm, "__version__", "unknown"))}
+        parameters = config.workload.parameters
+        model_name = str(parameters["hf_model_name"])
+        model_revision = str(parameters["hf_model_revision"])
+        max_new_tokens = int(parameters.get("max_new_tokens", 2))
+        prompt_token_id = int(parameters.get("prompt_token_id", 15496))
+        dtype = "bfloat16" if config.runtime.precision == "bf16" else "float16"
+        engine = LLM(
+            model=model_name,
+            revision=model_revision,
+            dtype=dtype,
+            tensor_parallel_size=1,
+            max_model_len=64,
+            enforce_eager=True,
+        )
+        sampling = SamplingParams(temperature=0.0, max_tokens=max_new_tokens)
+        prompt_token_ids = [[prompt_token_id]]
+        engine.generate(prompt_token_ids=prompt_token_ids, sampling_params=sampling, use_tqdm=False)
+        torch.cuda.synchronize()
+        started = time.perf_counter()
+        outputs = engine.generate(prompt_token_ids=prompt_token_ids, sampling_params=sampling, use_tqdm=False)
+        torch.cuda.synchronize()
+        elapsed = max(time.perf_counter() - started, 1e-12)
+        generated_tokens = sum(len(candidate.token_ids) for output in outputs for candidate in output.outputs)
+        if generated_tokens < 1:
+            raise RuntimeError("vLLM engine returned no generated tokens")
+        return {
+            "vllm_available": True,
+            "vllm_import": True,
+            "vllm_version": str(getattr(vllm, "__version__", "unknown")),
+            "engine_start": True,
+            "request_served": True,
+            "requests": len(outputs),
+            "generated_tokens": generated_tokens,
+            "total_tokens": generated_tokens,
+            "throughput_unit": "generated_tokens_per_second",
+            "measured_seconds": elapsed,
+            "gpu_seconds": elapsed,
+            "gpu_hours": elapsed / 3600,
+            "throughput_tokens_sec": generated_tokens / elapsed,
+            "latency_p50_ms": elapsed * 1000,
+            "latency_p95_ms": elapsed * 1000,
+            "time_to_first_token_p50_ms": elapsed * 1000,
+            "framework_observed": "vllm",
+            "hf_model_name": model_name,
+            "hf_model_revision": model_revision,
+        }
 
     @staticmethod
     def _tensorrt_llm_smoke(config: ExperimentConfig) -> dict[str, int | float | str | bool | None]:

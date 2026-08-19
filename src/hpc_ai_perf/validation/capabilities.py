@@ -12,11 +12,100 @@ SUPPORTED_ENVIRONMENT_TARGETS = {
     "vllm_serving",
     "tensorrt_llm",
 }
+TRANSFORMER_PARAMETER_KEYS = {
+    "activation_checkpointing",
+    "allreduce_bytes",
+    "allreduce_iterations",
+    "baseline_kind",
+    "batch_size",
+    "collect_gradient_synchronization",
+    "collect_loss",
+    "collect_sharded_communication",
+    "communication_study_type",
+    "comparison_axis",
+    "concurrent_requests",
+    "data_movement_study_type",
+    "data_parallel_size",
+    "deepspeed_config",
+    "device",
+    "distributed_strategy",
+    "effective_batch_size",
+    "engine_path",
+    "fixed_workload",
+    "framework",
+    "framework_label",
+    "frameworks",
+    "fsdp_config",
+    "global_batch_size",
+    "gradient_accumulation_steps",
+    "hardware_label",
+    "hf_model_name",
+    "hf_model_revision",
+    "inference_study_type",
+    "learning_rate",
+    "max_new_tokens",
+    "memory_study_type",
+    "micro_batch_size",
+    "num_labels",
+    "num_workers",
+    "per_gpu_batch_size",
+    "pinned_memory",
+    "precision_label",
+    "prefetch_factor",
+    "profile_target",
+    "prompt",
+    "prompt_length",
+    "quality_eval_samples",
+    "quality_sanity_check",
+    "quantization_bits",
+    "repeat_index",
+    "requests",
+    "requires_supported_fp8_backend",
+    "requires_transformer_engine_or_supported_inference_backend",
+    "runtime_precision_selected_for_config",
+    "scaling_type",
+    "sequence_length",
+    "stack",
+    "steps",
+    "strategy_detail",
+    "tensor_parallel_size",
+    "text",
+    "warmup_steps",
+}
+WORKLOAD_PARAMETER_KEYS = {
+    "distilbert": TRANSFORMER_PARAMETER_KEYS,
+    "gpt2_small": TRANSFORMER_PARAMETER_KEYS,
+    "tinyllama": TRANSFORMER_PARAMETER_KEYS,
+    "environment_validation": {
+        "allreduce_bytes",
+        "engine_path",
+        "expected_checks",
+        "expected_gpus",
+        "hf_model_name",
+        "hf_model_revision",
+        "max_new_tokens",
+        "prompt_token_id",
+        "validation_target",
+    },
+    "nanogpt": {"batch_size", "sequence_length"},
+    "synthetic": {"sleep_seconds", "tokens_per_step"},
+}
+
+
+def unknown_parameter_issues(config: ExperimentConfig) -> list[str]:
+    """Reject workload parameters that have no declared runtime or analysis meaning."""
+    allowed = WORKLOAD_PARAMETER_KEYS.get(config.workload.name)
+    if allowed is None:
+        return []
+    unknown = sorted(set(config.workload.parameters) - allowed)
+    if not unknown:
+        return []
+    return [f"unknown workload parameter(s): {', '.join(unknown)}"]
 
 
 def capability_issues(config: ExperimentConfig) -> list[str]:
     """Return semantic problems that would invalidate the declared experiment."""
-    issues: list[str] = []
+    issues = unknown_parameter_issues(config)
     parameters = config.workload.parameters
     workload = config.workload.name
     strategy = config.distributed.strategy
@@ -53,6 +142,12 @@ def capability_issues(config: ExperimentConfig) -> list[str]:
         target = str(parameters.get("validation_target", ""))
         if target not in SUPPORTED_ENVIRONMENT_TARGETS:
             issues.append(f"environment validation target has no implementation: {target}")
+        if target == "vllm_serving" and (
+            not parameters.get("hf_model_name") or not parameters.get("hf_model_revision")
+        ):
+            issues.append("vLLM environment validation requires a pinned hf_model_name and hf_model_revision")
+        if target == "tensorrt_llm" and not parameters.get("engine_path"):
+            issues.append("TensorRT-LLM environment validation requires a built engine_path")
 
     if workload in {"gpt2_small", "distilbert", "tinyllama"}:
         if config.experiment_id.startswith("E") and not config.workload.model_revision:
@@ -83,6 +178,8 @@ def capability_issues(config: ExperimentConfig) -> list[str]:
     if selected_framework == "pytorch":
         selected_framework = "pytorch_eager"
     if config.mode == "inference":
+        if "nccl" in config.profiling.profilers:
+            issues.append("inference adapter does not expose request-path NCCL metrics")
         if selected_framework not in {"pytorch_eager", "vllm", "tensorrt_llm"}:
             issues.append(f"inference framework is not implemented: {selected_framework}")
         if workload == "distilbert" and selected_framework != "pytorch_eager":

@@ -22,6 +22,10 @@
           <input id="phaseFile" type="file" accept=".csv" />
         </label>
         <label class="file-button">
+          Trial CSV
+          <input id="trialFile" type="file" accept=".csv" />
+        </label>
+        <label class="file-button">
           Readiness MD
           <input id="readinessFile" type="file" accept=".md,text/markdown,text/plain" />
         </label>
@@ -37,6 +41,10 @@
         <label>
           Workload
           <select id="workloadFilter"></select>
+        </label>
+        <label>
+          Throughput unit
+          <select id="throughputUnitFilter"></select>
         </label>
         <label>
           Priority
@@ -62,7 +70,7 @@
           <strong id="kpiGpuHours">0.0</strong>
         </article>
         <article>
-          <span>Best tokens/s</span>
+          <span>Best throughput</span>
           <strong id="kpiBestThroughput">0</strong>
         </article>
       </section>
@@ -105,6 +113,19 @@
         </div>
         <div class="table-wrap">
           <table id="phaseTable">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Trial Evidence and Uncertainty</h2>
+          <span id="trialCount">No trial evidence</span>
+        </div>
+        <div class="table-wrap">
+          <table id="trialTable">
             <thead></thead>
             <tbody></tbody>
           </table>

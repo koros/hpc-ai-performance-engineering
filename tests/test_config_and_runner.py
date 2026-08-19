@@ -1,10 +1,20 @@
 import csv
+import hashlib
+import json
+import sys
+import types
+from dataclasses import replace
 from pathlib import Path
 
 from hpc_ai_perf.analysis import analyze_results
-from hpc_ai_perf.analysis.summaries import build_scaling_summary
+from hpc_ai_perf.analysis.summaries import build_scaling_summary, build_trial_summary
 from hpc_ai_perf.cli import _check_slurm_profile, _load_slurm_profile, _refresh_outputs, _render_slurm_bulk
-from hpc_ai_perf.config import discover_experiment_configs, filter_config_entries, load_experiment_config
+from hpc_ai_perf.config import (
+    ProfilingConfig,
+    discover_experiment_configs,
+    filter_config_entries,
+    load_experiment_config,
+)
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
@@ -23,12 +33,15 @@ from hpc_ai_perf.slurm import (
 from hpc_ai_perf.tracking import track_experiment_progress
 from hpc_ai_perf.validation import capability_issues, validate_experiment_configs, validate_result_records
 from hpc_ai_perf.workloads import (
+    EnvironmentValidationWorkload,
     GPT2SmallWorkload,
     TinyLlamaWorkload,
     TransformerWorkload,
     WorkloadRegistry,
+    WorkloadRunOutput,
     default_registry,
 )
+from hpc_ai_perf.workloads import environment as environment_module
 from hpc_ai_perf.workloads import transformer as transformer_module
 
 
@@ -99,6 +112,17 @@ def test_render_slurm_script_with_setup_commands() -> None:
 
     assert "set -euo pipefail\nmodule purge\nsource .venv/bin/activate" in script
     assert "export TOKENIZERS_PARALLELISM=false" in script
+
+
+def test_render_slurm_repetition_array() -> None:
+    config_path = Path("configs/baseline_profiling/E008_gpt2_small_training_baseline.json")
+    config = load_experiment_config(config_path)
+
+    script = render_slurm_script(config, config_path, repetitions=3)
+
+    assert "#SBATCH --array=1-3" in script
+    assert "#SBATCH --output=results/raw/%x-%A_%a.out" in script
+    assert '--repetition "${SLURM_ARRAY_TASK_ID}"' in script
 
 
 def test_write_slurm_script(tmp_path: Path) -> None:
@@ -336,7 +360,47 @@ def test_local_runner_writes_standard_result(tmp_path: Path) -> None:
 
     assert result.status == "completed"
     assert result.throughput_tokens_sec is not None
+    assert result.throughput_unit == "synthetic_tokens_per_second"
     assert result_path.exists()
+
+
+def test_local_runner_records_explicit_repetition_and_provenance() -> None:
+    config = load_experiment_config(Path("configs/local/synthetic_smoke.json"))
+
+    result = LocalBenchmarkRunner().run(config, repetition_number=3)
+
+    assert result.repetition_number == 3
+    assert "-r003-" in result.run_id
+    assert result.measured_iterations == config.runtime.max_steps
+    assert result.git_commit
+    assert result.config_sha256
+    assert result.command
+
+
+def test_runner_fails_when_enabled_workload_profiler_metrics_are_missing() -> None:
+    config = load_experiment_config(Path("configs/local/synthetic_smoke.json"))
+    config = replace(
+        config,
+        profiling=ProfilingConfig(enabled=True, profilers=["dataloader_timing"]),
+    )
+
+    class IncompleteWorkload:
+        name = "synthetic"
+
+        def prepare(self, config) -> None:
+            return None
+
+        def run(self, config) -> WorkloadRunOutput:
+            return WorkloadRunOutput(metrics={"throughput_tokens_sec": 1.0})
+
+    registry = WorkloadRegistry()
+    registry.register(IncompleteWorkload())
+
+    result = LocalBenchmarkRunner(registry=registry).run(config)
+
+    assert result.status == "failed"
+    assert result.throughput_unit == "synthetic_tokens_per_second"
+    assert "dataloader_timing requires workload metric data_loading_seconds" in str(result.error)
 
 
 def test_preserved_trials_get_unique_paths(tmp_path: Path) -> None:
@@ -375,6 +439,48 @@ def test_transformer_workload_skeleton_fails_gracefully() -> None:
     assert result.error is not None
     assert "GPT-2 Small" in result.error
     assert "optional dependencies" in result.error
+
+
+def test_vllm_environment_validation_serves_a_real_request(monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/environment_validation/E006_vllm_1gpu.json"))
+
+    class FakeCuda:
+        @staticmethod
+        def synchronize() -> None:
+            return None
+
+    class FakeTorch:
+        cuda = FakeCuda()
+
+    class FakeCandidate:
+        token_ids = [1, 2]
+
+    class FakeOutput:
+        outputs = [FakeCandidate()]
+
+    class FakeLlm:
+        def __init__(self, **kwargs) -> None:
+            assert kwargs["model"] == "gpt2"
+            assert kwargs["revision"] == config.workload.parameters["hf_model_revision"]
+
+        def generate(self, **kwargs):
+            assert kwargs["prompt_token_ids"] == [[15496]]
+            return [FakeOutput()]
+
+    fake_vllm = types.ModuleType("vllm")
+    fake_vllm.__version__ = "test"
+    fake_vllm.LLM = FakeLlm
+    fake_vllm.SamplingParams = lambda **kwargs: kwargs
+    monkeypatch.setitem(sys.modules, "vllm", fake_vllm)
+    monkeypatch.setattr(environment_module, "_torch_with_cuda", lambda _: FakeTorch())
+    monkeypatch.setattr(environment_module.importlib.util, "find_spec", lambda _: object())
+
+    output = EnvironmentValidationWorkload().run(config)
+
+    assert output.metrics["engine_start"] is True
+    assert output.metrics["request_served"] is True
+    assert output.metrics["generated_tokens"] == 2
+    assert output.metrics["throughput_tokens_sec"] > 0
 
 
 def test_gpt2_inference_dispatches_to_causal_lm_helper(monkeypatch) -> None:
@@ -456,6 +562,35 @@ def test_transformer_device_auto_prefers_mps_when_cuda_is_unavailable() -> None:
     assert transformer_module._device(FakeTorch, {"device": "auto"}) == "mps"
 
 
+def test_cuda_event_timer_reports_seconds() -> None:
+    class FakeEvent:
+        def __init__(self, **kwargs) -> None:
+            assert kwargs == {"enable_timing": True}
+
+        def record(self) -> None:
+            return None
+
+        def synchronize(self) -> None:
+            return None
+
+        def elapsed_time(self, completed) -> float:
+            return 125.0
+
+    class FakeCuda:
+        Event = FakeEvent
+
+        @staticmethod
+        def is_available() -> bool:
+            return True
+
+    class FakeTorch:
+        cuda = FakeCuda()
+
+    timer = transformer_module._start_cuda_timer(FakeTorch)
+
+    assert transformer_module._stop_cuda_timer(FakeTorch, timer) == 0.125
+
+
 def test_aggregate_results_writes_processed_csv(tmp_path: Path) -> None:
     config = load_experiment_config(Path("configs/scaling_studies/E033_gpt2_small_strong_2gpu.json"))
     raw_dir = tmp_path / "raw"
@@ -467,7 +602,7 @@ def test_aggregate_results_writes_processed_csv(tmp_path: Path) -> None:
         started_at="2026-01-01T00:00:00Z",
         completed_at="2026-01-01T00:10:00Z",
         runtime_seconds=600.0,
-        metrics={"throughput_tokens_sec": 1234.5},
+        metrics={"throughput_tokens_sec": 1234.5, "throughput_unit": "training_tokens_per_second"},
     )
     result.write_json(raw_dir)
 
@@ -482,6 +617,7 @@ def test_aggregate_results_writes_processed_csv(tmp_path: Path) -> None:
     assert rows[0]["phase"] == "Strong scaling"
     assert rows[0]["priority"] == "Must Have"
     assert rows[0]["strategy"] == "ddp"
+    assert rows[0]["throughput_unit"] == "training_tokens_per_second"
     assert rows[0]["metric_throughput_tokens_sec"]
 
 
@@ -497,7 +633,12 @@ def test_analyze_results_writes_summary_tables(tmp_path: Path) -> None:
         started_at="2026-01-01T00:00:00Z",
         completed_at="2026-01-01T00:10:00Z",
         runtime_seconds=600.0,
-        metrics={"throughput_tokens_sec": 1200.0, "throughput_samples_sec": 30.0, "memory_used_gb": 42.0},
+        metrics={
+            "throughput_tokens_sec": 1200.0,
+            "throughput_samples_sec": 30.0,
+            "throughput_unit": "training_tokens_per_second",
+            "memory_used_gb": 42.0,
+        },
     )
     result.write_json(raw_dir)
     aggregate_results(raw_dir, processed_path)
@@ -525,6 +666,7 @@ def test_analyze_results_writes_summary_tables(tmp_path: Path) -> None:
 
     assert phase_rows[0]["phase"] == "Strong scaling"
     assert phase_rows[0]["completed"] == "1"
+    assert phase_rows[0]["throughput_unit"] == "training_tokens_per_second"
     assert phase_rows[0]["avg_throughput_tokens_sec"] == "1200.0"
     assert ranking_rows[0]["experiment_id"] == "E033"
     assert ranking_rows[0]["throughput_tokens_per_gpu"] == "600.0"
@@ -548,6 +690,9 @@ def test_dashboard_static_assets_exist() -> None:
     assert "../results/analysis/phase_summary.csv" in script
     assert "../results/processed/readiness_report.md" in script
     assert 'id="readinessSummary"' in html
+    assert 'id="throughputUnitFilter"' in html
+    assert 'id="trialTable"' in html
+    assert "Mixed units" in script
 
 
 def test_hpc_smoke_runbook_exists() -> None:
@@ -619,6 +764,7 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
         runtime_seconds=600.0,
         metrics={
             "throughput_tokens_sec": 1200.0,
+            "throughput_unit": "training_tokens_per_second",
             "measured_seconds": 590.0,
             "gpu_hours": 1180.0 / 3600,
             "total_tokens": 708000,
@@ -692,16 +838,28 @@ def test_experiment_configs_validate() -> None:
     assert validate_experiment_configs("configs") == []
 
 
+def test_config_validation_rejects_unknown_workload_parameters(tmp_path: Path) -> None:
+    config = load_experiment_config(Path("configs/local/synthetic_smoke.json")).to_dict()
+    config["workload"]["parameters"]["token_per_step_typo"] = 10
+    config_path = tmp_path / "bad_parameter.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+
+    issues = validate_experiment_configs(tmp_path)
+
+    assert any("unknown workload parameter(s): token_per_step_typo" in issue.message for issue in issues)
+
+
 def test_research_preflight_rejects_unbuilt_backend_artifacts() -> None:
     config = load_experiment_config(Path("configs/inference/E131_gpt2_small_framework_tensorrt_llm.json"))
 
     assert "TensorRT-LLM config requires a built engine_path" in capability_issues(config)
 
 
-def test_research_preflight_has_only_documented_backend_blockers() -> None:
+def test_research_preflight_has_only_documented_execution_blockers() -> None:
     blocked = {entry.config.experiment_id for entry in discover_experiment_configs() if capability_issues(entry.config)}
 
     assert blocked == {
+        "E007",
         "E086",
         "E089",
         "E093",
@@ -714,6 +872,10 @@ def test_research_preflight_has_only_documented_backend_blockers() -> None:
         "E175",
         "E176",
         "E179",
+        "E195",
+        "E196",
+        "E147",
+        "E148",
         "E199",
         "E200",
     }
@@ -725,6 +887,17 @@ def test_matrix_transformer_models_are_pinned() -> None:
             continue
         assert entry.config.workload.model_revision is not None
         assert len(entry.config.workload.model_revision) == 40
+
+
+def test_matrix_configs_have_normalized_research_traceability() -> None:
+    for entry in discover_experiment_configs():
+        research_questions = entry.config.metadata.get("research_questions")
+        analysis_tasks = entry.config.metadata.get("analysis_tasks")
+
+        assert research_questions
+        assert analysis_tasks
+        assert all(identifier.startswith("RQ") for identifier in research_questions)
+        assert all(identifier.startswith("A") for identifier in analysis_tasks)
 
 
 def test_weak_scaling_efficiency_uses_constant_runtime_ideal() -> None:
@@ -761,6 +934,33 @@ def test_weak_scaling_efficiency_uses_constant_runtime_ideal() -> None:
     assert summary[1]["scaling_efficiency"] == 1.0
 
 
+def test_trial_summary_requires_three_trials_and_reports_confidence_interval() -> None:
+    base = {
+        "experiment_id": "E008",
+        "phase": "Baseline profiling",
+        "workload": "gpt2_small",
+        "mode": "training",
+        "status": "completed",
+    }
+    rows = [
+        {**base, "runtime_seconds": "10", "throughput_tokens_sec": "100"},
+        {**base, "runtime_seconds": "12", "throughput_tokens_sec": "110"},
+        {**base, "runtime_seconds": "14", "throughput_tokens_sec": "120"},
+    ]
+
+    summary = build_trial_summary(rows)[0]
+
+    assert summary["evidence_status"] == "sufficient"
+    assert summary["required_trials"] == 3
+    assert summary["runtime_median_seconds"] == 12.0
+    assert summary["throughput_tokens_median"] == 110.0
+    assert summary["throughput_tokens_ci95_low"] < 110.0
+    assert summary["throughput_tokens_ci95_high"] > 110.0
+
+    summary = build_trial_summary(rows[:2])[0]
+    assert summary["evidence_status"] == "insufficient_data"
+
+
 def test_result_validation_reports_bad_record(tmp_path: Path) -> None:
     bad_result = tmp_path / "bad.json"
     bad_result.write_text('{"experiment_id": "E999", "status": "done", "runtime_seconds": -1}\n', encoding="utf-8")
@@ -782,6 +982,9 @@ def test_refresh_outputs_rebuilds_derived_files(tmp_path: Path) -> None:
     tracker_markdown = tmp_path / "processed" / "experiment_tracker.md"
     readiness_report = tmp_path / "processed" / "readiness_report.md"
 
+    config_sha256 = hashlib.sha256(
+        json.dumps(config.to_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
     result = ExperimentResult.from_config(
         config,
         status="completed",
@@ -790,13 +993,16 @@ def test_refresh_outputs_rebuilds_derived_files(tmp_path: Path) -> None:
         runtime_seconds=600.0,
         metrics={
             "throughput_tokens_sec": 1200.0,
+            "throughput_unit": "training_tokens_per_second",
             "measured_seconds": 590.0,
             "gpu_hours": 1180.0 / 3600,
             "total_tokens": 708000,
         },
         environment={
-            "config_sha256": "a" * 64,
+            "config_sha256": config_sha256,
             "git_dirty": False,
+            "git_commit": "deadbeef",
+            "command": "python -m hpc_ai_perf.cli run --config E033.json",
             "observed_gpu_model": "NVIDIA H100 SXM 80GB",
         },
     )

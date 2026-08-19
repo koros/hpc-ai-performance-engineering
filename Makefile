@@ -57,7 +57,7 @@ render-slurm-env-validation:
 	python -m hpc_ai_perf.cli render-slurm-bulk --phase "Environment validation" --priority "Must Have" --output-dir slurm/generated/environment_validation_must_have $(SLURM_PROFILE_ARG)
 
 render-slurm-baseline-must-have:
-	python -m hpc_ai_perf.cli render-slurm-bulk --phase "Baseline profiling" --priority "Must Have" --output-dir slurm/generated/baseline_profiling_must_have $(SLURM_PROFILE_ARG)
+	python -m hpc_ai_perf.cli render-slurm-bulk --phase "Baseline profiling" --priority "Must Have" --repetitions 3 --output-dir slurm/generated/baseline_profiling_must_have $(SLURM_PROFILE_ARG)
 
 render-slurm-first-batches: render-slurm-env-validation render-slurm-baseline-must-have
 

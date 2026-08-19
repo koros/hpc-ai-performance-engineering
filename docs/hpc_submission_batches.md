@@ -100,6 +100,8 @@ sed -n '1,20p' results/processed/slurm_environment_validation_status.csv
 
 Purpose: establish single-GPU baseline training and inference behavior for GPT-2 Small, DistilBERT, and TinyLlama inference.
 
+Each generated baseline script is a three-task Slurm array (`#SBATCH --array=1-3`). Array tasks keep the config and seed fixed, receive explicit repetition numbers, and write separate immutable result records. One `sbatch` command returns one array job ID; all three tasks must finish before the trial summary can become `sufficient`.
+
 Generate scripts:
 
 ```bash
@@ -177,6 +179,13 @@ Generate Markdown status reports:
 
 ```bash
 make report-slurm-first-status
+```
+
+For array jobs, inspect every task rather than relying only on the parent state:
+
+```bash
+squeue -r -j <array-job-id>
+sacct -j <array-job-id> --format=JobID,State,Elapsed,ExitCode
 ```
 
 ## After Each Batch

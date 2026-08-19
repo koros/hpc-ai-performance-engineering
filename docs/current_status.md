@@ -10,7 +10,7 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | Validation | `python -m hpc_ai_perf.cli validate --skip-results` passes with 0 config issues. |
 | Local smoke runner | CPU-only synthetic workload is ready and covered by tests. |
 | Semantic launch gate | `validate --research-ready` blocks unsupported precision/backend/framework combinations before Slurm rendering or execution. |
-| Result pipeline | Immutable matrix trials, aggregation, 11 objective-specific analysis tables, progress tracking, and readiness reporting are wired into `python -m hpc_ai_perf.cli refresh`. |
+| Result pipeline | Immutable, repetition-aware matrix trials, verified config/provenance fields, aggregation, 11 objective-specific analysis tables, progress tracking, and readiness reporting are wired into `python -m hpc_ai_perf.cli refresh`. |
 | Distributed execution | One-process-per-GPU `torchrun`, DDP, FSDP, DeepSpeed ZeRO, rank binding, global work accounting, and rank-safe result writing are implemented. |
 | Profiling | nvidia-smi power/utilisation/memory/clock/temperature sampling, PyTorch traces, workload timing, and NCCL microbenchmark metrics are implemented. |
 | Slurm support | Semantic-gated single/bulk rendering, H100/L40S profile matching, CPU allocation checks, and three transformer smoke presets are available. |
@@ -76,13 +76,14 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | Area | Remaining work |
 | --- | --- |
 | HPC verification | Run `E001-E006`, then baseline and 1/2/4-GPU pilots on Lovelace; local tests cannot validate CUDA/NCCL/Slurm behaviour. |
-| Independent trials | Submit each core comparison at least three times and inspect variance from preserved trial records. |
+| Independent trials | Baseline scripts render as three-task Slurm arrays; execute them on Lovelace and inspect confidence intervals and variance from preserved trial records. |
 | Backend-dependent rows | FP8, INT8, and TensorRT-LLM configs remain blocked until a named backend, calibration/engine artefact, and compatible cluster environment are supplied. |
 | Invalid DistilBERT framework rows | `E154-E155` must be removed from executable scope or redesigned around classification-compatible backends. |
+| Unsupported vLLM NCCL telemetry | `E147-E148` and `E195-E196` must gain request-path collective telemetry or stop claiming the `nccl` profiler before scheduling. |
 | Communication depth | The NCCL microbenchmark and PyTorch trace do not yet provide NVLink counters or full communication/compute attribution. |
 | Quality scope | Synthetic held-out checks detect instability; final RQ3 quality claims still need a preregistered real evaluation protocol. |
-| Dashboard | Connect the objective-specific tables to RQ views, confidence intervals, and explicit insufficient-data states. |
+| Dashboard | Trial confidence intervals and explicit insufficient-data states are connected; dedicated RQ views and conclusion-to-trial traceability remain. |
 
 ## Known Research-Readiness Blockers
 
-Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative list. The remaining blockers are intentional: the runner refuses to fabricate FP8/INT8/TensorRT measurements or route DistilBERT classification through a causal-generation adapter.
+Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative list. The remaining blockers are intentional: the runner refuses to treat an import-only TensorRT check as engine validation, fabricate FP8/INT8/TensorRT measurements, claim unavailable request-path NCCL telemetry, or route DistilBERT classification through a causal-generation adapter.

@@ -42,6 +42,8 @@ class ConfigCatalogEntry:
             "matrix_id": self.matrix_id,
             "phase": self.phase,
             "priority": self.priority,
+            "research_questions": self.config.metadata.get("research_questions", []),
+            "analysis_tasks": self.config.metadata.get("analysis_tasks", []),
             "mode": self.config.mode,
             "workload": self.config.workload.name,
             "strategy": self.config.distributed.strategy,
