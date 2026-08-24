@@ -22,13 +22,13 @@ Completed locally:
 - Immutable trial files, config hashes, git/software/hardware provenance, measured GPU-hours, and actual useful-work counts are recorded.
 - Trial, scaling, strategy, precision, memory, communication, data movement, inference, and hardware analysis tables are generated.
 
-Still blocked or awaiting external evidence:
+Deferred from the executable deployment scope or awaiting external evidence:
 
-- `E086`, `E089`, `E093`, `E096`, `E151`, `E175`, and `E199` require a selected, validated FP8 backend and model path.
-- `E152`, `E176`, and `E200` require a named quantization method, calibration protocol, and quantized artefact.
-- `E007`, `E131`, `E155`, and `E179` require built TensorRT-LLM engines and an engine-specific adapter contract.
-- `E154-E155` are not valid DistilBERT classification comparisons with the declared causal-LM engines and must be redesigned or excluded.
-- `E147-E148` and `E195-E196` request request-path NCCL metrics that the vLLM adapter cannot currently expose; add engine telemetry or remove that unsupported profiler claim before scheduling them.
+- `E086`, `E089`, `E093`, `E096`, `E151`, `E175`, and `E199` are marked deferred until a selected, validated FP8 backend and model path are supplied.
+- `E152`, `E176`, and `E200` are marked deferred until a named quantization method, calibration protocol, and quantized artefact are supplied.
+- `E007`, `E131`, `E155`, and `E179` are marked deferred until built TensorRT-LLM engines and an engine-specific adapter contract are supplied.
+- `E154` and `E155` are marked deferred because the declared generic causal-LM engines are not valid DistilBERT classification adapters.
+- `E147-E148` and `E195-E196` no longer claim request-path NCCL metrics that the vLLM adapter cannot expose.
 - Cluster execution must still prove CUDA/NCCL/Slurm behaviour, collect at least three independent core trials, and validate the measurement protocol on real H100/L40S nodes.
 - A preregistered real-data quality protocol is still needed before making final RQ3 model-quality claims; current held-out checks primarily detect numerical instability.
 
@@ -276,7 +276,7 @@ Objective 7 is a stretch goal, but its Must Have inference entries still require
 
 ### Required Changes
 
-- [x] Route `pytorch_eager` and `vllm` to different adapters; TensorRT-LLM remains blocked until an engine contract is supplied.
+- [x] Route `pytorch_eager` and `vllm` to different adapters; TensorRT-LLM rows are deferred until an engine contract is supplied.
 - [x] Reject incompatible DistilBERT/vLLM/TensorRT-LLM combinations and route valid classification sweeps through PyTorch.
 - [x] Generate deterministic exact-length token inputs within each model's supported context window.
 - [x] Make batch size and concurrent requests control actual PyTorch streams or vLLM active request groups.

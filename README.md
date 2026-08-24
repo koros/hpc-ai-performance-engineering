@@ -14,6 +14,8 @@ Primary planning documents:
 
 - [Current project status](docs/current_status.md): high-level snapshot of completed infrastructure, smoke-ready workloads, and remaining HPC submission tasks.
 - [Experiment remediation and readiness guide](docs/experiment_remediation_guide.md): objective-aligned changes, acceptance criteria, and launch gates required before the full matrix is submitted.
+- [Platform feasibility report](docs/platform_feasibility_report.md): platform-specific evidence boundaries and routing for Mac M1, L40/L40S, and H100 execution.
+- [Enhanced platform experiment matrix](docs/platform_experiment_matrix.md): direct, retargeted, local-dev, and deferred experiment routes across the three platforms.
 - [Measurement and trial protocol](docs/measurement_protocol.md): repetition, warm-up, timing, provenance, uncertainty, and outlier rules for research evidence.
 - [Comprehensive experiment matrix](docs/experiment_matrix.md): full source-of-truth matrix with `E001` to `E200`, priority levels, metrics, and GPU-hour estimates.
 - [Local dev runbook](docs/local_dev_runbook.md): Mac/local baseline-style runs for development while HPC access is unavailable.
@@ -273,7 +275,7 @@ Require semantic research readiness (implemented workload, strategy, profiler, p
 python -m hpc_ai_perf.cli validate --skip-results --research-ready
 ```
 
-This stricter command is expected to remain non-zero for explicitly unsupported FP8/INT8/TensorRT artefact rows, incompatible DistilBERT causal-engine comparisons, and vLLM multi-GPU rows that request unavailable request-path NCCL telemetry. Those rows cannot be rendered or run until their reported blocker is resolved; valid objective-aligned batches can be rendered independently.
+This stricter command must pass before deployment planning. Rows that require an external FP8/INT8/TensorRT artifact or an unsupported model/backend pairing are explicitly marked `execution_status: deferred`; they remain in the planning matrix but are skipped by bulk Slurm rendering until their backend contract is supplied. vLLM multi-GPU rows do not claim request-path NCCL telemetry that the adapter cannot expose.
 
 Refresh validation, aggregation, analysis, tracker outputs, and readiness reporting in one pass:
 
