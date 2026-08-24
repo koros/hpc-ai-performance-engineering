@@ -103,9 +103,18 @@ def unknown_parameter_issues(config: ExperimentConfig) -> list[str]:
     return [f"unknown workload parameter(s): {', '.join(unknown)}"]
 
 
-def capability_issues(config: ExperimentConfig) -> list[str]:
-    """Return semantic problems that would invalidate the declared experiment."""
+def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True) -> list[str]:
+    """Return semantic problems that would invalidate the declared experiment.
+
+    Deferred matrix rows remain visible in the planning catalogue, but are not
+    part of the executable deployment scope until their external backend or
+    protocol is supplied.  Normal execution and Slurm rendering keep reporting
+    their capability issues; the research-readiness aggregate can exclude them
+    explicitly without pretending that the row is runnable.
+    """
     issues = unknown_parameter_issues(config)
+    if str(config.metadata.get("execution_status", "ready")).lower() == "deferred" and not include_deferred:
+        return issues
     parameters = config.workload.parameters
     workload = config.workload.name
     strategy = config.distributed.strategy

@@ -13,6 +13,7 @@ from hpc_ai_perf.validation.capabilities import capability_issues, unknown_param
 CONFIG_MODES = {"training", "inference", "profiling"}
 PRECISIONS = {"fp32", "fp16", "bf16", "fp8", "int8", "int4"}
 RESULT_STATUSES = {"completed", "failed"}
+EXECUTION_STATUSES = {"ready", "deferred"}
 STRATEGIES = {"none", "ddp", "fsdp", "deepspeed_zero1", "deepspeed_zero2", "deepspeed_zero3"}
 THROUGHPUT_UNITS = {
     "generated_tokens_per_second",
@@ -131,9 +132,22 @@ def validate_experiment_configs(
                 issues.append(
                     ValidationIssue(config_path, "metadata.analysis_tasks must contain valid A01-A08 identifiers")
                 )
+            execution_status = str(config.metadata.get("execution_status", "ready")).lower()
+            if execution_status not in EXECUTION_STATUSES:
+                issues.append(
+                    ValidationIssue(
+                        config_path,
+                        "metadata.execution_status must be one of: ready, deferred",
+                    )
+                )
+            if execution_status == "deferred" and not config.metadata.get("defer_reason"):
+                issues.append(
+                    ValidationIssue(config_path, "deferred matrix configs must include metadata.defer_reason")
+                )
             if research_ready:
                 issues.extend(
-                    ValidationIssue(config_path, message, severity="error") for message in capability_issues(config)
+                    ValidationIssue(config_path, message, severity="error")
+                    for message in capability_issues(config, include_deferred=False)
                 )
 
     return issues

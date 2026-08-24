@@ -48,6 +48,8 @@
     }
   },
   "metadata": {
+    "execution_status": "deferred",
+    "defer_reason": "Requires a pinned TensorRT-LLM engine artifact and engine-specific runtime adapter.",
     "matrix_id": "E131",
     "template": "inference_serving",
     "phase": "Inference framework",

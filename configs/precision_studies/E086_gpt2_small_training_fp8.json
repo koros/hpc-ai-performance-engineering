@@ -47,6 +47,8 @@
     }
   },
   "metadata": {
+    "execution_status": "deferred",
+    "defer_reason": "Requires a selected and validated H100 FP8 training backend with recorded model/runtime support.",
     "matrix_id": "E086",
     "template": "precision_study",
     "phase": "Precision study",

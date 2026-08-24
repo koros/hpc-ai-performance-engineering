@@ -35,6 +35,16 @@ class ConfigCatalogEntry:
         """Return the matrix identifier, falling back to `experiment_id`."""
         return str(self.config.metadata.get("matrix_id", self.config.experiment_id))
 
+    @property
+    def execution_status(self) -> str:
+        """Return whether this row is in the executable or deferred scope."""
+        return str(self.config.metadata.get("execution_status", "ready"))
+
+    @property
+    def defer_reason(self) -> str:
+        """Return the reason a planning row is outside executable scope."""
+        return str(self.config.metadata.get("defer_reason", ""))
+
     def to_summary(self) -> dict[str, Any]:
         """Return a compact serializable summary for CLI table/JSON output."""
         return {
@@ -42,6 +52,8 @@ class ConfigCatalogEntry:
             "matrix_id": self.matrix_id,
             "phase": self.phase,
             "priority": self.priority,
+            "execution_status": self.execution_status,
+            "defer_reason": self.defer_reason,
             "research_questions": self.config.metadata.get("research_questions", []),
             "analysis_tasks": self.config.metadata.get("analysis_tasks", []),
             "mode": self.config.mode,

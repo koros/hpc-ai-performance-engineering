@@ -659,6 +659,18 @@ def _render_slurm_bulk(
         LOGGER.warning("No configs matched the requested filters.")
         return
 
+    deferred = [entry for entry in entries if entry.execution_status.lower() == "deferred"]
+    entries = [entry for entry in entries if entry.execution_status.lower() != "deferred"]
+    if deferred:
+        LOGGER.info(
+            "Skipping %d deferred config(s) outside executable scope: %s",
+            len(deferred),
+            ", ".join(entry.config.experiment_id for entry in deferred),
+        )
+    if not entries:
+        LOGGER.warning("All matching configs are deferred; no Slurm scripts generated.")
+        return
+
     slurm_options = _resolve_slurm_options(
         profile_path=profile_path,
         partition=partition,

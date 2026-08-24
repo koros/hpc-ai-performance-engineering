@@ -71,8 +71,15 @@ def build_progress_rows(
         error = str(result.get("error") or "")
         semantic_issues = capability_issues(config) if not result else []
         if semantic_issues:
-            status = "Blocked"
-        notes = error if status == "Failed" else "; ".join(semantic_issues)
+            status = "Deferred" if entry.execution_status.lower() == "deferred" else "Blocked"
+        if status == "Failed":
+            notes = error
+        elif status == "Deferred":
+            deferred_reason = entry.defer_reason
+            capability_note = "; ".join(semantic_issues)
+            notes = "; ".join(part for part in [deferred_reason, capability_note] if part)
+        else:
+            notes = "; ".join(semantic_issues)
 
         rows.append(
             {

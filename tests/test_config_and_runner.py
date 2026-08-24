@@ -304,6 +304,29 @@ def test_render_slurm_bulk_with_profile(tmp_path: Path) -> None:
     assert "export TOKENIZERS_PARALLELISM=false" in script
 
 
+def test_render_slurm_bulk_skips_deferred_scope_rows(tmp_path: Path) -> None:
+    _render_slurm_bulk(
+        config_root="configs",
+        output_dir=str(tmp_path),
+        phase="Inference framework",
+        priority=None,
+        mode=None,
+        workload=None,
+        experiment_id=None,
+        partition="gpu",
+        account=None,
+        time_limit=None,
+        cpus_per_task=8,
+        modules=[],
+        env_values=[],
+        profile_path=None,
+    )
+
+    generated = sorted(path.stem for path in tmp_path.glob("*.sbatch"))
+
+    assert generated == ["E129", "E130", "E153", "E177", "E178"]
+
+
 def test_slurm_profile_example_loads() -> None:
     profile = _load_slurm_profile("slurm/profiles/example.json")
 
@@ -736,8 +759,8 @@ def test_readme_documents_hpc_submission_workflow() -> None:
 def test_slurm_status_make_targets_do_not_rerender_scripts() -> None:
     makefile = Path("Makefile").read_text(encoding="utf-8")
 
-    assert "init-slurm-env-status:\n\tpython -m hpc_ai_perf.cli init-slurm-status" in makefile
-    assert "init-slurm-baseline-status:\n\tpython -m hpc_ai_perf.cli init-slurm-status" in makefile
+    assert "init-slurm-env-status:\n\t$(PYTHON) -m hpc_ai_perf.cli init-slurm-status" in makefile
+    assert "init-slurm-baseline-status:\n\t$(PYTHON) -m hpc_ai_perf.cli init-slurm-status" in makefile
 
 
 def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
@@ -748,6 +771,8 @@ def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
     assert "`gpt2_small`" in report
     assert "slurm/smoke/gpt2_small_smoke.sbatch" in report
     assert "Submission Gate" in report
+    assert "Research-readiness blockers: 0" in report
+    assert "Deferred scope rows: 15" in report
 
 
 def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
@@ -791,7 +816,7 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
     assert e033["status"] == "Completed"
     assert e033["runtime_seconds"] == "600.0"
     assert e034["status"] == "Configured"
-    assert e086["status"] == "Blocked"
+    assert e086["status"] == "Deferred"
     assert "precision fp8" in e086["notes"]
     assert "| Completed | 1 |" in markdown_path.read_text(encoding="utf-8")
 
@@ -872,13 +897,13 @@ def test_research_preflight_has_only_documented_execution_blockers() -> None:
         "E175",
         "E176",
         "E179",
-        "E195",
-        "E196",
-        "E147",
-        "E148",
         "E199",
         "E200",
     }
+
+
+def test_research_preflight_excludes_explicitly_deferred_scope() -> None:
+    assert validate_experiment_configs("configs", research_ready=True) == []
 
 
 def test_matrix_transformer_models_are_pinned() -> None:

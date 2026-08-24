@@ -48,6 +48,8 @@
     }
   },
   "metadata": {
+    "execution_status": "deferred",
+    "defer_reason": "Requires a selected and validated FP8 inference backend and model artifact.",
     "matrix_id": "E089",
     "template": "precision_study",
     "phase": "Precision study",

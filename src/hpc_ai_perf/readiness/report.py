@@ -58,6 +58,9 @@ def build_readiness_report(
     entries = discover_experiment_configs(config_root)
     validation_issues = validate_project(config_root, result_dir)
     research_issues = validate_project(config_root, result_dir, include_results=False, research_ready=True)
+    deferred_entries = [
+        entry for entry in entries if entry.config.metadata.get("execution_status", "ready") == "deferred"
+    ]
     workload_counts = Counter(entry.config.workload.name for entry in entries)
     phase_counts = Counter(entry.phase for entry in entries)
     priority_counts = Counter(entry.priority for entry in entries)
@@ -86,6 +89,7 @@ def build_readiness_report(
         f"- Matrix configs discovered: {len(entries)}",
         f"- Validation issues: {len(validation_issues)}",
         f"- Research-readiness blockers: {len(research_issues)}",
+        f"- Deferred scope rows: {len(deferred_entries)}",
         f"- Registered workloads: {', '.join(registry.names())}",
         f"- Slurm smoke presets: {len(smoke_scripts)}",
         f"- Core environment checks completed: {len(completed_environment_ids)}/{len(CORE_ENVIRONMENT_IDS)}",
@@ -110,7 +114,25 @@ def build_readiness_report(
         for issue in research_issues:
             lines.append(f"| {issue.severity} | `{issue.path}` | {issue.message} |")
     else:
-        lines.append("All matrix configs have a semantically valid execution path.")
+        lines.append("All non-deferred matrix configs have a semantically valid execution path.")
+
+    lines.extend(["", "## Deferred Scope", ""])
+    if deferred_entries:
+        lines.extend(
+            [
+                "These rows remain in the planning matrix but are excluded from deployment batches until the stated "
+                "backend or measurement contract is supplied.",
+                "",
+                "| Experiment | Reason |",
+                "| --- | --- |",
+            ]
+        )
+        lines.extend(
+            f"| `{entry.config.experiment_id}` | {entry.config.metadata.get('defer_reason', 'No reason recorded')} |"
+            for entry in deferred_entries
+        )
+    else:
+        lines.append("No matrix rows are deferred.")
 
     lines.extend(
         [

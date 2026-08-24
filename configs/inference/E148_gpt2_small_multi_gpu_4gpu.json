@@ -39,14 +39,12 @@
     "enabled": true,
     "profilers": [
       "nvidia_smi",
-      "serving_latency",
-      "nccl"
+      "serving_latency"
     ],
     "parameters": {
       "collect_latency_distribution": true,
       "collect_tensor_parallel_scaling": true,
-      "collect_memory_trace": true,
-      "collect_nccl_bandwidth": true
+      "collect_memory_trace": true
     }
   },
   "metadata": {

@@ -47,6 +47,8 @@
     }
   },
   "metadata": {
+    "execution_status": "deferred",
+    "defer_reason": "vLLM is a causal-generation engine and does not provide a validated DistilBERT classification adapter.",
     "matrix_id": "E154",
     "template": "inference_serving",
     "phase": "Inference framework",

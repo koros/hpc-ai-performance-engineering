@@ -48,6 +48,8 @@
     }
   },
   "metadata": {
+    "execution_status": "deferred",
+    "defer_reason": "Requires a site-built TensorRT-LLM engine and validated engine adapter contract.",
     "matrix_id": "E179",
     "template": "inference_serving",
     "phase": "Inference framework",

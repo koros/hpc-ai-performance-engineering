@@ -47,6 +47,8 @@
     }
   },
   "metadata": {
+    "execution_status": "deferred",
+    "defer_reason": "Requires a classification-compatible TensorRT-LLM contract and a built engine artifact.",
     "matrix_id": "E155",
     "template": "inference_serving",
     "phase": "Inference framework",

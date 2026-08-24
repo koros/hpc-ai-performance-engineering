@@ -54,6 +54,8 @@
     }
   },
   "metadata": {
+    "execution_status": "deferred",
+    "defer_reason": "Requires a named quantization method, calibration protocol, and immutable quantized artifact.",
     "matrix_id": "E200",
     "template": "inference_serving",
     "phase": "Inference precision/quantization",
