@@ -103,11 +103,12 @@ class EnvironmentValidationWorkload(Workload):
         _, rank, local_rank, world_size = _init_process_group(torch, config)
         from torch.distributed.fsdp import FullyShardedDataParallel
 
-        model = torch.nn.Sequential(torch.nn.Linear(128, 256), torch.nn.ReLU(), torch.nn.Linear(256, 2)).to(local_rank)
-        model = FullyShardedDataParallel(model, device_id=torch.device("cuda", local_rank), use_orig_params=True)
+        device = torch.device(f"cuda:{local_rank}")
+        model = torch.nn.Sequential(torch.nn.Linear(128, 256), torch.nn.ReLU(), torch.nn.Linear(256, 2)).to(device)
+        model = FullyShardedDataParallel(model, device_id=local_rank, use_orig_params=True)
         optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
-        inputs = torch.randn(8, 128, device=local_rank)
-        labels = torch.randint(0, 2, (8,), device=local_rank)
+        inputs = torch.randn(8, 128, device=device)
+        labels = torch.randint(0, 2, (8,), device=device)
         torch.cuda.reset_peak_memory_stats(local_rank)
         optimizer.zero_grad(set_to_none=True)
         loss = torch.nn.functional.cross_entropy(model(inputs), labels)
