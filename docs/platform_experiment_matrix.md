@@ -2,7 +2,12 @@
 
 This matrix routes every current `E001-E200` experiment family to Mac M1, L40/L40S, and H100. It supplements, rather than replaces, [the authoritative experiment matrix](experiment_matrix.md).
 
-Legend: **Direct** means use the existing config on the matching platform. **Retarget** means create a platform-specific companion config first. **Dev proxy** means use a local smoke/dev config only; it is not dissertation hardware evidence. **No** means do not run that matrix row on the platform. **Deferred** means do not schedule it anywhere yet.
+**Legend:** <br/>
+**`Direct`** means use the existing config on the matching platform. <br/>
+**`Retarget`** means create a platform-specific companion config first. <br/>
+**`Dev proxy`** means use a local smoke/dev config only; it is not dissertation hardware evidence. <br/>
+**`No`** means do not run that matrix row on the platform. <br/>
+**`Deferred`** means do not schedule it anywhere yet.<br/>
 
 | Current IDs | Experiment family | Mac M1 | L40/L40S | H100 | Clear reason and constraint |
 | --- | --- | --- | --- | --- | --- |
