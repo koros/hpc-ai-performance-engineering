@@ -24,6 +24,7 @@ Primary planning documents:
 - [Editable experiment tracker](docs/experiment_tracker.md): planning notes for every planned experiment and analysis task.
 - [HPC smoke runbook](docs/hpc_smoke_runbook.md): checklist for validating the cluster environment before full matrix submission.
 - [HPC submission batches](docs/hpc_submission_batches.md): first environment-validation and baseline Slurm batches after smoke tests pass.
+- [TensorRT-LLM E007 validation](docs/tensorrt_llm_validation.md): saved-engine contract, cluster setup, launch command, and activation criteria.
 - [Experiment workspace](experiments/README.md): phase folders aligned with the dissertation proposal outline.
 - [Experiment configs](configs/README.md): reusable config templates and concrete run configs.
 

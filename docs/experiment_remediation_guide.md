@@ -26,7 +26,8 @@ Deferred from the executable deployment scope or awaiting external evidence:
 
 - `E086`, `E089`, `E093`, `E096`, `E151`, `E175`, and `E199` are marked deferred until a selected, validated FP8 backend and model path are supplied.
 - `E152`, `E176`, and `E200` are marked deferred until a named quantization method, calibration protocol, and quantized artefact are supplied.
-- `E007`, `E131`, `E155`, and `E179` are marked deferred until built TensorRT-LLM engines and an engine-specific adapter contract are supplied.
+- `E007` now has a saved-engine build/load/request contract and is deferred only until a compatible TensorRT-LLM release succeeds on the target H100.
+- `E131` and `E179` remain deferred until the validated E007 contract is integrated into the performance adapter; `E155` additionally requires a classification-compatible design.
 - `E154` and `E155` are marked deferred because the declared generic causal-LM engines are not valid DistilBERT classification adapters.
 - `E147-E148` and `E195-E196` no longer claim request-path NCCL metrics that the vLLM adapter cannot expose.
 - Cluster execution must still prove CUDA/NCCL/Slurm behaviour, collect at least three independent core trials, and validate the measurement protocol on real H100/L40S nodes.
@@ -98,7 +99,7 @@ Ready when: the current unsupported environment-validation, TinyLlama-training, 
 - [x] Record observed GPU model, UUID, memory, driver, CUDA, PyTorch, NCCL, hostname, Slurm job ID, and visible-device count when exposed by the node.
 - [x] Compare observed hardware with requested hardware and fail on a mismatch.
 
-Ready when: `E001-E006` complete on Lovelace with all expected checks recorded as explicit result fields; `E007` may remain optional but must fail cleanly at preflight if unsupported.
+Ready when: `E001-E006` complete on Lovelace with all expected checks recorded as explicit result fields; optional `E007` must build, reload, and serve from a hashed engine artefact on its target GPU before activation.
 
 ### P0-04: Create a Reproducible Result and Trial Model
 
@@ -276,7 +277,7 @@ Objective 7 is a stretch goal, but its Must Have inference entries still require
 
 ### Required Changes
 
-- [x] Route `pytorch_eager` and `vllm` to different adapters; TensorRT-LLM rows are deferred until an engine contract is supplied.
+- [x] Route `pytorch_eager` and `vllm` to different adapters; supply E007 with a saved-engine validation contract while keeping performance rows deferred until adapter integration.
 - [x] Reject incompatible DistilBERT/vLLM/TensorRT-LLM combinations and route valid classification sweeps through PyTorch.
 - [x] Generate deterministic exact-length token inputs within each model's supported context window.
 - [x] Make batch size and concurrent requests control actual PyTorch streams or vLLM active request groups.

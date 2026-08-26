@@ -77,7 +77,7 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | --- | --- |
 | HPC verification | Run `E001-E006`, then baseline and 1/2/4-GPU pilots on Lovelace; local tests cannot validate CUDA/NCCL/Slurm behaviour. |
 | Independent trials | Baseline scripts render as three-task Slurm arrays; execute them on Lovelace and inspect confidence intervals and variance from preserved trial records. |
-| Backend-dependent rows | FP8, INT8, and TensorRT-LLM configs are explicitly deferred until a named backend, calibration/engine artefact, and compatible cluster environment are supplied. |
+| Backend-dependent rows | FP8 and INT8 rows still require named backend/calibration artefacts. E007 now has a saved-engine build/load/request adapter and remains deferred only until target-H100 validation; TensorRT-LLM benchmark rows still require performance-adapter integration. |
 | Invalid DistilBERT framework rows | `E154-E155` must be removed from executable scope or redesigned around classification-compatible backends. |
 | vLLM NCCL telemetry | `E147-E148` and `E195-E196` no longer claim request-path NCCL telemetry; they remain executable with serving-latency and system profilers. |
 | Communication depth | The NCCL microbenchmark and PyTorch trace do not yet provide NVLink counters or full communication/compute attribution. |
@@ -86,4 +86,4 @@ This snapshot summarises the repository state before full HPC submission. It sho
 
 ## Deferred Research Scope
 
-Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative gate; it must pass with zero blockers. The readiness report lists deferred rows that are intentionally excluded from deployment batches until a TensorRT engine, selected FP8 backend, quantization artifact, or classification-compatible serving adapter is supplied. The runner still refuses to schedule those rows directly, so unsupported measurements cannot be fabricated.
+Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative gate; it must pass with zero blockers. The readiness report lists deferred rows that are intentionally excluded from bulk deployment batches. E007 is a special acceptance candidate: it can be rendered directly with the TensorRT-LLM profile, but remains deferred until its first H100 result is reviewed. Other deferred rows still require their documented FP8, quantization, or serving prerequisites.

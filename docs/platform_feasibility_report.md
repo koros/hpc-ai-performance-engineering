@@ -82,7 +82,8 @@ Use the H100 node for the core baseline trials, 1/2/4-GPU scaling, distributed-s
 
 | IDs | Reason | Required before release |
 | --- | --- | --- |
-| `E007`, `E131`, `E155`, `E179` | TensorRT-LLM engine contract is absent; `E155` is also not a valid generic DistilBERT classification adapter. | A built, pinned engine plus a workload-compatible adapter and environment validation. |
+| `E007` | The saved-engine adapter is implemented but has not completed on the target H100. | A compatible pinned TensorRT-LLM environment, local pinned TinyLlama checkpoint, and successful build/load/request result. |
+| `E131`, `E155`, `E179` | TensorRT-LLM performance integration is absent; `E155` is also not a valid generic DistilBERT classification adapter. | Reuse the validated E007 engine contract in causal-LM benchmarks; design a separate classification contract for E155. |
 | `E086`, `E089`, `E093`, `E096`, `E151`, `E175`, `E199` | FP8 backend/model implementation is not selected or validated. | A documented, tested backend and model path on the target GPU. |
 | `E152`, `E176`, `E200` | Quantization method, calibration, and immutable quantized artefact are absent. | Named method, calibration protocol, artefact hash, and matching serving runtime. |
 | `E154` | vLLM is a causal-generation engine, not the current DistilBERT classification adapter. | A valid classification serving adapter or a redesign of the comparison. |
