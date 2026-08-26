@@ -8,6 +8,7 @@ from typing import Any
 
 from hpc_ai_perf.config import ExperimentConfig
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
+from hpc_ai_perf.workloads.tensorrt_llm import validate_tensorrt_llm_environment
 
 
 @dataclass(frozen=True)
@@ -218,15 +219,12 @@ class EnvironmentValidationWorkload(Workload):
 
     @staticmethod
     def _tensorrt_llm_smoke(config: ExperimentConfig) -> dict[str, int | float | str | bool | None]:
-        _torch_with_cuda(config)
+        torch = _torch_with_cuda(config)
         if importlib.util.find_spec("tensorrt_llm") is None:
             raise RuntimeError("TensorRT-LLM is not installed")
         import tensorrt_llm
 
-        return {
-            "tensorrt_llm_available": True,
-            "tensorrt_llm_version": str(getattr(tensorrt_llm, "__version__", "unknown")),
-        }
+        return validate_tensorrt_llm_environment(config, torch=torch, tensorrt_llm=tensorrt_llm)
 
 
 def _torch_with_cuda(config: ExperimentConfig) -> Any:

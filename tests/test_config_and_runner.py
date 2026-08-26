@@ -506,6 +506,206 @@ def test_vllm_environment_validation_serves_a_real_request(monkeypatch) -> None:
     assert output.metrics["throughput_tokens_sec"] > 0
 
 
+def test_tensorrt_llm_environment_validation_builds_loads_and_serves(tmp_path: Path, monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/environment_validation/E007_tensorrt_llm_1gpu.json"))
+    model_path = tmp_path / "model"
+    engine_root = tmp_path / "engines"
+    model_path.mkdir()
+    (model_path / "hpc_ai_perf_model_revision.txt").write_text(
+        str(config.workload.parameters["hf_model_revision"]), encoding="utf-8"
+    )
+    monkeypatch.setenv("TRTLLM_MODEL_PATH", str(model_path))
+    monkeypatch.setenv("TRTLLM_ENGINE_ROOT", str(engine_root))
+    monkeypatch.setenv("SLURM_JOB_ID", "12345")
+
+    class FakeCuda:
+        @staticmethod
+        def synchronize() -> None:
+            return None
+
+        @staticmethod
+        def empty_cache() -> None:
+            return None
+
+        @staticmethod
+        def get_device_name(index: int) -> str:
+            assert index == 0
+            return "NVIDIA H100 SXM 80GB"
+
+        @staticmethod
+        def device_count() -> int:
+            return 1
+
+        @staticmethod
+        def get_device_capability(index: int) -> tuple[int, int]:
+            assert index == 0
+            return 9, 0
+
+    class FakeTorch:
+        __version__ = "test-torch"
+        version = types.SimpleNamespace(cuda="12.4")
+        cuda = FakeCuda()
+
+    class FakeBuildConfig:
+        max_batch_size = 0
+        max_num_tokens = 0
+
+    class FakeCandidate:
+        token_ids = [1, 2]
+
+    class FakeOutput:
+        outputs = [FakeCandidate()]
+
+    created_models: list[str] = []
+
+    class FakeLlm:
+        def __init__(self, **kwargs) -> None:
+            created_models.append(kwargs["model"])
+            if kwargs["model"] == str(model_path):
+                assert kwargs["tensor_parallel_size"] == 1
+                assert kwargs["build_config"].max_batch_size == 1
+                assert kwargs["build_config"].max_num_tokens == 72
+            else:
+                assert kwargs == {"model": str(engine_root / "E007-12345")}
+
+        def save(self, engine_path: str) -> None:
+            output_path = Path(engine_path)
+            output_path.mkdir(parents=True, exist_ok=True)
+            (output_path / "rank0.engine").write_bytes(b"test-engine")
+
+        def generate(self, prompts, sampling_params=None, use_tqdm=False):
+            assert prompts == ["The capital of France is"]
+            assert sampling_params["max_tokens"] == 8
+            assert use_tqdm is False
+            return [FakeOutput()]
+
+        def shutdown(self) -> None:
+            return None
+
+    fake_tensorrt_llm = types.ModuleType("tensorrt_llm")
+    fake_tensorrt_llm.__version__ = "0.19.0"
+    fake_tensorrt_llm.LLM = FakeLlm
+    fake_tensorrt_llm.SamplingParams = lambda **kwargs: kwargs
+    fake_tensorrt_llm.llmapi = types.SimpleNamespace(BuildConfig=FakeBuildConfig)
+    monkeypatch.setitem(sys.modules, "tensorrt_llm", fake_tensorrt_llm)
+    monkeypatch.setattr(environment_module, "_torch_with_cuda", lambda _: FakeTorch())
+    monkeypatch.setattr(environment_module.importlib.util, "find_spec", lambda _: object())
+
+    output = EnvironmentValidationWorkload().run(config)
+
+    engine_path = engine_root / "E007-12345"
+    manifest_path = engine_path / "hpc_ai_perf_engine_manifest.json"
+    assert created_models == [str(model_path), str(engine_path)]
+    assert output.metrics["tensorrt_llm_import"] is True
+    assert output.metrics["engine_build"] is True
+    assert output.metrics["engine_loaded"] is True
+    assert output.metrics["request_served"] is True
+    assert output.metrics["served_requests"] == 3
+    assert output.metrics["generated_tokens"] == 6
+    assert len(str(output.metrics["engine_manifest_sha256"])) == 64
+    assert manifest_path.is_file()
+
+
+def test_tensorrt_llm_environment_validation_rejects_runtime_without_engine_save(tmp_path: Path, monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/environment_validation/E007_tensorrt_llm_1gpu.json"))
+    model_path = tmp_path / "model"
+    model_path.mkdir()
+    (model_path / "hpc_ai_perf_model_revision.txt").write_text(
+        str(config.workload.parameters["hf_model_revision"]), encoding="utf-8"
+    )
+    monkeypatch.setenv("TRTLLM_MODEL_PATH", str(model_path))
+    monkeypatch.setenv("TRTLLM_ENGINE_ROOT", str(tmp_path / "engines"))
+    monkeypatch.setenv("SLURM_JOB_ID", "new-api")
+
+    class FakeCuda:
+        @staticmethod
+        def empty_cache() -> None:
+            return None
+
+        @staticmethod
+        def device_count() -> int:
+            return 1
+
+        @staticmethod
+        def get_device_name(index: int) -> str:
+            assert index == 0
+            return "NVIDIA H100 SXM 80GB"
+
+    class FakeTorch:
+        cuda = FakeCuda()
+
+    class FakeLlm:
+        def __init__(self, **kwargs) -> None:
+            return None
+
+    fake_tensorrt_llm = types.ModuleType("tensorrt_llm")
+    fake_tensorrt_llm.__version__ = "0.19.0"
+    fake_tensorrt_llm.LLM = FakeLlm
+    monkeypatch.setitem(sys.modules, "tensorrt_llm", fake_tensorrt_llm)
+    monkeypatch.setattr(environment_module, "_torch_with_cuda", lambda _: FakeTorch())
+    monkeypatch.setattr(environment_module.importlib.util, "find_spec", lambda _: object())
+
+    try:
+        EnvironmentValidationWorkload().run(config)
+    except RuntimeError as exc:
+        assert "does not expose LLM.save()" in str(exc)
+    else:
+        raise AssertionError("E007 accepted a TensorRT-LLM runtime without saved-engine support")
+
+
+def test_tensorrt_llm_environment_validation_rejects_unresolved_artifact_paths(monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/environment_validation/E007_tensorrt_llm_1gpu.json"))
+    monkeypatch.delenv("TRTLLM_MODEL_PATH", raising=False)
+    monkeypatch.delenv("TRTLLM_ENGINE_ROOT", raising=False)
+    monkeypatch.delenv("SLURM_JOB_ID", raising=False)
+
+    fake_tensorrt_llm = types.ModuleType("tensorrt_llm")
+    fake_tensorrt_llm.__version__ = "0.19.0"
+    monkeypatch.setitem(sys.modules, "tensorrt_llm", fake_tensorrt_llm)
+    monkeypatch.setattr(environment_module, "_torch_with_cuda", lambda _: object())
+    monkeypatch.setattr(environment_module.importlib.util, "find_spec", lambda _: object())
+
+    try:
+        EnvironmentValidationWorkload().run(config)
+    except RuntimeError as exc:
+        assert "unresolved environment variable" in str(exc)
+    else:
+        raise AssertionError("E007 accepted unresolved artifact paths")
+
+
+def test_tensorrt_llm_environment_validation_rejects_wrong_gpu(tmp_path: Path, monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/environment_validation/E007_tensorrt_llm_1gpu.json"))
+    monkeypatch.setenv("TRTLLM_MODEL_PATH", str(tmp_path / "model"))
+    monkeypatch.setenv("TRTLLM_ENGINE_ROOT", str(tmp_path / "engines"))
+    monkeypatch.setenv("SLURM_JOB_ID", "wrong-gpu")
+
+    class FakeCuda:
+        @staticmethod
+        def device_count() -> int:
+            return 1
+
+        @staticmethod
+        def get_device_name(index: int) -> str:
+            assert index == 0
+            return "NVIDIA L40S"
+
+    class FakeTorch:
+        cuda = FakeCuda()
+
+    fake_tensorrt_llm = types.ModuleType("tensorrt_llm")
+    fake_tensorrt_llm.__version__ = "0.19.0"
+    monkeypatch.setitem(sys.modules, "tensorrt_llm", fake_tensorrt_llm)
+    monkeypatch.setattr(environment_module, "_torch_with_cuda", lambda _: FakeTorch())
+    monkeypatch.setattr(environment_module.importlib.util, "find_spec", lambda _: object())
+
+    try:
+        EnvironmentValidationWorkload().run(config)
+    except RuntimeError as exc:
+        assert "requested NVIDIA H100 SXM 80GB, observed NVIDIA L40S" in str(exc)
+    else:
+        raise AssertionError("E007 accepted an L40S for an H100-labelled result")
+
+
 def test_gpt2_inference_dispatches_to_causal_lm_helper(monkeypatch) -> None:
     config = load_experiment_config(Path("configs/local/gpt2_small_smoke.json"))
     config = config.__class__(
@@ -884,7 +1084,6 @@ def test_research_preflight_has_only_documented_execution_blockers() -> None:
     blocked = {entry.config.experiment_id for entry in discover_experiment_configs() if capability_issues(entry.config)}
 
     assert blocked == {
-        "E007",
         "E086",
         "E089",
         "E093",

@@ -78,14 +78,26 @@ WORKLOAD_PARAMETER_KEYS = {
     "tinyllama": TRANSFORMER_PARAMETER_KEYS,
     "environment_validation": {
         "allreduce_bytes",
+        "engine_api_contract",
+        "engine_manifest_path",
+        "engine_mode",
         "engine_path",
         "expected_checks",
         "expected_gpus",
+        "expected_tensorrt_llm_version",
         "hf_model_name",
         "hf_model_revision",
+        "max_batch_size",
+        "max_input_tokens",
         "max_new_tokens",
+        "min_generated_tokens",
+        "model_path",
+        "prompt",
         "prompt_token_id",
+        "requests",
+        "tensor_parallel_size",
         "validation_target",
+        "warmup_requests",
     },
     "nanogpt": {"batch_size", "sequence_length"},
     "synthetic": {"sleep_seconds", "tokens_per_step"},
@@ -155,8 +167,8 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
             not parameters.get("hf_model_name") or not parameters.get("hf_model_revision")
         ):
             issues.append("vLLM environment validation requires a pinned hf_model_name and hf_model_revision")
-        if target == "tensorrt_llm" and not parameters.get("engine_path"):
-            issues.append("TensorRT-LLM environment validation requires a built engine_path")
+        if target == "tensorrt_llm":
+            _extend_tensorrt_llm_environment_issues(issues, parameters, config.hardware.gpus)
 
     if workload in {"gpt2_small", "distilbert", "tinyllama"}:
         if config.experiment_id.startswith("E") and not config.workload.model_revision:
@@ -254,3 +266,38 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
             issues.append("prefetch_factor requires num_workers greater than zero")
 
     return issues
+
+
+def _extend_tensorrt_llm_environment_issues(
+    issues: list[str], parameters: dict[str, object], hardware_gpus: int
+) -> None:
+    """Validate the explicit saved-engine contract used by E007."""
+    required = [
+        "engine_api_contract",
+        "engine_mode",
+        "engine_path",
+        "expected_tensorrt_llm_version",
+        "hf_model_name",
+        "hf_model_revision",
+    ]
+    missing = [field for field in required if not parameters.get(field)]
+    if missing:
+        issues.append("TensorRT-LLM environment validation is missing: " + ", ".join(missing))
+        return
+    if parameters.get("engine_api_contract") != "legacy_llm_engine_v1":
+        issues.append("TensorRT-LLM environment validation requires engine_api_contract=legacy_llm_engine_v1")
+    engine_mode = str(parameters.get("engine_mode"))
+    if engine_mode not in {"build_and_validate", "validate_prebuilt"}:
+        issues.append("TensorRT-LLM engine_mode must be build_and_validate or validate_prebuilt")
+    if engine_mode == "build_and_validate" and not parameters.get("model_path"):
+        issues.append("TensorRT-LLM build_and_validate mode requires model_path")
+    if engine_mode == "validate_prebuilt" and not parameters.get("engine_manifest_path"):
+        issues.append("TensorRT-LLM validate_prebuilt mode requires engine_manifest_path")
+    tensor_parallel_size = int(parameters.get("tensor_parallel_size", 1))
+    if tensor_parallel_size != hardware_gpus:
+        issues.append("TensorRT-LLM tensor_parallel_size must match hardware.gpus")
+    for field in ["max_batch_size", "max_input_tokens", "max_new_tokens", "min_generated_tokens", "requests"]:
+        if int(parameters.get(field, 1)) < 1:
+            issues.append(f"TensorRT-LLM {field} must be at least 1")
+    if int(parameters.get("warmup_requests", 1)) < 0:
+        issues.append("TensorRT-LLM warmup_requests must be non-negative")
