@@ -27,6 +27,7 @@ Primary planning documents:
 - [TensorRT-LLM E007 validation](docs/tensorrt_llm_validation.md): saved-engine contract, cluster setup, launch command, and activation criteria.
 - [Experiment workspace](experiments/README.md): phase folders aligned with the dissertation proposal outline.
 - [Experiment configs](configs/README.md): reusable config templates and concrete run configs.
+- [Research result retention](results/README.md): importing, validating, committing, and backing up immutable HPC evidence.
 
 ## Proposal Outline
 
