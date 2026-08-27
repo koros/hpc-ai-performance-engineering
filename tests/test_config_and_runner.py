@@ -7,7 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from hpc_ai_perf.analysis import analyze_results
-from hpc_ai_perf.analysis.summaries import build_scaling_summary, build_trial_summary
+from hpc_ai_perf.analysis.summaries import build_phase_summary, build_scaling_summary, build_trial_summary
 from hpc_ai_perf.cli import _check_slurm_profile, _load_slurm_profile, _refresh_outputs, _render_slurm_bulk
 from hpc_ai_perf.config import (
     ProfilingConfig,
@@ -837,6 +837,8 @@ def test_aggregate_results_writes_processed_csv(tmp_path: Path) -> None:
     assert csv_path == output_path
     assert len(rows) == 1
     assert rows[0]["experiment_id"] == "E033"
+    assert rows[0]["condition_id"] == "E033@h100"
+    assert rows[0]["platform_id"] == "h100"
     assert rows[0]["phase"] == "Strong scaling"
     assert rows[0]["priority"] == "Must Have"
     assert rows[0]["strategy"] == "ddp"
@@ -914,6 +916,7 @@ def test_dashboard_static_assets_exist() -> None:
     assert "../results/processed/readiness_report.md" in script
     assert 'id="readinessSummary"' in html
     assert 'id="throughputUnitFilter"' in html
+    assert 'id="platformFilter"' in html
     assert 'id="trialTable"' in html
     assert "Mixed units" in script
 
@@ -1183,6 +1186,48 @@ def test_trial_summary_requires_three_trials_and_reports_confidence_interval() -
 
     summary = build_trial_summary(rows[:2])[0]
     assert summary["evidence_status"] == "insufficient_data"
+
+
+def test_analysis_never_pools_l40s_and_h100_conditions() -> None:
+    base = {
+        "experiment_id": "E008",
+        "phase": "Baseline profiling",
+        "priority": "Must Have",
+        "workload": "gpt2_small",
+        "model": "gpt2",
+        "mode": "training",
+        "precision": "bf16",
+        "strategy": "none",
+        "gpus": "1",
+        "status": "completed",
+        "throughput_unit": "training_tokens_per_second",
+        "comparability": "exact",
+        "required_trials": "1",
+    }
+    rows = [
+        {
+            **base,
+            "condition_id": "E008@l40s",
+            "platform_id": "l40s",
+            "runtime_seconds": "20",
+            "throughput_tokens_sec": "100",
+        },
+        {
+            **base,
+            "condition_id": "E008@h100",
+            "platform_id": "h100",
+            "runtime_seconds": "10",
+            "throughput_tokens_sec": "200",
+        },
+    ]
+
+    phase_rows = build_phase_summary(rows)
+    trial_rows = build_trial_summary(rows)
+
+    assert {row["platform_id"] for row in phase_rows} == {"l40s", "h100"}
+    assert {row["condition_id"] for row in trial_rows} == {"E008@l40s", "E008@h100"}
+    assert all(row["completed_trials"] == 1 for row in trial_rows)
+    assert all(row["evidence_status"] == "sufficient" for row in trial_rows)
 
 
 def test_result_validation_reports_bad_record(tmp_path: Path) -> None:

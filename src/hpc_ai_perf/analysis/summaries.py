@@ -8,6 +8,8 @@ from typing import Any
 
 ANALYSIS_TABLES = {
     "phase_summary": [
+        "platform_id",
+        "comparability",
         "phase",
         "priority",
         "mode",
@@ -27,7 +29,10 @@ ANALYSIS_TABLES = {
         "energy_joules",
     ],
     "experiment_rankings": [
+        "condition_id",
         "experiment_id",
+        "platform_id",
+        "comparability",
         "phase",
         "priority",
         "workload",
@@ -53,6 +58,8 @@ ANALYSIS_TABLES = {
         "tokens_per_kwh",
     ],
     "scaling_summary": [
+        "platform_id",
+        "comparability",
         "phase",
         "workload",
         "model",
@@ -71,6 +78,8 @@ ANALYSIS_TABLES = {
         "trials",
     ],
     "precision_summary": [
+        "platform_id",
+        "comparability",
         "workload",
         "model",
         "mode",
@@ -88,7 +97,10 @@ ANALYSIS_TABLES = {
         "avg_quality_accuracy",
     ],
     "trial_summary": [
+        "condition_id",
         "experiment_id",
+        "platform_id",
+        "comparability",
         "phase",
         "workload",
         "mode",
@@ -116,6 +128,8 @@ ANALYSIS_TABLES = {
         "throughput_samples_ci95_high",
     ],
     "strategy_summary": [
+        "platform_id",
+        "comparability",
         "workload",
         "model",
         "precision",
@@ -130,7 +144,10 @@ ANALYSIS_TABLES = {
         "avg_loss",
     ],
     "communication_summary": [
+        "condition_id",
         "experiment_id",
+        "platform_id",
+        "comparability",
         "workload",
         "throughput_unit",
         "strategy",
@@ -142,7 +159,10 @@ ANALYSIS_TABLES = {
         "communication_to_compute_ratio",
     ],
     "data_movement_summary": [
+        "condition_id",
         "experiment_id",
+        "platform_id",
+        "comparability",
         "workload",
         "throughput_unit",
         "num_workers",
@@ -155,7 +175,10 @@ ANALYSIS_TABLES = {
         "avg_throughput_tokens_sec",
     ],
     "memory_summary": [
+        "condition_id",
         "experiment_id",
+        "platform_id",
+        "comparability",
         "workload",
         "throughput_unit",
         "study_type",
@@ -171,7 +194,10 @@ ANALYSIS_TABLES = {
         "avg_loss",
     ],
     "inference_summary": [
+        "condition_id",
         "experiment_id",
+        "platform_id",
+        "comparability",
         "workload",
         "model",
         "platform",
@@ -193,6 +219,8 @@ ANALYSIS_TABLES = {
         "avg_energy_joules",
     ],
     "hardware_summary": [
+        "platform_id",
+        "comparability",
         "workload",
         "model",
         "mode",
@@ -267,10 +295,12 @@ def build_phase_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     answer questions like "how much baseline profiling has completed?" or "which
     workload phase is consuming the most estimated GPU-hours?"
     """
-    grouped: dict[tuple[str, str, str, str, str], list[dict[str, str]]] = defaultdict(list)
+    grouped: dict[tuple[str, ...], list[dict[str, str]]] = defaultdict(list)
     for row in rows:
         grouped[
             (
+                _value(row, "platform_id"),
+                _value(row, "comparability"),
                 _value(row, "phase"),
                 _value(row, "priority"),
                 _value(row, "mode"),
@@ -280,11 +310,15 @@ def build_phase_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
         ].append(row)
 
     summaries: list[dict[str, Any]] = []
-    for (phase, priority, mode, workload, throughput_unit), group_rows in sorted(grouped.items()):
+    for (platform_id, comparability, phase, priority, mode, workload, throughput_unit), group_rows in sorted(
+        grouped.items()
+    ):
         completed_rows = [row for row in group_rows if row.get("status") == "completed"]
         runtime_values = [_float(row.get("runtime_seconds")) for row in completed_rows]
         summaries.append(
             {
+                "platform_id": platform_id,
+                "comparability": comparability,
                 "phase": phase,
                 "priority": priority,
                 "mode": mode,
@@ -330,7 +364,10 @@ def build_experiment_rankings(rows: list[dict[str, str]]) -> list[dict[str, Any]
 
         rankings.append(
             {
+                "condition_id": row.get("condition_id", row.get("experiment_id", "")),
                 "experiment_id": row.get("experiment_id", ""),
+                "platform_id": row.get("platform_id", ""),
+                "comparability": row.get("comparability", ""),
                 "phase": row.get("phase", ""),
                 "priority": row.get("priority", ""),
                 "workload": row.get("workload", ""),
@@ -373,9 +410,11 @@ def build_scaling_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
         if row.get("status") == "completed"
         and (row.get("scaling_type") in {"strong", "weak"} or row.get("phase") in {"Strong scaling", "Weak scaling"})
     ]
-    grouped: dict[tuple[str, str, str, str, str, str, str], list[dict[str, str]]] = defaultdict(list)
+    grouped: dict[tuple[str, ...], list[dict[str, str]]] = defaultdict(list)
     for row in completed_rows:
         key = (
+            _value(row, "platform_id"),
+            _value(row, "comparability"),
             _value(row, "phase"),
             _value(row, "workload"),
             _value(row, "model"),
@@ -387,9 +426,17 @@ def build_scaling_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
         grouped[key].append(row)
 
     summaries: list[dict[str, Any]] = []
-    for (phase, workload, model, precision, strategy, scaling_type, throughput_unit), group_rows in sorted(
-        grouped.items()
-    ):
+    for (
+        platform_id,
+        comparability,
+        phase,
+        workload,
+        model,
+        precision,
+        strategy,
+        scaling_type,
+        throughput_unit,
+    ), group_rows in sorted(grouped.items()):
         by_gpus: dict[float, list[dict[str, str]]] = defaultdict(list)
         for row in group_rows:
             gpus = _float(row.get("gpus"))
@@ -432,6 +479,8 @@ def build_scaling_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
                 efficiency = _divide(speedup, gpu_ratio)
             summaries.append(
                 {
+                    "platform_id": platform_id,
+                    "comparability": comparability,
                     "phase": phase,
                     "workload": workload,
                     "model": model,
@@ -456,12 +505,14 @@ def build_scaling_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
 
 def build_precision_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     """Summarize average runtime, throughput, memory, and latency by precision."""
-    grouped: dict[tuple[str, str, str, str, str], list[dict[str, str]]] = defaultdict(list)
+    grouped: dict[tuple[str, ...], list[dict[str, str]]] = defaultdict(list)
     for row in rows:
         if row.get("status") != "completed":
             continue
         grouped[
             (
+                _value(row, "platform_id"),
+                _value(row, "comparability"),
                 _value(row, "workload"),
                 _value(row, "model"),
                 _value(row, "mode"),
@@ -471,9 +522,13 @@ def build_precision_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
         ].append(row)
 
     summaries: list[dict[str, Any]] = []
-    for (workload, model, mode, precision, throughput_unit), group_rows in sorted(grouped.items()):
+    for (platform_id, comparability, workload, model, mode, precision, throughput_unit), group_rows in sorted(
+        grouped.items()
+    ):
         summaries.append(
             {
+                "platform_id": platform_id,
+                "comparability": comparability,
                 "workload": workload,
                 "model": model,
                 "mode": mode,
@@ -497,10 +552,21 @@ def build_precision_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
 
 def build_trial_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     """Quantify independent-run variance without mixing failed trials."""
-    required_trials = 3
-    grouped = _group_rows(rows, "experiment_id", "phase", "workload", "mode", "throughput_unit")
+    grouped = _group_rows(
+        rows,
+        "condition_id",
+        "experiment_id",
+        "platform_id",
+        "comparability",
+        "phase",
+        "workload",
+        "mode",
+        "throughput_unit",
+    )
     summaries: list[dict[str, Any]] = []
     for key, group_rows in sorted(grouped.items()):
+        configured_trials = [_float(row.get("required_trials")) for row in group_rows]
+        required_trials = int(max((value for value in configured_trials if value is not None), default=3))
         completed = [row for row in group_rows if row.get("status") == "completed"]
         runtime = _numeric(_metric_values(completed, "runtime_seconds"))
         token_throughput = _numeric(_metric_values(completed, "throughput_tokens_sec"))
@@ -510,11 +576,14 @@ def build_trial_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
         sample_ci = _ci95(sample_throughput)
         summaries.append(
             {
-                "experiment_id": key[0],
-                "phase": key[1],
-                "workload": key[2],
-                "mode": key[3],
-                "throughput_unit": key[4],
+                "condition_id": key[0],
+                "experiment_id": key[1],
+                "platform_id": key[2],
+                "comparability": key[3],
+                "phase": key[4],
+                "workload": key[5],
+                "mode": key[6],
+                "throughput_unit": key[7],
                 "required_trials": required_trials,
                 "completed_trials": len(completed),
                 "failed_trials": sum(row.get("status") == "failed" for row in group_rows),
@@ -544,17 +613,29 @@ def build_trial_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
 def build_strategy_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     """Compare throughput-to-memory trade-offs for distributed strategies."""
     selected = _completed_phase(rows, "Distributed training strategy")
-    grouped = _group_rows(selected, "workload", "model", "precision", "strategy", "throughput_unit", "gpus")
+    grouped = _group_rows(
+        selected,
+        "platform_id",
+        "comparability",
+        "workload",
+        "model",
+        "precision",
+        "strategy",
+        "throughput_unit",
+        "gpus",
+    )
     summaries = []
     for key, group_rows in sorted(grouped.items()):
         summaries.append(
             {
-                "workload": key[0],
-                "model": key[1],
-                "precision": key[2],
-                "strategy": key[3],
-                "throughput_unit": key[4],
-                "gpus": key[5],
+                "platform_id": key[0],
+                "comparability": key[1],
+                "workload": key[2],
+                "model": key[3],
+                "precision": key[4],
+                "strategy": key[5],
+                "throughput_unit": key[6],
+                "gpus": key[7],
                 "trials": len(group_rows),
                 "avg_throughput_tokens_sec": _mean(_metric_values(group_rows, "throughput_tokens_sec")),
                 "avg_throughput_samples_sec": _mean(_metric_values(group_rows, "throughput_samples_sec")),
@@ -570,7 +651,10 @@ def build_communication_summary(rows: list[dict[str, str]]) -> list[dict[str, An
     """Expose collective latency and bandwidth for RQ4."""
     grouped = _group_rows(
         _completed_phase(rows, "Communication analysis"),
+        "condition_id",
         "experiment_id",
+        "platform_id",
+        "comparability",
         "workload",
         "strategy",
         "gpus",
@@ -583,11 +667,14 @@ def build_communication_summary(rows: list[dict[str, str]]) -> list[dict[str, An
         measured = _mean(_metric_values(group_rows, "measured_seconds"))
         summaries.append(
             {
-                "experiment_id": key[0],
-                "workload": key[1],
-                "strategy": key[2],
-                "gpus": key[3],
-                "throughput_unit": key[4],
+                "condition_id": key[0],
+                "experiment_id": key[1],
+                "platform_id": key[2],
+                "comparability": key[3],
+                "workload": key[4],
+                "strategy": key[5],
+                "gpus": key[6],
+                "throughput_unit": key[7],
                 "trials": len(group_rows),
                 "avg_allreduce_time_seconds": communication,
                 "avg_nccl_bandwidth_gbps": _mean(_metric_values(group_rows, "nccl_bandwidth_gbps")),
@@ -603,15 +690,26 @@ def build_communication_summary(rows: list[dict[str, str]]) -> list[dict[str, An
 
 def build_data_movement_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     """Summarize configured DataLoader factors and measured pipeline time."""
-    grouped = _group_rows(_completed_phase(rows, "Data movement"), "experiment_id", "workload", "throughput_unit")
+    grouped = _group_rows(
+        _completed_phase(rows, "Data movement"),
+        "condition_id",
+        "experiment_id",
+        "platform_id",
+        "comparability",
+        "workload",
+        "throughput_unit",
+    )
     summaries = []
     for key, group_rows in sorted(grouped.items()):
         first = group_rows[0]
         summaries.append(
             {
-                "experiment_id": key[0],
-                "workload": key[1],
-                "throughput_unit": key[2],
+                "condition_id": key[0],
+                "experiment_id": key[1],
+                "platform_id": key[2],
+                "comparability": key[3],
+                "workload": key[4],
+                "throughput_unit": key[5],
                 "num_workers": first.get("parameter_num_workers", ""),
                 "pinned_memory": first.get("parameter_pinned_memory", ""),
                 "prefetch_factor": first.get("parameter_prefetch_factor", ""),
@@ -630,7 +728,10 @@ def build_inference_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     selected = [row for row in rows if row.get("status") == "completed" and row.get("mode") == "inference"]
     grouped = _group_rows(
         selected,
+        "condition_id",
         "experiment_id",
+        "platform_id",
+        "comparability",
         "workload",
         "model",
         "platform",
@@ -645,15 +746,18 @@ def build_inference_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
         first = group_rows[0]
         summaries.append(
             {
-                "experiment_id": key[0],
-                "workload": key[1],
-                "model": key[2],
-                "platform": key[3],
-                "framework": key[4],
-                "precision": key[5],
-                "gpus": key[6],
-                "batch_size": key[7],
-                "throughput_unit": key[8],
+                "condition_id": key[0],
+                "experiment_id": key[1],
+                "platform_id": key[2],
+                "comparability": key[3],
+                "workload": key[4],
+                "model": key[5],
+                "platform": key[6],
+                "framework": key[7],
+                "precision": key[8],
+                "gpus": key[9],
+                "batch_size": key[10],
+                "throughput_unit": key[11],
                 "concurrent_requests": first.get("parameter_concurrent_requests", ""),
                 "prompt_length": first.get("parameter_prompt_length", ""),
                 "trials": len(group_rows),
@@ -672,15 +776,26 @@ def build_inference_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
 
 def build_memory_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     """Summarize checkpointing, micro-batch, and accumulation trade-offs."""
-    grouped = _group_rows(_completed_phase(rows, "Memory optimisation"), "experiment_id", "workload", "throughput_unit")
+    grouped = _group_rows(
+        _completed_phase(rows, "Memory optimisation"),
+        "condition_id",
+        "experiment_id",
+        "platform_id",
+        "comparability",
+        "workload",
+        "throughput_unit",
+    )
     summaries = []
     for key, group_rows in sorted(grouped.items()):
         first = group_rows[0]
         summaries.append(
             {
-                "experiment_id": key[0],
-                "workload": key[1],
-                "throughput_unit": key[2],
+                "condition_id": key[0],
+                "experiment_id": key[1],
+                "platform_id": key[2],
+                "comparability": key[3],
+                "workload": key[4],
+                "throughput_unit": key[5],
                 "study_type": first.get("parameter_memory_study_type", ""),
                 "activation_checkpointing": first.get("parameter_activation_checkpointing", ""),
                 "micro_batch_size": first.get("parameter_micro_batch_size", ""),
@@ -701,19 +816,30 @@ def build_hardware_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     """Compare completed H100/L40S experiments using observed platform fields."""
     selected = _completed_phase(rows, "Hardware comparison")
     grouped = _group_rows(
-        selected, "workload", "model", "mode", "platform", "gpu_model", "precision", "throughput_unit"
+        selected,
+        "platform_id",
+        "comparability",
+        "workload",
+        "model",
+        "mode",
+        "platform",
+        "gpu_model",
+        "precision",
+        "throughput_unit",
     )
     summaries = []
     for key, group_rows in sorted(grouped.items()):
         summaries.append(
             {
-                "workload": key[0],
-                "model": key[1],
-                "mode": key[2],
-                "platform": key[3],
-                "gpu_model": key[4],
-                "precision": key[5],
-                "throughput_unit": key[6],
+                "platform_id": key[0],
+                "comparability": key[1],
+                "workload": key[2],
+                "model": key[3],
+                "mode": key[4],
+                "platform": key[5],
+                "gpu_model": key[6],
+                "precision": key[7],
+                "throughput_unit": key[8],
                 "trials": len(group_rows),
                 "avg_throughput_tokens_sec": _mean(_metric_values(group_rows, "throughput_tokens_sec")),
                 "avg_throughput_samples_sec": _mean(_metric_values(group_rows, "throughput_samples_sec")),

@@ -14,6 +14,7 @@ BASE_COLUMNS = [
     "condition_id",
     "platform_id",
     "comparability",
+    "required_trials",
     "matrix_id",
     "experiment",
     "phase",
@@ -110,15 +111,20 @@ def flatten_result_record(record: dict[str, Any], source_path: str | Path | None
     workload_parameters = _mapping(workload_config.get("parameters"))
     metrics = _mapping(record.get("metrics"))
     environment = _mapping(record.get("environment"))
+    platform_id = _result_platform_id(record, metadata, hardware)
+    experiment_id = str(record.get("experiment_id") or "")
 
     row: dict[str, Any] = {
         "schema_version": record.get("schema_version"),
         "run_id": record.get("run_id"),
         "repetition_number": record.get("repetition_number"),
-        "experiment_id": record.get("experiment_id"),
-        "condition_id": record.get("condition_id", metadata.get("condition_id")),
-        "platform_id": record.get("platform_id", metadata.get("execution_platform")),
+        "experiment_id": experiment_id,
+        "condition_id": record.get("condition_id")
+        or metadata.get("condition_id")
+        or (f"{experiment_id}@{platform_id}" if experiment_id and platform_id in {"l40s", "h100"} else experiment_id),
+        "platform_id": platform_id,
         "comparability": record.get("comparability", metadata.get("comparability")),
+        "required_trials": metadata.get("required_trials"),
         "matrix_id": metadata.get("matrix_id", record.get("experiment_id")),
         "experiment": record.get("experiment"),
         "phase": metadata.get("phase"),
@@ -210,6 +216,20 @@ def _mapping(value: object) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
+
+
+def _result_platform_id(record: dict[str, Any], metadata: dict[str, Any], hardware: dict[str, Any]) -> str | None:
+    configured = record.get("platform_id") or metadata.get("execution_platform")
+    if configured:
+        return str(configured)
+    hardware_label = f"{hardware.get('platform', '')} {hardware.get('gpu_model', '')}".lower()
+    if "l40" in hardware_label:
+        return "l40s"
+    if "h100" in hardware_label:
+        return "h100"
+    if "mac" in hardware_label or "mps" in hardware_label:
+        return "mac_m1"
+    return str(hardware.get("platform")) if hardware.get("platform") else None
 
 
 def _slugify(value: str) -> str:
