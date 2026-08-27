@@ -19,6 +19,14 @@ from hpc_ai_perf.config.experiment import (
     WorkloadConfig,
     load_experiment_config,
 )
+from hpc_ai_perf.config.platform import (
+    PlatformCondition,
+    PlatformProfile,
+    load_platform_conditions,
+    load_platform_profile,
+    materialize_platform_configs,
+    resolve_platform_config,
+)
 
 __all__ = [
     "ConfigCatalogEntry",
@@ -28,6 +36,8 @@ __all__ = [
     "ExperimentMode",
     "HardwareConfig",
     "Precision",
+    "PlatformCondition",
+    "PlatformProfile",
     "ProfilingConfig",
     "RuntimeConfig",
     "WorkloadConfig",
@@ -36,4 +46,8 @@ __all__ = [
     "entries_to_table",
     "filter_config_entries",
     "load_experiment_config",
+    "load_platform_conditions",
+    "load_platform_profile",
+    "materialize_platform_configs",
+    "resolve_platform_config",
 ]

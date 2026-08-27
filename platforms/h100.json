@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "platform_id": "h100",
+  "platform": "lovelace_h100",
+  "gpu_model": "NVIDIA H100 SXM 80GB",
+  "interconnect": "NVLink",
+  "partition": "gpu_h100",
+  "cpus_per_gpu": 16,
+  "max_gpus": 4,
+  "output_root": "results/raw/h100",
+  "slurm_profile": "slurm/profiles/example.json",
+  "unsupported_metrics": []
+}

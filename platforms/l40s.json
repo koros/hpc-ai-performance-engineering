@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "platform_id": "l40s",
+  "platform": "lovelace_l40s",
+  "gpu_model": "NVIDIA L40S 48GB",
+  "interconnect": "PCIe",
+  "partition": "gpu_l40s",
+  "cpus_per_gpu": 8,
+  "max_gpus": 8,
+  "output_root": "results/raw/l40s",
+  "slurm_profile": "slurm/profiles/example_l40s.json",
+  "unsupported_metrics": ["nvlink_utilization"]
+}
