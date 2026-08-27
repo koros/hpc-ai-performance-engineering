@@ -29,7 +29,7 @@ from hpc_ai_perf.slurm import (
     write_slurm_script,
     write_submission_plan,
 )
-from hpc_ai_perf.tracking import track_experiment_progress
+from hpc_ai_perf.tracking import track_experiment_progress, track_platform_progress
 from hpc_ai_perf.validation import capability_issues, format_validation_issues, validate_project
 
 LOGGER = logging.getLogger(__name__)
@@ -239,6 +239,20 @@ def main() -> None:
         )
         LOGGER.info("Wrote tracker CSV to %s", csv_path)
         LOGGER.info("Wrote tracker Markdown to %s", markdown_path)
+        return
+
+    if args.command == "track-platform-progress":
+        csv_path, markdown_path = track_platform_progress(
+            args.platform_profile,
+            args.execution_matrix,
+            args.result_dir,
+            args.output_csv,
+            args.output_markdown,
+            config_root=args.config_root,
+            wave=args.wave,
+        )
+        LOGGER.info("Wrote platform tracker CSV to %s", csv_path)
+        LOGGER.info("Wrote platform tracker Markdown to %s", markdown_path)
         return
 
     if args.command == "validate":
@@ -474,6 +488,18 @@ def _build_parser() -> argparse.ArgumentParser:
         default="matrix",
         help="Config/result profile to include in the generated tracker.",
     )
+
+    platform_tracker_parser = subparsers.add_parser(
+        "track-platform-progress",
+        help="Track validated trials for one L40S or H100 execution plan.",
+    )
+    platform_tracker_parser.add_argument("--platform-profile", required=True)
+    platform_tracker_parser.add_argument("--execution-matrix", default="platforms/execution_matrix.json")
+    platform_tracker_parser.add_argument("--config-root", default="configs")
+    platform_tracker_parser.add_argument("--result-dir", default="results/raw")
+    platform_tracker_parser.add_argument("--output-csv", default=None)
+    platform_tracker_parser.add_argument("--output-markdown", default=None)
+    platform_tracker_parser.add_argument("--wave", default=None)
 
     validate_parser = subparsers.add_parser("validate", help="Validate experiment configs and raw result records.")
     validate_parser.add_argument(

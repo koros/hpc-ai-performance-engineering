@@ -12,7 +12,7 @@ DEV_CONFIGS := $(sort $(wildcard configs/dev/*.json))
 DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
 
 # Dev targets run local Mac/workstation checks; matrix tracking stays separate.
-.PHONY: install-dev lint format test check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-platform-wave submit-platform-wave render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate validate-result-evidence readiness-report refresh serve-dashboard
+.PHONY: install-dev lint format test check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-platform-wave submit-platform-wave track-platform-progress track-l40s-progress track-h100-progress render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate validate-result-evidence readiness-report refresh serve-dashboard
 
 install-dev:
 	$(PYTHON) -m pip install -e ".[dev,yaml]"
@@ -78,6 +78,15 @@ dry-run-submit-platform-wave:
 
 submit-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli submit-slurm-batch --script-dir $(PLATFORM_SLURM_DIR) --status $(PLATFORM_STATUS)
+
+track-platform-progress:
+	$(PYTHON) -m hpc_ai_perf.cli track-platform-progress --platform-profile $(PLATFORM_PROFILE)
+
+track-l40s-progress:
+	$(MAKE) track-platform-progress PLATFORM=l40s
+
+track-h100-progress:
+	$(MAKE) track-platform-progress PLATFORM=h100
 
 render-slurm-example:
 	$(PYTHON) -m hpc_ai_perf.cli render-slurm --config configs/environment_validation/E001_cuda_pytorch_1gpu.json $(SLURM_PROFILE_ARG)

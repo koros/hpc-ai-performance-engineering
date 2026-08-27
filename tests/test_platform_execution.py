@@ -16,6 +16,7 @@ from hpc_ai_perf.config import (
     resolve_platform_config,
 )
 from hpc_ai_perf.results import ExperimentResult, flatten_result_record
+from hpc_ai_perf.tracking import build_platform_progress_rows, track_platform_progress
 from hpc_ai_perf.validation import validate_result_records
 
 
@@ -243,3 +244,78 @@ def test_platform_result_validation_rejects_wrong_platform_directory(tmp_path: P
     issues = validate_result_records(raw_root)
 
     assert any("result path platform does not match platform_id" in issue.message for issue in issues)
+
+
+def test_platform_tracker_counts_latest_valid_independent_trials(tmp_path: Path) -> None:
+    entry = next(entry for entry in discover_experiment_configs() if entry.config.experiment_id == "E123")
+    profile = load_platform_profile("platforms/l40s.json")
+    conditions = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "l40s",
+        wave="2",
+        include_deferred=False,
+    )
+    condition = next(item for item in conditions if item.matrix_id == "E123")
+    config = resolve_platform_config(entry, profile, condition)
+    raw_root = tmp_path / "results" / "raw"
+
+    failed = ExperimentResult.from_config(
+        config,
+        status="failed",
+        started_at="2026-08-27T10:00:00+00:00",
+        completed_at="2026-08-27T10:00:30+00:00",
+        runtime_seconds=30.0,
+        repetition_number=1,
+        error="transient scheduler failure",
+    )
+    failed.write_json(raw_root / "l40s", preserve_trial=True)
+
+    config_hash = hashlib.sha256(
+        json.dumps(config.to_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    completed = ExperimentResult.from_config(
+        config,
+        status="completed",
+        started_at="2026-08-27T10:01:00+00:00",
+        completed_at="2026-08-27T10:02:00+00:00",
+        runtime_seconds=60.0,
+        repetition_number=1,
+        metrics={
+            "measured_seconds": 50.0,
+            "gpu_hours": 50.0 / 3600,
+            "total_tokens": 1000,
+            "throughput_unit": "training_tokens_per_second",
+        },
+        environment={
+            "git_commit": "a" * 40,
+            "git_dirty": False,
+            "config_sha256": config_hash,
+            "command": "python -m hpc_ai_perf.cli run",
+            "observed_gpu_model": "NVIDIA L40S",
+        },
+    )
+    completed.write_json(raw_root / "l40s", preserve_trial=True)
+
+    rows = build_platform_progress_rows(conditions, raw_root)
+    row = next(item for item in rows if item["condition_id"] == "E123@l40s")
+
+    assert row["status"] == "Partial"
+    assert row["valid_trials"] == 1
+    assert row["failed_trials"] == 0
+    assert row["required_trials"] == 3
+
+
+def test_platform_tracker_writes_deferred_conditions(tmp_path: Path) -> None:
+    csv_path, markdown_path = track_platform_progress(
+        "platforms/l40s.json",
+        result_dir=tmp_path / "raw",
+        output_csv=tmp_path / "tracker.csv",
+        output_markdown=tmp_path / "tracker.md",
+        wave="deferred",
+    )
+
+    assert csv_path.exists()
+    markdown = markdown_path.read_text(encoding="utf-8")
+    assert "# L40S Experiment Tracker" in markdown
+    assert "E007@l40s" in markdown
+    assert "Deferred" in markdown
