@@ -17,6 +17,7 @@ const rankingColumns = [
   "condition_id",
   "experiment_id",
   "platform_id",
+  "comparability",
   "phase",
   "priority",
   "workload",
@@ -68,14 +69,24 @@ const trialColumns = [
   "throughput_tokens_ci95_high",
 ];
 
-document.addEventListener("DOMContentLoaded", () => {
-  bindInputs();
-  loadDefaultData();
-  render();
-});
+if (typeof document !== "undefined") {
+  document.addEventListener("DOMContentLoaded", () => {
+    bindInputs();
+    loadDefaultData();
+    render();
+  });
+}
 
 function bindInputs() {
-  ["platformFilter", "phaseFilter", "workloadFilter", "throughputUnitFilter", "priorityFilter", "statusFilter"].forEach((id) => {
+  [
+    "platformFilter",
+    "comparabilityFilter",
+    "phaseFilter",
+    "workloadFilter",
+    "throughputUnitFilter",
+    "priorityFilter",
+    "statusFilter",
+  ].forEach((id) => {
     document.getElementById(id).addEventListener("change", render);
   });
 
@@ -205,6 +216,7 @@ function parseCsv(text) {
 
 function rebuildFilters() {
   setFilterOptions("platformFilter", uniqueValues(state.results, "platform_id"));
+  setFilterOptions("comparabilityFilter", uniqueValues(state.results, "comparability"));
   setFilterOptions("phaseFilter", uniqueValues(state.results, "phase"));
   setFilterOptions("workloadFilter", uniqueValues(state.results, "workload"));
   setFilterOptions("throughputUnitFilter", uniqueValues(state.results, "throughput_unit"));
@@ -247,12 +259,14 @@ function render() {
 
 function renderTrialTable() {
   const platform = document.getElementById("platformFilter").value;
+  const comparability = document.getElementById("comparabilityFilter").value;
   const phase = document.getElementById("phaseFilter").value;
   const workload = document.getElementById("workloadFilter").value;
   const throughputUnit = document.getElementById("throughputUnitFilter").value;
   const rows = state.trialSummary.filter(
     (row) =>
       (!platform || row.platform_id === platform) &&
+      (!comparability || row.comparability === comparability) &&
       (!phase || row.phase === phase) &&
       (!workload || row.workload === workload) &&
       (!throughputUnit || row.throughput_unit === throughputUnit),
@@ -310,6 +324,7 @@ function parseReadinessSummary(markdown) {
 function filteredResults() {
   const filters = {
     platform_id: document.getElementById("platformFilter").value,
+    comparability: document.getElementById("comparabilityFilter").value,
     phase: document.getElementById("phaseFilter").value,
     workload: document.getElementById("workloadFilter").value,
     throughput_unit: document.getElementById("throughputUnitFilter").value,
@@ -340,25 +355,7 @@ function renderKpis(rows) {
 
 function renderBars(rows) {
   const container = document.getElementById("phaseBars");
-  const grouped = rows.reduce((groups, row) => {
-    const platform = row.platform_id || "unlabelled";
-    const phase = row.phase || "Unassigned";
-    const unit = row.throughput_unit || "unit_not_recorded";
-    const key = `${platform}\u0000${phase}\u0000${unit}`;
-    groups[key] = groups[key] || [];
-    groups[key].push(row);
-    return groups;
-  }, {});
-  const entries = Object.entries(grouped)
-    .map(([key, groupRows]) => ({
-      platform: key.split("\u0000")[0],
-      phase: key.split("\u0000")[1],
-      unit: key.split("\u0000")[2],
-      value: average(groupRows.map((row) => throughput(row))),
-    }))
-    .filter((entry) => entry.value > 0)
-    .sort((left, right) => right.value - left.value)
-    .slice(0, 10);
+  const entries = buildPhaseBarEntries(rows);
 
   container.replaceChildren();
   if (!entries.length) {
@@ -371,26 +368,51 @@ function renderBars(rows) {
     const row = document.createElement("div");
     row.className = "bar-row";
     row.innerHTML = `
-      <div class="bar-meta"><strong>${escapeHtml(entry.platform)} · ${escapeHtml(entry.phase)}</strong><span>${formatInteger(entry.value)} ${escapeHtml(entry.unit)}</span></div>
+      <div class="bar-meta"><strong>${escapeHtml(entry.platform)} · ${escapeHtml(entry.comparability)} · ${escapeHtml(entry.phase)} · ${escapeHtml(entry.workload)}</strong><span>${formatInteger(entry.value)} ${escapeHtml(entry.unit)}</span></div>
       <div class="bar-track"><div class="bar-fill" style="width: ${Math.max(3, (entry.value / topValue) * 100)}%"></div></div>
     `;
     container.append(row);
   });
 }
 
+function buildPhaseBarEntries(rows) {
+  const grouped = rows.reduce((groups, row) => {
+    const platform = row.platform_id || "unlabelled";
+    const comparability = row.comparability || "unspecified";
+    const phase = row.phase || "Unassigned";
+    const workload = row.workload || "Unassigned";
+    const unit = row.throughput_unit || "unit_not_recorded";
+    const key = `${platform}\u0000${comparability}\u0000${phase}\u0000${workload}\u0000${unit}`;
+    groups[key] = groups[key] || [];
+    groups[key].push(row);
+    return groups;
+  }, {});
+  const entries = Object.entries(grouped)
+    .map(([key, groupRows]) => ({
+      platform: key.split("\u0000")[0],
+      comparability: key.split("\u0000")[1],
+      phase: key.split("\u0000")[2],
+      workload: key.split("\u0000")[3],
+      unit: key.split("\u0000")[4],
+      value: average(groupRows.map((row) => throughput(row))),
+    }))
+    .filter((entry) => entry.value > 0)
+    .sort((left, right) => right.value - left.value)
+    .slice(0, 10);
+  return entries;
+}
+
 function renderPhaseTable() {
   const filters = {
     platform_id: document.getElementById("platformFilter").value,
+    comparability: document.getElementById("comparabilityFilter").value,
     phase: document.getElementById("phaseFilter").value,
     workload: document.getElementById("workloadFilter").value,
     throughput_unit: document.getElementById("throughputUnitFilter").value,
     priority: document.getElementById("priorityFilter").value,
   };
-  const rows = state.phaseSummary.length
-    ? state.phaseSummary.filter((row) =>
-        Object.entries(filters).every(([key, value]) => !value || row[key] === value),
-      )
-    : summarizePhases(filteredResults());
+  const hasActiveFilter = Object.values(filters).some(Boolean) || document.getElementById("statusFilter").value;
+  const rows = state.phaseSummary.length && !hasActiveFilter ? state.phaseSummary : summarizePhases(filteredResults());
   renderTable("phaseTable", rows, phaseColumns);
   document.getElementById("phaseCount").textContent = `${rows.length} rows`;
 }
@@ -467,7 +489,15 @@ function sortRows(rows, table) {
 
 function summarizePhases(rows) {
   const grouped = rows.reduce((groups, row) => {
-    const key = `${row.platform_id || ""}\u0000${row.comparability || ""}\u0000${row.phase || ""}`;
+    const key = [
+      row.platform_id || "",
+      row.comparability || "",
+      row.phase || "",
+      row.priority || "",
+      row.mode || "",
+      row.workload || "",
+      row.throughput_unit || "",
+    ].join("\u0000");
     groups[key] = groups[key] || [];
     groups[key].push(row);
     return groups;
@@ -476,10 +506,10 @@ function summarizePhases(rows) {
     platform_id: key.split("\u0000")[0],
     comparability: key.split("\u0000")[1],
     phase: key.split("\u0000")[2],
-    priority: "",
-    mode: "",
-    workload: "",
-    throughput_unit: "",
+    priority: key.split("\u0000")[3],
+    mode: key.split("\u0000")[4],
+    workload: key.split("\u0000")[5],
+    throughput_unit: key.split("\u0000")[6],
     experiments: groupRows.length,
     completed: groupRows.filter((row) => row.status === "completed").length,
     failed: groupRows.filter((row) => row.status === "failed").length,
@@ -487,15 +517,6 @@ function summarizePhases(rows) {
     avg_runtime_seconds: average(groupRows.map((row) => number(row.runtime_seconds))),
     estimated_gpu_hours: sum(groupRows.map((row) => number(row.gpu_hours_estimate))),
   }));
-}
-
-function groupBy(rows, key) {
-  return rows.reduce((groups, row) => {
-    const value = row[key] || "";
-    groups[value] = groups[value] || [];
-    groups[value].push(row);
-    return groups;
-  }, {});
 }
 
 function throughput(row) {
@@ -557,4 +578,8 @@ function escapeHtml(value) {
   const element = document.createElement("span");
   element.textContent = value;
   return element.innerHTML;
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { buildPhaseBarEntries, summarizePhases };
 }
