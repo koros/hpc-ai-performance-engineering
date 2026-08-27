@@ -21,6 +21,10 @@ part of the experimental record even though analysis excludes them from performa
 
 Local and Mac development results remain ignored because they are workflow checks rather than H100/L40S evidence.
 
+Older matrix records without top-level platform fields may be retained unchanged. They are accepted only when their
+embedded hardware identifies exactly one L40S/H100 platform. Derived outputs synthesize the platform-qualified
+condition and mark it `platform_specific`; ambiguous or contradictory legacy records are rejected.
+
 ## Files That Must Not Be Committed
 
 - Slurm `.out` and `.err` files, except short manually curated excerpts in a research note.
@@ -63,6 +67,10 @@ Then inspect every new JSON record and confirm:
 - L40S records identify L40S and PCIe and are not stored under an H100-labelled experimental condition;
 - `SHA256SUMS` covers every platform result file and `make validate-result-evidence` reports no mismatch;
 - no secret, private path, or unrelated personal data appears in `command`, `error`, or environment fields.
+
+After aggregation, analysis also rejects matrix rows with a missing or inconsistent platform identity. Every generated
+summary carries `platform_id` and `comparability`; hardware summaries retain condition IDs so an intentional H100–L40S
+comparison starts from separate per-platform statistics.
 
 Commit one experiment or one tightly related trial batch at a time. A useful commit subject is:
 

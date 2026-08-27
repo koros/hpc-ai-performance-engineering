@@ -35,6 +35,23 @@ separate conditions even when they originate from the same logical E-number.
 
 The trial summary reports completed and failed counts, mean, median, sample standard deviation, coefficient of variation, and a two-sided 95% Student's t confidence interval. Fewer than three completed trials are labelled `insufficient_data`.
 
+### Platform-isolation contract
+
+- Every matrix row entering analysis must have a valid `E###@l40s` or `E###@h100` condition, platform, and
+  comparability class. Ambiguous processed rows are rejected rather than assigned to an unlabelled group.
+- All 11 generated analysis tables include `platform_id` and `comparability` in their statistical grouping keys.
+  Trial-level tables also group by `condition_id`.
+- Means, confidence intervals, trial sufficiency, rankings, precision summaries, and scaling baselines are calculated
+  within one platform. Three L40S and three H100 trials therefore remain two samples of three, never one sample of six.
+- An “All Platforms” dashboard view may add counts/GPU-hours or display separate series. It must not average throughput,
+  latency, memory, energy, or runtime across platforms.
+- A deliberate hardware comparison first computes independent per-platform condition statistics, then calculates a
+  matched-pair difference or ratio. Raw H100 and L40S trials are never pooled before that comparison.
+
+Legacy matrix JSON that predates the platform fields is not rewritten. It is accepted only when embedded requested
+and observed hardware identify exactly one of L40S or H100. Aggregation synthesizes `E###@<platform>` and assigns the
+conservative `platform_specific` class. Conflicting or unidentified legacy evidence fails validation and import.
+
 No trial is automatically excluded as an outlier. Before final collection, investigate extreme observations using scheduler logs, profiler traces, thermals, clocks, and contention. Exclude a trial only for a documented protocol violation or measurement failure, preserve the raw record, and report results with and without the exclusion. The generated summary therefore reports `outliers_excluded=0`.
 
 ## Pilot Acceptance

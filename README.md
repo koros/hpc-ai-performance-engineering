@@ -298,6 +298,10 @@ Serve the static dashboard:
 make serve-dashboard
 ```
 
+The dashboard exposes Platform and Comparability filters. Its “All Platforms” view keeps chart series separate and
+uses only additive counts or maxima for combined KPIs; statistical averages, confidence intervals, rankings, and
+scaling baselines remain platform-local. `make check` includes mixed-platform Python and JavaScript regression tests.
+
 ## Expected Outputs
 
 - Reproducible experiment suite and configuration catalogue
