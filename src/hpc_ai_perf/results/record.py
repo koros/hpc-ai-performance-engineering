@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -26,6 +28,9 @@ class ExperimentResult:
     run_id: str
     repetition_number: int
     experiment_id: str
+    condition_id: str
+    platform_id: str
+    comparability: str
     experiment: str
     workload: str
     model: str
@@ -81,10 +86,13 @@ class ExperimentResult:
         environment = environment or {}
         resolved_repetition = _repetition_number(config, environment, repetition_number)
         return cls(
-            schema_version="1.2.0",
+            schema_version="1.3.0",
             run_id=_run_id(config.experiment_id, started_at, resolved_repetition),
             repetition_number=resolved_repetition,
             experiment_id=config.experiment_id,
+            condition_id=_condition_id(config),
+            platform_id=_platform_id(config),
+            comparability=str(config.metadata.get("comparability", "platform_specific")),
             experiment=config.experiment,
             workload=config.workload.name,
             model=config.workload.model,
@@ -147,7 +155,22 @@ class ExperimentResult:
             result_path = output_path / f"{self.run_id}.json"
         else:
             result_path = output_path / f"{self.experiment_id}.json"
-        result_path.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        if preserve_trial and result_path.exists():
+            raise FileExistsError(f"Refusing to overwrite immutable trial: {result_path}")
+        serialized = json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n"
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=result_path.parent,
+            prefix=f".{result_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as file_obj:
+            temporary_path = Path(file_obj.name)
+            file_obj.write(serialized)
+            file_obj.flush()
+            os.fsync(file_obj.fileno())
+        os.replace(temporary_path, result_path)
         return result_path
 
 
@@ -240,3 +263,25 @@ def _repetition_number(
 def _run_id(experiment_id: str, started_at: str, repetition_number: int) -> str:
     timestamp = re.sub(r"[^0-9]", "", started_at)[:20] or "unknown"
     return f"{experiment_id}-{timestamp}-r{repetition_number:03d}-{uuid.uuid4().hex[:8]}"
+
+
+def _platform_id(config: ExperimentConfig) -> str:
+    configured = str(config.metadata.get("execution_platform", "")).strip().lower()
+    if configured:
+        return configured
+    platform = config.hardware.platform.lower()
+    if "l40s" in platform:
+        return "l40s"
+    if "h100" in platform:
+        return "h100"
+    if platform == "mac_m1_dev":
+        return "mac_m1"
+    return platform or "local"
+
+
+def _condition_id(config: ExperimentConfig) -> str:
+    configured = str(config.metadata.get("condition_id", "")).strip()
+    if configured:
+        return configured
+    matrix_id = str(config.metadata.get("matrix_id", config.experiment_id))
+    return f"{matrix_id}@{_platform_id(config)}"
