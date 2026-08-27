@@ -8,6 +8,6 @@
   "cpus_per_gpu": 8,
   "max_gpus": 8,
   "output_root": "results/raw/l40s",
-  "slurm_profile": "slurm/profiles/example_l40s.json",
+  "slurm_profile": "slurm/profiles/cluster_l40s.json",
   "unsupported_metrics": ["nvlink_utilization"]
 }

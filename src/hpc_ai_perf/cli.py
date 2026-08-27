@@ -13,6 +13,9 @@ from hpc_ai_perf.config import (
     entries_to_table,
     filter_config_entries,
     load_experiment_config,
+    load_platform_conditions,
+    load_platform_profile,
+    materialize_platform_configs,
 )
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import aggregate_results
@@ -76,6 +79,39 @@ def main() -> None:
 
     if args.command == "run":
         _run_local_config(args.config, args.output_dir, repetition_number=args.repetition)
+        return
+
+    if args.command == "materialize-platform-configs":
+        written_paths = _materialize_platform_batch(
+            platform_profile=args.platform_profile,
+            execution_matrix=args.execution_matrix,
+            config_root=args.config_root,
+            output_dir=args.output_dir,
+            wave=args.wave,
+            experiment_ids=set(args.experiment_id) if args.experiment_id else None,
+            include_deferred=args.include_deferred,
+        )
+        LOGGER.info("Wrote %d resolved platform configs", len(written_paths))
+        return
+
+    if args.command == "render-platform-slurm":
+        config_paths, script_paths = _render_platform_slurm(
+            platform_profile=args.platform_profile,
+            execution_matrix=args.execution_matrix,
+            config_root=args.config_root,
+            config_output_dir=args.config_output_dir,
+            output_dir=args.output_dir,
+            wave=args.wave,
+            experiment_ids=set(args.experiment_id) if args.experiment_id else None,
+            profile_path=args.slurm_profile,
+            partition=args.partition,
+            account=args.account,
+            time_limit=args.time,
+            cpus_per_task=args.cpus_per_task,
+            modules=args.module,
+            env_values=args.env,
+        )
+        LOGGER.info("Wrote %d resolved configs and %d Slurm scripts", len(config_paths), len(script_paths))
         return
 
     if args.command == "render-slurm":
@@ -279,6 +315,50 @@ def _build_parser() -> argparse.ArgumentParser:
     list_parser.add_argument("--workload", default=None, help="Filter by workload name.")
     list_parser.add_argument("--experiment-id", default=None, help="Filter by experiment ID, such as E001.")
     list_parser.add_argument("--format", choices=["table", "json"], default="table")
+
+    materialize_parser = subparsers.add_parser(
+        "materialize-platform-configs",
+        help="Resolve matrix experiments for an L40S or H100 execution profile.",
+    )
+    _add_platform_options(materialize_parser)
+    materialize_parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Resolved config directory; defaults to build/platform_configs/<platform>.",
+    )
+    materialize_parser.add_argument(
+        "--include-deferred",
+        action="store_true",
+        help="Also materialize explicitly deferred conditions for inspection only.",
+    )
+
+    platform_slurm_parser = subparsers.add_parser(
+        "render-platform-slurm",
+        help="Materialize one platform batch and render its planned Slurm jobs.",
+    )
+    _add_platform_options(platform_slurm_parser)
+    platform_slurm_parser.add_argument(
+        "--config-output-dir",
+        default=None,
+        help="Resolved config directory; defaults to build/platform_configs/<platform>.",
+    )
+    platform_slurm_parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Slurm script directory; defaults to slurm/generated/<platform>/wave_<wave>.",
+    )
+    platform_slurm_parser.add_argument("--slurm-profile", default=None, help="Override the platform Slurm profile.")
+    platform_slurm_parser.add_argument("--partition", default=None, help="Override the platform partition.")
+    platform_slurm_parser.add_argument("--account", default=None, help="Optional Slurm account override.")
+    platform_slurm_parser.add_argument("--time", default=None, help="Optional Slurm time limit override.")
+    platform_slurm_parser.add_argument("--cpus-per-task", type=int, default=None)
+    platform_slurm_parser.add_argument("--module", action="append", default=[], help="Additional module to load.")
+    platform_slurm_parser.add_argument(
+        "--env",
+        action="append",
+        default=[],
+        help="Additional environment variable in KEY=VALUE form.",
+    )
 
     slurm_parser = subparsers.add_parser("render-slurm", help="Render an sbatch script for an experiment config.")
     slurm_parser.add_argument("--config", required=True, help="Path to a JSON or YAML experiment config.")
@@ -489,6 +569,24 @@ def _add_slurm_options(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_platform_options(parser: argparse.ArgumentParser) -> None:
+    """Attach matrix/profile selectors shared by platform execution commands."""
+    parser.add_argument("--platform-profile", required=True, help="Path to platforms/l40s.json or h100.json.")
+    parser.add_argument(
+        "--execution-matrix",
+        default="platforms/execution_matrix.json",
+        help="Platform wave/defer policy.",
+    )
+    parser.add_argument("--config-root", default="configs", help="Root containing the logical E001-E200 configs.")
+    parser.add_argument("--wave", default=None, help="Wave identifier to select, such as 0, 1, or 4b.")
+    parser.add_argument(
+        "--experiment-id",
+        action="append",
+        default=[],
+        help="Limit execution to one E-number; may be repeated.",
+    )
+
+
 def _run_local_config(config_path: str, output_dir: str | None, *, repetition_number: int | None = None) -> None:
     """Run one experiment configuration through the local benchmark runner.
 
@@ -513,6 +611,107 @@ def _run_local_config(config_path: str, output_dir: str | None, *, repetition_nu
             preserve_trial=config.experiment_id.startswith("E"),
         )
         LOGGER.info("Wrote result to %s", result_path)
+
+
+def _materialize_platform_batch(
+    *,
+    platform_profile: str,
+    execution_matrix: str,
+    config_root: str,
+    output_dir: str | None,
+    wave: str | None,
+    experiment_ids: set[str] | None,
+    include_deferred: bool,
+) -> list[Path]:
+    """Resolve selected logical experiments into immutable platform-labelled configs."""
+    profile = load_platform_profile(platform_profile)
+    conditions = load_platform_conditions(
+        execution_matrix,
+        profile.platform_id,
+        wave=wave,
+        experiment_ids=experiment_ids,
+        include_deferred=include_deferred,
+    )
+    if not conditions:
+        raise ValueError(f"No {profile.platform_id} conditions matched the requested platform batch")
+    resolved_dir = Path(output_dir or f"build/platform_configs/{profile.platform_id}")
+    return materialize_platform_configs(
+        profile,
+        conditions,
+        resolved_dir,
+        config_root=config_root,
+        include_deferred=include_deferred,
+    )
+
+
+def _render_platform_slurm(
+    *,
+    platform_profile: str,
+    execution_matrix: str,
+    config_root: str,
+    config_output_dir: str | None,
+    output_dir: str | None,
+    wave: str | None,
+    experiment_ids: set[str] | None,
+    profile_path: str | None,
+    partition: str | None,
+    account: str | None,
+    time_limit: str | None,
+    cpus_per_task: int | None,
+    modules: list[str],
+    env_values: list[str],
+) -> tuple[list[Path], list[Path]]:
+    """Resolve and render a platform batch without changing logical matrix configs."""
+    profile = load_platform_profile(platform_profile)
+    conditions = load_platform_conditions(
+        execution_matrix,
+        profile.platform_id,
+        wave=wave,
+        experiment_ids=experiment_ids,
+        include_deferred=False,
+    )
+    conditions = [condition for condition in conditions if condition.status == "planned"]
+    if not conditions:
+        raise ValueError(f"No planned {profile.platform_id} conditions matched the requested platform batch")
+
+    resolved_dir = Path(config_output_dir or f"build/platform_configs/{profile.platform_id}")
+    config_paths = materialize_platform_configs(profile, conditions, resolved_dir, config_root=config_root)
+    condition_by_id = {condition.matrix_id: condition for condition in conditions}
+    slurm_dir = Path(output_dir or f"slurm/generated/{profile.platform_id}/wave_{wave or 'all'}")
+    slurm_profile = profile_path or profile.slurm_profile
+    slurm_options = _resolve_slurm_options(
+        profile_path=slurm_profile,
+        partition=partition or profile.partition,
+        account=account,
+        time_limit=time_limit,
+        cpus_per_task=cpus_per_task,
+        modules=modules,
+        env_values=env_values,
+    )
+
+    script_paths: list[Path] = []
+    for config_path in config_paths:
+        config = load_experiment_config(config_path)
+        semantic_issues = capability_issues(config)
+        if semantic_issues:
+            raise ValueError(f"{config.experiment_id} is not research-ready: {'; '.join(semantic_issues)}")
+        _verify_profile_platform(config, slurm_options.get("platform"), slurm_profile)
+        condition = condition_by_id[config.experiment_id]
+        requested_cpus = cpus_per_task or profile.cpus_per_gpu * max(1, config.hardware.gpus)
+        script = render_slurm_script(
+            config,
+            config_path,
+            partition=slurm_options["partition"],
+            account=slurm_options["account"],
+            time_limit=slurm_options["time_limit"],
+            cpus_per_task=requested_cpus,
+            modules=slurm_options["modules"],
+            environment=slurm_options["environment"],
+            setup_commands=slurm_options["setup_commands"],
+            repetitions=condition.required_trials,
+        )
+        script_paths.append(write_slurm_script(script, slurm_dir, config.experiment_id))
+    return config_paths, script_paths
 
 
 def _refresh_outputs(

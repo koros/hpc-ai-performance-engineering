@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from hpc_ai_perf.cli import _materialize_platform_batch, _render_platform_slurm
 from hpc_ai_perf.config import (
     discover_experiment_configs,
     load_experiment_config,
@@ -90,6 +91,54 @@ def test_materialize_platform_configs_writes_loadable_resolved_configs(tmp_path:
     config = load_experiment_config(paths[0])
     assert config.metadata["condition_id"] == "E123@l40s"
     assert config.hardware.platform == "lovelace_l40s"
+
+
+def test_materialize_platform_batch_filters_by_wave_and_experiment(tmp_path: Path) -> None:
+    paths = _materialize_platform_batch(
+        platform_profile="platforms/l40s.json",
+        execution_matrix="platforms/execution_matrix.json",
+        config_root="configs",
+        output_dir=str(tmp_path),
+        wave="1",
+        experiment_ids={"E008"},
+        include_deferred=False,
+    )
+
+    assert paths == [tmp_path / "E008.json"]
+    config = load_experiment_config(paths[0])
+    assert config.metadata["condition_id"] == "E008@l40s"
+    assert config.metadata["required_trials"] == 3
+
+
+def test_render_platform_slurm_uses_profile_partition_and_matrix_trials(tmp_path: Path) -> None:
+    config_dir = tmp_path / "configs"
+    slurm_dir = tmp_path / "slurm"
+
+    config_paths, script_paths = _render_platform_slurm(
+        platform_profile="platforms/l40s.json",
+        execution_matrix="platforms/execution_matrix.json",
+        config_root="configs",
+        config_output_dir=str(config_dir),
+        output_dir=str(slurm_dir),
+        wave="1",
+        experiment_ids={"E008"},
+        profile_path=None,
+        partition=None,
+        account=None,
+        time_limit=None,
+        cpus_per_task=None,
+        modules=[],
+        env_values=[],
+    )
+
+    assert config_paths == [config_dir / "E008.json"]
+    assert script_paths == [slurm_dir / "E008.sbatch"]
+    script = script_paths[0].read_text(encoding="utf-8")
+    assert "#SBATCH --partition=gpu_l40s" in script
+    assert "#SBATCH --array=1-3" in script
+    assert "#SBATCH --cpus-per-task=8" in script
+    assert "source slurm/modules_for_hpc_ai" in script
+    assert f"--config {config_dir / 'E008.json'}" in script
 
 
 def test_platform_condition_rejects_duplicate_matrix_rows(tmp_path: Path) -> None:

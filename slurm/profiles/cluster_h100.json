@@ -1,0 +1,15 @@
+{
+  "partition": "gpu_h100",
+  "platform": "lovelace_h100",
+  "account": null,
+  "cpus_per_task": 16,
+  "time": null,
+  "setup_commands": [
+    "source slurm/modules_for_hpc_ai",
+    "source .venv/bin/activate"
+  ],
+  "modules": [],
+  "environment": {
+    "TOKENIZERS_PARALLELISM": "false"
+  }
+}

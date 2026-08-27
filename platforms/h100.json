@@ -8,6 +8,6 @@
   "cpus_per_gpu": 16,
   "max_gpus": 4,
   "output_root": "results/raw/h100",
-  "slurm_profile": "slurm/profiles/example.json",
+  "slurm_profile": "slurm/profiles/cluster_h100.json",
   "unsupported_metrics": []
 }
