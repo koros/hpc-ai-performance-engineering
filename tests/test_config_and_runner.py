@@ -6,7 +6,9 @@ import types
 from dataclasses import replace
 from pathlib import Path
 
-from hpc_ai_perf.analysis import analyze_results
+import pytest
+
+from hpc_ai_perf.analysis import analyze_results, build_analysis_tables
 from hpc_ai_perf.analysis.summaries import build_phase_summary, build_scaling_summary, build_trial_summary
 from hpc_ai_perf.cli import _check_slurm_profile, _load_slurm_profile, _refresh_outputs, _render_slurm_bulk
 from hpc_ai_perf.config import (
@@ -1228,6 +1230,119 @@ def test_analysis_never_pools_l40s_and_h100_conditions() -> None:
     assert {row["condition_id"] for row in trial_rows} == {"E008@l40s", "E008@h100"}
     assert all(row["completed_trials"] == 1 for row in trial_rows)
     assert all(row["evidence_status"] == "sufficient" for row in trial_rows)
+
+
+def test_every_analysis_table_keeps_platform_groups_separate() -> None:
+    def result_row(
+        experiment_id: str,
+        platform_id: str,
+        phase: str,
+        *,
+        gpus: str = "1",
+        mode: str = "training",
+    ) -> dict[str, str]:
+        is_h100 = platform_id == "h100"
+        return {
+            "condition_id": f"{experiment_id}@{platform_id}",
+            "experiment_id": experiment_id,
+            "platform_id": platform_id,
+            "comparability": "exact",
+            "phase": phase,
+            "priority": "Must Have",
+            "workload": "gpt2_small",
+            "model": "gpt2",
+            "mode": mode,
+            "precision": "bf16",
+            "strategy": "ddp",
+            "gpus": gpus,
+            "status": "completed",
+            "required_trials": "1",
+            "throughput_unit": "training_tokens_per_second",
+            "runtime_seconds": "10" if is_h100 else "20",
+            "metric_measured_seconds": "9" if is_h100 else "18",
+            "throughput_tokens_sec": "200" if is_h100 else "100",
+            "throughput_samples_sec": "20" if is_h100 else "10",
+            "memory_used_gb": "20" if is_h100 else "30",
+            "platform": "lovelace_h100" if is_h100 else "lovelace_l40s",
+            "gpu_model": "NVIDIA H100 SXM 80GB" if is_h100 else "NVIDIA L40S 48GB",
+            "framework": "pytorch",
+            "batch_size": "1",
+            "metric_allreduce_time_seconds": "0.1",
+            "metric_nccl_bandwidth_gbps": "100",
+            "metric_data_loading_seconds": "1",
+            "metric_cpu_to_gpu_transfer_seconds": "0.5",
+            "metric_memory_reserved_gb": "32",
+            "metric_step_time_mean_ms": "5",
+            "metric_loss": "1",
+            "parameter_num_workers": "4",
+            "parameter_pinned_memory": "true",
+            "parameter_prefetch_factor": "2",
+            "parameter_memory_study_type": "micro_batch",
+            "parameter_micro_batch_size": "1",
+            "parameter_gradient_accumulation_steps": "1",
+            "global_batch_size": "1",
+        }
+
+    specifications = [
+        ("E008", "Baseline profiling", "1", "training"),
+        ("E032", "Strong scaling", "1", "training"),
+        ("E034", "Strong scaling", "4", "training"),
+        ("E047", "Distributed training strategy", "2", "training"),
+        ("E063", "Memory optimisation", "1", "training"),
+        ("E097", "Data movement", "1", "training"),
+        ("E113", "Communication analysis", "2", "training"),
+        ("E121", "Hardware comparison", "1", "training"),
+        ("E129", "Inference framework", "1", "inference"),
+    ]
+    rows = [
+        result_row(experiment_id, platform_id, phase, gpus=gpus, mode=mode)
+        for experiment_id, phase, gpus, mode in specifications
+        for platform_id in ["l40s", "h100"]
+    ]
+
+    tables = build_analysis_tables(rows)
+
+    assert set(tables) == {
+        "phase_summary",
+        "experiment_rankings",
+        "scaling_summary",
+        "precision_summary",
+        "trial_summary",
+        "strategy_summary",
+        "communication_summary",
+        "data_movement_summary",
+        "memory_summary",
+        "inference_summary",
+        "hardware_summary",
+    }
+    for table_rows in tables.values():
+        assert table_rows
+        assert {row["platform_id"] for row in table_rows} == {"l40s", "h100"}
+        assert {row["comparability"] for row in table_rows} == {"exact"}
+
+    assert len(tables["phase_summary"]) == 16
+    assert len(tables["scaling_summary"]) == 4
+    assert len(tables["precision_summary"]) == 4
+    assert len(tables["strategy_summary"]) == 2
+    assert len(tables["communication_summary"]) == 2
+    assert len(tables["data_movement_summary"]) == 2
+    assert len(tables["memory_summary"]) == 2
+    assert len(tables["inference_summary"]) == 2
+    assert len(tables["hardware_summary"]) == 2
+    assert len(tables["trial_summary"]) == len(rows)
+
+
+def test_analysis_rejects_ambiguous_processed_matrix_rows() -> None:
+    row = {
+        "experiment_id": "E008",
+        "condition_id": "",
+        "platform_id": "",
+        "comparability": "",
+        "status": "completed",
+    }
+
+    with pytest.raises(ValueError, match="invalid platform_id"):
+        build_analysis_tables([row])
 
 
 def test_result_validation_reports_bad_record(tmp_path: Path) -> None:

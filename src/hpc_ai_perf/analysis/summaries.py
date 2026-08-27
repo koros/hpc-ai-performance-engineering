@@ -6,6 +6,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from hpc_ai_perf.result_identity import COMPARABILITY_VALUES, MATRIX_PLATFORMS, is_matrix_experiment_id
+
 ANALYSIS_TABLES = {
     "phase_summary": [
         "platform_id",
@@ -219,6 +221,8 @@ ANALYSIS_TABLES = {
         "avg_energy_joules",
     ],
     "hardware_summary": [
+        "condition_id",
+        "experiment_id",
         "platform_id",
         "comparability",
         "workload",
@@ -273,6 +277,7 @@ def load_processed_results(input_csv: str | Path) -> list[dict[str, str]]:
 
 def build_analysis_tables(rows: list[dict[str, str]]) -> dict[str, list[dict[str, Any]]]:
     """Build every named analysis table from processed result rows."""
+    _validate_analysis_identities(rows)
     return {
         "phase_summary": build_phase_summary(rows),
         "experiment_rankings": build_experiment_rankings(rows),
@@ -817,6 +822,8 @@ def build_hardware_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     selected = _completed_phase(rows, "Hardware comparison")
     grouped = _group_rows(
         selected,
+        "condition_id",
+        "experiment_id",
         "platform_id",
         "comparability",
         "workload",
@@ -831,15 +838,17 @@ def build_hardware_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     for key, group_rows in sorted(grouped.items()):
         summaries.append(
             {
-                "platform_id": key[0],
-                "comparability": key[1],
-                "workload": key[2],
-                "model": key[3],
-                "mode": key[4],
-                "platform": key[5],
-                "gpu_model": key[6],
-                "precision": key[7],
-                "throughput_unit": key[8],
+                "condition_id": key[0],
+                "experiment_id": key[1],
+                "platform_id": key[2],
+                "comparability": key[3],
+                "workload": key[4],
+                "model": key[5],
+                "mode": key[6],
+                "platform": key[7],
+                "gpu_model": key[8],
+                "precision": key[9],
+                "throughput_unit": key[10],
                 "trials": len(group_rows),
                 "avg_throughput_tokens_sec": _mean(_metric_values(group_rows, "throughput_tokens_sec")),
                 "avg_throughput_samples_sec": _mean(_metric_values(group_rows, "throughput_samples_sec")),
@@ -874,6 +883,23 @@ def _group_rows(rows: list[dict[str, str]], *names: str) -> dict[tuple[str, ...]
     for row in rows:
         grouped[tuple(_value(row, name) for name in names)].append(row)
     return grouped
+
+
+def _validate_analysis_identities(rows: list[dict[str, str]]) -> None:
+    """Reject processed matrix rows that could enter ambiguous analysis groups."""
+    for index, row in enumerate(rows, start=1):
+        experiment_id = _value(row, "experiment_id")
+        if not is_matrix_experiment_id(experiment_id):
+            continue
+        platform_id = _value(row, "platform_id")
+        condition_id = _value(row, "condition_id")
+        comparability = _value(row, "comparability")
+        if platform_id not in MATRIX_PLATFORMS:
+            raise ValueError(f"processed matrix row {index} has invalid platform_id: {platform_id or '<missing>'}")
+        if condition_id != f"{experiment_id}@{platform_id}":
+            raise ValueError(f"processed matrix row {index} has invalid condition_id: {condition_id or '<missing>'}")
+        if comparability not in COMPARABILITY_VALUES:
+            raise ValueError(f"processed matrix row {index} has invalid comparability: {comparability or '<missing>'}")
 
 
 def _numeric(values: list[float | None]) -> list[float]:
