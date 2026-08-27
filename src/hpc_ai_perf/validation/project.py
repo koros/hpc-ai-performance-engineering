@@ -158,19 +158,21 @@ def validate_result_records(result_dir: str | Path = "results/raw") -> list[Vali
     """Validate every raw result JSON record under a result directory."""
     issues: list[ValidationIssue] = []
     for result_path in sorted(Path(result_dir).rglob("*.json")):
-        try:
-            data = json.loads(result_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            issues.append(ValidationIssue(result_path, f"invalid JSON: {exc}"))
-            continue
-
-        if not isinstance(data, dict):
-            issues.append(ValidationIssue(result_path, "result record must be a JSON object"))
-            continue
-
-        issues.extend(_validate_result_mapping(result_path, data))
+        issues.extend(validate_result_file(result_path))
 
     return issues
+
+
+def validate_result_file(result_path: str | Path) -> list[ValidationIssue]:
+    """Validate one raw result file for safe evidence import or project checks."""
+    path = Path(result_path)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return [ValidationIssue(path, f"invalid JSON: {exc}")]
+    if not isinstance(data, dict):
+        return [ValidationIssue(path, "result record must be a JSON object")]
+    return _validate_result_mapping(path, data)
 
 
 def format_validation_issues(issues: list[ValidationIssue]) -> str:

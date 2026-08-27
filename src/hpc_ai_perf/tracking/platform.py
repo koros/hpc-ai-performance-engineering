@@ -178,7 +178,11 @@ def _result_condition_id(result: dict[str, Any]) -> str:
         return configured
     config = result.get("config") if isinstance(result.get("config"), dict) else {}
     metadata = config.get("metadata") if isinstance(config.get("metadata"), dict) else {}
+    hardware = config.get("hardware") if isinstance(config.get("hardware"), dict) else {}
     platform_id = str(result.get("platform_id") or metadata.get("execution_platform") or "").strip()
+    if not platform_id:
+        hardware_label = f"{hardware.get('platform', '')} {hardware.get('gpu_model', '')}".lower()
+        platform_id = "l40s" if "l40" in hardware_label else "h100" if "h100" in hardware_label else ""
     experiment_id = str(result.get("experiment_id", "")).strip()
     return f"{experiment_id}@{platform_id}" if experiment_id and platform_id else ""
 

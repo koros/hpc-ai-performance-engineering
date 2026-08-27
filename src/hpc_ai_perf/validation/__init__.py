@@ -6,6 +6,7 @@ from hpc_ai_perf.validation.project import (
     format_validation_issues,
     validate_experiment_configs,
     validate_project,
+    validate_result_file,
     validate_result_records,
 )
 
@@ -15,5 +16,6 @@ __all__ = [
     "format_validation_issues",
     "validate_experiment_configs",
     "validate_project",
+    "validate_result_file",
     "validate_result_records",
 ]

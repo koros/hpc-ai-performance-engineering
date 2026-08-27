@@ -15,7 +15,12 @@ from hpc_ai_perf.config import (
     materialize_platform_configs,
     resolve_platform_config,
 )
-from hpc_ai_perf.results import ExperimentResult, flatten_result_record
+from hpc_ai_perf.results import (
+    ExperimentResult,
+    flatten_result_record,
+    import_result_evidence,
+    verify_result_evidence,
+)
 from hpc_ai_perf.tracking import build_platform_progress_rows, track_platform_progress
 from hpc_ai_perf.validation import validate_result_records
 
@@ -319,3 +324,68 @@ def test_platform_tracker_writes_deferred_conditions(tmp_path: Path) -> None:
     assert "# L40S Experiment Tracker" in markdown
     assert "E007@l40s" in markdown
     assert "Deferred" in markdown
+
+
+def test_import_result_evidence_is_platform_qualified_and_idempotent(tmp_path: Path) -> None:
+    entry = next(entry for entry in discover_experiment_configs() if entry.config.experiment_id == "E123")
+    profile = load_platform_profile("platforms/l40s.json")
+    condition = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "l40s",
+        experiment_ids={"E123"},
+        include_deferred=False,
+    )[0]
+    config = resolve_platform_config(entry, profile, condition)
+    result = ExperimentResult.from_config(
+        config,
+        status="failed",
+        started_at="2026-08-27T10:00:00+00:00",
+        completed_at="2026-08-27T10:00:01+00:00",
+        runtime_seconds=1.0,
+        repetition_number=1,
+        error="retained OOM evidence",
+    )
+    copied_dir = tmp_path / "copied"
+    copied_dir.mkdir()
+    source = copied_dir / "E123-trial.json"
+    source.write_text(json.dumps(result.to_dict(), indent=2) + "\n", encoding="utf-8")
+    result_root = tmp_path / "results" / "raw"
+
+    first = import_result_evidence(copied_dir, result_root)
+    second = import_result_evidence(copied_dir, result_root)
+    target = result_root / "l40s" / "E123" / source.name
+
+    assert first.imported == (target,)
+    assert second.unchanged == (target,)
+    assert (result_root / "l40s" / "SHA256SUMS").exists()
+    assert verify_result_evidence(result_root) == []
+
+    source.write_text(source.read_text(encoding="utf-8").replace("retained OOM", "different OOM"), encoding="utf-8")
+    with pytest.raises(FileExistsError, match="immutable evidence"):
+        import_result_evidence(copied_dir, result_root)
+
+
+def test_import_result_evidence_rejects_sensitive_fields(tmp_path: Path) -> None:
+    entry = next(entry for entry in discover_experiment_configs() if entry.config.experiment_id == "E123")
+    profile = load_platform_profile("platforms/l40s.json")
+    condition = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "l40s",
+        experiment_ids={"E123"},
+        include_deferred=False,
+    )[0]
+    config = resolve_platform_config(entry, profile, condition)
+    result = ExperimentResult.from_config(
+        config,
+        status="failed",
+        started_at="2026-08-27T10:00:00+00:00",
+        completed_at="2026-08-27T10:00:01+00:00",
+        runtime_seconds=1.0,
+        error="test",
+    ).to_dict()
+    result["environment"]["api_key"] = "must-not-be-committed"
+    source = tmp_path / "E123-secret.json"
+    source.write_text(json.dumps(result), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Sensitive field `environment.api_key`"):
+        import_result_evidence(source, tmp_path / "raw")

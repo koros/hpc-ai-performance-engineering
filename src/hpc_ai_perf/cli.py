@@ -18,7 +18,7 @@ from hpc_ai_perf.config import (
     materialize_platform_configs,
 )
 from hpc_ai_perf.readiness import write_readiness_report
-from hpc_ai_perf.results import aggregate_results
+from hpc_ai_perf.results import aggregate_results, import_result_evidence, verify_result_evidence
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.slurm import (
     record_job_submission,
@@ -222,6 +222,27 @@ def main() -> None:
     if args.command == "aggregate-results":
         result_path = aggregate_results(args.input_dir, args.output)
         LOGGER.info("Wrote aggregated results to %s", result_path)
+        return
+
+    if args.command == "import-result-evidence":
+        summary = import_result_evidence(args.source, args.result_root, max_file_bytes=args.max_file_bytes)
+        LOGGER.info(
+            "Imported %d evidence file(s); %d identical file(s) already present",
+            len(summary.imported),
+            len(summary.unchanged),
+        )
+        for path in summary.imported:
+            print(path)
+        return
+
+    if args.command == "verify-result-evidence":
+        problems = verify_result_evidence(args.result_root)
+        if problems:
+            print("Evidence verification failed:")
+            for problem in problems:
+                print(f"- {problem}")
+            raise SystemExit(1)
+        print("Evidence verification passed.")
         return
 
     if args.command == "analyze-results":
@@ -456,6 +477,20 @@ def _build_parser() -> argparse.ArgumentParser:
         default="results/processed/experiments.csv",
         help="Path for the processed experiment CSV.",
     )
+
+    import_evidence_parser = subparsers.add_parser(
+        "import-result-evidence",
+        help="Safely import copied HPC matrix JSON files into platform evidence directories.",
+    )
+    import_evidence_parser.add_argument("--source", required=True, help="Copied result JSON file or directory.")
+    import_evidence_parser.add_argument("--result-root", default="results/raw")
+    import_evidence_parser.add_argument("--max-file-bytes", type=int, default=5 * 1024 * 1024)
+
+    verify_evidence_parser = subparsers.add_parser(
+        "verify-result-evidence",
+        help="Validate platform evidence and verify its SHA-256 manifests.",
+    )
+    verify_evidence_parser.add_argument("--result-root", default="results/raw")
 
     analyze_parser = subparsers.add_parser("analyze-results", help="Build analysis tables from processed results.")
     analyze_parser.add_argument(

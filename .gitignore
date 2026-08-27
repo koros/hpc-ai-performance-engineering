@@ -17,6 +17,14 @@ results/figures/*
 !results/raw/E[0-9][0-9][0-9].json
 !results/raw/E[0-9][0-9][0-9]/
 !results/raw/E[0-9][0-9][0-9]/*.json
+!results/raw/l40s/
+!results/raw/l40s/SHA256SUMS
+!results/raw/l40s/E[0-9][0-9][0-9]/
+!results/raw/l40s/E[0-9][0-9][0-9]/*.json
+!results/raw/h100/
+!results/raw/h100/SHA256SUMS
+!results/raw/h100/E[0-9][0-9][0-9]/
+!results/raw/h100/E[0-9][0-9][0-9]/*.json
 !results/processed/.gitkeep
 !results/analysis/.gitkeep
 !results/figures/.gitkeep
