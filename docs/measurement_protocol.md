@@ -8,6 +8,7 @@ This protocol applies to dissertation evidence collected from the `E001-E200` ma
 - Core comparisons require at least three completed trials. Five are preferred when queue and GPU-hour budgets permit.
 - `--repetitions N` renders a Slurm job array with task numbers `1-N`. The baseline Must Have Make target uses three repetitions.
 - Each raw result records `repetition_number` and includes it in the unique `run_id`. Failed and OOM trials are preserved and counted but are not included in performance statistics.
+- Platform evidence also records `condition_id` (`E###@l40s` or `E###@h100`) and `comparability`. The logical E-number alone is not sufficient to identify a trial.
 - Repetitions do not modify the configured seed. This keeps workload inputs fixed while measuring run-to-run system variation. Configs that intentionally vary seeds remain separate experiment definitions.
 
 ## Setup, Warm-up, and Measurement
@@ -25,6 +26,10 @@ Every result also records `throughput_unit`: `training_tokens_per_second` for op
 Every run applies `runtime.seed` to Python, PyTorch CPU, and CUDA devices. `runtime.deterministic` defaults to `false`: deterministic inputs and seeds are retained, while deterministic PyTorch algorithms are disabled and cuDNN autotuning is enabled for representative performance. Set it to `true` for numerical-reproducibility diagnostics; those runs must not be mixed with default performance trials.
 
 Completed matrix evidence records the config hash, git commit and clean/dirty state, command, repetition, model revision, versioned dataset protocol, software versions, and observed hardware. Validation rejects completed matrix records with missing provenance, a dirty worktree, or a config hash that does not match the embedded config.
+
+Platform-resolved evidence additionally records the logical source-config SHA-256, generated execution platform,
+wave, required-trial count, result root, and comparability class. L40S and H100 trials are stored and aggregated as
+separate conditions even when they originate from the same logical E-number.
 
 ## Statistics and Missing Evidence
 

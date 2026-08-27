@@ -949,11 +949,11 @@ def test_readme_documents_hpc_submission_workflow() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
 
     assert "## HPC Submission Workflow" in readme
-    assert "make check-slurm-profile" in readme
-    assert "SLURM_PROFILE=slurm/profiles/cluster.local.json make plan-slurm-first-batches" in readme
-    assert "make init-slurm-first-status" in readme
-    assert "submit-slurm-batch" in readme
-    assert "record-slurm-job" in readme
+    assert "slurm/profiles/cluster_l40s.json" in readme
+    assert "make render-l40s-wave PLATFORM_WAVE=0" in readme
+    assert "make init-platform-wave-status PLATFORM=l40s PLATFORM_WAVE=0" in readme
+    assert "make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0" in readme
+    assert "import-result-evidence" in readme
 
 
 def test_slurm_status_make_targets_do_not_rerender_scripts() -> None:

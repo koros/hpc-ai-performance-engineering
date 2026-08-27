@@ -15,7 +15,8 @@ Primary planning documents:
 - [Current project status](docs/current_status.md): high-level snapshot of completed infrastructure, smoke-ready workloads, and remaining HPC submission tasks.
 - [Experiment remediation and readiness guide](docs/experiment_remediation_guide.md): objective-aligned changes, acceptance criteria, and launch gates required before the full matrix is submitted.
 - [Platform feasibility report](docs/platform_feasibility_report.md): platform-specific evidence boundaries and routing for Mac M1, L40/L40S, and H100 execution.
-- [Enhanced platform experiment matrix](docs/platform_experiment_matrix.md): direct, retargeted, local-dev, and deferred experiment routes across the three platforms.
+- [Enhanced platform experiment matrix](docs/platform_experiment_matrix.md): resolved, direct, local-dev, and deferred experiment routes across the three platforms.
+- [L40S-first execution runbook](docs/platform_execution_runbook.md): gated waves, Slurm commands, evidence import, and H100 recovery workflow.
 - [Measurement and trial protocol](docs/measurement_protocol.md): repetition, warm-up, timing, provenance, uncertainty, and outlier rules for research evidence.
 - [Comprehensive experiment matrix](docs/experiment_matrix.md): full source-of-truth matrix with `E001` to `E200`, priority levels, metrics, and GPU-hour estimates.
 - [Local dev runbook](docs/local_dev_runbook.md): Mac/local baseline-style runs for development while HPC access is unavailable.
@@ -197,54 +198,52 @@ python -m hpc_ai_perf.cli render-slurm-bulk --phase "Environment validation" --p
 
 ## HPC Submission Workflow
 
-Prepare a local Slurm profile from the tracked example and edit it for the target cluster:
+The active path uses the tracked L40S platform profile while the H100 node is unavailable. Validate it, generate wave
+0, and review the plan:
 
 ```bash
-cp slurm/profiles/example.json slurm/profiles/cluster.local.json
+python3 -m hpc_ai_perf.cli check-slurm-profile --slurm-profile slurm/profiles/cluster_l40s.json
+make render-l40s-wave PLATFORM_WAVE=0
+make plan-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
 ```
 
-Use `slurm/profiles/example_l40s.json` as the starting point for L40S jobs. Rendering fails when a profile platform does not match the config, preventing H100/L40S result mislabelling.
+This materializes generated configs under `build/platform_configs/l40s` and scripts under
+`slurm/generated/l40s/wave_0`. The source `E001-E200` configs remain unchanged. Rendering fails when a profile does
+not match the generated platform, preventing H100/L40S result mislabelling.
 
-Generate the first environment-validation and baseline batches with site-specific settings:
+Initialize status, dry-run, and then submit only after reviewing the generated files:
 
 ```bash
-SLURM_PROFILE=slurm/profiles/cluster.local.json make check-slurm-profile
-SLURM_PROFILE=slurm/profiles/cluster.local.json make plan-slurm-first-batches
+make init-platform-wave-status PLATFORM=l40s PLATFORM_WAVE=0
+make dry-run-submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
+make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
 ```
 
-The baseline scripts are three-task Slurm arrays. Each task writes an immutable trial with an explicit repetition number; see the [measurement protocol](docs/measurement_protocol.md).
+Wave 0 uses one acceptance trial per condition. Core performance waves use three-task Slurm arrays based on the
+tracked execution matrix. Each task writes an immutable, platform-qualified result with an explicit repetition number;
+see the [measurement protocol](docs/measurement_protocol.md).
 
-Initialize job-status CSVs before submitting jobs:
+Track accepted evidence separately from scheduler status:
 
 ```bash
-make init-slurm-first-status
-make dry-run-submit-slurm-first
+make track-l40s-progress
 ```
 
-On the cluster, submit a batch and record returned Slurm job IDs automatically:
+When H100 returns, generate its independent conditions from the same logical matrix:
 
 ```bash
-python -m hpc_ai_perf.cli submit-slurm-batch \
-  --script-dir slurm/generated/environment_validation_must_have \
-  --status results/processed/slurm_environment_validation_status.csv
+make render-h100-wave PLATFORM_WAVE=0
+make track-h100-progress
 ```
 
-Or after a manual `sbatch` command, record the returned Slurm job ID:
+Import JSON copied from the HPC through the integrity gate:
 
 ```bash
-python -m hpc_ai_perf.cli record-slurm-job \
-  --status results/processed/slurm_environment_validation_status.csv \
-  --experiment-id E001 \
-  --sbatch-output "Submitted batch job 123456"
+python3 -m hpc_ai_perf.cli import-result-evidence --source /tmp/hpc-result-staging
+make validate-result-evidence
 ```
 
-Generate Markdown status reports:
-
-```bash
-make report-slurm-first-status
-```
-
-Detailed submission instructions are tracked in [HPC submission batches](docs/hpc_submission_batches.md).
+Detailed gated instructions are tracked in the [L40S-first execution runbook](docs/platform_execution_runbook.md).
 
 Aggregate raw JSON results into a processed experiment table:
 
@@ -263,6 +262,8 @@ Generate progress tracker reports from configs and raw results:
 ```bash
 python -m hpc_ai_perf.cli track-progress
 make track-dev-progress
+make track-l40s-progress
+make track-h100-progress
 ```
 
 Validate experiment configs and raw results:

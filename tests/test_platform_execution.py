@@ -46,6 +46,17 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
     ]
 
 
+def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
+    expected_ids = {f"E{index:03d}" for index in range(1, 201)}
+
+    for platform_id, planned_count in [("l40s", 181), ("h100", 182)]:
+        conditions = load_platform_conditions("platforms/execution_matrix.json", platform_id)
+
+        assert len(conditions) == 200
+        assert {condition.matrix_id for condition in conditions} == expected_ids
+        assert sum(condition.status == "planned" for condition in conditions) == planned_count
+
+
 def test_deferred_platform_conditions_are_tracked() -> None:
     conditions = load_platform_conditions(
         "platforms/execution_matrix.json",

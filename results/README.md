@@ -6,11 +6,13 @@ for normal Git and stay ignored.
 
 ## Tracked Evidence
 
-The repository tracks only these raw matrix-result layouts:
+The repository tracks these platform-qualified raw matrix-result layouts:
 
 ```text
-results/raw/E123.json
-results/raw/E123/E123-<timestamp>-r001-<uuid>.json
+results/raw/l40s/E123/E123-<timestamp>-r001-<uuid>.json
+results/raw/h100/E121/E121-<timestamp>-r001-<uuid>.json
+results/raw/l40s/SHA256SUMS
+results/raw/h100/SHA256SUMS
 ```
 
 The per-trial directory layout is preferred because it preserves independent repetitions and prevents later runs
@@ -29,15 +31,18 @@ Local and Mac development results remain ignored because they are workflow check
 
 ## Importing HPC Results
 
-Copy the immutable JSON trial directories from the HPC repository into the same local path. For example, adapt the
-host and remote repository path before running:
+Copy cluster results into a staging directory, then use the importer. For example, adapt the host and remote path:
 
 ```bash
-rsync -av --include='E[0-9][0-9][0-9]/***' --exclude='*' \
-  USER@HPC_HOST:/path/to/hpc-ai-performance-engineering/results/raw/ results/raw/
+rsync -av USER@HPC_HOST:/path/to/hpc-ai-performance-engineering/results/raw/ /tmp/hpc-result-staging/
+python3 -m hpc_ai_perf.cli import-result-evidence \
+  --source /tmp/hpc-result-staging \
+  --result-root results/raw
 ```
 
-Do not use `--delete`: the local evidence directory may contain trials copied from earlier cluster runs.
+Do not use `--delete`: the local evidence directory may contain trials copied from earlier cluster runs. The importer
+preserves source bytes, validates result shape and platform identity, rejects credential-like keys, refuses a
+different file at an existing immutable path, and updates the platform `SHA256SUMS` manifest.
 
 ## Validation Before Every Result Commit
 
@@ -51,11 +56,12 @@ git diff --cached --check
 
 Then inspect every new JSON record and confirm:
 
-- `experiment_id` matches its directory and intended config;
+- `experiment_id` matches its directory and `condition_id` matches `E###@l40s` or `E###@h100` for new records;
 - `status`, requested/observed GPU model, GPU count, precision, framework, and strategy are correct;
 - `git_commit` is present and `git_dirty` is `false` for completed matrix evidence;
 - `config_sha256`, model revision, dataset revision, command, Slurm job ID, and software versions are present;
 - L40S records identify L40S and PCIe and are not stored under an H100-labelled experimental condition;
+- `SHA256SUMS` covers every platform result file and `make validate-result-evidence` reports no mismatch;
 - no secret, private path, or unrelated personal data appears in `command`, `error`, or environment fields.
 
 Commit one experiment or one tightly related trial batch at a time. A useful commit subject is:

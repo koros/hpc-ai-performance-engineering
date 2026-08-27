@@ -12,8 +12,8 @@
     {
       "platform": "l40s",
       "wave": "1",
-      "name": "L40S core baselines",
-      "experiment_ids": ["E008-E015", "E018-E019"],
+      "name": "L40S core baselines and characterisation",
+      "experiment_ids": ["E008-E015", "E018-E031"],
       "required_trials": 3,
       "comparability": "exact"
     },
@@ -38,6 +38,7 @@
       "wave": "4",
       "name": "L40S supported precision memory and data",
       "experiment_ids": ["E063-E085", "E087-E088", "E090-E092", "E094-E112"],
+      "exclude_ids": ["E096"],
       "required_trials": 3,
       "comparability": "exact"
     },
@@ -77,8 +78,8 @@
     {
       "platform": "h100",
       "wave": "1",
-      "name": "H100 core baselines",
-      "experiment_ids": ["E008-E015", "E018-E019"],
+      "name": "H100 core baselines and characterisation",
+      "experiment_ids": ["E008-E015", "E018-E031"],
       "required_trials": 3,
       "comparability": "exact"
     },
@@ -103,6 +104,7 @@
       "wave": "4",
       "name": "H100 supported precision memory and data",
       "experiment_ids": ["E063-E085", "E087-E088", "E090-E092", "E094-E112"],
+      "exclude_ids": ["E096"],
       "required_trials": 3,
       "comparability": "exact"
     },

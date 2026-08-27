@@ -14,6 +14,8 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | Distributed execution | One-process-per-GPU `torchrun`, DDP, FSDP, DeepSpeed ZeRO, rank binding, global work accounting, and rank-safe result writing are implemented. |
 | Profiling | nvidia-smi power/utilisation/memory/clock/temperature sampling, PyTorch traces, workload timing, and NCCL microbenchmark metrics are implemented. |
 | Slurm support | Semantic-gated single/bulk rendering, H100/L40S profile matching, CPU allocation checks, and three transformer smoke presets are available. |
+| Platform execution | All 200 logical rows route exactly once per platform. There are 181 planned L40S conditions and 182 planned H100 conditions, with generated configs, wave-based Slurm batches, and separate trial trackers. |
+| Evidence retention | L40S/H100 JSON is imported non-destructively into separate roots, scanned for sensitive keys, validated, and covered by tracked SHA-256 manifests. |
 | Dashboard | Static dashboard reads processed results, analysis summaries, and readiness report output. |
 | Quality gates | `pytest`, `ruff`, and `pre-commit` are configured and passing. |
 
@@ -37,7 +39,14 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | Training configs | 107 |
 | Inference configs | 93 |
 
-## Before Full HPC Submission
+## Current HPC State
+
+The L40S node is the active execution target. The H100 node is unavailable, so H100 rows remain unrun rather than
+being marked failed or replaced by L40S measurements. Follow
+[the L40S-first platform runbook](platform_execution_runbook.md); the same matrix can render H100 conditions when the
+node returns.
+
+## Before Each L40S Wave
 
 1. Install the workload extra on the cluster:
 
@@ -45,24 +54,27 @@ This snapshot summarises the repository state before full HPC submission. It sho
    python -m pip install -e ".[dev,yaml,workloads,distributed,serving]"
    ```
 
-2. Review Slurm smoke presets for partition, account, module loading, and virtual environment activation:
+2. Validate the active profile and render the selected platform wave:
 
    ```bash
-   slurm/smoke/gpt2_small_smoke.sbatch
-   slurm/smoke/distilbert_smoke.sbatch
-   slurm/smoke/tinyllama_inference_smoke.sbatch
+   python -m hpc_ai_perf.cli check-slurm-profile --slurm-profile slurm/profiles/cluster_l40s.json
+   make render-l40s-wave PLATFORM_WAVE=0
    ```
 
-3. Run the HPC smoke checklist:
+3. Review, initialize, and dry-run the Slurm batch:
 
    ```bash
-   docs/hpc_smoke_runbook.md
+   make plan-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
+   make init-platform-wave-status PLATFORM=l40s PLATFORM_WAVE=0
+   make dry-run-submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
    ```
 
-4. Refresh generated outputs:
+4. After completion, import and verify result evidence:
 
    ```bash
-   python -m hpc_ai_perf.cli refresh
+   python -m hpc_ai_perf.cli import-result-evidence --source /tmp/hpc-result-staging
+   make validate-result-evidence
+   make track-l40s-progress
    ```
 
 5. Review:
@@ -75,7 +87,7 @@ This snapshot summarises the repository state before full HPC submission. It sho
 
 | Area | Remaining work |
 | --- | --- |
-| HPC verification | Run `E001-E006`, then baseline and 1/2/4-GPU pilots on Lovelace; local tests cannot validate CUDA/NCCL/Slurm behaviour. |
+| HPC verification | Run L40S wave 0, then baseline and 1/2/4-GPU pilots. H100 wave 0 waits for node recovery; local tests cannot validate CUDA/NCCL/Slurm behaviour. |
 | Independent trials | Baseline scripts render as three-task Slurm arrays; execute them on Lovelace and inspect confidence intervals and variance from preserved trial records. |
 | Backend-dependent rows | FP8 and INT8 rows still require named backend/calibration artefacts. E007 now has a saved-engine build/load/request adapter and remains deferred only until target-H100 validation; TensorRT-LLM benchmark rows still require performance-adapter integration. |
 | Invalid DistilBERT framework rows | `E154-E155` must be removed from executable scope or redesigned around classification-compatible backends. |
@@ -86,4 +98,4 @@ This snapshot summarises the repository state before full HPC submission. It sho
 
 ## Deferred Research Scope
 
-Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative gate; it must pass with zero blockers. The readiness report lists deferred rows that are intentionally excluded from bulk deployment batches. E007 is a special acceptance candidate: it can be rendered directly with the TensorRT-LLM profile, but remains deferred until its first H100 result is reviewed. Other deferred rows still require their documented FP8, quantization, or serving prerequisites.
+Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative gate; it must pass with zero blockers. The platform tracker lists deferred rows that are intentionally excluded from generated deployment waves. `E007@h100` is an acceptance condition for when H100 returns; `E007@l40s` stays deferred until a compatible L40S engine environment exists. Other deferred rows still require their documented FP8, quantization, or serving prerequisites.
