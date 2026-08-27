@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from hpc_ai_perf.result_identity import resolve_matrix_result_identity
 from hpc_ai_perf.validation import validate_result_file, validate_result_records
 
 MAX_EVIDENCE_BYTES = 5 * 1024 * 1024
@@ -97,28 +98,7 @@ def import_result_evidence(
 
 def infer_evidence_platform(record: dict[str, Any]) -> str:
     """Infer one unambiguous L40S/H100 identity from recorded result metadata."""
-    config = record.get("config") if isinstance(record.get("config"), dict) else {}
-    metadata = config.get("metadata") if isinstance(config.get("metadata"), dict) else {}
-    hardware = config.get("hardware") if isinstance(config.get("hardware"), dict) else {}
-    environment = record.get("environment") if isinstance(record.get("environment"), dict) else {}
-    signals = [
-        record.get("platform_id"),
-        metadata.get("execution_platform"),
-        hardware.get("platform"),
-        hardware.get("gpu_model"),
-        environment.get("observed_gpu_model"),
-    ]
-    platforms: set[str] = set()
-    for signal in signals:
-        text = str(signal or "").lower()
-        if "l40" in text:
-            platforms.add("l40s")
-        if "h100" in text:
-            platforms.add("h100")
-    if len(platforms) != 1:
-        observed = ", ".join(sorted(platforms)) or "none"
-        raise ValueError(f"Evidence must identify exactly one L40S/H100 platform; observed: {observed}")
-    return next(iter(platforms))
+    return resolve_matrix_result_identity(record).platform_id
 
 
 def write_evidence_manifest(platform_dir: str | Path) -> Path:

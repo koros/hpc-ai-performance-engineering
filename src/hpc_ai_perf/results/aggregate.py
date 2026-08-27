@@ -6,6 +6,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from hpc_ai_perf.result_identity import is_matrix_experiment_id, resolve_matrix_result_identity
+
 BASE_COLUMNS = [
     "schema_version",
     "run_id",
@@ -111,19 +113,25 @@ def flatten_result_record(record: dict[str, Any], source_path: str | Path | None
     workload_parameters = _mapping(workload_config.get("parameters"))
     metrics = _mapping(record.get("metrics"))
     environment = _mapping(record.get("environment"))
-    platform_id = _result_platform_id(record, metadata, hardware)
     experiment_id = str(record.get("experiment_id") or "")
+    if is_matrix_experiment_id(experiment_id):
+        identity = resolve_matrix_result_identity(record)
+        condition_id = identity.condition_id
+        platform_id = identity.platform_id
+        comparability = identity.comparability
+    else:
+        platform_id = _result_platform_id(record, metadata, hardware)
+        condition_id = str(record.get("condition_id") or metadata.get("condition_id") or experiment_id)
+        comparability = record.get("comparability", metadata.get("comparability"))
 
     row: dict[str, Any] = {
         "schema_version": record.get("schema_version"),
         "run_id": record.get("run_id"),
         "repetition_number": record.get("repetition_number"),
         "experiment_id": experiment_id,
-        "condition_id": record.get("condition_id")
-        or metadata.get("condition_id")
-        or (f"{experiment_id}@{platform_id}" if experiment_id and platform_id in {"l40s", "h100"} else experiment_id),
+        "condition_id": condition_id,
         "platform_id": platform_id,
-        "comparability": record.get("comparability", metadata.get("comparability")),
+        "comparability": comparability,
         "required_trials": metadata.get("required_trials"),
         "matrix_id": metadata.get("matrix_id", record.get("experiment_id")),
         "experiment": record.get("experiment"),

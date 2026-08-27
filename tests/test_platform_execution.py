@@ -262,6 +262,82 @@ def test_platform_result_validation_rejects_wrong_platform_directory(tmp_path: P
     assert any("result path platform does not match platform_id" in issue.message for issue in issues)
 
 
+def test_matrix_identity_rejects_conflicting_platform_signals(tmp_path: Path) -> None:
+    entry = next(entry for entry in discover_experiment_configs() if entry.config.experiment_id == "E123")
+    profile = load_platform_profile("platforms/l40s.json")
+    condition = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "l40s",
+        experiment_ids={"E123"},
+        include_deferred=False,
+    )[0]
+    config = resolve_platform_config(entry, profile, condition)
+    record = ExperimentResult.from_config(
+        config,
+        status="failed",
+        started_at="2026-08-27T10:00:00+00:00",
+        completed_at="2026-08-27T10:00:01+00:00",
+        runtime_seconds=1.0,
+        error="identity test",
+    ).to_dict()
+    record["environment"]["observed_gpu_model"] = "NVIDIA H100 SXM 80GB"
+    result_path = tmp_path / "raw" / "l40s" / "E123" / "conflict.json"
+    result_path.parent.mkdir(parents=True)
+    result_path.write_text(json.dumps(record), encoding="utf-8")
+
+    issues = validate_result_records(tmp_path / "raw")
+
+    assert any("exactly one L40S/H100 platform" in issue.message for issue in issues)
+    with pytest.raises(ValueError, match="exactly one L40S/H100 platform"):
+        flatten_result_record(record, result_path)
+
+
+def test_legacy_matrix_identity_is_derived_conservatively(tmp_path: Path) -> None:
+    entry = next(entry for entry in discover_experiment_configs() if entry.config.experiment_id == "E123")
+    record = ExperimentResult.from_config(
+        entry.config,
+        status="failed",
+        started_at="2026-08-27T10:00:00+00:00",
+        completed_at="2026-08-27T10:00:01+00:00",
+        runtime_seconds=1.0,
+        error="legacy evidence",
+    ).to_dict()
+    record["schema_version"] = "1.2.0"
+    for field in ["condition_id", "platform_id", "comparability"]:
+        record.pop(field)
+    result_path = tmp_path / "raw" / "l40s" / "E123" / "legacy.json"
+    result_path.parent.mkdir(parents=True)
+    result_path.write_text(json.dumps(record), encoding="utf-8")
+
+    flattened = flatten_result_record(record, result_path)
+
+    assert flattened["condition_id"] == "E123@l40s"
+    assert flattened["platform_id"] == "l40s"
+    assert flattened["comparability"] == "platform_specific"
+    assert validate_result_records(tmp_path / "raw") == []
+
+
+def test_platform_contract_requires_explicit_comparability(tmp_path: Path) -> None:
+    entry = next(entry for entry in discover_experiment_configs() if entry.config.experiment_id == "E123")
+    record = ExperimentResult.from_config(
+        entry.config,
+        status="failed",
+        started_at="2026-08-27T10:00:00+00:00",
+        completed_at="2026-08-27T10:00:01+00:00",
+        runtime_seconds=1.0,
+        error="missing contract field",
+    ).to_dict()
+    record.pop("comparability")
+    result_path = tmp_path / "E123.json"
+    result_path.write_text(json.dumps(record), encoding="utf-8")
+
+    issues = validate_result_records(tmp_path)
+
+    assert any("must include comparability" in issue.message for issue in issues)
+    with pytest.raises(ValueError, match="must include comparability"):
+        flatten_result_record(record, result_path)
+
+
 def test_platform_tracker_counts_latest_valid_independent_trials(tmp_path: Path) -> None:
     entry = next(entry for entry in discover_experiment_configs() if entry.config.experiment_id == "E123")
     profile = load_platform_profile("platforms/l40s.json")

@@ -9,6 +9,7 @@ from typing import Any
 
 from hpc_ai_perf.config import load_experiment_config
 from hpc_ai_perf.config.traceability import ANALYSIS_TASKS, RESEARCH_QUESTIONS
+from hpc_ai_perf.result_identity import MatrixResultIdentity, resolve_matrix_result_identity
 from hpc_ai_perf.validation.capabilities import capability_issues, unknown_parameter_issues
 
 CONFIG_MODES = {"training", "inference", "profiling"}
@@ -229,8 +230,13 @@ def _validate_result_mapping(path: Path, data: dict[str, Any]) -> list[Validatio
         issues.append(ValidationIssue(path, "config must be an object"))
 
     experiment_id = str(data.get("experiment_id", ""))
-    if _is_matrix_experiment_id(experiment_id) and _uses_platform_result_schema(data):
-        issues.extend(_validate_platform_result_identity(path, data))
+    if _is_matrix_experiment_id(experiment_id):
+        try:
+            identity = resolve_matrix_result_identity(data)
+        except ValueError as exc:
+            issues.append(ValidationIssue(path, f"invalid matrix result identity: {exc}"))
+        else:
+            issues.extend(_validate_platform_result_identity(path, data, identity))
     if _is_matrix_experiment_id(experiment_id) and data.get("status") == "completed":
         metrics = data.get("metrics") if isinstance(data.get("metrics"), dict) else {}
         environment = data.get("environment") if isinstance(data.get("environment"), dict) else {}
@@ -288,47 +294,23 @@ def _validate_result_mapping(path: Path, data: dict[str, Any]) -> list[Validatio
     return issues
 
 
-def _uses_platform_result_schema(data: dict[str, Any]) -> bool:
-    schema_version = str(data.get("schema_version", ""))
-    return schema_version.startswith("1.3.") or any(
-        field in data for field in ["condition_id", "platform_id", "comparability"]
-    )
-
-
-def _validate_platform_result_identity(path: Path, data: dict[str, Any]) -> list[ValidationIssue]:
+def _validate_platform_result_identity(
+    path: Path, data: dict[str, Any], identity: MatrixResultIdentity
+) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
-    experiment_id = str(data.get("experiment_id", ""))
-    platform_id = str(data.get("platform_id", ""))
-    condition_id = str(data.get("condition_id", ""))
-    comparability = str(data.get("comparability", ""))
-    for field in ["condition_id", "platform_id", "comparability"]:
-        if not data.get(field):
-            issues.append(ValidationIssue(path, f"platform-aware matrix result must include {field}"))
-    if platform_id not in {"l40s", "h100"}:
-        issues.append(ValidationIssue(path, f"matrix platform_id must be l40s or h100: {platform_id}"))
-    if platform_id and condition_id != f"{experiment_id}@{platform_id}":
-        issues.append(ValidationIssue(path, "condition_id must match experiment_id@platform_id"))
-    if comparability not in {"exact", "capacity_adjusted", "platform_specific"}:
-        issues.append(ValidationIssue(path, f"unsupported comparability value: {comparability}"))
-
     config = data.get("config") if isinstance(data.get("config"), dict) else {}
     metadata = config.get("metadata") if isinstance(config.get("metadata"), dict) else {}
     hardware = config.get("hardware") if isinstance(config.get("hardware"), dict) else {}
     runtime = config.get("runtime") if isinstance(config.get("runtime"), dict) else {}
-    expected_hardware_token = {"l40s": "l40s", "h100": "h100"}.get(platform_id, "")
-    if expected_hardware_token and expected_hardware_token not in str(hardware.get("platform", "")).lower():
+    hardware_label = f"{hardware.get('platform', '')} {hardware.get('gpu_model', '')}".lower()
+    expected_hardware_token = "l40" if identity.platform_id == "l40s" else "h100"
+    if identity.explicit_contract and expected_hardware_token not in hardware_label:
         issues.append(ValidationIssue(path, "platform_id does not match config.hardware.platform"))
-    if metadata.get("condition_id") and metadata.get("condition_id") != condition_id:
-        issues.append(ValidationIssue(path, "top-level condition_id does not match config metadata"))
-    if metadata.get("execution_platform") and metadata.get("execution_platform") != platform_id:
-        issues.append(ValidationIssue(path, "top-level platform_id does not match config metadata"))
-    if metadata.get("comparability") and metadata.get("comparability") != comparability:
-        issues.append(ValidationIssue(path, "top-level comparability does not match config metadata"))
     if metadata.get("execution_platform"):
         source_hash = str(metadata.get("source_config_sha256", ""))
         if not re.fullmatch(r"[0-9a-f]{64}", source_hash):
             issues.append(ValidationIssue(path, "platform condition must include a valid source_config_sha256"))
-        expected_output = f"results/raw/{platform_id}"
+        expected_output = f"results/raw/{identity.platform_id}"
         if runtime.get("output_dir") != expected_output:
             issues.append(ValidationIssue(path, f"platform condition output_dir must be {expected_output}"))
 
@@ -337,8 +319,10 @@ def _validate_platform_result_identity(path: Path, data: dict[str, Any]) -> list
         raw_index = path_parts.index("raw")
         if len(path_parts) > raw_index + 1 and path_parts[raw_index + 1] in {"l40s", "h100"}:
             path_platform = path_parts[raw_index + 1]
-            if path_platform != platform_id:
+            if path_platform != identity.platform_id:
                 issues.append(ValidationIssue(path, "result path platform does not match platform_id"))
+            if len(path_parts) > raw_index + 2 and path_parts[raw_index + 2] != identity.experiment_id:
+                issues.append(ValidationIssue(path, "result path experiment directory does not match experiment_id"))
     return issues
 
 
