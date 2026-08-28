@@ -43,8 +43,10 @@ class TransformerWorkload(Workload):
             package_list = ", ".join(missing)
             raise RuntimeError(
                 f"{self.display_name} requires optional dependencies: {package_list}. "
-                "Install the extras required by this batch, for example: "
-                "python -m pip install -e '.[workloads,distributed,serving]'"
+                "Install the core workload/distributed extras with "
+                "python -m pip install -e '.[workloads,distributed]'. "
+                "If this batch needs vLLM, install a vLLM wheel or source build that matches the cluster CUDA/PyTorch "
+                "runtime before rerunning."
             )
 
     def run(self, config: ExperimentConfig) -> WorkloadRunOutput:

@@ -135,10 +135,16 @@ python -m pip install -e ".[dev,yaml,workloads]"
 On the Linux GPU cluster, install the extras required by the selected batch:
 
 ```bash
-python -m pip install -e ".[dev,yaml,workloads,distributed,serving]"
+python -m pip install -e ".[dev,yaml,workloads,distributed]"
 ```
 
-TensorRT-LLM and FP8/quantized model tooling remain vendor/backend-specific and are not silently substituted by these extras.
+Install vLLM separately only after confirming the cluster CUDA/PyTorch stack. Its wheels are CUDA-ABI-specific, so a
+generic latest PyPI install can import a wheel that expects a different CUDA runtime. For example, if `torch.version.cuda`
+reports `12.4` but `import vllm` fails looking for `libcudart.so.13`, remove that vLLM wheel and install or build one
+matching the site runtime before running E006 or later vLLM rows.
+
+TensorRT-LLM, vLLM, and FP8/quantized model tooling remain vendor/backend-specific and are not silently substituted by
+these extras.
 
 Run the optional GPT-2 Small smoke workload after installing those dependencies:
 

@@ -22,7 +22,9 @@ workloads = [
     "transformers>=4.44,<5",
 ]
 distributed = ["deepspeed>=0.15,<0.18"]
-serving = ["vllm>=0.6,<1; platform_system == 'Linux'"]
+# vLLM wheels are tightly coupled to the active CUDA/PyTorch/driver ABI.
+# Install or build vLLM separately for the target cluster stack before running serving rows.
+serving = []
 
 [project.scripts]
 hpc-ai-run = "hpc_ai_perf.cli:main"

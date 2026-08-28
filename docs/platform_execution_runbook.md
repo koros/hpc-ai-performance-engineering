@@ -23,11 +23,15 @@ and keeps raw evidence physically and semantically separate.
 From a clean checkout on the HPC login node:
 
 ```bash
-python3 -m pip install -e ".[dev,yaml,workloads,distributed,serving]"
+python3 -m pip install -e ".[dev,yaml,workloads,distributed]"
 python3 -m hpc_ai_perf.cli validate --skip-results --research-ready
 python3 -m hpc_ai_perf.cli check-slurm-profile --slurm-profile slurm/profiles/cluster_l40s.json
 sinfo -p gpu_l40s,gpu_h100
 ```
+
+Before E006 or any later vLLM wave, install vLLM separately for the exact active CUDA/PyTorch/driver stack. If PyTorch
+reports CUDA 12.x but `import vllm` fails looking for `libcudart.so.13`, the installed vLLM wheel targets a different
+CUDA runtime and must be replaced before the result can be accepted.
 
 On an L40S allocation, capture the actual device and topology before accepting results:
 

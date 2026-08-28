@@ -1,3 +1,4 @@
+import builtins
 import csv
 import hashlib
 import json
@@ -17,6 +18,7 @@ from hpc_ai_perf.config import (
     filter_config_entries,
     load_experiment_config,
 )
+from hpc_ai_perf.profiling.system import TorchMemoryProfiler
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
@@ -483,6 +485,72 @@ def test_transformer_workload_skeleton_fails_gracefully() -> None:
     assert "optional dependencies" in result.error
 
 
+def test_torch_memory_profiler_sets_explicit_local_rank_device(monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/environment_validation/E004_fsdp_2gpu.json"))
+    events: list[tuple[str, object]] = []
+
+    class FakeDevice:
+        def __init__(self, kind: str, index: int) -> None:
+            self.kind = kind
+            self.index = index
+
+        def __eq__(self, other: object) -> bool:
+            return isinstance(other, FakeDevice) and (self.kind, self.index) == (other.kind, other.index)
+
+    expected_device = FakeDevice("cuda", 1)
+
+    class FakeCuda:
+        @staticmethod
+        def is_available() -> bool:
+            return True
+
+        @staticmethod
+        def device_count() -> int:
+            return 2
+
+        @staticmethod
+        def set_device(device) -> None:
+            assert device == expected_device
+            events.append(("set_device", device))
+
+        @staticmethod
+        def reset_peak_memory_stats(device) -> None:
+            assert device == expected_device
+            events.append(("reset_peak_memory_stats", device))
+
+        @staticmethod
+        def synchronize(device) -> None:
+            assert device == expected_device
+            events.append(("synchronize", device))
+
+        @staticmethod
+        def max_memory_allocated(device) -> int:
+            assert device == expected_device
+            events.append(("max_memory_allocated", device))
+            return 1024**3
+
+        @staticmethod
+        def max_memory_reserved(device) -> int:
+            assert device == expected_device
+            events.append(("max_memory_reserved", device))
+            return 2 * 1024**3
+
+    fake_torch = types.ModuleType("torch")
+    fake_torch.cuda = FakeCuda()
+    fake_torch.device = lambda kind, index: FakeDevice(kind, index)
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setenv("LOCAL_RANK", "1")
+
+    profiler = TorchMemoryProfiler()
+    profiler.start(config)
+    metrics = profiler.stop()
+
+    assert events[0] == ("set_device", expected_device)
+    assert ("reset_peak_memory_stats", expected_device) in events
+    assert metrics["memory_used_gb"] == 1
+    assert metrics["memory_reserved_gb"] == 2
+
+
 def test_fsdp_environment_validation_uses_explicit_cuda_device(monkeypatch) -> None:
     config = load_experiment_config(Path("configs/environment_validation/E004_fsdp_2gpu.json"))
     devices_seen: list[object] = []
@@ -737,6 +805,31 @@ def test_vllm_environment_validation_serves_a_real_request(monkeypatch) -> None:
     assert output.metrics["request_served"] is True
     assert output.metrics["generated_tokens"] == 2
     assert output.metrics["throughput_tokens_sec"] > 0
+
+
+def test_vllm_environment_validation_reports_cuda_wheel_mismatch(monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/environment_validation/E006_vllm_1gpu.json"))
+    real_import = builtins.__import__
+
+    class FakeTorch:
+        version = types.SimpleNamespace(cuda="12.4")
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "vllm":
+            raise ImportError("libcudart.so.13: cannot open shared object file")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(environment_module, "_torch_with_cuda", lambda _: FakeTorch())
+    monkeypatch.setattr(environment_module.importlib.util, "find_spec", lambda name: object())
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        EnvironmentValidationWorkload().run(config)
+
+    message = str(exc_info.value)
+    assert "vLLM import failed before engine startup" in message
+    assert "torch CUDA 12.4" in message
+    assert "libcudart.so.13" in message
 
 
 def test_tensorrt_llm_environment_validation_builds_loads_and_serves(tmp_path: Path, monkeypatch) -> None:

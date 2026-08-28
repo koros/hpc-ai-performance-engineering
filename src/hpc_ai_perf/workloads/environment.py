@@ -168,8 +168,16 @@ class EnvironmentValidationWorkload(Workload):
         torch = _torch_with_cuda(config)
         if importlib.util.find_spec("vllm") is None:
             raise RuntimeError("vLLM is not installed")
-        import vllm
-        from vllm import LLM, SamplingParams
+        try:
+            import vllm
+            from vllm import LLM, SamplingParams
+        except (ImportError, OSError) as exc:
+            torch_cuda = getattr(getattr(torch, "version", None), "cuda", "unknown")
+            raise RuntimeError(
+                "vLLM import failed before engine startup; the installed vLLM wheel is likely incompatible with "
+                f"the active CUDA/PyTorch runtime (torch CUDA {torch_cuda}). Reinstall or build vLLM for the "
+                f"cluster CUDA/driver stack. Original import error: {exc}"
+            ) from exc
 
         parameters = config.workload.parameters
         model_name = str(parameters["hf_model_name"])

@@ -51,8 +51,12 @@ node returns.
 1. Install the workload extra on the cluster:
 
    ```bash
-   python -m pip install -e ".[dev,yaml,workloads,distributed,serving]"
+   python -m pip install -e ".[dev,yaml,workloads,distributed]"
    ```
+
+   Install vLLM separately for the active CUDA/PyTorch module stack before E006 or any later vLLM row. A wheel built
+   against another CUDA runtime, such as one expecting `libcudart.so.13` while the active PyTorch reports CUDA 12.x,
+   must be replaced with a site-compatible vLLM install.
 
 2. Validate the active profile and render the selected platform wave:
 

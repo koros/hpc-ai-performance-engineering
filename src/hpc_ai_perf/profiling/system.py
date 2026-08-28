@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import threading
@@ -50,9 +51,15 @@ class TorchMemoryProfiler(Profiler):
             raise RuntimeError("torch_memory profiling requires PyTorch") from exc
         if not torch.cuda.is_available():
             raise RuntimeError("torch_memory profiling requires CUDA")
-        local_rank = int(__import__("os").environ.get("LOCAL_RANK", "0"))
+        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
         self._torch = torch
         self._device = torch.device("cuda", local_rank)
+        if local_rank >= torch.cuda.device_count():
+            raise RuntimeError(
+                f"torch_memory profiling requested LOCAL_RANK={local_rank}, "
+                f"but only {torch.cuda.device_count()} CUDA device(s) are visible"
+            )
+        torch.cuda.set_device(self._device)
         torch.cuda.reset_peak_memory_stats(self._device)
         torch.cuda.synchronize(self._device)
 

@@ -12,8 +12,12 @@ git pull
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e ".[dev,yaml,workloads,distributed,serving]"
+python -m pip install -e ".[dev,yaml,workloads,distributed]"
 ```
+
+Install vLLM separately for the active cluster CUDA/PyTorch stack before running E006 or later vLLM experiments. Do not
+treat a generic latest PyPI vLLM wheel as portable across CUDA runtimes; if `import vllm` fails with a missing
+`libcudart.so.13` while PyTorch reports CUDA 12.x, uninstall that wheel and install or build a site-compatible vLLM.
 
 The Slurm scripts assume jobs are submitted from the project root. Load the required cluster modules for CUDA, Python, and PyTorch before activating the project virtual environment. On Lovelace, the project helper can be used:
 
