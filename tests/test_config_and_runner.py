@@ -483,6 +483,220 @@ def test_transformer_workload_skeleton_fails_gracefully() -> None:
     assert "optional dependencies" in result.error
 
 
+def test_fsdp_environment_validation_uses_explicit_cuda_device(monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/environment_validation/E004_fsdp_2gpu.json"))
+    devices_seen: list[object] = []
+
+    class FakeDevice:
+        def __init__(self, kind: str, index: int) -> None:
+            self.kind = kind
+            self.index = index
+
+        def __eq__(self, other: object) -> bool:
+            return isinstance(other, FakeDevice) and (self.kind, self.index) == (other.kind, other.index)
+
+    expected_device = FakeDevice("cuda", 1)
+
+    class FakeTensor:
+        def backward(self) -> None:
+            return None
+
+        def detach(self):
+            return self
+
+        def cpu(self):
+            return self
+
+        def __float__(self) -> float:
+            return 0.5
+
+    class FakeModel:
+        def __init__(self) -> None:
+            self.device = None
+
+        def to(self, device):
+            self.device = device
+            devices_seen.append(device)
+            return self
+
+        def parameters(self):
+            return []
+
+        def __call__(self, inputs):
+            return FakeTensor()
+
+    class FakeFSDP(FakeModel):
+        def __init__(self, model, *, device_id, use_orig_params) -> None:
+            super().__init__()
+            assert model.device == expected_device
+            assert device_id == expected_device
+            assert use_orig_params is True
+            self.model = model
+
+    class FakeCuda:
+        @staticmethod
+        def reset_peak_memory_stats(device) -> None:
+            assert device == expected_device
+            devices_seen.append(device)
+
+        @staticmethod
+        def synchronize(device) -> None:
+            assert device == expected_device
+            devices_seen.append(device)
+
+        @staticmethod
+        def max_memory_allocated(device) -> int:
+            assert device == expected_device
+            devices_seen.append(device)
+            return 1024**3
+
+    class FakeTorch:
+        cuda = FakeCuda()
+        nn = types.SimpleNamespace(
+            Sequential=lambda *layers: FakeModel(),
+            Linear=lambda *args: object(),
+            ReLU=lambda: object(),
+            functional=types.SimpleNamespace(cross_entropy=lambda output, labels: FakeTensor()),
+        )
+        optim = types.SimpleNamespace(
+            AdamW=lambda parameters, lr: types.SimpleNamespace(
+                zero_grad=lambda set_to_none: None,
+                step=lambda: None,
+            )
+        )
+
+        @staticmethod
+        def device(kind: str, index: int) -> FakeDevice:
+            return FakeDevice(kind, index)
+
+        @staticmethod
+        def randn(*shape, device):
+            assert device == expected_device
+            devices_seen.append(device)
+            return FakeTensor()
+
+        @staticmethod
+        def randint(low: int, high: int, shape, *, device):
+            assert device == expected_device
+            devices_seen.append(device)
+            return FakeTensor()
+
+    fake_fsdp_module = types.ModuleType("torch.distributed.fsdp")
+    fake_fsdp_module.FullyShardedDataParallel = FakeFSDP
+    monkeypatch.setitem(sys.modules, "torch.distributed.fsdp", fake_fsdp_module)
+    monkeypatch.setattr(environment_module, "_torch_with_cuda", lambda _: FakeTorch())
+    monkeypatch.setattr(environment_module, "_init_process_group", lambda torch, config: (object(), 1, 1, 2))
+
+    output = EnvironmentValidationWorkload().run(config)
+
+    assert output.metrics["fsdp_init"] is True
+    assert output.metrics["single_train_step"] is True
+    assert devices_seen
+    assert all(device == expected_device for device in devices_seen)
+
+
+def test_deepspeed_environment_validation_uses_explicit_cuda_device(monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/environment_validation/E005_deepspeed_zero_2gpu.json"))
+    devices_seen: list[object] = []
+
+    class FakeDevice:
+        def __init__(self, kind: str, index: int) -> None:
+            self.kind = kind
+            self.index = index
+
+        def __eq__(self, other: object) -> bool:
+            return isinstance(other, FakeDevice) and (self.kind, self.index) == (other.kind, other.index)
+
+    expected_device = FakeDevice("cuda", 1)
+
+    class FakeTensor:
+        def detach(self):
+            return self
+
+        def cpu(self):
+            return self
+
+        def __float__(self) -> float:
+            return 0.5
+
+    class FakeModel:
+        def __init__(self) -> None:
+            self.device = None
+
+        def to(self, device):
+            self.device = device
+            devices_seen.append(device)
+            return self
+
+        def parameters(self):
+            return []
+
+        def __call__(self, inputs):
+            return FakeTensor()
+
+    class FakeEngine:
+        def __call__(self, inputs):
+            return FakeTensor()
+
+        @staticmethod
+        def backward(loss) -> None:
+            return None
+
+        @staticmethod
+        def step() -> None:
+            return None
+
+    class FakeCuda:
+        @staticmethod
+        def set_device(device) -> None:
+            assert device == expected_device
+            devices_seen.append(device)
+
+    class FakeTorch:
+        cuda = FakeCuda()
+        nn = types.SimpleNamespace(
+            Linear=lambda *args: FakeModel(),
+            functional=types.SimpleNamespace(cross_entropy=lambda output, labels: FakeTensor()),
+        )
+
+        @staticmethod
+        def device(kind: str, index: int) -> FakeDevice:
+            return FakeDevice(kind, index)
+
+        @staticmethod
+        def randn(*shape, device):
+            assert device == expected_device
+            devices_seen.append(device)
+            return FakeTensor()
+
+        @staticmethod
+        def randint(low: int, high: int, shape, *, device):
+            assert device == expected_device
+            devices_seen.append(device)
+            return FakeTensor()
+
+    def fake_deepspeed_initialize(*, model, model_parameters, config):
+        assert model.device == expected_device
+        assert config["zero_optimization"]["stage"] == 2
+        return FakeEngine(), None, None, None
+
+    fake_deepspeed = types.ModuleType("deepspeed")
+    fake_deepspeed.initialize = fake_deepspeed_initialize
+    monkeypatch.setitem(sys.modules, "deepspeed", fake_deepspeed)
+    monkeypatch.setattr(environment_module, "_torch_with_cuda", lambda _: FakeTorch())
+    monkeypatch.setattr(environment_module.importlib.util, "find_spec", lambda name: object())
+    monkeypatch.setenv("LOCAL_RANK", "1")
+    monkeypatch.setenv("RANK", "1")
+    monkeypatch.setenv("WORLD_SIZE", "2")
+
+    output = EnvironmentValidationWorkload().run(config)
+
+    assert output.metrics["zero_init"] is True
+    assert output.metrics["single_train_step"] is True
+    assert devices_seen
+    assert all(device == expected_device for device in devices_seen)
+
+
 def test_vllm_environment_validation_serves_a_real_request(monkeypatch) -> None:
     config = load_experiment_config(Path("configs/environment_validation/E006_vllm_1gpu.json"))
 

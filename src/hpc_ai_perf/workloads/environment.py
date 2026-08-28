@@ -104,24 +104,24 @@ class EnvironmentValidationWorkload(Workload):
         _, rank, local_rank, world_size = _init_process_group(torch, config)
         from torch.distributed.fsdp import FullyShardedDataParallel
 
-        device = torch.device(f"cuda:{local_rank}")
+        device = torch.device("cuda", local_rank)
         model = torch.nn.Sequential(torch.nn.Linear(128, 256), torch.nn.ReLU(), torch.nn.Linear(256, 2)).to(device)
-        model = FullyShardedDataParallel(model, device_id=local_rank, use_orig_params=True)
+        model = FullyShardedDataParallel(model, device_id=device, use_orig_params=True)
         optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
         inputs = torch.randn(8, 128, device=device)
         labels = torch.randint(0, 2, (8,), device=device)
-        torch.cuda.reset_peak_memory_stats(local_rank)
+        torch.cuda.reset_peak_memory_stats(device)
         optimizer.zero_grad(set_to_none=True)
         loss = torch.nn.functional.cross_entropy(model(inputs), labels)
         loss.backward()
         optimizer.step()
-        torch.cuda.synchronize(local_rank)
+        torch.cuda.synchronize(device)
         return {
             "torchrun_launch": world_size > 1,
             "fsdp_init": True,
             "single_train_step": True,
             "loss": float(loss.detach().cpu()),
-            "memory_used_gb": torch.cuda.max_memory_allocated(local_rank) / (1024**3),
+            "memory_used_gb": torch.cuda.max_memory_allocated(device) / (1024**3),
             "world_size": world_size,
             "rank": rank,
         }
@@ -139,16 +139,17 @@ class EnvironmentValidationWorkload(Workload):
         expected = config.distributed.nodes * config.distributed.gpus_per_node
         if world_size != expected:
             raise RuntimeError(f"Expected DeepSpeed world size {expected}, observed {world_size}")
-        torch.cuda.set_device(local_rank)
-        model = torch.nn.Linear(128, 2).to(local_rank)
+        device = torch.device("cuda", local_rank)
+        torch.cuda.set_device(device)
+        model = torch.nn.Linear(128, 2).to(device)
         ds_config = {
             "train_micro_batch_size_per_gpu": 8,
             "zero_optimization": {"stage": 2},
             "bf16": {"enabled": True},
         }
         engine, _, _, _ = deepspeed.initialize(model=model, model_parameters=model.parameters(), config=ds_config)
-        inputs = torch.randn(8, 128, device=local_rank)
-        labels = torch.randint(0, 2, (8,), device=local_rank)
+        inputs = torch.randn(8, 128, device=device)
+        labels = torch.randint(0, 2, (8,), device=device)
         loss = torch.nn.functional.cross_entropy(engine(inputs), labels)
         engine.backward(loss)
         engine.step()
