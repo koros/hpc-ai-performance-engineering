@@ -1,0 +1,161 @@
+{
+  "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E005.json --output-dir build/platform_results/l40s/wave_0",
+  "comparability": "platform_specific",
+  "completed_at": "2026-08-28T21:46:20.572886+00:00",
+  "condition_id": "E005@l40s",
+  "config": {
+    "distributed": {
+      "backend": "nccl",
+      "gpus_per_node": 2,
+      "nodes": 1,
+      "strategy": "deepspeed_zero2"
+    },
+    "experiment": "environment_validation_deepspeed_zero_2gpu",
+    "experiment_id": "E005",
+    "hardware": {
+      "gpu_model": "NVIDIA L40S 48GB",
+      "gpus": 2,
+      "interconnect": "PCIe",
+      "platform": "lovelace_l40s"
+    },
+    "metadata": {
+      "analysis_tasks": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A06",
+        "A07"
+      ],
+      "comparability": "platform_specific",
+      "condition_id": "E005@l40s",
+      "execution_platform": "l40s",
+      "gpu_hours_estimate": 0.5,
+      "key_metrics": [
+        "successful_run",
+        "memory_trace"
+      ],
+      "matrix_id": "E005",
+      "matrix_precision_config": "N/A",
+      "objective": "Confirm DeepSpeed launcher and ZeRO configuration work",
+      "phase": "Environment validation",
+      "platform_wave": "0",
+      "platform_wave_name": "L40S environment gate",
+      "priority": "Should Have",
+      "required_trials": 1,
+      "research_questions": [
+        "RQ1",
+        "RQ2",
+        "RQ3",
+        "RQ4",
+        "RQ5",
+        "RQ6",
+        "RQ7"
+      ],
+      "source_config_path": "configs/environment_validation/E005_deepspeed_zero_2gpu.json",
+      "source_config_sha256": "e02ab71ca2b71d3951bc79c4d216f0f705ea7029312b96137da9badad8b0450a",
+      "strategy_detail": "DeepSpeed ZeRO smoke test",
+      "template": "environment_validation",
+      "unsupported_platform_metrics": [
+        "nvlink_utilization"
+      ]
+    },
+    "mode": "training",
+    "profiling": {
+      "enabled": true,
+      "parameters": {},
+      "profilers": [
+        "nvidia_smi",
+        "torch_memory"
+      ]
+    },
+    "runtime": {
+      "deterministic": false,
+      "max_steps": 1,
+      "output_dir": "results/raw/l40s",
+      "precision": "bf16",
+      "seed": 1337
+    },
+    "workload": {
+      "dataset": null,
+      "model": "all",
+      "model_revision": null,
+      "name": "environment_validation",
+      "parameters": {
+        "expected_checks": [
+          "deepspeed_launch",
+          "zero_init",
+          "single_train_step"
+        ],
+        "expected_gpus": 2,
+        "validation_target": "deepspeed_zero_smoke"
+      }
+    }
+  },
+  "config_sha256": "4727c7fcc1b00f94987e7d8badc1901e15c474c4b43f94d006979ee54c472973",
+  "dataset_revision": null,
+  "environment": {
+    "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E005.json --output-dir build/platform_results/l40s/wave_0",
+    "config_sha256": "4727c7fcc1b00f94987e7d8badc1901e15c474c4b43f94d006979ee54c472973",
+    "cuda_available": true,
+    "cuda_device_count": 2,
+    "cuda_version": "12.4",
+    "cuda_visible_devices": "0,1",
+    "cudnn_version": "8907",
+    "datasets_version": "4.8.5",
+    "deepspeed_version": "0.17.6",
+    "deterministic_algorithms_requested": false,
+    "git_commit": "c2e8ca33b65bfb16a518c52595ed1815d45ac5a3",
+    "git_dirty": false,
+    "gpu_compute_capability": "8.9",
+    "hostname": "research-node-b",
+    "local_rank": 0,
+    "nccl_version": "(2, 27, 7)",
+    "nvidia_driver_version": "550.54.15",
+    "observed_gpu_memory_gb": 44.52056884765625,
+    "observed_gpu_model": "NVIDIA L40S",
+    "observed_gpu_uuid": "GPU-f540d6b8-8532-977d-dc58-d4326945f0aa",
+    "platform": "Linux-4.18.0-553.150.1.el8_10.x86_64-x86_64-with-glibc2.28",
+    "python_version": "3.11.11",
+    "rank": 0,
+    "repetition_number_requested": null,
+    "requested_gpu_model": "NVIDIA L40S 48GB",
+    "requested_platform": "lovelace_l40s",
+    "slurm_array_job_id": null,
+    "slurm_array_task_id": null,
+    "slurm_job_id": "1769316",
+    "torch_version": "2.8.0",
+    "transformers_version": "4.57.6",
+    "vllm_version": "0.23.0",
+    "world_size": 2
+  },
+  "error": "RuntimeError: Invalid device argument ",
+  "experiment": "environment_validation_deepspeed_zero_2gpu",
+  "experiment_id": "E005",
+  "git_commit": "c2e8ca33b65bfb16a518c52595ed1815d45ac5a3",
+  "git_dirty": false,
+  "gpu_utilization": null,
+  "gpus": 2,
+  "latency_p50_ms": null,
+  "latency_p95_ms": null,
+  "measured_iterations": 1,
+  "memory_used_gb": null,
+  "metrics": {},
+  "mode": "training",
+  "model": "all",
+  "model_revision": null,
+  "platform_id": "l40s",
+  "precision": "bf16",
+  "repetition_number": 1,
+  "run_id": "E005-20260828214617581392-r001-af59b518",
+  "runtime_seconds": 2.9914903370663524,
+  "schema_version": "1.3.0",
+  "started_at": "2026-08-28T21:46:17.581392+00:00",
+  "status": "failed",
+  "throughput_samples_sec": null,
+  "throughput_tokens_sec": null,
+  "throughput_unit": null,
+  "warmup_iterations": 0,
+  "workload": "environment_validation"
+}
