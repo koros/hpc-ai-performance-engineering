@@ -1,0 +1,173 @@
+{
+  "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E031.json --repetition 1",
+  "comparability": "exact",
+  "completed_at": "2026-08-28T15:45:19.210403+00:00",
+  "condition_id": "E031@l40s",
+  "config": {
+    "distributed": {
+      "backend": "nccl",
+      "gpus_per_node": 1,
+      "nodes": 1,
+      "strategy": "none"
+    },
+    "experiment": "workload_characterisation_tinyllama_inference",
+    "experiment_id": "E031",
+    "hardware": {
+      "gpu_model": "NVIDIA L40S 48GB",
+      "gpus": 1,
+      "interconnect": "PCIe",
+      "platform": "lovelace_l40s"
+    },
+    "metadata": {
+      "analysis_tasks": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A07"
+      ],
+      "comparability": "exact",
+      "condition_id": "E031@l40s",
+      "execution_platform": "l40s",
+      "gpu_hours_estimate": 0.5,
+      "key_metrics": [
+        "time_to_first_token",
+        "tokens_sec",
+        "memory",
+        "gpu_util"
+      ],
+      "matrix_id": "E031",
+      "objective": "Characterise inference as latency, memory, or compute constrained",
+      "phase": "Workload characterisation",
+      "platform_wave": "1",
+      "platform_wave_name": "L40S core baselines and characterisation",
+      "priority": "Should Have",
+      "required_trials": 3,
+      "research_questions": [
+        "RQ4",
+        "RQ5",
+        "RQ7"
+      ],
+      "source_config_path": "configs/workload_characterisation/E031_tinyllama_inference.json",
+      "source_config_sha256": "2591d2975d6b3127763936e71707edc4f1d668915b71c978d1418e83493c5582",
+      "template": "profiling",
+      "unsupported_platform_metrics": [
+        "nvlink_utilization"
+      ]
+    },
+    "mode": "inference",
+    "profiling": {
+      "enabled": true,
+      "parameters": {
+        "collect_latency_distribution": true
+      },
+      "profilers": [
+        "nvidia_smi",
+        "serving_latency"
+      ]
+    },
+    "runtime": {
+      "deterministic": false,
+      "max_steps": 100,
+      "output_dir": "results/raw/l40s",
+      "precision": "bf16",
+      "seed": 1337
+    },
+    "workload": {
+      "dataset": "synthetic_token_prompts_v1",
+      "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+      "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+      "name": "tinyllama",
+      "parameters": {
+        "batch_size": 1,
+        "framework": "pytorch_eager",
+        "max_new_tokens": 128,
+        "profile_target": "inference",
+        "prompt_length": 128,
+        "stack": "vllm_pytorch_profiler"
+      }
+    }
+  },
+  "config_sha256": "2f65b9d0dd2989a0b848107c3f511bcb7342b174aa74ff6b53569ef0d689201b",
+  "dataset_revision": "synthetic_token_prompts_v1",
+  "environment": {
+    "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E031.json --repetition 1",
+    "config_sha256": "2f65b9d0dd2989a0b848107c3f511bcb7342b174aa74ff6b53569ef0d689201b",
+    "cuda_available": true,
+    "cuda_device_count": 1,
+    "cuda_version": "12.4",
+    "cuda_visible_devices": "0",
+    "cudnn_version": "8907",
+    "datasets_version": "4.8.5",
+    "deepspeed_version": "0.17.6",
+    "deterministic_algorithms_requested": false,
+    "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+    "git_dirty": true,
+    "gpu_compute_capability": "8.9",
+    "hostname": "research-node-b",
+    "local_rank": 0,
+    "nccl_version": "(2, 27, 7)",
+    "nvidia_driver_version": "550.54.15",
+    "observed_gpu_memory_gb": 44.52056884765625,
+    "observed_gpu_model": "NVIDIA L40S",
+    "observed_gpu_uuid": "GPU-ac36d581-05f0-7e43-bfce-23b1a3549d22",
+    "platform": "Linux-4.18.0-553.150.1.el8_10.x86_64-x86_64-with-glibc2.28",
+    "python_version": "3.11.11",
+    "rank": 0,
+    "repetition_number_requested": 1,
+    "requested_gpu_model": "NVIDIA L40S 48GB",
+    "requested_platform": "lovelace_l40s",
+    "slurm_array_job_id": "1768549",
+    "slurm_array_task_id": "1",
+    "slurm_job_id": "1768638",
+    "torch_version": "2.8.0",
+    "transformers_version": "4.57.6",
+    "vllm_version": "0.23.0",
+    "world_size": 1
+  },
+  "error": "ModuleNotFoundError: Could not import module 'LlamaForCausalLM'. Are this object's requirements defined correctly?",
+  "experiment": "workload_characterisation_tinyllama_inference",
+  "experiment_id": "E031",
+  "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+  "git_dirty": true,
+  "gpu_utilization": 0.0,
+  "gpus": 1,
+  "latency_p50_ms": null,
+  "latency_p95_ms": null,
+  "measured_iterations": 100,
+  "memory_used_gb": 0.419921875,
+  "metrics": {
+    "energy_joules_estimate": 500.4060937389196,
+    "gpu_utilization": 0.0,
+    "memory_used_gb": 0.419921875,
+    "nvidia_smi.energy_joules_estimate": 500.4060937389196,
+    "nvidia_smi.gpu_utilization": 0.0,
+    "nvidia_smi.gpu_utilization_max": 0.0,
+    "nvidia_smi.memory_used_gb": 0.419921875,
+    "nvidia_smi.power_draw_max_watts": 82.59,
+    "nvidia_smi.power_draw_watts": 82.03,
+    "nvidia_smi.profiled_gpu_count": 1,
+    "nvidia_smi.samples": 7,
+    "nvidia_smi.sm_clock_mean_mhz": 2520.0,
+    "nvidia_smi.temperature_max_c": 27.0,
+    "power_draw_watts": 82.03,
+    "serving_latency.collector_active": true
+  },
+  "mode": "inference",
+  "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+  "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+  "platform_id": "l40s",
+  "precision": "bf16",
+  "repetition_number": 1,
+  "run_id": "E031-20260828154513107225-r001-91ab4495",
+  "runtime_seconds": 6.103165725013241,
+  "schema_version": "1.3.0",
+  "started_at": "2026-08-28T15:45:13.107225+00:00",
+  "status": "failed",
+  "throughput_samples_sec": null,
+  "throughput_tokens_sec": null,
+  "throughput_unit": "generated_tokens_per_second",
+  "warmup_iterations": 5,
+  "workload": "tinyllama"
+}

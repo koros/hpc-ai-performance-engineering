@@ -1,0 +1,160 @@
+{
+  "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E004.json",
+  "comparability": "platform_specific",
+  "completed_at": "2026-08-28T15:31:39.768677+00:00",
+  "condition_id": "E004@l40s",
+  "config": {
+    "distributed": {
+      "backend": "nccl",
+      "gpus_per_node": 2,
+      "nodes": 1,
+      "strategy": "fsdp"
+    },
+    "experiment": "environment_validation_fsdp_2gpu",
+    "experiment_id": "E004",
+    "hardware": {
+      "gpu_model": "NVIDIA L40S 48GB",
+      "gpus": 2,
+      "interconnect": "PCIe",
+      "platform": "lovelace_l40s"
+    },
+    "metadata": {
+      "analysis_tasks": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A06",
+        "A07"
+      ],
+      "comparability": "platform_specific",
+      "condition_id": "E004@l40s",
+      "execution_platform": "l40s",
+      "gpu_hours_estimate": 0.5,
+      "key_metrics": [
+        "successful_run",
+        "memory_trace"
+      ],
+      "matrix_id": "E004",
+      "matrix_precision_config": "N/A",
+      "objective": "Confirm FSDP script executes correctly on two GPUs",
+      "phase": "Environment validation",
+      "platform_wave": "0",
+      "platform_wave_name": "L40S environment gate",
+      "priority": "Must Have",
+      "required_trials": 1,
+      "research_questions": [
+        "RQ1",
+        "RQ2",
+        "RQ3",
+        "RQ4",
+        "RQ5",
+        "RQ6",
+        "RQ7"
+      ],
+      "source_config_path": "configs/environment_validation/E004_fsdp_2gpu.json",
+      "source_config_sha256": "0da4dd887ac49ff23cb991843885bd52db1557d4e4a6d95567ba9c9dd78f68dd",
+      "template": "environment_validation",
+      "unsupported_platform_metrics": [
+        "nvlink_utilization"
+      ]
+    },
+    "mode": "training",
+    "profiling": {
+      "enabled": true,
+      "parameters": {},
+      "profilers": [
+        "nvidia_smi",
+        "torch_memory"
+      ]
+    },
+    "runtime": {
+      "deterministic": false,
+      "max_steps": 1,
+      "output_dir": "results/raw/l40s",
+      "precision": "bf16",
+      "seed": 1337
+    },
+    "workload": {
+      "dataset": null,
+      "model": "all",
+      "model_revision": null,
+      "name": "environment_validation",
+      "parameters": {
+        "expected_checks": [
+          "torchrun_launch",
+          "fsdp_init",
+          "single_train_step"
+        ],
+        "expected_gpus": 2,
+        "validation_target": "fsdp_smoke"
+      }
+    }
+  },
+  "config_sha256": "8c999c1a2f1026569941121b96f8f65476e86b2308364bd2002e011d0d596998",
+  "dataset_revision": null,
+  "environment": {
+    "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E004.json",
+    "config_sha256": "8c999c1a2f1026569941121b96f8f65476e86b2308364bd2002e011d0d596998",
+    "cuda_available": true,
+    "cuda_device_count": 2,
+    "cuda_version": "12.4",
+    "cuda_visible_devices": "0,1",
+    "cudnn_version": "8907",
+    "datasets_version": "4.8.5",
+    "deepspeed_version": "0.17.6",
+    "deterministic_algorithms_requested": false,
+    "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+    "git_dirty": true,
+    "gpu_compute_capability": "8.9",
+    "hostname": "research-node-b",
+    "local_rank": 0,
+    "nccl_version": "(2, 27, 7)",
+    "nvidia_driver_version": "550.54.15",
+    "observed_gpu_memory_gb": 44.52056884765625,
+    "observed_gpu_model": "NVIDIA L40S",
+    "observed_gpu_uuid": "GPU-ac36d581-05f0-7e43-bfce-23b1a3549d22",
+    "platform": "Linux-4.18.0-553.150.1.el8_10.x86_64-x86_64-with-glibc2.28",
+    "python_version": "3.11.11",
+    "rank": 0,
+    "repetition_number_requested": null,
+    "requested_gpu_model": "NVIDIA L40S 48GB",
+    "requested_platform": "lovelace_l40s",
+    "slurm_array_job_id": null,
+    "slurm_array_task_id": null,
+    "slurm_job_id": "1768523",
+    "torch_version": "2.8.0",
+    "transformers_version": "4.57.6",
+    "vllm_version": "0.23.0",
+    "world_size": 2
+  },
+  "error": "RuntimeError: Invalid device argument ",
+  "experiment": "environment_validation_fsdp_2gpu",
+  "experiment_id": "E004",
+  "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+  "git_dirty": true,
+  "gpu_utilization": null,
+  "gpus": 2,
+  "latency_p50_ms": null,
+  "latency_p95_ms": null,
+  "measured_iterations": 1,
+  "memory_used_gb": null,
+  "metrics": {},
+  "mode": "training",
+  "model": "all",
+  "model_revision": null,
+  "platform_id": "l40s",
+  "precision": "bf16",
+  "repetition_number": 1,
+  "run_id": "E004-20260828153136798687-r001-1af66f41",
+  "runtime_seconds": 2.9699750570580363,
+  "schema_version": "1.3.0",
+  "started_at": "2026-08-28T15:31:36.798687+00:00",
+  "status": "failed",
+  "throughput_samples_sec": null,
+  "throughput_tokens_sec": null,
+  "throughput_unit": null,
+  "warmup_iterations": 0,
+  "workload": "environment_validation"
+}

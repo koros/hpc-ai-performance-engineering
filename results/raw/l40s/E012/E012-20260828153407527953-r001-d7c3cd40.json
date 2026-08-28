@@ -1,0 +1,169 @@
+{
+  "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E012.json --repetition 1",
+  "comparability": "exact",
+  "completed_at": "2026-08-28T15:34:13.837872+00:00",
+  "condition_id": "E012@l40s",
+  "config": {
+    "distributed": {
+      "backend": "nccl",
+      "gpus_per_node": 1,
+      "nodes": 1,
+      "strategy": "none"
+    },
+    "experiment": "baseline_profiling_distilbert_training",
+    "experiment_id": "E012",
+    "hardware": {
+      "gpu_model": "NVIDIA L40S 48GB",
+      "gpus": 1,
+      "interconnect": "PCIe",
+      "platform": "lovelace_l40s"
+    },
+    "metadata": {
+      "analysis_tasks": [
+        "A01",
+        "A02",
+        "A04",
+        "A05",
+        "A07"
+      ],
+      "comparability": "exact",
+      "condition_id": "E012@l40s",
+      "execution_platform": "l40s",
+      "gpu_hours_estimate": 1.0,
+      "key_metrics": [
+        "throughput",
+        "runtime",
+        "memory",
+        "loss",
+        "gpu_util",
+        "gpu_hours"
+      ],
+      "matrix_id": "E012",
+      "objective": "Establish single-GPU training baseline for encoder",
+      "phase": "Baseline profiling",
+      "platform_wave": "1",
+      "platform_wave_name": "L40S core baselines and characterisation",
+      "priority": "Must Have",
+      "required_trials": 3,
+      "research_questions": [
+        "RQ5",
+        "RQ7"
+      ],
+      "source_config_path": "configs/baseline_profiling/E012_distilbert_training_baseline.json",
+      "source_config_sha256": "95f8f5cf4ee54a9336ab22dd2895e92dde1b2d5908891dc203503953a9c07f0f",
+      "template": "baseline_training",
+      "unsupported_platform_metrics": [
+        "nvlink_utilization"
+      ]
+    },
+    "mode": "training",
+    "profiling": {
+      "enabled": true,
+      "parameters": {},
+      "profilers": [
+        "nvidia_smi"
+      ]
+    },
+    "runtime": {
+      "deterministic": false,
+      "max_steps": 100,
+      "output_dir": "results/raw/l40s",
+      "precision": "bf16",
+      "seed": 1337
+    },
+    "workload": {
+      "dataset": "synthetic_classification_v1",
+      "model": "distilbert-base-uncased",
+      "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+      "name": "distilbert",
+      "parameters": {
+        "baseline_kind": "training",
+        "batch_size": 32,
+        "quality_sanity_check": true,
+        "repeat_index": 1,
+        "sequence_length": 512,
+        "stack": "pytorch_single_gpu"
+      }
+    }
+  },
+  "config_sha256": "8fe3c8935b4aa5916f801f87e68d8e651017f649b90aeeb468b9a12a1b4bf70d",
+  "dataset_revision": "synthetic_classification_v1",
+  "environment": {
+    "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E012.json --repetition 1",
+    "config_sha256": "8fe3c8935b4aa5916f801f87e68d8e651017f649b90aeeb468b9a12a1b4bf70d",
+    "cuda_available": true,
+    "cuda_device_count": 1,
+    "cuda_version": "12.4",
+    "cuda_visible_devices": "0",
+    "cudnn_version": "8907",
+    "datasets_version": "4.8.5",
+    "deepspeed_version": "0.17.6",
+    "deterministic_algorithms_requested": false,
+    "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+    "git_dirty": true,
+    "gpu_compute_capability": "8.9",
+    "hostname": "research-node-b",
+    "local_rank": 0,
+    "nccl_version": "(2, 27, 7)",
+    "nvidia_driver_version": "550.54.15",
+    "observed_gpu_memory_gb": 44.52056884765625,
+    "observed_gpu_model": "NVIDIA L40S",
+    "observed_gpu_uuid": "GPU-ab71e05a-fc46-b1c7-d904-2cf263148a54",
+    "platform": "Linux-4.18.0-553.150.1.el8_10.x86_64-x86_64-with-glibc2.28",
+    "python_version": "3.11.11",
+    "rank": 0,
+    "repetition_number_requested": 1,
+    "requested_gpu_model": "NVIDIA L40S 48GB",
+    "requested_platform": "lovelace_l40s",
+    "slurm_array_job_id": "1768532",
+    "slurm_array_task_id": "1",
+    "slurm_job_id": "1768599",
+    "torch_version": "2.8.0",
+    "transformers_version": "4.57.6",
+    "vllm_version": "0.23.0",
+    "world_size": 1
+  },
+  "error": "ModuleNotFoundError: Could not import module 'DistilBertForSequenceClassification'. Are this object's requirements defined correctly?",
+  "experiment": "baseline_profiling_distilbert_training",
+  "experiment_id": "E012",
+  "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+  "git_dirty": true,
+  "gpu_utilization": 0.2,
+  "gpus": 1,
+  "latency_p50_ms": null,
+  "latency_p95_ms": null,
+  "measured_iterations": 100,
+  "memory_used_gb": 0.419921875,
+  "metrics": {
+    "energy_joules_estimate": 489.09787029972864,
+    "gpu_utilization": 0.2,
+    "memory_used_gb": 0.419921875,
+    "nvidia_smi.energy_joules_estimate": 489.09787029972864,
+    "nvidia_smi.gpu_utilization": 0.2,
+    "nvidia_smi.gpu_utilization_max": 1.0,
+    "nvidia_smi.memory_used_gb": 0.419921875,
+    "nvidia_smi.power_draw_max_watts": 77.73,
+    "nvidia_smi.power_draw_watts": 77.57600000000001,
+    "nvidia_smi.profiled_gpu_count": 1,
+    "nvidia_smi.samples": 5,
+    "nvidia_smi.sm_clock_mean_mhz": 2520.0,
+    "nvidia_smi.temperature_max_c": 28.0,
+    "power_draw_watts": 77.57600000000001
+  },
+  "mode": "training",
+  "model": "distilbert-base-uncased",
+  "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+  "platform_id": "l40s",
+  "precision": "bf16",
+  "repetition_number": 1,
+  "run_id": "E012-20260828153407527953-r001-d7c3cd40",
+  "runtime_seconds": 6.309905987931415,
+  "schema_version": "1.3.0",
+  "started_at": "2026-08-28T15:34:07.527953+00:00",
+  "status": "failed",
+  "throughput_samples_sec": null,
+  "throughput_tokens_sec": null,
+  "throughput_unit": "training_tokens_per_second",
+  "warmup_iterations": 5,
+  "workload": "distilbert"
+}

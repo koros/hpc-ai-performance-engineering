@@ -1,0 +1,146 @@
+{
+  "command": "./src/hpc_ai_perf/cli.py run --config configs/environment_validation/E004_fsdp_2gpu.json",
+  "completed_at": "2026-08-19T01:55:11.873988+00:00",
+  "config": {
+    "distributed": {
+      "backend": "nccl",
+      "gpus_per_node": 2,
+      "nodes": 1,
+      "strategy": "fsdp"
+    },
+    "experiment": "environment_validation_fsdp_2gpu",
+    "experiment_id": "E004",
+    "hardware": {
+      "gpu_model": "NVIDIA H100 SXM 80GB",
+      "gpus": 2,
+      "interconnect": "NVLink",
+      "platform": "lovelace_h100"
+    },
+    "metadata": {
+      "analysis_tasks": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A06",
+        "A07"
+      ],
+      "gpu_hours_estimate": 0.5,
+      "key_metrics": [
+        "successful_run",
+        "memory_trace"
+      ],
+      "matrix_id": "E004",
+      "matrix_precision_config": "N/A",
+      "objective": "Confirm FSDP script executes correctly on two GPUs",
+      "phase": "Environment validation",
+      "priority": "Must Have",
+      "research_questions": [
+        "RQ1",
+        "RQ2",
+        "RQ3",
+        "RQ4",
+        "RQ5",
+        "RQ6",
+        "RQ7"
+      ],
+      "template": "environment_validation"
+    },
+    "mode": "training",
+    "profiling": {
+      "enabled": true,
+      "parameters": {},
+      "profilers": [
+        "nvidia_smi",
+        "torch_memory"
+      ]
+    },
+    "runtime": {
+      "deterministic": false,
+      "max_steps": 1,
+      "output_dir": "results/raw",
+      "precision": "bf16",
+      "seed": 1337
+    },
+    "workload": {
+      "dataset": null,
+      "model": "all",
+      "model_revision": null,
+      "name": "environment_validation",
+      "parameters": {
+        "expected_checks": [
+          "torchrun_launch",
+          "fsdp_init",
+          "single_train_step"
+        ],
+        "expected_gpus": 2,
+        "validation_target": "fsdp_smoke"
+      }
+    }
+  },
+  "config_sha256": "0c7c4000014c453882f7ac20d12ac1b2f918072dc79f0bffc7d728d7bb7faea6",
+  "dataset_revision": null,
+  "environment": {
+    "command": "./src/hpc_ai_perf/cli.py run --config configs/environment_validation/E004_fsdp_2gpu.json",
+    "config_sha256": "0c7c4000014c453882f7ac20d12ac1b2f918072dc79f0bffc7d728d7bb7faea6",
+    "cuda_available": true,
+    "cuda_device_count": 2,
+    "cuda_version": "12.4",
+    "cuda_visible_devices": "0,1",
+    "cudnn_version": "8907",
+    "datasets_version": "4.8.5",
+    "deepspeed_version": "0.17.6",
+    "deterministic_algorithms_requested": false,
+    "git_commit": "f086942d032643254e86ce3c3385a3619affdfff",
+    "git_dirty": false,
+    "gpu_compute_capability": "8.9",
+    "hostname": "research-node-b",
+    "local_rank": 0,
+    "nccl_version": "(2, 27, 7)",
+    "nvidia_driver_version": "550.54.15",
+    "observed_gpu_memory_gb": 44.52056884765625,
+    "observed_gpu_model": "NVIDIA L40S",
+    "observed_gpu_uuid": "GPU-ab71e05a-fc46-b1c7-d904-2cf263148a54",
+    "platform": "Linux-4.18.0-553.150.1.el8_10.x86_64-x86_64-with-glibc2.28",
+    "python_version": "3.11.11",
+    "rank": 0,
+    "repetition_number_requested": null,
+    "requested_gpu_model": "NVIDIA H100 SXM 80GB",
+    "requested_platform": "lovelace_h100",
+    "slurm_array_job_id": null,
+    "slurm_array_task_id": null,
+    "slurm_job_id": "1763517",
+    "torch_version": "2.8.0",
+    "transformers_version": "4.57.6",
+    "vllm_version": "0.23.0",
+    "world_size": 2
+  },
+  "error": "RuntimeError: Invalid device argument ",
+  "experiment": "environment_validation_fsdp_2gpu",
+  "experiment_id": "E004",
+  "git_commit": "f086942d032643254e86ce3c3385a3619affdfff",
+  "git_dirty": false,
+  "gpu_utilization": null,
+  "gpus": 2,
+  "latency_p50_ms": null,
+  "latency_p95_ms": null,
+  "measured_iterations": 1,
+  "memory_used_gb": null,
+  "metrics": {},
+  "mode": "training",
+  "model": "all",
+  "model_revision": null,
+  "precision": "bf16",
+  "repetition_number": 1,
+  "run_id": "E004-20260819015508531885-r001-09771e8d",
+  "runtime_seconds": 3.342098450055346,
+  "schema_version": "1.2.0",
+  "started_at": "2026-08-19T01:55:08.531885+00:00",
+  "status": "failed",
+  "throughput_samples_sec": null,
+  "throughput_tokens_sec": null,
+  "throughput_unit": null,
+  "warmup_iterations": 0,
+  "workload": "environment_validation"
+}

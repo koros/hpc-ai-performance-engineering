@@ -1,0 +1,172 @@
+{
+  "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E020.json --repetition 2",
+  "comparability": "exact",
+  "completed_at": "2026-08-28T15:38:33.257681+00:00",
+  "condition_id": "E020@l40s",
+  "config": {
+    "distributed": {
+      "backend": "nccl",
+      "gpus_per_node": 1,
+      "nodes": 1,
+      "strategy": "none"
+    },
+    "experiment": "workload_characterisation_gpt2_small_compute",
+    "experiment_id": "E020",
+    "hardware": {
+      "gpu_model": "NVIDIA L40S 48GB",
+      "gpus": 1,
+      "interconnect": "PCIe",
+      "platform": "lovelace_l40s"
+    },
+    "metadata": {
+      "analysis_tasks": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A07"
+      ],
+      "comparability": "exact",
+      "condition_id": "E020@l40s",
+      "execution_platform": "l40s",
+      "gpu_hours_estimate": 0.7,
+      "key_metrics": [
+        "gpu_util",
+        "sm_occupancy_proxy",
+        "kernel_time"
+      ],
+      "matrix_id": "E020",
+      "objective": "Identify compute intensity and kernel utilisation",
+      "phase": "Workload characterisation",
+      "platform_wave": "1",
+      "platform_wave_name": "L40S core baselines and characterisation",
+      "priority": "Must Have",
+      "required_trials": 3,
+      "research_questions": [
+        "RQ4",
+        "RQ5",
+        "RQ7"
+      ],
+      "source_config_path": "configs/workload_characterisation/E020_gpt2_small_compute.json",
+      "source_config_sha256": "7484383a3cee2e8db15f759fcef358e3e531ace9cb29ef6719f005530f8b3192",
+      "template": "profiling",
+      "unsupported_platform_metrics": [
+        "nvlink_utilization"
+      ]
+    },
+    "mode": "training",
+    "profiling": {
+      "enabled": true,
+      "parameters": {
+        "schedule": "wait_1_warmup_1_active_3"
+      },
+      "profilers": [
+        "nvidia_smi",
+        "torch_profiler"
+      ]
+    },
+    "runtime": {
+      "deterministic": false,
+      "max_steps": 50,
+      "output_dir": "results/raw/l40s",
+      "precision": "bf16",
+      "seed": 1337
+    },
+    "workload": {
+      "dataset": "synthetic_tokens_v1",
+      "model": "gpt2",
+      "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+      "name": "gpt2_small",
+      "parameters": {
+        "batch_size": 16,
+        "profile_target": "compute",
+        "sequence_length": 1024,
+        "stack": "profiler"
+      }
+    }
+  },
+  "config_sha256": "91918ca4cf154219d53d8f60f6ba33ab8c8153e12e7eebf18cd56f1e00888ee6",
+  "dataset_revision": "synthetic_tokens_v1",
+  "environment": {
+    "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E020.json --repetition 2",
+    "config_sha256": "91918ca4cf154219d53d8f60f6ba33ab8c8153e12e7eebf18cd56f1e00888ee6",
+    "cuda_available": true,
+    "cuda_device_count": 1,
+    "cuda_version": "12.4",
+    "cuda_visible_devices": "0",
+    "cudnn_version": "8907",
+    "datasets_version": "4.8.5",
+    "deepspeed_version": "0.17.6",
+    "deterministic_algorithms_requested": false,
+    "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+    "git_dirty": true,
+    "gpu_compute_capability": "8.9",
+    "hostname": "research-node-b",
+    "local_rank": 0,
+    "nccl_version": "(2, 27, 7)",
+    "nvidia_driver_version": "550.54.15",
+    "observed_gpu_memory_gb": 44.52056884765625,
+    "observed_gpu_model": "NVIDIA L40S",
+    "observed_gpu_uuid": "GPU-f540d6b8-8532-977d-dc58-d4326945f0aa",
+    "platform": "Linux-4.18.0-553.150.1.el8_10.x86_64-x86_64-with-glibc2.28",
+    "python_version": "3.11.11",
+    "rank": 0,
+    "repetition_number_requested": 2,
+    "requested_gpu_model": "NVIDIA L40S 48GB",
+    "requested_platform": "lovelace_l40s",
+    "slurm_array_job_id": "1768538",
+    "slurm_array_task_id": "2",
+    "slurm_job_id": "1768614",
+    "torch_version": "2.8.0",
+    "transformers_version": "4.57.6",
+    "vllm_version": "0.23.0",
+    "world_size": 1
+  },
+  "error": "ModuleNotFoundError: Could not import module 'GPT2LMHeadModel'. Are this object's requirements defined correctly?",
+  "experiment": "workload_characterisation_gpt2_small_compute",
+  "experiment_id": "E020",
+  "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+  "git_dirty": true,
+  "gpu_utilization": 0.0,
+  "gpus": 1,
+  "latency_p50_ms": null,
+  "latency_p95_ms": null,
+  "measured_iterations": 50,
+  "memory_used_gb": 0.017578125,
+  "metrics": {
+    "energy_joules_estimate": 477.6024195302532,
+    "gpu_utilization": 0.0,
+    "memory_used_gb": 0.017578125,
+    "nvidia_smi.energy_joules_estimate": 477.6024195302532,
+    "nvidia_smi.gpu_utilization": 0.0,
+    "nvidia_smi.gpu_utilization_max": 0.0,
+    "nvidia_smi.memory_used_gb": 0.017578125,
+    "nvidia_smi.power_draw_max_watts": 78.69,
+    "nvidia_smi.power_draw_watts": 78.53416666666666,
+    "nvidia_smi.profiled_gpu_count": 1,
+    "nvidia_smi.samples": 12,
+    "nvidia_smi.sm_clock_mean_mhz": 2520.0,
+    "nvidia_smi.temperature_max_c": 27.0,
+    "power_draw_watts": 78.53416666666666,
+    "torch_profiler.self_cpu_time_ms": 3.878106999999378,
+    "torch_profiler.self_cuda_time_ms": 0.0,
+    "torch_profiler.trace_path": "results/raw/l40s/profiler/E020.rank0.json"
+  },
+  "mode": "training",
+  "model": "gpt2",
+  "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+  "platform_id": "l40s",
+  "precision": "bf16",
+  "repetition_number": 2,
+  "run_id": "E020-20260828153827172158-r002-3e46d051",
+  "runtime_seconds": 6.085515804123133,
+  "schema_version": "1.3.0",
+  "started_at": "2026-08-28T15:38:27.172158+00:00",
+  "status": "failed",
+  "throughput_samples_sec": null,
+  "throughput_tokens_sec": null,
+  "throughput_unit": "training_tokens_per_second",
+  "warmup_iterations": 5,
+  "workload": "gpt2_small"
+}

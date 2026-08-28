@@ -1,0 +1,159 @@
+{
+  "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E068.json --repetition 3",
+  "comparability": "exact",
+  "completed_at": "2026-08-28T16:50:08.092822+00:00",
+  "condition_id": "E068@l40s",
+  "config": {
+    "distributed": {
+      "backend": "nccl",
+      "gpus_per_node": 1,
+      "nodes": 1,
+      "strategy": "ddp"
+    },
+    "experiment": "memory_optimisation_gpt2_small_micro_batch_64",
+    "experiment_id": "E068",
+    "hardware": {
+      "gpu_model": "NVIDIA L40S 48GB",
+      "gpus": 1,
+      "interconnect": "PCIe",
+      "platform": "lovelace_l40s"
+    },
+    "metadata": {
+      "analysis_tasks": [
+        "A01",
+        "A03",
+        "A04",
+        "A05",
+        "A07"
+      ],
+      "comparability": "exact",
+      "condition_id": "E068@l40s",
+      "execution_platform": "l40s",
+      "gpu_hours_estimate": 0.6,
+      "key_metrics": [
+        "throughput",
+        "memory",
+        "oom",
+        "loss_stability"
+      ],
+      "matrix_id": "E068",
+      "objective": "Sweep micro-batch size 64",
+      "phase": "Memory optimisation",
+      "platform_wave": "4",
+      "platform_wave_name": "L40S supported precision memory and data",
+      "priority": "Should Have",
+      "required_trials": 3,
+      "research_questions": [
+        "RQ2",
+        "RQ5",
+        "RQ7"
+      ],
+      "source_config_path": "configs/memory_optimisation/E068_gpt2_small_micro_batch_64.json",
+      "source_config_sha256": "22b55a6d2eff388159c82c6ce31be9f331f973ca3375af7919f8f105abc7c584",
+      "template": "memory_optimisation",
+      "unsupported_platform_metrics": [
+        "nvlink_utilization"
+      ]
+    },
+    "mode": "training",
+    "profiling": {
+      "enabled": true,
+      "parameters": {
+        "collect_effective_batch_metrics": false,
+        "collect_memory_trace": true,
+        "collect_oom_risk": true
+      },
+      "profilers": [
+        "nvidia_smi",
+        "torch_memory"
+      ]
+    },
+    "runtime": {
+      "deterministic": false,
+      "max_steps": 100,
+      "output_dir": "results/raw/l40s",
+      "precision": "bf16",
+      "seed": 1337
+    },
+    "workload": {
+      "dataset": "synthetic_tokens_v1",
+      "model": "gpt2",
+      "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+      "name": "gpt2_small",
+      "parameters": {
+        "activation_checkpointing": false,
+        "batch_size": 64,
+        "effective_batch_size": 64,
+        "gradient_accumulation_steps": 1,
+        "memory_study_type": "micro_batch",
+        "micro_batch_size": 64,
+        "sequence_length": 1024
+      }
+    }
+  },
+  "config_sha256": "ea66c38c2cd27cfc542496a6095f39859d21d4ee71ace4ff5d1dc7e93914c4fd",
+  "dataset_revision": "synthetic_tokens_v1",
+  "environment": {
+    "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E068.json --repetition 3",
+    "config_sha256": "ea66c38c2cd27cfc542496a6095f39859d21d4ee71ace4ff5d1dc7e93914c4fd",
+    "cuda_available": true,
+    "cuda_device_count": 1,
+    "cuda_version": "12.4",
+    "cuda_visible_devices": "0",
+    "cudnn_version": "8907",
+    "datasets_version": "4.8.5",
+    "deepspeed_version": "0.17.6",
+    "deterministic_algorithms_requested": false,
+    "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+    "git_dirty": true,
+    "gpu_compute_capability": "8.9",
+    "hostname": "research-node-b",
+    "local_rank": 0,
+    "nccl_version": "(2, 27, 7)",
+    "nvidia_driver_version": "550.54.15",
+    "observed_gpu_memory_gb": 44.52056884765625,
+    "observed_gpu_model": "NVIDIA L40S",
+    "observed_gpu_uuid": "GPU-ab71e05a-fc46-b1c7-d904-2cf263148a54",
+    "platform": "Linux-4.18.0-553.150.1.el8_10.x86_64-x86_64-with-glibc2.28",
+    "python_version": "3.11.11",
+    "rank": 0,
+    "repetition_number_requested": 3,
+    "requested_gpu_model": "NVIDIA L40S 48GB",
+    "requested_platform": "lovelace_l40s",
+    "slurm_array_job_id": "1768693",
+    "slurm_array_task_id": "3",
+    "slurm_job_id": "1768693",
+    "torch_version": "2.8.0",
+    "transformers_version": "4.57.6",
+    "vllm_version": "0.23.0",
+    "world_size": 1
+  },
+  "error": "RuntimeError: Invalid device argument ",
+  "experiment": "memory_optimisation_gpt2_small_micro_batch_64",
+  "experiment_id": "E068",
+  "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+  "git_dirty": true,
+  "gpu_utilization": null,
+  "gpus": 1,
+  "latency_p50_ms": null,
+  "latency_p95_ms": null,
+  "measured_iterations": 100,
+  "memory_used_gb": null,
+  "metrics": {},
+  "mode": "training",
+  "model": "gpt2",
+  "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+  "platform_id": "l40s",
+  "precision": "bf16",
+  "repetition_number": 3,
+  "run_id": "E068-20260828165004737614-r003-7c011dfb",
+  "runtime_seconds": 3.3552008289843798,
+  "schema_version": "1.3.0",
+  "started_at": "2026-08-28T16:50:04.737614+00:00",
+  "status": "failed",
+  "throughput_samples_sec": null,
+  "throughput_tokens_sec": null,
+  "throughput_unit": "training_tokens_per_second",
+  "warmup_iterations": 5,
+  "workload": "gpt2_small"
+}

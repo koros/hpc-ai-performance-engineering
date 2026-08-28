@@ -1,0 +1,159 @@
+{
+  "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E082.json --repetition 3",
+  "comparability": "exact",
+  "completed_at": "2026-08-28T17:04:57.481703+00:00",
+  "condition_id": "E082@l40s",
+  "config": {
+    "distributed": {
+      "backend": "nccl",
+      "gpus_per_node": 2,
+      "nodes": 1,
+      "strategy": "ddp"
+    },
+    "experiment": "memory_optimisation_distilbert_grad_accum_8",
+    "experiment_id": "E082",
+    "hardware": {
+      "gpu_model": "NVIDIA L40S 48GB",
+      "gpus": 2,
+      "interconnect": "PCIe",
+      "platform": "lovelace_l40s"
+    },
+    "metadata": {
+      "analysis_tasks": [
+        "A01",
+        "A03",
+        "A04",
+        "A05",
+        "A07"
+      ],
+      "comparability": "exact",
+      "condition_id": "E082@l40s",
+      "execution_platform": "l40s",
+      "gpu_hours_estimate": 0.7,
+      "key_metrics": [
+        "effective_batch",
+        "throughput",
+        "memory",
+        "stability"
+      ],
+      "matrix_id": "E082",
+      "objective": "Gradient accumulation steps 8",
+      "phase": "Memory optimisation",
+      "platform_wave": "4",
+      "platform_wave_name": "L40S supported precision memory and data",
+      "priority": "Optional",
+      "required_trials": 3,
+      "research_questions": [
+        "RQ2",
+        "RQ5",
+        "RQ7"
+      ],
+      "source_config_path": "configs/memory_optimisation/E082_distilbert_grad_accum_8.json",
+      "source_config_sha256": "63f11d0e9cbf96183a9244462d5dc3496e6682fb02d26234b220cfb184aca0e4",
+      "template": "memory_optimisation",
+      "unsupported_platform_metrics": [
+        "nvlink_utilization"
+      ]
+    },
+    "mode": "training",
+    "profiling": {
+      "enabled": true,
+      "parameters": {
+        "collect_effective_batch_metrics": true,
+        "collect_memory_trace": true,
+        "collect_oom_risk": false
+      },
+      "profilers": [
+        "nvidia_smi",
+        "torch_memory"
+      ]
+    },
+    "runtime": {
+      "deterministic": false,
+      "max_steps": 100,
+      "output_dir": "results/raw/l40s",
+      "precision": "bf16",
+      "seed": 1337
+    },
+    "workload": {
+      "dataset": "synthetic_classification_v1",
+      "model": "distilbert-base-uncased",
+      "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+      "name": "distilbert",
+      "parameters": {
+        "activation_checkpointing": false,
+        "batch_size": 32,
+        "effective_batch_size": 512,
+        "gradient_accumulation_steps": 8,
+        "memory_study_type": "gradient_accumulation",
+        "micro_batch_size": 32,
+        "sequence_length": 512
+      }
+    }
+  },
+  "config_sha256": "5948a901890ea613b5e495b07fcfdd864d7d057eb5f21b1d10599e705bd1a42d",
+  "dataset_revision": "synthetic_classification_v1",
+  "environment": {
+    "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E082.json --repetition 3",
+    "config_sha256": "5948a901890ea613b5e495b07fcfdd864d7d057eb5f21b1d10599e705bd1a42d",
+    "cuda_available": true,
+    "cuda_device_count": 2,
+    "cuda_version": "12.4",
+    "cuda_visible_devices": "0,1",
+    "cudnn_version": "8907",
+    "datasets_version": "4.8.5",
+    "deepspeed_version": "0.17.6",
+    "deterministic_algorithms_requested": false,
+    "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+    "git_dirty": true,
+    "gpu_compute_capability": "8.9",
+    "hostname": "research-node-b",
+    "local_rank": 0,
+    "nccl_version": "(2, 27, 7)",
+    "nvidia_driver_version": "550.54.15",
+    "observed_gpu_memory_gb": 44.52056884765625,
+    "observed_gpu_model": "NVIDIA L40S",
+    "observed_gpu_uuid": "GPU-f540d6b8-8532-977d-dc58-d4326945f0aa",
+    "platform": "Linux-4.18.0-553.150.1.el8_10.x86_64-x86_64-with-glibc2.28",
+    "python_version": "3.11.11",
+    "rank": 0,
+    "repetition_number_requested": 3,
+    "requested_gpu_model": "NVIDIA L40S 48GB",
+    "requested_platform": "lovelace_l40s",
+    "slurm_array_job_id": "1768707",
+    "slurm_array_task_id": "3",
+    "slurm_job_id": "1768707",
+    "torch_version": "2.8.0",
+    "transformers_version": "4.57.6",
+    "vllm_version": "0.23.0",
+    "world_size": 2
+  },
+  "error": "RuntimeError: Invalid device argument ",
+  "experiment": "memory_optimisation_distilbert_grad_accum_8",
+  "experiment_id": "E082",
+  "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+  "git_dirty": true,
+  "gpu_utilization": null,
+  "gpus": 2,
+  "latency_p50_ms": null,
+  "latency_p95_ms": null,
+  "measured_iterations": 100,
+  "memory_used_gb": null,
+  "metrics": {},
+  "mode": "training",
+  "model": "distilbert-base-uncased",
+  "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+  "platform_id": "l40s",
+  "precision": "bf16",
+  "repetition_number": 3,
+  "run_id": "E082-20260828170455342730-r003-b827108e",
+  "runtime_seconds": 2.138963167089969,
+  "schema_version": "1.3.0",
+  "started_at": "2026-08-28T17:04:55.342730+00:00",
+  "status": "failed",
+  "throughput_samples_sec": null,
+  "throughput_tokens_sec": null,
+  "throughput_unit": "training_tokens_per_second",
+  "warmup_iterations": 5,
+  "workload": "distilbert"
+}

@@ -1,0 +1,176 @@
+{
+  "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E088.json --repetition 1",
+  "comparability": "exact",
+  "completed_at": "2026-08-28T17:08:21.039574+00:00",
+  "condition_id": "E088@l40s",
+  "config": {
+    "distributed": {
+      "backend": "nccl",
+      "gpus_per_node": 1,
+      "nodes": 1,
+      "strategy": "none"
+    },
+    "experiment": "precision_study_gpt2_small_inference_bf16",
+    "experiment_id": "E088",
+    "hardware": {
+      "gpu_model": "NVIDIA L40S 48GB",
+      "gpus": 1,
+      "interconnect": "PCIe",
+      "platform": "lovelace_l40s"
+    },
+    "metadata": {
+      "analysis_tasks": [
+        "A01",
+        "A02",
+        "A04",
+        "A05",
+        "A07"
+      ],
+      "comparability": "exact",
+      "condition_id": "E088@l40s",
+      "execution_platform": "l40s",
+      "gpu_hours_estimate": 0.5,
+      "key_metrics": [
+        "tokens_sec",
+        "time_to_first_token",
+        "p95_latency",
+        "memory",
+        "power"
+      ],
+      "matrix_id": "E088",
+      "matrix_precision_config": "BF16",
+      "objective": "Compare inference precision BF16",
+      "phase": "Precision study",
+      "platform_wave": "4",
+      "platform_wave_name": "L40S supported precision memory and data",
+      "priority": "Must Have",
+      "required_trials": 3,
+      "research_questions": [
+        "RQ3",
+        "RQ5",
+        "RQ7"
+      ],
+      "source_config_path": "configs/precision_studies/E088_gpt2_small_inference_bf16.json",
+      "source_config_sha256": "8f1986246d545fcda2dd633539b97cc0ffc76ef29ec17155563d1b073c43a790",
+      "template": "precision_study",
+      "unsupported_platform_metrics": [
+        "nvlink_utilization"
+      ]
+    },
+    "mode": "inference",
+    "profiling": {
+      "enabled": true,
+      "parameters": {
+        "collect_latency_distribution": true,
+        "collect_memory_trace": true,
+        "collect_power": true
+      },
+      "profilers": [
+        "nvidia_smi",
+        "serving_latency"
+      ]
+    },
+    "runtime": {
+      "deterministic": false,
+      "max_steps": 100,
+      "output_dir": "results/raw/l40s",
+      "precision": "bf16",
+      "seed": 1337
+    },
+    "workload": {
+      "dataset": "synthetic_token_prompts_v1",
+      "model": "gpt2",
+      "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+      "name": "gpt2_small",
+      "parameters": {
+        "batch_size": 1,
+        "framework": "pytorch_eager",
+        "max_new_tokens": 128,
+        "precision_label": "BF16",
+        "prompt_length": 128,
+        "quality_sanity_check": true
+      }
+    }
+  },
+  "config_sha256": "7a28de366e0f715faf585d0ee595aae11c7da4987a855f0e44be853a77485c0c",
+  "dataset_revision": "synthetic_token_prompts_v1",
+  "environment": {
+    "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E088.json --repetition 1",
+    "config_sha256": "7a28de366e0f715faf585d0ee595aae11c7da4987a855f0e44be853a77485c0c",
+    "cuda_available": true,
+    "cuda_device_count": 1,
+    "cuda_version": "12.4",
+    "cuda_visible_devices": "0",
+    "cudnn_version": "8907",
+    "datasets_version": "4.8.5",
+    "deepspeed_version": "0.17.6",
+    "deterministic_algorithms_requested": false,
+    "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+    "git_dirty": true,
+    "gpu_compute_capability": "8.9",
+    "hostname": "research-node-b",
+    "local_rank": 0,
+    "nccl_version": "(2, 27, 7)",
+    "nvidia_driver_version": "550.54.15",
+    "observed_gpu_memory_gb": 44.52056884765625,
+    "observed_gpu_model": "NVIDIA L40S",
+    "observed_gpu_uuid": "GPU-ac36d581-05f0-7e43-bfce-23b1a3549d22",
+    "platform": "Linux-4.18.0-553.150.1.el8_10.x86_64-x86_64-with-glibc2.28",
+    "python_version": "3.11.11",
+    "rank": 0,
+    "repetition_number_requested": 1,
+    "requested_gpu_model": "NVIDIA L40S 48GB",
+    "requested_platform": "lovelace_l40s",
+    "slurm_array_job_id": "1768712",
+    "slurm_array_task_id": "1",
+    "slurm_job_id": "1768930",
+    "torch_version": "2.8.0",
+    "transformers_version": "4.57.6",
+    "vllm_version": "0.23.0",
+    "world_size": 1
+  },
+  "error": "ModuleNotFoundError: Could not import module 'GPT2LMHeadModel'. Are this object's requirements defined correctly?",
+  "experiment": "precision_study_gpt2_small_inference_bf16",
+  "experiment_id": "E088",
+  "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+  "git_dirty": true,
+  "gpu_utilization": 0.0,
+  "gpus": 1,
+  "latency_p50_ms": null,
+  "latency_p95_ms": null,
+  "measured_iterations": 100,
+  "memory_used_gb": 0.419921875,
+  "metrics": {
+    "energy_joules_estimate": 437.08221918292344,
+    "gpu_utilization": 0.0,
+    "memory_used_gb": 0.419921875,
+    "nvidia_smi.energy_joules_estimate": 437.08221918292344,
+    "nvidia_smi.gpu_utilization": 0.0,
+    "nvidia_smi.gpu_utilization_max": 0.0,
+    "nvidia_smi.memory_used_gb": 0.419921875,
+    "nvidia_smi.power_draw_max_watts": 82.74,
+    "nvidia_smi.power_draw_watts": 82.62,
+    "nvidia_smi.profiled_gpu_count": 1,
+    "nvidia_smi.samples": 3,
+    "nvidia_smi.sm_clock_mean_mhz": 2520.0,
+    "nvidia_smi.temperature_max_c": 27.0,
+    "power_draw_watts": 82.62,
+    "serving_latency.collector_active": true
+  },
+  "mode": "inference",
+  "model": "gpt2",
+  "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+  "platform_id": "l40s",
+  "precision": "bf16",
+  "repetition_number": 1,
+  "run_id": "E088-20260828170815745365-r001-b627faa7",
+  "runtime_seconds": 5.29419982386753,
+  "schema_version": "1.3.0",
+  "started_at": "2026-08-28T17:08:15.745365+00:00",
+  "status": "failed",
+  "throughput_samples_sec": null,
+  "throughput_tokens_sec": null,
+  "throughput_unit": "generated_tokens_per_second",
+  "warmup_iterations": 5,
+  "workload": "gpt2_small"
+}

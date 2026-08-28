@@ -1,0 +1,154 @@
+{
+  "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E029.json --repetition 2",
+  "comparability": "exact",
+  "completed_at": "2026-08-28T15:44:25.130527+00:00",
+  "condition_id": "E029@l40s",
+  "config": {
+    "distributed": {
+      "backend": "nccl",
+      "gpus_per_node": 1,
+      "nodes": 1,
+      "strategy": "none"
+    },
+    "experiment": "workload_characterisation_tinyllama_memory",
+    "experiment_id": "E029",
+    "hardware": {
+      "gpu_model": "NVIDIA L40S 48GB",
+      "gpus": 1,
+      "interconnect": "PCIe",
+      "platform": "lovelace_l40s"
+    },
+    "metadata": {
+      "analysis_tasks": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A07"
+      ],
+      "comparability": "exact",
+      "condition_id": "E029@l40s",
+      "execution_platform": "l40s",
+      "gpu_hours_estimate": 0.7,
+      "key_metrics": [
+        "peak_memory",
+        "allocation_pattern",
+        "oom_risk"
+      ],
+      "matrix_id": "E029",
+      "objective": "Identify memory pressure and peak memory behaviour",
+      "phase": "Workload characterisation",
+      "platform_wave": "1",
+      "platform_wave_name": "L40S core baselines and characterisation",
+      "priority": "Must Have",
+      "required_trials": 3,
+      "research_questions": [
+        "RQ4",
+        "RQ5",
+        "RQ7"
+      ],
+      "source_config_path": "configs/workload_characterisation/E029_tinyllama_memory.json",
+      "source_config_sha256": "6436fe5d67a8fdc6a1485002ea8bf159d01acec780bc4637a0641fa3d6189b77",
+      "template": "profiling",
+      "unsupported_platform_metrics": [
+        "nvlink_utilization"
+      ]
+    },
+    "mode": "training",
+    "profiling": {
+      "enabled": true,
+      "parameters": {
+        "collect_memory_trace": true
+      },
+      "profilers": [
+        "nvidia_smi",
+        "torch_memory"
+      ]
+    },
+    "runtime": {
+      "deterministic": false,
+      "max_steps": 50,
+      "output_dir": "results/raw/l40s",
+      "precision": "bf16",
+      "seed": 1337
+    },
+    "workload": {
+      "dataset": "synthetic_tokens_v1",
+      "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+      "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+      "name": "tinyllama",
+      "parameters": {
+        "batch_size": 4,
+        "profile_target": "memory",
+        "sequence_length": 1024,
+        "stack": "memory_profiler"
+      }
+    }
+  },
+  "config_sha256": "63682ec3a8a3eff11d91139304298378d324a15b59f8c37d95ddc5472b7c1a3a",
+  "dataset_revision": "synthetic_tokens_v1",
+  "environment": {
+    "command": "./src/hpc_ai_perf/cli.py run --config build/platform_configs/l40s/E029.json --repetition 2",
+    "config_sha256": "63682ec3a8a3eff11d91139304298378d324a15b59f8c37d95ddc5472b7c1a3a",
+    "cuda_available": true,
+    "cuda_device_count": 1,
+    "cuda_version": "12.4",
+    "cuda_visible_devices": "0",
+    "cudnn_version": "8907",
+    "datasets_version": "4.8.5",
+    "deepspeed_version": "0.17.6",
+    "deterministic_algorithms_requested": false,
+    "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+    "git_dirty": true,
+    "gpu_compute_capability": "8.9",
+    "hostname": "research-node-b",
+    "local_rank": 0,
+    "nccl_version": "(2, 27, 7)",
+    "nvidia_driver_version": "550.54.15",
+    "observed_gpu_memory_gb": 44.52056884765625,
+    "observed_gpu_model": "NVIDIA L40S",
+    "observed_gpu_uuid": "GPU-6ec1972f-b7cb-267a-4cc1-a316f851d229",
+    "platform": "Linux-4.18.0-553.150.1.el8_10.x86_64-x86_64-with-glibc2.28",
+    "python_version": "3.11.11",
+    "rank": 0,
+    "repetition_number_requested": 2,
+    "requested_gpu_model": "NVIDIA L40S 48GB",
+    "requested_platform": "lovelace_l40s",
+    "slurm_array_job_id": "1768547",
+    "slurm_array_task_id": "2",
+    "slurm_job_id": "1768635",
+    "torch_version": "2.8.0",
+    "transformers_version": "4.57.6",
+    "vllm_version": "0.23.0",
+    "world_size": 1
+  },
+  "error": "RuntimeError: Invalid device argument ",
+  "experiment": "workload_characterisation_tinyllama_memory",
+  "experiment_id": "E029",
+  "git_commit": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+  "git_dirty": true,
+  "gpu_utilization": null,
+  "gpus": 1,
+  "latency_p50_ms": null,
+  "latency_p95_ms": null,
+  "measured_iterations": 50,
+  "memory_used_gb": null,
+  "metrics": {},
+  "mode": "training",
+  "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+  "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+  "platform_id": "l40s",
+  "precision": "bf16",
+  "repetition_number": 2,
+  "run_id": "E029-20260828154423787314-r002-07fa63df",
+  "runtime_seconds": 1.3432020619511604,
+  "schema_version": "1.3.0",
+  "started_at": "2026-08-28T15:44:23.787314+00:00",
+  "status": "failed",
+  "throughput_samples_sec": null,
+  "throughput_tokens_sec": null,
+  "throughput_unit": "training_tokens_per_second",
+  "warmup_iterations": 5,
+  "workload": "tinyllama"
+}
