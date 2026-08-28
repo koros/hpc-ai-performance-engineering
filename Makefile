@@ -6,6 +6,7 @@ PLATFORM_WAVE ?= 0
 PLATFORM_PROFILE ?= platforms/$(PLATFORM).json
 PLATFORM_CONFIG_DIR ?= build/platform_configs/$(PLATFORM)
 PLATFORM_SLURM_DIR ?= slurm/generated/$(PLATFORM)/wave_$(PLATFORM_WAVE)
+PLATFORM_RUN_OUTPUT_DIR ?= build/platform_results/$(PLATFORM)/wave_$(PLATFORM_WAVE)
 PLATFORM_STATUS ?= results/processed/slurm_$(PLATFORM)_wave_$(PLATFORM_WAVE)_status.csv
 
 DEV_CONFIGS := $(sort $(wildcard configs/dev/*.json))
@@ -62,7 +63,7 @@ materialize-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli materialize-platform-configs --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --output-dir $(PLATFORM_CONFIG_DIR)
 
 render-platform-wave:
-	$(PYTHON) -m hpc_ai_perf.cli render-platform-slurm --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --config-output-dir $(PLATFORM_CONFIG_DIR) --output-dir $(PLATFORM_SLURM_DIR) $(SLURM_PROFILE_ARG)
+	$(PYTHON) -m hpc_ai_perf.cli render-platform-slurm --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --config-output-dir $(PLATFORM_CONFIG_DIR) --output-dir $(PLATFORM_SLURM_DIR) --run-output-dir $(PLATFORM_RUN_OUTPUT_DIR) $(SLURM_PROFILE_ARG)
 
 render-l40s-wave:
 	$(MAKE) render-platform-wave PLATFORM=l40s

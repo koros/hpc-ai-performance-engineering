@@ -101,6 +101,8 @@ def main() -> None:
             config_root=args.config_root,
             config_output_dir=args.config_output_dir,
             output_dir=args.output_dir,
+            run_output_dir=args.run_output_dir,
+            log_dir=args.log_dir,
             wave=args.wave,
             experiment_ids=set(args.experiment_id) if args.experiment_id else None,
             profile_path=args.slurm_profile,
@@ -381,6 +383,19 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         default=None,
         help="Slurm script directory; defaults to slurm/generated/<platform>/wave_<wave>.",
+    )
+    platform_slurm_parser.add_argument(
+        "--run-output-dir",
+        default=None,
+        help=(
+            "Directory where generated jobs write result JSON before import; "
+            "defaults to build/platform_results/<platform>/wave_<wave>."
+        ),
+    )
+    platform_slurm_parser.add_argument(
+        "--log-dir",
+        default=None,
+        help="Directory for Slurm stdout/stderr files; defaults to <script-dir>/logs.",
     )
     platform_slurm_parser.add_argument("--slurm-profile", default=None, help="Override the platform Slurm profile.")
     platform_slurm_parser.add_argument("--partition", default=None, help="Override the platform partition.")
@@ -712,6 +727,8 @@ def _render_platform_slurm(
     config_root: str,
     config_output_dir: str | None,
     output_dir: str | None,
+    run_output_dir: str | None,
+    log_dir: str | None,
     wave: str | None,
     experiment_ids: set[str] | None,
     profile_path: str | None,
@@ -739,6 +756,9 @@ def _render_platform_slurm(
     config_paths = materialize_platform_configs(profile, conditions, resolved_dir, config_root=config_root)
     condition_by_id = {condition.matrix_id: condition for condition in conditions}
     slurm_dir = Path(output_dir or f"slurm/generated/{profile.platform_id}/wave_{wave or 'all'}")
+    staged_result_dir = Path(run_output_dir or f"build/platform_results/{profile.platform_id}/wave_{wave or 'all'}")
+    slurm_log_dir = Path(log_dir or slurm_dir / "logs")
+    slurm_log_dir.mkdir(parents=True, exist_ok=True)
     slurm_profile = profile_path or profile.slurm_profile
     slurm_options = _resolve_slurm_options(
         profile_path=slurm_profile,
@@ -770,6 +790,8 @@ def _render_platform_slurm(
             environment=slurm_options["environment"],
             setup_commands=slurm_options["setup_commands"],
             repetitions=condition.required_trials,
+            run_output_dir=staged_result_dir,
+            log_dir=slurm_log_dir,
         )
         script_paths.append(write_slurm_script(script, slurm_dir, config.experiment_id))
     return config_paths, script_paths

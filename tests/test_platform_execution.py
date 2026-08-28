@@ -137,6 +137,8 @@ def test_render_platform_slurm_uses_profile_partition_and_matrix_trials(tmp_path
         config_root="configs",
         config_output_dir=str(config_dir),
         output_dir=str(slurm_dir),
+        run_output_dir=None,
+        log_dir=None,
         wave="1",
         experiment_ids={"E008"},
         profile_path=None,
@@ -154,6 +156,8 @@ def test_render_platform_slurm_uses_profile_partition_and_matrix_trials(tmp_path
     assert "#SBATCH --partition=gpu_l40s" in script
     assert "#SBATCH --array=1-3" in script
     assert "#SBATCH --cpus-per-task=8" in script
+    assert f"#SBATCH --output={slurm_dir / 'logs'}/%x-%A_%a.out" in script
+    assert "--output-dir build/platform_results/l40s/wave_1" in script
     assert "source slurm/modules_for_hpc_ai" in script
     assert f"--config {config_dir / 'E008.json'}" in script
 

@@ -40,8 +40,8 @@ This matrix routes every current `E001-E200` experiment family to Mac M1, L40/L4
 | Platform | Current configs you can run without changing target hardware labels | Important condition |
 | --- | --- | --- |
 | Mac M1 | `configs/local/*.json` (4 smoke configs) and `configs/dev/*.json` (15 dev configs) | Workflow validation only. Keep results out of the `E001-E200` evidence set. |
-| L40/L40S | 181 planned `E###@l40s` conditions | Generated configs use `gpu_l40s`, 8 CPUs/GPU, PCIe, and `results/raw/l40s`. Nineteen rows are explicitly deferred. |
-| H100 | 182 planned `E###@h100` conditions | Generated configs use `gpu_h100`, 16 CPUs/GPU, NVLink, and `results/raw/h100`. Eighteen rows are explicitly deferred. |
+| L40/L40S | 181 planned `E###@l40s` conditions | Generated configs use `gpu_l40s`, 8 CPUs/GPU, PCIe, and accepted evidence root `results/raw/l40s`. Nineteen rows are explicitly deferred. |
+| H100 | 182 planned `E###@h100` conditions | Generated configs use `gpu_h100`, 16 CPUs/GPU, NVLink, and accepted evidence root `results/raw/h100`. Eighteen rows are explicitly deferred. |
 
 ## Generated Companion-Config Contract
 

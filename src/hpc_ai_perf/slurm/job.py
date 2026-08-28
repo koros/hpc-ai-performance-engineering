@@ -29,6 +29,8 @@ class SlurmJob:
     environment: dict[str, str] = field(default_factory=dict)
     setup_commands: list[str] = field(default_factory=list)
     repetitions: int = 1
+    run_output_dir: str | None = None
+    log_dir: str = "results/raw"
 
     @classmethod
     def from_config(
@@ -44,6 +46,8 @@ class SlurmJob:
         environment: dict[str, str] | None = None,
         setup_commands: list[str] | None = None,
         repetitions: int = 1,
+        run_output_dir: str | Path | None = None,
+        log_dir: str | Path = "results/raw",
     ) -> SlurmJob:
         """Create a Slurm job description from an experiment config.
 
@@ -58,6 +62,8 @@ class SlurmJob:
         if config.distributed.nodes != 1 and config.hardware.gpus > 0:
             raise ValueError("Multi-node rendering is outside this project's validated single-node scope")
         base_command = f"-m hpc_ai_perf.cli run --config {quote(str(config_path))}"
+        if run_output_dir:
+            base_command += f" --output-dir {quote(str(run_output_dir))}"
         if repetitions > 1:
             base_command += ' --repetition "${SLURM_ARRAY_TASK_ID}"'
         distributed_training = (
@@ -82,6 +88,8 @@ class SlurmJob:
             environment=environment or {},
             setup_commands=setup_commands or [],
             repetitions=repetitions,
+            run_output_dir=str(run_output_dir) if run_output_dir else None,
+            log_dir=str(log_dir),
         )
 
     def render(self) -> str:
@@ -100,8 +108,8 @@ class SlurmJob:
             f"#SBATCH --nodes={self.nodes}",
             f"#SBATCH --cpus-per-task={self.cpus_per_task}",
             f"#SBATCH --time={self.time_limit}",
-            f"#SBATCH --output=results/raw/%x-{array_log_suffix}.out",
-            f"#SBATCH --error=results/raw/%x-{array_log_suffix}.err",
+            f"#SBATCH --output={self.log_dir}/%x-{array_log_suffix}.out",
+            f"#SBATCH --error={self.log_dir}/%x-{array_log_suffix}.err",
         ]
         if self.repetitions > 1:
             lines.insert(3, f"#SBATCH --array=1-{self.repetitions}")
@@ -137,6 +145,8 @@ def render_slurm_script(
     environment: dict[str, str] | None = None,
     setup_commands: list[str] | None = None,
     repetitions: int = 1,
+    run_output_dir: str | Path | None = None,
+    log_dir: str | Path = "results/raw",
 ) -> str:
     """Convenience wrapper that builds and renders one Slurm script."""
     return SlurmJob.from_config(
@@ -150,6 +160,8 @@ def render_slurm_script(
         environment=environment,
         setup_commands=setup_commands,
         repetitions=repetitions,
+        run_output_dir=run_output_dir,
+        log_dir=log_dir,
     ).render()
 
 

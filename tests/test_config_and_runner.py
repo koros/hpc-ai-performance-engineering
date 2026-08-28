@@ -127,6 +127,23 @@ def test_render_slurm_repetition_array() -> None:
     assert '--repetition "${SLURM_ARRAY_TASK_ID}"' in script
 
 
+def test_render_slurm_can_stage_result_output() -> None:
+    config_path = Path("configs/baseline_profiling/E008_gpt2_small_training_baseline.json")
+    config = load_experiment_config(config_path)
+
+    script = render_slurm_script(
+        config,
+        config_path,
+        repetitions=3,
+        run_output_dir="build/platform_results/l40s/wave_1",
+        log_dir="slurm/generated/l40s/wave_1/logs",
+    )
+
+    assert "#SBATCH --output=slurm/generated/l40s/wave_1/logs/%x-%A_%a.out" in script
+    assert "--output-dir build/platform_results/l40s/wave_1" in script
+    assert '--repetition "${SLURM_ARRAY_TASK_ID}"' in script
+
+
 def test_write_slurm_script(tmp_path: Path) -> None:
     script_path = write_slurm_script("#!/bin/bash\n", tmp_path, "E001")
 

@@ -207,9 +207,10 @@ make render-l40s-wave PLATFORM_WAVE=0
 make plan-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
 ```
 
-This materializes generated configs under `build/platform_configs/l40s` and scripts under
-`slurm/generated/l40s/wave_0`. The source `E001-E200` configs remain unchanged. Rendering fails when a profile does
-not match the generated platform, preventing H100/L40S result mislabelling.
+This materializes generated configs under `build/platform_configs/l40s`, scripts under
+`slurm/generated/l40s/wave_0`, and staged result JSON under `build/platform_results/l40s/wave_0`. The source
+`E001-E200` configs remain unchanged. Rendering fails when a profile does not match the generated platform, preventing
+H100/L40S result mislabelling.
 
 Initialize status, dry-run, and then submit only after reviewing the generated files:
 
@@ -220,12 +221,14 @@ make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
 ```
 
 Wave 0 uses one acceptance trial per condition. Core performance waves use three-task Slurm arrays based on the
-tracked execution matrix. Each task writes an immutable, platform-qualified result with an explicit repetition number;
-see the [measurement protocol](docs/measurement_protocol.md).
+tracked execution matrix. Each task writes an immutable, platform-qualified staged result with an explicit repetition
+number; see the [measurement protocol](docs/measurement_protocol.md).
 
-Track accepted evidence separately from scheduler status:
+Import staged JSON through the evidence gate, then track accepted evidence separately from scheduler status:
 
 ```bash
+make import-result-evidence SOURCE=build/platform_results/l40s/wave_0
+make validate-result-evidence
 make track-l40s-progress
 ```
 
@@ -236,7 +239,7 @@ make render-h100-wave PLATFORM_WAVE=0
 make track-h100-progress
 ```
 
-Import JSON copied from the HPC through the integrity gate:
+Import JSON copied from the HPC or staged under `build/platform_results/...` through the integrity gate:
 
 ```bash
 python3 -m hpc_ai_perf.cli import-result-evidence --source /tmp/hpc-result-staging

@@ -9,7 +9,10 @@ and keeps raw evidence physically and semantically separate.
 ## Invariants
 
 - `E###@l40s` and `E###@h100` are different conditions even when they share a logical `E###` row.
-- L40S results go only under `results/raw/l40s/E###/`; H100 results go only under `results/raw/h100/E###/`.
+- Accepted L40S evidence goes only under `results/raw/l40s/E###/`; accepted H100 evidence goes only under
+  `results/raw/h100/E###/`.
+- Generated Slurm jobs write trial JSON into ignored staging paths under `build/platform_results/<platform>/wave_<wave>/`;
+  import accepted records into `results/raw/` after each wave.
 - A wave advances only after its required trials are valid in the platform tracker.
 - `exact` results preserve workload shape. `platform_specific` results describe platform behaviour and are not pooled.
 - A capacity-driven workload change must be registered as `capacity_adjusted` before execution.
@@ -38,10 +41,19 @@ Stop if the observed device is not L40S, CUDA is unavailable, or the generated s
 
 ## 2. Import L40S Trials Already Run
 
-Copy cluster JSON into a staging directory. Do not copy directly over committed evidence and do not use `--delete`:
+Copy cluster JSON into a staging directory. Do not copy directly over committed evidence and do not use `--delete`.
+For newly rendered platform waves, the default source is the ignored staging directory:
 
 ```bash
-rsync -av USER@HPC_HOST:/path/to/project/results/raw/ /tmp/hpc-result-staging/
+python3 -m hpc_ai_perf.cli import-result-evidence \
+  --source build/platform_results/l40s/wave_0 \
+  --result-root results/raw
+```
+
+If results were produced on another checkout or copied back from the cluster, import from that copied staging path:
+
+```bash
+rsync -av USER@HPC_HOST:/path/to/project/build/platform_results/l40s/ /tmp/hpc-result-staging/l40s/
 python3 -m hpc_ai_perf.cli import-result-evidence \
   --source /tmp/hpc-result-staging \
   --result-root results/raw
@@ -95,9 +107,12 @@ Review every generated `#SBATCH` directive and resolved config. Then submit from
 make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
 ```
 
-After jobs finish, import their JSON evidence, verify checksums, and rebuild the tracker:
+Generated jobs write result JSON to `build/platform_results/l40s/wave_0/` by default and Slurm logs to
+`slurm/generated/l40s/wave_0/logs/`. After jobs finish, import their JSON evidence, verify checksums, and rebuild the
+tracker:
 
 ```bash
+make import-result-evidence SOURCE=build/platform_results/l40s/wave_0
 make validate-result-evidence
 make track-l40s-progress
 ```
@@ -114,9 +129,10 @@ make render-h100-wave PLATFORM_WAVE=0
 make track-h100-progress
 ```
 
-Use the same wave process with `PLATFORM=h100`. H100 evidence is written under its own root and never changes L40S
-status. Only compare rows whose workload, revisions, seed, useful-work definition, and `comparability` contract match.
-The hardware-comparison anchors are `E121/E123`, `E122/E124`, `E125/E127`, and `E126/E128`.
+Use the same wave process with `PLATFORM=h100`. H100 staged JSON is written under `build/platform_results/h100/` and
+accepted evidence is imported under its own root, never changing L40S status. Only compare rows whose workload,
+revisions, seed, useful-work definition, and `comparability` contract match. The hardware-comparison anchors are
+`E121/E123`, `E122/E124`, `E125/E127`, and `E126/E128`.
 
 ## 6. Recovery Rules
 

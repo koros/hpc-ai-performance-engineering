@@ -22,7 +22,7 @@ config embeds:
 - the execution platform and condition ID;
 - the source config path and SHA-256;
 - wave and required independent-trial count;
-- result root (`results/raw/l40s` or `results/raw/h100`); and
+- accepted evidence root (`results/raw/l40s` or `results/raw/h100`); and
 - `exact`, `capacity_adjusted`, or `platform_specific` comparability.
 
 Do not edit a generated config and treat it as an existing condition. If memory limits force a workload-shape change,

@@ -72,7 +72,7 @@ node returns.
 4. After completion, import and verify result evidence:
 
    ```bash
-   python -m hpc_ai_perf.cli import-result-evidence --source /tmp/hpc-result-staging
+   python -m hpc_ai_perf.cli import-result-evidence --source build/platform_results/l40s/wave_0
    make validate-result-evidence
    make track-l40s-progress
    ```
