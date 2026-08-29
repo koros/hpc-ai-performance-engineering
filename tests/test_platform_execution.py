@@ -40,21 +40,41 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
     l40s = load_platform_conditions("platforms/execution_matrix.json", "l40s", wave="0")
     h100 = load_platform_conditions("platforms/execution_matrix.json", "h100", wave="0")
 
-    assert [condition.condition_id for condition in l40s] == [f"E{index:03d}@l40s" for index in range(1, 7)]
-    assert [condition.condition_id for condition in h100 if condition.status == "planned"] == [
-        f"E{index:03d}@h100" for index in range(1, 8)
-    ]
+    assert [condition.condition_id for condition in l40s] == [f"E{index:03d}@l40s" for index in range(1, 6)]
+    assert [condition.condition_id for condition in h100] == [f"E{index:03d}@h100" for index in range(1, 6)]
 
 
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     expected_ids = {f"E{index:03d}" for index in range(1, 201)}
 
-    for platform_id, planned_count in [("l40s", 181), ("h100", 182)]:
+    for platform_id, planned_count in [("l40s", 144), ("h100", 144)]:
         conditions = load_platform_conditions("platforms/execution_matrix.json", platform_id)
 
         assert len(conditions) == 200
         assert {condition.matrix_id for condition in conditions} == expected_ids
         assert sum(condition.status == "planned" for condition in conditions) == planned_count
+
+
+def test_execution_matrix_defers_vllm_and_cuda_toolkit_rows_on_both_platforms() -> None:
+    expected_ids = {
+        "E006",
+        "E007",
+        "E130",
+        *(f"E{index:03d}" for index in range(132, 149)),
+        "E178",
+        *(f"E{index:03d}" for index in range(180, 197)),
+    }
+
+    for platform_id in ("l40s", "h100"):
+        conditions = load_platform_conditions(
+            "platforms/execution_matrix.json",
+            platform_id,
+            experiment_ids=expected_ids,
+        )
+
+        assert {condition.matrix_id for condition in conditions} == expected_ids
+        assert {condition.status for condition in conditions} == {"deferred"}
+        assert all(condition.wave == "deferred" for condition in conditions)
 
 
 def test_deferred_platform_conditions_are_tracked() -> None:

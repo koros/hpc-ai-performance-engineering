@@ -118,7 +118,7 @@ def load_platform_conditions(
         if comparability not in COMPARABILITY_VALUES:
             raise ValueError(f"Unsupported comparability value: {comparability}")
         ids = _expand_experiment_selectors(wave_data.get("experiment_ids", []))
-        ids -= {str(item) for item in wave_data.get("exclude_ids", [])}
+        ids -= _expand_experiment_selectors(wave_data.get("exclude_ids", []))
         for experiment_id in sorted(ids, key=_experiment_number):
             conditions.append(
                 PlatformCondition(

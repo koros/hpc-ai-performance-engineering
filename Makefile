@@ -117,7 +117,7 @@ render-slurm-must-have:
 	$(PYTHON) -m hpc_ai_perf.cli render-slurm-bulk --priority "Must Have" $(SLURM_PROFILE_ARG)
 
 render-slurm-env-validation:
-	$(PYTHON) -m hpc_ai_perf.cli render-slurm-bulk --phase "Environment validation" --priority "Must Have" --output-dir slurm/generated/environment_validation_must_have $(SLURM_PROFILE_ARG)
+	$(MAKE) render-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=0 PLATFORM_SLURM_DIR=slurm/generated/environment_validation_must_have
 
 render-slurm-tensorrt-llm:
 	$(PYTHON) -m hpc_ai_perf.cli render-slurm --config configs/environment_validation/E007_tensorrt_llm_1gpu.json --output-dir slurm/generated/tensorrt_llm $(SLURM_PROFILE_ARG)
