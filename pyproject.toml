@@ -21,7 +21,7 @@ workloads = [
     "torch>=2.4,<3",
     "transformers>=4.44,<5",
 ]
-distributed = ["deepspeed>=0.15,<0.18"]
+distributed = ["deepspeed>=0.18.9,<0.20"]
 # vLLM wheels are tightly coupled to the active CUDA/PyTorch/driver ABI.
 # Install or build vLLM separately for the target cluster stack before running serving rows.
 serving = []

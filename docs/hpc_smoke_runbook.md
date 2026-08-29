@@ -34,9 +34,10 @@ Before submitting environment-validation jobs, run the runtime preflight from an
 python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --require-deepspeed --require-vllm
 ```
 
-Run the DeepSpeed check inside an allocation with the same GPU count as E005. If it warns that `nvcc` is unavailable,
-E005 may still run because it validates DeepSpeed ZeRO runtime behaviour, not custom CUDA-op compilation. If the vLLM
-check fails, fix the vLLM install before running E006.
+Run the DeepSpeed check inside an allocation with the same GPU count as E005. A missing-`nvcc` warning is acceptable
+only if `deepspeed_import` and `deepspeed_accelerator` still pass. If DeepSpeed 0.17.x is installed without a full CUDA
+toolkit, upgrade to the project-supported DeepSpeed 0.18.9+ line or load a toolkit whose `CUDA_HOME/bin/nvcc` exists.
+If the vLLM check fails, fix the vLLM install before running E006.
 
 ## 2. Validate Repository State
 

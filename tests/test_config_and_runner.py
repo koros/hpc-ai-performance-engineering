@@ -23,7 +23,7 @@ from hpc_ai_perf.profiling.system import TorchMemoryProfiler
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
-from hpc_ai_perf.runtime_checks import prepare_deepspeed_import_environment
+from hpc_ai_perf.runtime_checks import prepare_deepspeed_import_environment, run_cluster_runtime_checks
 from hpc_ai_perf.slurm import (
     build_job_status_report,
     build_job_status_rows,
@@ -569,6 +569,48 @@ def test_deepspeed_import_environment_unsets_stale_cuda_home(monkeypatch, tmp_pa
     assert metadata["nvcc_available"] is False
     assert metadata["deepspeed_cuda_detection_ignored"] is True
     assert os.environ["DS_IGNORE_CUDA_DETECTION"] == "1"
+
+
+def test_runtime_check_rejects_old_deepspeed_without_nvcc(monkeypatch, tmp_path: Path) -> None:
+    stale_cuda_home = tmp_path / "cuda_without_nvcc"
+    stale_cuda_home.mkdir()
+
+    class FakeCuda:
+        @staticmethod
+        def is_available() -> bool:
+            return True
+
+        @staticmethod
+        def device_count() -> int:
+            return 2
+
+        @staticmethod
+        def get_device_name(index: int) -> str:
+            return "NVIDIA L40S"
+
+    fake_torch = types.ModuleType("torch")
+    fake_torch.__version__ = "2.8.0"
+    fake_torch.version = types.SimpleNamespace(cuda="12.4")
+    fake_torch.cuda = FakeCuda()
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setenv("CUDA_HOME", str(stale_cuda_home))
+    monkeypatch.delenv("CUDA_PATH", raising=False)
+    monkeypatch.delenv("DS_IGNORE_CUDA_DETECTION", raising=False)
+    monkeypatch.setattr("hpc_ai_perf.runtime_checks.shutil.which", lambda name: None)
+    monkeypatch.setattr("hpc_ai_perf.runtime_checks.importlib.util.find_spec", lambda name: object())
+    monkeypatch.setattr("hpc_ai_perf.runtime_checks.metadata.version", lambda package: "0.17.6")
+
+    checks = run_cluster_runtime_checks(
+        expected_gpu_model="L40S",
+        expected_gpus=2,
+        require_deepspeed=True,
+        require_clean_git=False,
+    )
+
+    failing_checks = {check.name: check for check in checks if check.failed}
+    assert "deepspeed_version" in failing_checks
+    assert "0.17.6" in failing_checks["deepspeed_version"].detail
+    assert "deepspeed>=0.18.9" in str(failing_checks["deepspeed_version"].remediation)
 
 
 def test_fsdp_environment_validation_uses_explicit_cuda_device(monkeypatch) -> None:

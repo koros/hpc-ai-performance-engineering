@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
+from importlib import metadata
 from pathlib import Path
 from typing import Any
 
@@ -239,6 +240,7 @@ def _torch_cuda_checks(
 def _deepspeed_checks(torch: Any) -> list[RuntimeCheck]:
     checks: list[RuntimeCheck] = []
     metadata = prepare_deepspeed_import_environment(torch)
+    deepspeed_version = _distribution_version("deepspeed")
     if metadata["nvcc_available"]:
         checks.append(
             RuntimeCheck(
@@ -275,6 +277,16 @@ def _deepspeed_checks(torch: Any) -> list[RuntimeCheck]:
             )
         )
         return checks
+    if deepspeed_version and _version_less_than(deepspeed_version, (0, 18, 9)) and not metadata["nvcc_available"]:
+        checks.append(
+            RuntimeCheck(
+                "deepspeed_version",
+                "fail",
+                f"deepspeed {deepspeed_version} is installed without an available nvcc compiler",
+                "Upgrade to deepspeed>=0.18.9,<0.20, or load a full CUDA toolkit whose CUDA_HOME/bin/nvcc exists.",
+            )
+        )
+        return checks
     try:
         import deepspeed
     except Exception as exc:  # pragma: no cover - depends on active environment
@@ -283,7 +295,7 @@ def _deepspeed_checks(torch: Any) -> list[RuntimeCheck]:
                 "deepspeed_import",
                 "fail",
                 f"{type(exc).__name__}: {exc}",
-                "Fix CUDA_HOME/nvcc or enable DS_IGNORE_CUDA_DETECTION for prebuilt cluster/runtime-only checks.",
+                "Upgrade to deepspeed>=0.18.9,<0.20, or load a full CUDA toolkit whose CUDA_HOME/bin/nvcc exists.",
             )
         )
         return checks
@@ -371,3 +383,20 @@ def _nvcc_under(cuda_home: str | None) -> Path | None:
         return None
     candidate = Path(cuda_home) / "bin" / "nvcc"
     return candidate if candidate.exists() and os.access(candidate, os.X_OK) else None
+
+
+def _distribution_version(package: str) -> str | None:
+    try:
+        return metadata.version(package)
+    except metadata.PackageNotFoundError:
+        return None
+
+
+def _version_less_than(version: str, minimum: tuple[int, int, int]) -> bool:
+    parts = []
+    for raw_part in version.split("+", 1)[0].split(".")[:3]:
+        numeric = "".join(character for character in raw_part if character.isdigit())
+        parts.append(int(numeric) if numeric else 0)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3]) < minimum

@@ -149,6 +149,9 @@ Before running environment-validation waves from an allocated GPU node, check th
 python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --require-deepspeed --require-vllm
 ```
 
+DeepSpeed 0.17.x can still require `CUDA_HOME/bin/nvcc` during import-time optional-op probes. Use the project
+`distributed` extra, which requires DeepSpeed 0.18.9 or newer, or load a full CUDA toolkit before running E005.
+
 TensorRT-LLM, vLLM, and FP8/quantized model tooling remain vendor/backend-specific and are not silently substituted by
 these extras.
 

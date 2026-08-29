@@ -61,8 +61,9 @@ python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-gp
 '
 ```
 
-The DeepSpeed check can pass with a warning when `nvcc` is unavailable because E005 validates ZeRO runtime execution,
-not custom CUDA-op compilation. The vLLM check must pass before E006 can become accepted evidence.
+The DeepSpeed check may warn when `nvcc` is unavailable, but it must still pass `deepspeed_import`. If DeepSpeed 0.17.x
+is installed without a full CUDA toolkit, upgrade to the project-supported DeepSpeed 0.18.9+ line or load a toolkit whose
+`CUDA_HOME/bin/nvcc` exists before running E005. The vLLM check must pass before E006 can become accepted evidence.
 
 ## 2. Import L40S Trials Already Run
 
