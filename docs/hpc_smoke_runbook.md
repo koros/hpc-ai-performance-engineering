@@ -28,6 +28,16 @@ source .venv/bin/activate
 
 Review `slurm/modules_for_hpc_ai` on the cluster and adjust module names if Lovelace has changed since the last working examples. If the target HPC site uses a different module stack, replace the helper with the appropriate `module load ...` commands.
 
+Before submitting environment-validation jobs, run the runtime preflight from an allocated GPU node:
+
+```bash
+python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --require-deepspeed --require-vllm
+```
+
+Run the DeepSpeed check inside an allocation with the same GPU count as E005. If it warns that `nvcc` is unavailable,
+E005 may still run because it validates DeepSpeed ZeRO runtime behaviour, not custom CUDA-op compilation. If the vLLM
+check fails, fix the vLLM install before running E006.
+
 ## 2. Validate Repository State
 
 Run local checks on the login node:

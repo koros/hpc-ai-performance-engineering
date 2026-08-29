@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from hpc_ai_perf.config import ExperimentConfig
+from hpc_ai_perf.runtime_checks import prepare_deepspeed_import_environment
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
 
 
@@ -837,9 +838,19 @@ def _configure_training_strategy(
     strategy = config.distributed.strategy
     parameters = config.workload.parameters
     if strategy.startswith("deepspeed"):
+        deepspeed_runtime = prepare_deepspeed_import_environment(torch)
         if importlib.util.find_spec("deepspeed") is None:
             raise RuntimeError(f"{strategy} requested, but DeepSpeed is not installed")
-        import deepspeed
+        try:
+            import deepspeed
+        except FileNotFoundError as exc:
+            if "nvcc" in str(exc):
+                raise RuntimeError(
+                    f"{strategy} failed while DeepSpeed was probing nvcc. Source slurm/modules_for_hpc_ai before "
+                    "running, or load a full CUDA toolkit whose CUDA_HOME/bin/nvcc exists. "
+                    f"Prepared runtime details: {deepspeed_runtime}. Original error: {exc}"
+                ) from exc
+            raise
 
         stage = int(strategy[-1])
         requested = parameters.get("deepspeed_config", {})

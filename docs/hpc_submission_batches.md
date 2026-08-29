@@ -42,6 +42,12 @@ source .venv/bin/activate
 
 Review `slurm/modules_for_hpc_ai` on the cluster before submitting. If the module stack changes, edit that helper or replace it in `setup_commands` with the appropriate `module load ...` commands.
 
+From an allocated GPU node, run the runtime gate before environment-validation batches:
+
+```bash
+python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --require-deepspeed --require-vllm
+```
+
 Use the profile while rendering:
 
 ```bash

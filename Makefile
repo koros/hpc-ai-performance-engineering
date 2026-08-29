@@ -8,12 +8,19 @@ PLATFORM_CONFIG_DIR ?= build/platform_configs/$(PLATFORM)
 PLATFORM_SLURM_DIR ?= slurm/generated/$(PLATFORM)/wave_$(PLATFORM_WAVE)
 PLATFORM_RUN_OUTPUT_DIR ?= build/platform_results/$(PLATFORM)/wave_$(PLATFORM_WAVE)
 PLATFORM_STATUS ?= results/processed/slurm_$(PLATFORM)_wave_$(PLATFORM_WAVE)_status.csv
+RUNTIME_EXPECTED_GPU_MODEL ?= $(if $(filter h100,$(PLATFORM)),H100,L40S)
+EXPECTED_GPUS ?=
+EXPECTED_GPUS_ARG := $(if $(EXPECTED_GPUS),--expected-gpus $(EXPECTED_GPUS),)
+REQUIRE_DEEPSPEED ?=
+REQUIRE_DEEPSPEED_ARG := $(if $(REQUIRE_DEEPSPEED),--require-deepspeed,)
+REQUIRE_VLLM ?=
+REQUIRE_VLLM_ARG := $(if $(REQUIRE_VLLM),--require-vllm,)
 
 DEV_CONFIGS := $(sort $(wildcard configs/dev/*.json))
 DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
 
 # Dev targets run local Mac/workstation checks; matrix tracking stays separate.
-.PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-platform-wave submit-platform-wave track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate validate-result-evidence readiness-report refresh serve-dashboard
+.PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile check-platform-runtime check-l40s-runtime check-h100-runtime materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-platform-wave submit-platform-wave track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate validate-result-evidence readiness-report refresh serve-dashboard
 
 install-dev:
 	$(PYTHON) -m pip install -e ".[dev,yaml]"
@@ -57,6 +64,15 @@ run-dev-refresh: run-dev-experiments refresh track-dev-progress
 check-slurm-profile:
 	test -n "$(SLURM_PROFILE)" || (echo "Set SLURM_PROFILE=slurm/profiles/cluster.local.json" && exit 1)
 	$(PYTHON) -m hpc_ai_perf.cli check-slurm-profile --slurm-profile $(SLURM_PROFILE)
+
+check-platform-runtime:
+	$(PYTHON) -m hpc_ai_perf.cli check-runtime --expected-gpu-model $(RUNTIME_EXPECTED_GPU_MODEL) $(EXPECTED_GPUS_ARG) $(REQUIRE_DEEPSPEED_ARG) $(REQUIRE_VLLM_ARG)
+
+check-l40s-runtime:
+	$(MAKE) check-platform-runtime PLATFORM=l40s
+
+check-h100-runtime:
+	$(MAKE) check-platform-runtime PLATFORM=h100
 
 # L40S is the active platform; the same targets accept PLATFORM=h100 when that node returns.
 materialize-platform-wave:

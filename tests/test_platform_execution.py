@@ -159,6 +159,8 @@ def test_render_platform_slurm_uses_profile_partition_and_matrix_trials(tmp_path
     assert f"#SBATCH --output={slurm_dir / 'logs'}/%x-%A_%a.out" in script
     assert "--output-dir build/platform_results/l40s/wave_1" in script
     assert "source slurm/modules_for_hpc_ai" in script
+    assert "export DS_IGNORE_CUDA_DETECTION=1" in script
+    assert "export PYTORCH_NVML_BASED_CUDA_CHECK=1" in script
     assert f"--config {config_dir / 'E008.json'}" in script
 
 

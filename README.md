@@ -143,6 +143,12 @@ generic latest PyPI install can import a wheel that expects a different CUDA run
 reports `12.4` but `import vllm` fails looking for `libcudart.so.13`, remove that vLLM wheel and install or build one
 matching the site runtime before running E006 or later vLLM rows.
 
+Before running environment-validation waves from an allocated GPU node, check the active runtime:
+
+```bash
+python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --require-deepspeed --require-vllm
+```
+
 TensorRT-LLM, vLLM, and FP8/quantized model tooling remain vendor/backend-specific and are not silently substituted by
 these extras.
 

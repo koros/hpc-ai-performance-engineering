@@ -43,6 +43,27 @@ python3 -c 'import torch; print(torch.__version__, torch.version.cuda, torch.cud
 
 Stop if the observed device is not L40S, CUDA is unavailable, or the generated script requests another partition.
 
+Before rerunning wave 0 after an environment failure, run the active-node checks inside matching allocations:
+
+```bash
+srun -p gpu_l40s --gres=gpu:2 --cpus-per-task=8 --time=00:10:00 bash -lc '
+cd ./
+source slurm/modules_for_hpc_ai
+source .venv/bin/activate
+python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-gpus 2 --require-deepspeed
+'
+
+srun -p gpu_l40s --gres=gpu:1 --cpus-per-task=8 --time=00:10:00 bash -lc '
+cd ./
+source slurm/modules_for_hpc_ai
+source .venv/bin/activate
+python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-gpus 1 --require-vllm
+'
+```
+
+The DeepSpeed check can pass with a warning when `nvcc` is unavailable because E005 validates ZeRO runtime execution,
+not custom CUDA-op compilation. The vLLM check must pass before E006 can become accepted evidence.
+
 ## 2. Import L40S Trials Already Run
 
 Copy cluster JSON into a staging directory. Do not copy directly over committed evidence and do not use `--delete`.

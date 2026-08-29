@@ -20,6 +20,7 @@ from hpc_ai_perf.config import (
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import aggregate_results, import_result_evidence, verify_result_evidence
 from hpc_ai_perf.runners import LocalBenchmarkRunner
+from hpc_ai_perf.runtime_checks import format_runtime_checks, run_cluster_runtime_checks, runtime_checks_to_json
 from hpc_ai_perf.slurm import (
     record_job_submission,
     render_slurm_script,
@@ -219,6 +220,22 @@ def main() -> None:
                 print(f"- {issue}")
             raise SystemExit(1)
         print(f"Slurm profile is ready: {args.slurm_profile}")
+        return
+
+    if args.command == "check-runtime":
+        checks = run_cluster_runtime_checks(
+            expected_gpu_model=args.expected_gpu_model,
+            expected_gpus=args.expected_gpus,
+            require_deepspeed=args.require_deepspeed,
+            require_vllm=args.require_vllm,
+            require_clean_git=not args.allow_dirty_git,
+        )
+        if args.format == "json":
+            print(runtime_checks_to_json(checks), end="")
+        else:
+            print(format_runtime_checks(checks), end="")
+        if any(check.failed for check in checks):
+            raise SystemExit(1)
         return
 
     if args.command == "aggregate-results":
@@ -482,6 +499,23 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Validate that a Slurm profile is ready for real cluster rendering.",
     )
     check_profile_parser.add_argument("--slurm-profile", required=True, help="Path to a Slurm profile JSON file.")
+
+    runtime_parser = subparsers.add_parser(
+        "check-runtime",
+        help="Check the active GPU node runtime before submitting or accepting HPC evidence.",
+    )
+    runtime_parser.add_argument(
+        "--expected-gpu-model", default=None, help="Substring expected in each CUDA device name."
+    )
+    runtime_parser.add_argument("--expected-gpus", type=int, default=None, help="Exact visible CUDA device count.")
+    runtime_parser.add_argument(
+        "--require-deepspeed", action="store_true", help="Require DeepSpeed import and CUDA accelerator detection."
+    )
+    runtime_parser.add_argument("--require-vllm", action="store_true", help="Require vLLM import compatibility.")
+    runtime_parser.add_argument(
+        "--allow-dirty-git", action="store_true", help="Do not fail when the working tree is dirty."
+    )
+    runtime_parser.add_argument("--format", choices=["table", "json"], default="table")
 
     aggregate_parser = subparsers.add_parser("aggregate-results", help="Aggregate raw result JSON files into CSV.")
     aggregate_parser.add_argument(

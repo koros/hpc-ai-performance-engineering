@@ -62,8 +62,12 @@ node returns.
 
    ```bash
    python -m hpc_ai_perf.cli check-slurm-profile --slurm-profile slurm/profiles/cluster_l40s.json
+   python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --require-deepspeed --require-vllm
    make render-l40s-wave PLATFORM_WAVE=0
    ```
+
+   Run `check-runtime` from an allocated GPU node. The DeepSpeed portion can pass with a warning when `nvcc` is absent;
+   the vLLM portion must pass before E006 can be accepted.
 
 3. Review, initialize, and dry-run the Slurm batch:
 

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from hpc_ai_perf.config import ExperimentConfig
+from hpc_ai_perf.runtime_checks import prepare_deepspeed_import_environment
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
 from hpc_ai_perf.workloads.tensorrt_llm import validate_tensorrt_llm_environment
 
@@ -129,9 +130,19 @@ class EnvironmentValidationWorkload(Workload):
     @staticmethod
     def _deepspeed_smoke(config: ExperimentConfig) -> dict[str, int | float | str | bool | None]:
         torch = _torch_with_cuda(config)
+        deepspeed_runtime = prepare_deepspeed_import_environment(torch)
         if importlib.util.find_spec("deepspeed") is None:
             raise RuntimeError("DeepSpeed is not installed")
-        import deepspeed
+        try:
+            import deepspeed
+        except FileNotFoundError as exc:
+            if "nvcc" in str(exc):
+                raise RuntimeError(
+                    "DeepSpeed import failed while probing nvcc. Source slurm/modules_for_hpc_ai before running, "
+                    "or load a full CUDA toolkit whose CUDA_HOME/bin/nvcc exists. "
+                    f"Prepared runtime details: {deepspeed_runtime}. Original error: {exc}"
+                ) from exc
+            raise
 
         local_rank = int(os.environ.get("LOCAL_RANK", "0"))
         rank = int(os.environ.get("RANK", "0"))
@@ -142,12 +153,19 @@ class EnvironmentValidationWorkload(Workload):
         device = torch.device("cuda", local_rank)
         torch.cuda.set_device(device)
         model = torch.nn.Linear(128, 2).to(device)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
         ds_config = {
             "train_micro_batch_size_per_gpu": 8,
+            "gradient_accumulation_steps": 1,
             "zero_optimization": {"stage": 2},
             "bf16": {"enabled": True},
         }
-        engine, _, _, _ = deepspeed.initialize(model=model, model_parameters=model.parameters(), config=ds_config)
+        engine, _, _, _ = deepspeed.initialize(
+            model=model,
+            model_parameters=model.parameters(),
+            optimizer=optimizer,
+            config=ds_config,
+        )
         inputs = torch.randn(8, 128, device=device)
         labels = torch.randint(0, 2, (8,), device=device)
         loss = torch.nn.functional.cross_entropy(engine(inputs), labels)
@@ -161,6 +179,11 @@ class EnvironmentValidationWorkload(Workload):
             "world_size": world_size,
             "rank": rank,
             "local_rank": local_rank,
+            "torch_optimizer": "AdamW",
+            "deepspeed_nvcc_available": bool(deepspeed_runtime["nvcc_available"]),
+            "deepspeed_cuda_detection_ignored": bool(deepspeed_runtime["deepspeed_cuda_detection_ignored"]),
+            "cuda_home": str(deepspeed_runtime["cuda_home_after"] or ""),
+            "nvcc_path": str(deepspeed_runtime["cuda_home_nvcc_after"] or deepspeed_runtime["nvcc_path_after"] or ""),
         }
 
     @staticmethod

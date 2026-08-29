@@ -2,6 +2,7 @@ import builtins
 import csv
 import hashlib
 import json
+import os
 import sys
 import types
 from dataclasses import replace
@@ -22,6 +23,7 @@ from hpc_ai_perf.profiling.system import TorchMemoryProfiler
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
+from hpc_ai_perf.runtime_checks import prepare_deepspeed_import_environment
 from hpc_ai_perf.slurm import (
     build_job_status_report,
     build_job_status_rows,
@@ -551,6 +553,24 @@ def test_torch_memory_profiler_sets_explicit_local_rank_device(monkeypatch) -> N
     assert metrics["memory_reserved_gb"] == 2
 
 
+def test_deepspeed_import_environment_unsets_stale_cuda_home(monkeypatch, tmp_path: Path) -> None:
+    stale_cuda_home = tmp_path / "cuda_without_nvcc"
+    stale_cuda_home.mkdir()
+    monkeypatch.setenv("CUDA_HOME", str(stale_cuda_home))
+    monkeypatch.delenv("CUDA_PATH", raising=False)
+    monkeypatch.delenv("DS_IGNORE_CUDA_DETECTION", raising=False)
+    monkeypatch.setattr("hpc_ai_perf.runtime_checks.shutil.which", lambda name: None)
+
+    metadata = prepare_deepspeed_import_environment(None)
+
+    assert "CUDA_HOME" not in os.environ
+    assert metadata["cuda_home_before"] == str(stale_cuda_home)
+    assert metadata["cuda_home_after"] is None
+    assert metadata["nvcc_available"] is False
+    assert metadata["deepspeed_cuda_detection_ignored"] is True
+    assert os.environ["DS_IGNORE_CUDA_DETECTION"] == "1"
+
+
 def test_fsdp_environment_validation_uses_explicit_cuda_device(monkeypatch) -> None:
     config = load_experiment_config(Path("configs/environment_validation/E004_fsdp_2gpu.json"))
     devices_seen: list[object] = []
@@ -726,6 +746,7 @@ def test_deepspeed_environment_validation_uses_explicit_cuda_device(monkeypatch)
             Linear=lambda *args: FakeModel(),
             functional=types.SimpleNamespace(cross_entropy=lambda output, labels: FakeTensor()),
         )
+        optim = types.SimpleNamespace(AdamW=lambda parameters, lr: "torch-adamw")
 
         @staticmethod
         def device(kind: str, index: int) -> FakeDevice:
@@ -743,8 +764,10 @@ def test_deepspeed_environment_validation_uses_explicit_cuda_device(monkeypatch)
             devices_seen.append(device)
             return FakeTensor()
 
-    def fake_deepspeed_initialize(*, model, model_parameters, config):
+    def fake_deepspeed_initialize(*, model, model_parameters, optimizer, config):
         assert model.device == expected_device
+        assert optimizer == "torch-adamw"
+        assert config["gradient_accumulation_steps"] == 1
         assert config["zero_optimization"]["stage"] == 2
         return FakeEngine(), None, None, None
 
@@ -761,6 +784,7 @@ def test_deepspeed_environment_validation_uses_explicit_cuda_device(monkeypatch)
 
     assert output.metrics["zero_init"] is True
     assert output.metrics["single_train_step"] is True
+    assert output.metrics["torch_optimizer"] == "AdamW"
     assert devices_seen
     assert all(device == expected_device for device in devices_seen)
 

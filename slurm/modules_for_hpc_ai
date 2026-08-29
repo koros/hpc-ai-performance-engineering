@@ -13,3 +13,27 @@ module load deeplearning/py-torch-py3.11/2.8.0-3feiiad
 module load python-science/py-matplotlib-py3.11/3.10.6-ogsaoll
 module load python-science/py-pandas-py3.11/2.3.2-wr7hjzs
 module load python-science/py-scipy-py3.11/1.16.1-g5b6aib
+
+# Keep CUDA/DeepSpeed discovery deterministic on Lovelace. The PyTorch module
+# exposes the CUDA runtime, but CUDA_HOME can point at a toolkit path without
+# bin/nvcc on some nodes. DeepSpeed's optional-op probes should not block the
+# ZeRO runtime smoke path merely because nvcc is unavailable.
+export PYTORCH_NVML_BASED_CUDA_CHECK="${PYTORCH_NVML_BASED_CUDA_CHECK:-1}"
+export DS_IGNORE_CUDA_DETECTION="${DS_IGNORE_CUDA_DETECTION:-1}"
+export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-$PWD/build/torch_extensions}"
+mkdir -p "$TORCH_EXTENSIONS_DIR"
+
+_hpc_ai_nvcc="$(command -v nvcc || true)"
+_hpc_ai_cuda_home="${CUDA_HOME:-${CUDA_PATH:-}}"
+if [[ -n "$_hpc_ai_cuda_home" && ! -x "$_hpc_ai_cuda_home/bin/nvcc" ]]; then
+  if [[ -n "$_hpc_ai_nvcc" ]]; then
+    export CUDA_HOME="$(cd "$(dirname "$_hpc_ai_nvcc")/.." && pwd)"
+  else
+    unset CUDA_HOME
+    unset CUDA_PATH
+  fi
+elif [[ -z "$_hpc_ai_cuda_home" && -n "$_hpc_ai_nvcc" ]]; then
+  export CUDA_HOME="$(cd "$(dirname "$_hpc_ai_nvcc")/.." && pwd)"
+fi
+unset _hpc_ai_nvcc
+unset _hpc_ai_cuda_home
