@@ -257,6 +257,20 @@ def _validate_result_mapping(path: Path, data: dict[str, Any]) -> list[Validatio
                 issues.append(ValidationIssue(path, f"completed matrix result must include {field}"))
         if data.get("git_dirty") is not False:
             issues.append(ValidationIssue(path, "completed matrix evidence must come from a clean git worktree"))
+        bundle_fields = [
+            "submission_bundle_id",
+            "submission_bundle_manifest_sha256",
+            "submission_bundle_platform",
+            "submission_bundle_wave",
+        ]
+        present_bundle_fields = [field for field in bundle_fields if environment.get(field)]
+        if present_bundle_fields and len(present_bundle_fields) != len(bundle_fields):
+            issues.append(ValidationIssue(path, "submission-bundle evidence must include complete bundle metadata"))
+        if present_bundle_fields and environment.get("submission_bundle_platform") != data.get("platform_id"):
+            issues.append(ValidationIssue(path, "submission_bundle_platform must match platform_id"))
+        manifest_hash = environment.get("submission_bundle_manifest_sha256")
+        if manifest_hash and not re.fullmatch(r"[0-9a-f]{64}", str(manifest_hash)):
+            issues.append(ValidationIssue(path, "submission_bundle_manifest_sha256 must be a SHA-256 hex digest"))
         recorded_hash = data.get("config_sha256")
         if isinstance(recorded_hash, str) and config:
             expected_hash = hashlib.sha256(

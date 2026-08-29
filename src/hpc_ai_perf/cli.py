@@ -4,6 +4,7 @@ import argparse
 import json
 import logging
 from pathlib import Path
+from shlex import quote
 from typing import Any
 
 from hpc_ai_perf.analysis import analyze_results
@@ -22,12 +23,18 @@ from hpc_ai_perf.results import aggregate_results, import_result_evidence, verif
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.runtime_checks import format_runtime_checks, run_cluster_runtime_checks, runtime_checks_to_json
 from hpc_ai_perf.slurm import (
+    manifest_sha256,
+    prepare_submission_bundle,
     record_job_submission,
+    remove_submission_bundle,
     render_slurm_script,
     submit_job_scripts,
+    verify_submission_bundle,
     write_job_status_csv,
     write_job_status_report,
+    write_script_checksums,
     write_slurm_script,
+    write_submission_manifest,
     write_submission_plan,
 )
 from hpc_ai_perf.tracking import track_experiment_progress, track_platform_progress
@@ -115,6 +122,26 @@ def main() -> None:
             env_values=args.env,
         )
         LOGGER.info("Wrote %d resolved configs and %d Slurm scripts", len(config_paths), len(script_paths))
+        return
+
+    if args.command == "create-platform-submission-bundle":
+        bundle = _create_platform_submission_bundle(args)
+        LOGGER.info("Created submission bundle %s", bundle.root)
+        LOGGER.info("Review %s, then submit scripts from %s", bundle.root / "SUBMISSION_PLAN.md", bundle.script_dir)
+        return
+
+    if args.command == "verify-submission-bundle":
+        problems = verify_submission_bundle(
+            manifest_path=args.manifest,
+            expected_manifest_sha256=args.expected_manifest_sha256,
+            config_path=args.config,
+        )
+        if problems:
+            print("Submission bundle verification failed:")
+            for problem in problems:
+                print(f"- {problem}")
+            raise SystemExit(1)
+        print("Submission bundle verification passed.")
         return
 
     if args.command == "render-slurm":
@@ -428,6 +455,51 @@ def _build_parser() -> argparse.ArgumentParser:
         default=[],
         help="Additional environment variable in KEY=VALUE form.",
     )
+
+    bundle_parser = subparsers.add_parser(
+        "create-platform-submission-bundle",
+        help="Create an immutable source/configuration bundle for one platform Slurm wave.",
+    )
+    _add_platform_options(bundle_parser)
+    bundle_parser.add_argument(
+        "--bundle-root",
+        default=None,
+        help="Parent for immutable bundles; defaults to ../hpc-ai-submissions beside the repository.",
+    )
+    bundle_parser.add_argument(
+        "--bundle-id",
+        default=None,
+        help="Optional stable bundle identifier; defaults to platform-wave-commit-timestamp.",
+    )
+    bundle_parser.add_argument(
+        "--venv-activate",
+        default=None,
+        help="Virtualenv activation script shared by snapshot jobs; defaults to <repository>/.venv/bin/activate.",
+    )
+    bundle_parser.add_argument("--slurm-profile", default=None, help="Override the platform Slurm profile.")
+    bundle_parser.add_argument("--partition", default=None, help="Override the platform partition.")
+    bundle_parser.add_argument("--account", default=None, help="Optional Slurm account override.")
+    bundle_parser.add_argument("--time", default=None, help="Optional Slurm time limit override.")
+    bundle_parser.add_argument("--cpus-per-task", type=int, default=None)
+    bundle_parser.add_argument("--module", action="append", default=[], help="Additional module to load.")
+    bundle_parser.add_argument(
+        "--env",
+        action="append",
+        default=[],
+        help="Additional environment variable in KEY=VALUE form.",
+    )
+
+    verify_bundle_parser = subparsers.add_parser(
+        "verify-submission-bundle",
+        help="Verify a bundle manifest, snapshot, resolved config, and runtime environment contract.",
+    )
+    verify_bundle_parser.add_argument("--manifest", required=True, help="Path to SUBMISSION_MANIFEST.json.")
+    verify_bundle_parser.add_argument(
+        "--expected-manifest-sha256",
+        required=True,
+        help="Manifest SHA-256 embedded in the generated Slurm script.",
+    )
+    verify_bundle_parser.add_argument("--config", required=True, help="Resolved config selected by this Slurm script.")
 
     slurm_parser = subparsers.add_parser("render-slurm", help="Render an sbatch script for an experiment config.")
     slurm_parser.add_argument("--config", required=True, help="Path to a JSON or YAML experiment config.")
@@ -776,6 +848,10 @@ def _render_platform_slurm(
     cpus_per_task: int | None,
     modules: list[str],
     env_values: list[str],
+    setup_commands_override: list[str] | None = None,
+    environment_overrides: dict[str, str] | None = None,
+    submission_manifest: Path | None = None,
+    submission_manifest_sha256: str | None = None,
 ) -> tuple[list[Path], list[Path]]:
     """Resolve and render a platform batch without changing logical matrix configs."""
     profile = load_platform_profile(platform_profile)
@@ -807,6 +883,10 @@ def _render_platform_slurm(
         modules=modules,
         env_values=env_values,
     )
+    if setup_commands_override is not None:
+        slurm_options["setup_commands"] = setup_commands_override
+    if environment_overrides:
+        slurm_options["environment"] = {**slurm_options["environment"], **environment_overrides}
 
     script_paths: list[Path] = []
     for config_path in config_paths:
@@ -817,6 +897,14 @@ def _render_platform_slurm(
         _verify_profile_platform(config, slurm_options.get("platform"), slurm_profile)
         condition = condition_by_id[config.experiment_id]
         requested_cpus = cpus_per_task or profile.cpus_per_gpu * max(1, config.hardware.gpus)
+        pre_run_command = None
+        if submission_manifest is not None and submission_manifest_sha256 is not None:
+            pre_run_command = (
+                "python -m hpc_ai_perf.cli verify-submission-bundle "
+                f"--manifest {quote(str(submission_manifest))} "
+                f"--expected-manifest-sha256 {quote(submission_manifest_sha256)} "
+                f"--config {quote(str(config_path))}"
+            )
         script = render_slurm_script(
             config,
             config_path,
@@ -830,9 +918,173 @@ def _render_platform_slurm(
             repetitions=condition.required_trials,
             run_output_dir=staged_result_dir,
             log_dir=slurm_log_dir,
+            pre_run_command=pre_run_command,
         )
         script_paths.append(write_slurm_script(script, slurm_dir, config.experiment_id))
     return config_paths, script_paths
+
+
+def _create_platform_submission_bundle(args: argparse.Namespace):
+    """Freeze one platform wave into a detached source/configuration submission bundle."""
+    repository = Path.cwd().resolve()
+    default_root = repository.parent / "hpc-ai-submissions"
+    bundle_root = Path(args.bundle_root).expanduser() if args.bundle_root else default_root
+    provisional_id = args.bundle_id
+    if provisional_id is None:
+        import datetime
+
+        commit = _git_head(repository)
+        timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
+        profile = load_platform_profile(args.platform_profile)
+        provisional_id = f"{profile.platform_id}-wave-{args.wave or 'all'}-{commit[:8]}-{timestamp}".lower()
+    bundle = prepare_submission_bundle(repository=repository, bundle_root=bundle_root, bundle_id=provisional_id)
+    try:
+        source_profile = _bundle_snapshot_path(bundle, args.platform_profile)
+        source_matrix = _bundle_snapshot_path(bundle, args.execution_matrix)
+        source_config_root = _bundle_snapshot_path(bundle, args.config_root)
+        profile = load_platform_profile(source_profile)
+        selected_profile = _bundle_snapshot_path(bundle, args.slurm_profile) if args.slurm_profile else None
+        effective_profile = selected_profile or (bundle.repo_dir / profile.slurm_profile)
+        if not effective_profile.is_file():
+            raise FileNotFoundError(f"Slurm profile is missing from submission snapshot: {effective_profile}")
+
+        config_paths = _materialize_platform_batch(
+            platform_profile=str(source_profile),
+            execution_matrix=str(source_matrix),
+            config_root=str(source_config_root),
+            output_dir=str(bundle.config_dir),
+            wave=args.wave,
+            experiment_ids=set(args.experiment_id) if args.experiment_id else None,
+            include_deferred=False,
+        )
+        write_submission_manifest(
+            bundle,
+            platform_id=profile.platform_id,
+            wave=args.wave or "all",
+            input_files={
+                "platform_profile": source_profile,
+                "execution_matrix": source_matrix,
+                "slurm_profile": effective_profile,
+            },
+        )
+        manifest_hash = manifest_sha256(bundle.manifest_path)
+        venv_activate = _resolve_bundle_venv(repository, args.venv_activate)
+        base_options = _resolve_slurm_options(
+            profile_path=str(effective_profile),
+            partition=args.partition or profile.partition,
+            account=args.account,
+            time_limit=args.time,
+            cpus_per_task=args.cpus_per_task,
+            modules=args.module,
+            env_values=args.env,
+        )
+        setup_commands = _bundle_setup_commands(
+            base_options["setup_commands"],
+            bundle=bundle,
+            venv_activate=venv_activate,
+        )
+        environment = {
+            "HPC_AI_SUBMISSION_BUNDLE_ID": bundle.bundle_id,
+            "HPC_AI_SUBMISSION_BUNDLE_MANIFEST_SHA256": manifest_hash,
+            "HPC_AI_SUBMISSION_BUNDLE_PLATFORM": profile.platform_id,
+            "HPC_AI_SUBMISSION_BUNDLE_WAVE": str(args.wave or "all"),
+        }
+        _, script_paths = _render_platform_slurm(
+            platform_profile=str(source_profile),
+            execution_matrix=str(source_matrix),
+            config_root=str(source_config_root),
+            config_output_dir=str(bundle.config_dir),
+            output_dir=str(bundle.script_dir),
+            run_output_dir=str(bundle.result_dir),
+            log_dir=str(bundle.log_dir),
+            wave=args.wave,
+            experiment_ids=set(args.experiment_id) if args.experiment_id else None,
+            profile_path=str(effective_profile),
+            partition=args.partition,
+            account=args.account,
+            time_limit=args.time,
+            cpus_per_task=args.cpus_per_task,
+            modules=args.module,
+            env_values=args.env,
+            setup_commands_override=setup_commands,
+            environment_overrides=environment,
+            submission_manifest=bundle.manifest_path,
+            submission_manifest_sha256=manifest_hash,
+        )
+        if sorted(config_paths) != sorted(bundle.config_dir.glob("E*.json")):
+            raise RuntimeError("Submission bundle config set changed while rendering Slurm scripts")
+        write_script_checksums(bundle)
+        write_submission_plan(
+            bundle.script_dir,
+            bundle.root / "SUBMISSION_PLAN.md",
+            batch_name=f"{profile.platform_id} wave {args.wave or 'all'} ({bundle.bundle_id})",
+        )
+        return bundle
+    except Exception:
+        remove_submission_bundle(bundle)
+        raise
+
+
+def _bundle_snapshot_path(bundle, source_path: str) -> Path:
+    """Map one repository-relative input to the exact detached snapshot counterpart."""
+    source = Path(source_path)
+    repository = Path.cwd().resolve()
+    resolved = source.resolve() if source.is_absolute() else (repository / source).resolve()
+    try:
+        relative = resolved.relative_to(repository)
+    except ValueError as exc:
+        raise ValueError(f"Submission bundle inputs must be inside the repository: {source_path}") from exc
+    snapshot_path = bundle.repo_dir / relative
+    if not snapshot_path.exists():
+        raise FileNotFoundError(f"Submission snapshot is missing requested input: {relative}")
+    return snapshot_path
+
+
+def _resolve_bundle_venv(repository: Path, requested_path: str | None) -> Path:
+    path = Path(requested_path).expanduser() if requested_path else repository / ".venv" / "bin" / "activate"
+    resolved = path.resolve() if path.is_absolute() else (repository / path).resolve()
+    if not resolved.is_file():
+        raise FileNotFoundError(
+            f"Virtualenv activation script is missing: {resolved}. Use --venv-activate to select the shared runtime."
+        )
+    return resolved
+
+
+def _bundle_setup_commands(
+    base_commands: list[str],
+    *,
+    bundle,
+    venv_activate: Path,
+) -> list[str]:
+    """Run cluster setup in the snapshot while activating the explicitly shared virtualenv."""
+    commands = [
+        f"cd {quote(str(bundle.repo_dir))}",
+        f"export TORCH_EXTENSIONS_DIR={quote(str(bundle.cache_dir / 'torch_extensions'))}",
+    ]
+    activated = False
+    for command in base_commands:
+        if command.strip() == "source .venv/bin/activate":
+            commands.append(f"source {quote(str(venv_activate))}")
+            activated = True
+        else:
+            commands.append(command)
+    if not activated:
+        commands.append(f"source {quote(str(venv_activate))}")
+    commands.append(f"export PYTHONPATH={quote(str(bundle.repo_dir / 'src'))}${{PYTHONPATH:+:$PYTHONPATH}}")
+    return commands
+
+
+def _git_head(repository: Path) -> str:
+    import subprocess
+
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repository,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
 
 
 def _refresh_outputs(

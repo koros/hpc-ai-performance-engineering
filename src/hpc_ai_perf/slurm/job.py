@@ -31,6 +31,7 @@ class SlurmJob:
     repetitions: int = 1
     run_output_dir: str | None = None
     log_dir: str = "results/raw"
+    pre_run_command: str | None = None
 
     @classmethod
     def from_config(
@@ -48,6 +49,7 @@ class SlurmJob:
         repetitions: int = 1,
         run_output_dir: str | Path | None = None,
         log_dir: str | Path = "results/raw",
+        pre_run_command: str | None = None,
     ) -> SlurmJob:
         """Create a Slurm job description from an experiment config.
 
@@ -75,6 +77,8 @@ class SlurmJob:
             command = f"python {base_command}"
         workers = int(config.workload.parameters.get("num_workers", 0))
         required_cpus = max(cpus_per_task, workers * max(1, gpus_per_node if distributed_training else 1))
+        if pre_run_command:
+            command = f"{pre_run_command}\n{command}"
         return cls(
             job_name=_job_name(config),
             command=command,
@@ -90,6 +94,7 @@ class SlurmJob:
             repetitions=repetitions,
             run_output_dir=str(run_output_dir) if run_output_dir else None,
             log_dir=str(log_dir),
+            pre_run_command=pre_run_command,
         )
 
     def render(self) -> str:
@@ -147,6 +152,7 @@ def render_slurm_script(
     repetitions: int = 1,
     run_output_dir: str | Path | None = None,
     log_dir: str | Path = "results/raw",
+    pre_run_command: str | None = None,
 ) -> str:
     """Convenience wrapper that builds and renders one Slurm script."""
     return SlurmJob.from_config(
@@ -162,6 +168,7 @@ def render_slurm_script(
         repetitions=repetitions,
         run_output_dir=run_output_dir,
         log_dir=log_dir,
+        pre_run_command=pre_run_command,
     ).render()
 
 

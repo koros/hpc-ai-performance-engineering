@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from hpc_ai_perf.result_identity import resolve_matrix_result_identity
+from hpc_ai_perf.slurm import validate_result_bundle_provenance
 from hpc_ai_perf.validation import validate_result_file, validate_result_records
 
 MAX_EVIDENCE_BYTES = 5 * 1024 * 1024
@@ -75,6 +76,9 @@ def import_result_evidence(
         if validation_issues:
             messages = "; ".join(issue.message for issue in validation_issues)
             raise ValueError(f"Evidence validation failed for {candidate}: {messages}")
+        bundle_issues = validate_result_bundle_provenance(data, candidate)
+        if bundle_issues:
+            raise ValueError(f"Bundle provenance validation failed for {candidate}: {'; '.join(bundle_issues)}")
         platform_id = infer_evidence_platform(data)
         target = root / platform_id / experiment_id / candidate.name
         source_bytes = candidate.read_bytes()
@@ -123,6 +127,9 @@ def verify_result_evidence(result_root: str | Path = "results/raw") -> list[str]
         platform_dir = root / platform_id
         if not platform_dir.exists():
             continue
+        result_paths = sorted(platform_dir.rglob("*.json"))
+        if not result_paths:
+            continue
         manifest_path = platform_dir / "SHA256SUMS"
         if not manifest_path.exists():
             problems.append(f"{manifest_path}: missing evidence checksum manifest")
@@ -136,7 +143,7 @@ def verify_result_evidence(result_root: str | Path = "results/raw") -> list[str]
             if parts[1] in expected:
                 problems.append(f"{manifest_path}:{line_number}: duplicate manifest path: {parts[1]}")
             expected[parts[1]] = parts[0]
-        actual_paths = {path.relative_to(platform_dir).as_posix(): path for path in platform_dir.rglob("*.json")}
+        actual_paths = {path.relative_to(platform_dir).as_posix(): path for path in result_paths}
         for relative_path in sorted(set(actual_paths) - set(expected)):
             problems.append(f"{actual_paths[relative_path]}: result is missing from SHA256SUMS")
         for relative_path in sorted(set(expected) - set(actual_paths)):

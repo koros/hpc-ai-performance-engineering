@@ -161,6 +161,13 @@ def _environment(
 
     environment["git_commit"] = _git_value(["git", "rev-parse", "HEAD"])
     environment["git_dirty"] = bool(_git_value(["git", "status", "--porcelain"]))
+    bundle_environment = {
+        "submission_bundle_id": os.environ.get("HPC_AI_SUBMISSION_BUNDLE_ID"),
+        "submission_bundle_manifest_sha256": os.environ.get("HPC_AI_SUBMISSION_BUNDLE_MANIFEST_SHA256"),
+        "submission_bundle_platform": os.environ.get("HPC_AI_SUBMISSION_BUNDLE_PLATFORM"),
+        "submission_bundle_wave": os.environ.get("HPC_AI_SUBMISSION_BUNDLE_WAVE"),
+    }
+    environment.update({key: value for key, value in bundle_environment.items() if value})
     environment.update(_nvidia_smi_metadata())
     for package in ["datasets", "deepspeed", "transformers", "vllm"]:
         try:

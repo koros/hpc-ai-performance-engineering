@@ -148,6 +148,21 @@ def test_render_slurm_can_stage_result_output() -> None:
     assert '--repetition "${SLURM_ARRAY_TASK_ID}"' in script
 
 
+def test_render_slurm_runs_bundle_verification_before_workload() -> None:
+    config_path = Path("configs/baseline_profiling/E008_gpt2_small_training_baseline.json")
+    config = load_experiment_config(config_path)
+
+    script = render_slurm_script(
+        config,
+        config_path,
+        pre_run_command=(
+            "python -m hpc_ai_perf.cli verify-submission-bundle --manifest /bundle/SUBMISSION_MANIFEST.json"
+        ),
+    )
+
+    assert script.index("verify-submission-bundle") < script.index("python -m hpc_ai_perf.cli run")
+
+
 def test_write_slurm_script(tmp_path: Path) -> None:
     script_path = write_slurm_script("#!/bin/bash\n", tmp_path, "E001")
 

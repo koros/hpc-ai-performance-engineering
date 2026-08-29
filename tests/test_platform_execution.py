@@ -502,3 +502,68 @@ def test_import_result_evidence_rejects_sensitive_fields(tmp_path: Path) -> None
 
     with pytest.raises(ValueError, match="Sensitive field `environment.api_key`"):
         import_result_evidence(source, tmp_path / "raw")
+
+
+def test_import_result_evidence_accepts_verified_submission_bundle(tmp_path: Path) -> None:
+    entry = next(entry for entry in discover_experiment_configs() if entry.config.experiment_id == "E123")
+    profile = load_platform_profile("platforms/l40s.json")
+    condition = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "l40s",
+        experiment_ids={"E123"},
+        include_deferred=False,
+    )[0]
+    config = resolve_platform_config(entry, profile, condition)
+    config_hash = hashlib.sha256(
+        json.dumps(config.to_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    staged = tmp_path / "bundle" / "results"
+    staged.mkdir(parents=True)
+    manifest = {
+        "schema_version": "1.0",
+        "bundle_id": "l40s-wave-2-test",
+        "platform_id": "l40s",
+        "wave": "2",
+        "repository": {"git_commit": "a" * 40, "snapshot_directory": "repo"},
+        "configs": {"E123": {"path": "E123.json", "sha256": config_hash, "required_trials": 3}},
+    }
+    manifest_path = staged / "SUBMISSION_MANIFEST.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    result = ExperimentResult.from_config(
+        config,
+        status="completed",
+        started_at="2026-08-27T10:00:00+00:00",
+        completed_at="2026-08-27T10:01:00+00:00",
+        runtime_seconds=60.0,
+        repetition_number=1,
+        metrics={
+            "measured_seconds": 50.0,
+            "gpu_hours": 50.0 / 3600,
+            "total_tokens": 1000,
+            "throughput_tokens_sec": 20.0,
+        },
+        environment={
+            "git_commit": "a" * 40,
+            "git_dirty": False,
+            "config_sha256": config_hash,
+            "command": "python -m hpc_ai_perf.cli run",
+            "observed_gpu_model": "NVIDIA L40S",
+            "submission_bundle_id": "l40s-wave-2-test",
+            "submission_bundle_manifest_sha256": manifest_hash,
+            "submission_bundle_platform": "l40s",
+            "submission_bundle_wave": "2",
+        },
+    )
+    result_path = result.write_json(staged, preserve_trial=True)
+
+    summary = import_result_evidence(staged, tmp_path / "raw")
+
+    assert summary.imported == (tmp_path / "raw" / "l40s" / "E123" / result_path.name,)
+    assert verify_result_evidence(tmp_path / "raw") == []
+
+
+def test_verify_result_evidence_ignores_empty_platform_directory(tmp_path: Path) -> None:
+    (tmp_path / "raw" / "h100").mkdir(parents=True)
+
+    assert verify_result_evidence(tmp_path / "raw") == []
