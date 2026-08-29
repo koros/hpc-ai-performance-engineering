@@ -100,11 +100,11 @@ class SlurmJob:
     def render(self) -> str:
         """Render the job description as a bash `sbatch` script.
 
-        The script intentionally uses relative output paths and setup commands
-        because the project workflow assumes jobs are submitted from the repo
-        root. Optional directives such as partition and account are omitted when
-        not provided so clusters that do not require them can still accept the
-        script.
+        Legacy rendering accepts relative paths for repository-root submission.
+        Immutable submission bundles pass absolute paths and an explicit
+        snapshot setup sequence instead. Optional directives such as partition
+        and account are omitted when not provided so clusters that do not
+        require them can still accept the script.
         """
         array_log_suffix = "%A_%a" if self.repetitions > 1 else "%j"
         lines = [

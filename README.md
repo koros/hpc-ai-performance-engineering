@@ -220,53 +220,51 @@ python -m hpc_ai_perf.cli render-slurm-bulk --phase "Environment validation" --p
 
 ## HPC Submission Workflow
 
-The active path uses the tracked L40S platform profile while the H100 node is unavailable. Validate it, generate wave
-0, and review the plan:
+Use an immutable submission bundle for every real Slurm wave. The bundle is a detached Git worktree plus frozen
+platform configs, Slurm scripts, an environment contract, and staging outside the primary checkout. This means that
+importing or committing an earlier result cannot invalidate jobs that are still waiting in Slurm.
+
+After loading the same runtime used by jobs, create a stable L40S Wave 0 bundle:
 
 ```bash
+source slurm/modules_for_hpc_ai
+source .venv/bin/activate
 python3 -m hpc_ai_perf.cli check-slurm-profile --slurm-profile slurm/profiles/cluster_l40s.json
-make render-l40s-wave PLATFORM_WAVE=0
-make plan-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
+
+make create-platform-wave-bundle \
+  PLATFORM=l40s PLATFORM_WAVE=0 \
+  SUBMISSION_BUNDLE_ID=l40s-wave-0-$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%SZ)
 ```
 
-This materializes generated configs under `build/platform_configs/l40s`, scripts under
-`slurm/generated/l40s/wave_0`, and staged result JSON under `build/platform_results/l40s/wave_0`. The source
-`E001-E200` configs remain unchanged. Rendering fails when a profile does not match the generated platform, preventing
-H100/L40S result mislabelling.
-
-Initialize status, dry-run, and then submit only after reviewing the generated files:
+The command prints the resulting directory, normally `../hpc-ai-submissions/<bundle-id>`. Set it once for the
+remaining actions:
 
 ```bash
-make init-platform-wave-status PLATFORM=l40s PLATFORM_WAVE=0
-make dry-run-submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
-make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
+export SUBMISSION_BUNDLE_DIR=../hpc-ai-submissions/<bundle-id>
+make plan-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0
+make init-platform-wave-bundle-status PLATFORM=l40s PLATFORM_WAVE=0
+make dry-run-submit-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0
+make submit-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0
 ```
 
-Wave 0 uses one acceptance trial per condition. Core performance waves use three-task Slurm arrays based on the
-tracked execution matrix. Each task writes an immutable, platform-qualified staged result with an explicit repetition
-number; see the [measurement protocol](docs/measurement_protocol.md).
+Each script verifies the source commit, manifest SHA-256, resolved config SHA-256, clean snapshot, and dependency
+contract before running. Results and logs remain in `$SUBMISSION_BUNDLE_DIR`, so the main checkout may safely receive
+and commit completed trials while other array tasks are queued.
 
-Import staged JSON through the evidence gate, then track accepted evidence separately from scheduler status:
+Import completed bundle results incrementally or after the wave, then verify and track them:
 
 ```bash
-make import-result-evidence SOURCE=build/platform_results/l40s/wave_0
+make import-platform-wave-bundle SUBMISSION_BUNDLE_DIR="$SUBMISSION_BUNDLE_DIR"
 make validate-result-evidence
 make track-l40s-progress
 ```
 
-When H100 returns, generate its independent conditions from the same logical matrix:
+Wave 0 uses one acceptance trial per condition. Core performance waves use three-task Slurm arrays based on the
+tracked execution matrix; see the [measurement protocol](docs/measurement_protocol.md). H100 uses the same bundle
+workflow with `PLATFORM=h100`; its evidence remains in a separate platform root.
 
-```bash
-make render-h100-wave PLATFORM_WAVE=0
-make track-h100-progress
-```
-
-Import JSON copied from the HPC or staged under `build/platform_results/...` through the integrity gate:
-
-```bash
-python3 -m hpc_ai_perf.cli import-result-evidence --source /tmp/hpc-result-staging
-make validate-result-evidence
-```
+The older `render-platform-wave` targets remain available for inspection and local script development, but they are
+not the recommended path for queued research collection.
 
 Detailed gated instructions are tracked in the [L40S-first execution runbook](docs/platform_execution_runbook.md).
 

@@ -8,6 +8,9 @@ PLATFORM_CONFIG_DIR ?= build/platform_configs/$(PLATFORM)
 PLATFORM_SLURM_DIR ?= slurm/generated/$(PLATFORM)/wave_$(PLATFORM_WAVE)
 PLATFORM_RUN_OUTPUT_DIR ?= build/platform_results/$(PLATFORM)/wave_$(PLATFORM_WAVE)
 PLATFORM_STATUS ?= results/processed/slurm_$(PLATFORM)_wave_$(PLATFORM_WAVE)_status.csv
+SUBMISSION_BUNDLE_ROOT ?= ../hpc-ai-submissions
+SUBMISSION_BUNDLE_ID ?=
+SUBMISSION_BUNDLE_DIR ?=
 RUNTIME_EXPECTED_GPU_MODEL ?= $(if $(filter h100,$(PLATFORM)),H100,L40S)
 EXPECTED_TORCH_VERSION ?= 2.8.0
 EXPECTED_TORCH_CUDA ?= 12.4
@@ -22,7 +25,7 @@ DEV_CONFIGS := $(sort $(wildcard configs/dev/*.json))
 DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
 
 # Dev targets run local Mac/workstation checks; matrix tracking stays separate.
-.PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile check-platform-runtime check-l40s-runtime check-h100-runtime materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-platform-wave submit-platform-wave track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate validate-result-evidence readiness-report refresh serve-dashboard
+.PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile check-platform-runtime check-l40s-runtime check-h100-runtime materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-platform-wave submit-platform-wave create-platform-wave-bundle plan-platform-wave-bundle init-platform-wave-bundle-status dry-run-submit-platform-wave-bundle submit-platform-wave-bundle import-platform-wave-bundle track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate validate-result-evidence readiness-report refresh serve-dashboard
 
 install-dev:
 	$(PYTHON) -m pip install -e ".[dev,yaml]"
@@ -100,6 +103,33 @@ dry-run-submit-platform-wave:
 
 submit-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli submit-slurm-batch --script-dir $(PLATFORM_SLURM_DIR) --status $(PLATFORM_STATUS)
+
+# Immutable bundles are the recommended path for real Slurm submissions. They
+# run from a detached source snapshot, so importing evidence cannot invalidate
+# jobs that are still queued from the same wave.
+create-platform-wave-bundle:
+	test -n "$(SUBMISSION_BUNDLE_ID)" || (echo "Set SUBMISSION_BUNDLE_ID to a stable wave identifier" && exit 1)
+	$(PYTHON) -m hpc_ai_perf.cli create-platform-submission-bundle --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) --bundle-id $(SUBMISSION_BUNDLE_ID) $(SLURM_PROFILE_ARG)
+
+plan-platform-wave-bundle:
+	test -n "$(SUBMISSION_BUNDLE_DIR)" || (echo "Set SUBMISSION_BUNDLE_DIR to the created bundle path" && exit 1)
+	$(PYTHON) -m hpc_ai_perf.cli plan-slurm-submission --script-dir $(SUBMISSION_BUNDLE_DIR)/scripts --output $(SUBMISSION_BUNDLE_DIR)/SUBMISSION_PLAN.md --batch-name "$(PLATFORM) wave $(PLATFORM_WAVE) bundle"
+
+init-platform-wave-bundle-status:
+	test -n "$(SUBMISSION_BUNDLE_DIR)" || (echo "Set SUBMISSION_BUNDLE_DIR to the created bundle path" && exit 1)
+	$(PYTHON) -m hpc_ai_perf.cli init-slurm-status --script-dir $(SUBMISSION_BUNDLE_DIR)/scripts --output $(SUBMISSION_BUNDLE_DIR)/SLURM_STATUS.csv --batch-name "$(PLATFORM) wave $(PLATFORM_WAVE) bundle"
+
+dry-run-submit-platform-wave-bundle:
+	test -n "$(SUBMISSION_BUNDLE_DIR)" || (echo "Set SUBMISSION_BUNDLE_DIR to the created bundle path" && exit 1)
+	$(PYTHON) -m hpc_ai_perf.cli submit-slurm-batch --script-dir $(SUBMISSION_BUNDLE_DIR)/scripts --status $(SUBMISSION_BUNDLE_DIR)/SLURM_STATUS.csv --dry-run
+
+submit-platform-wave-bundle:
+	test -n "$(SUBMISSION_BUNDLE_DIR)" || (echo "Set SUBMISSION_BUNDLE_DIR to the created bundle path" && exit 1)
+	$(PYTHON) -m hpc_ai_perf.cli submit-slurm-batch --script-dir $(SUBMISSION_BUNDLE_DIR)/scripts --status $(SUBMISSION_BUNDLE_DIR)/SLURM_STATUS.csv
+
+import-platform-wave-bundle:
+	test -n "$(SUBMISSION_BUNDLE_DIR)" || (echo "Set SUBMISSION_BUNDLE_DIR to the created bundle path" && exit 1)
+	$(PYTHON) -m hpc_ai_perf.cli import-result-evidence --source $(SUBMISSION_BUNDLE_DIR)/results --result-root results/raw
 
 track-platform-progress:
 	$(PYTHON) -m hpc_ai_perf.cli track-platform-progress --platform-profile $(PLATFORM_PROFILE)

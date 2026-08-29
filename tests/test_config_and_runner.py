@@ -1362,10 +1362,10 @@ def test_readme_documents_hpc_submission_workflow() -> None:
 
     assert "## HPC Submission Workflow" in readme
     assert "slurm/profiles/cluster_l40s.json" in readme
-    assert "make render-l40s-wave PLATFORM_WAVE=0" in readme
-    assert "make init-platform-wave-status PLATFORM=l40s PLATFORM_WAVE=0" in readme
-    assert "make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0" in readme
-    assert "import-result-evidence" in readme
+    assert "make create-platform-wave-bundle" in readme
+    assert "make init-platform-wave-bundle-status PLATFORM=l40s PLATFORM_WAVE=0" in readme
+    assert "make submit-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0" in readme
+    assert "make import-platform-wave-bundle" in readme
 
 
 def test_slurm_status_make_targets_do_not_rerender_scripts() -> None:

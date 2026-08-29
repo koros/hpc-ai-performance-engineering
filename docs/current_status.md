@@ -42,8 +42,9 @@ This snapshot summarises the repository state before full HPC submission. It sho
 ## Current HPC State
 
 Both L40S and H100 are available execution targets. They remain separate evidence streams: an L40S result is never
-relabelled as H100 evidence. Follow [the platform execution runbook](platform_execution_runbook.md) and render the
-same supported matrix scope for each platform.
+relabelled as H100 evidence. Follow [the platform execution runbook](platform_execution_runbook.md) and create an
+immutable submission bundle for each platform/wave. The bundle isolates queued work from later result imports and
+commits in the primary checkout.
 
 ## Before Each L40S Wave
 
@@ -61,30 +62,33 @@ same supported matrix scope for each platform.
    serving rows because the cluster lacks both a site-compatible vLLM package and a usable CUDA compiler toolchain for
    a supported build.
 
-2. Validate the active profile and render the selected platform wave:
+2. Validate the active profile and create the selected immutable platform-wave bundle:
 
    ```bash
    python -m hpc_ai_perf.cli check-slurm-profile --slurm-profile slurm/profiles/cluster_l40s.json
    python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed
-   make render-l40s-wave PLATFORM_WAVE=0
+   make create-platform-wave-bundle \
+     PLATFORM=l40s PLATFORM_WAVE=0 \
+     SUBMISSION_BUNDLE_ID=l40s-wave-0-$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%SZ)
    ```
 
    Run `check-runtime` from an allocated GPU node. The DeepSpeed portion must pass import/accelerator checks; if
    DeepSpeed 0.17.x is installed without `nvcc`, upgrade to the project-supported 0.18.9+ line or load a full CUDA
    toolkit before E005. The active wave 0 scope is E001-E005; vLLM is not a precondition for this supported scope.
 
-3. Review, initialize, and dry-run the Slurm batch:
+3. Set the printed bundle path, then review, initialize, and dry-run the Slurm batch:
 
    ```bash
-   make plan-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
-   make init-platform-wave-status PLATFORM=l40s PLATFORM_WAVE=0
-   make dry-run-submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
+   export SUBMISSION_BUNDLE_DIR=../hpc-ai-submissions/<bundle-id>
+   make plan-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0
+   make init-platform-wave-bundle-status PLATFORM=l40s PLATFORM_WAVE=0
+   make dry-run-submit-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0
    ```
 
 4. After completion, import and verify result evidence:
 
    ```bash
-   python -m hpc_ai_perf.cli import-result-evidence --source build/platform_results/l40s/wave_0
+   make import-platform-wave-bundle SUBMISSION_BUNDLE_DIR="$SUBMISSION_BUNDLE_DIR"
    make validate-result-evidence
    make track-l40s-progress
    ```
