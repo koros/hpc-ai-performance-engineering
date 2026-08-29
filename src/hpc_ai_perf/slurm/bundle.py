@@ -22,7 +22,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-_BUNDLE_ID = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+_BUNDLE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _MUTABLE_RESULT_PATHS = (
     "build/",
     "results/raw/",
@@ -68,7 +68,7 @@ def prepare_submission_bundle(
     queued, because they are not copied into the snapshot.
     """
     if not _BUNDLE_ID.fullmatch(bundle_id):
-        raise ValueError("bundle_id must use lowercase letters, numbers, dots, underscores, or hyphens")
+        raise ValueError("bundle_id must use letters, numbers, dots, underscores, or hyphens")
 
     repo_dir = _git_repository_root(repository)
     _validate_execution_inputs_clean(repo_dir)

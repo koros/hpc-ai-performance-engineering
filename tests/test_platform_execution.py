@@ -21,6 +21,7 @@ from hpc_ai_perf.results import (
     import_result_evidence,
     verify_result_evidence,
 )
+from hpc_ai_perf.slurm.bundle import _BUNDLE_ID
 from hpc_ai_perf.tracking import build_platform_progress_rows, track_platform_progress
 from hpc_ai_perf.validation import validate_result_records
 
@@ -34,6 +35,10 @@ def test_platform_profiles_load() -> None:
     assert l40s.output_root == "results/raw/l40s"
     assert h100.platform_id == "h100"
     assert h100.max_gpus == 4
+
+
+def test_submission_bundle_id_accepts_documented_utc_timestamp() -> None:
+    assert _BUNDLE_ID.fullmatch("l40s-wave-1-f18d325-20260829T231916Z")
 
 
 def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
