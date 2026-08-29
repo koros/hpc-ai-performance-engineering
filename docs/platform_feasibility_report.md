@@ -30,10 +30,10 @@ The companion [platform experiment matrix](platform_experiment_matrix.md) gives 
 | Scope | Count | Interpretation |
 | --- | ---: | --- |
 | Total matrix configs | 200 | `E001-E200` |
-| Planned L40S conditions | 181 | Generated as `E###@l40s`; run in gated waves while H100 is unavailable. |
-| Deferred L40S conditions | 19 | Fourteen backend/adapter rows, L40S `E007`, and four H100-specific hardware rows. |
-| Planned H100 conditions | 182 | Generated as `E###@h100` when the node returns. |
-| Deferred H100 conditions | 18 | Fourteen backend/adapter rows and four L40S-specific hardware rows. |
+| Planned L40S conditions | 144 | Generated as `E###@l40s`; run in gated waves on the validated PyTorch CUDA stack. |
+| Deferred L40S conditions | 56 | Existing backend/adapter rows, 37 site-blocked vLLM rows, TensorRT-LLM `E007`, and four H100-specific hardware rows. |
+| Planned H100 conditions | 144 | Generated as `E###@h100`; run the same supported scope when allocation is available. |
+| Deferred H100 conditions | 56 | Existing backend/adapter rows, 37 site-blocked vLLM rows, TensorRT-LLM `E007`, and four L40S-specific hardware rows. |
 | Mac M1 smoke configs | 4 | `configs/local/*`; minimal workflow checks. |
 | Mac M1 dev configs | 15 | `configs/dev/*`; lightweight MPS/CPU development checks. |
 
@@ -78,11 +78,11 @@ companion:
 - use the `gpu_l40s` queue/profile and repeat the L40S environment-validation sequence before matrix collection; and
 - report communication as NCCL/PCIe behaviour, not NVLink behaviour.
 
-L40S is suitable for single-GPU baselines, 1/2/4-GPU scaling, DDP/FSDP/ZeRO comparisons, memory optimisation, data-movement studies, power/energy analysis, and supported PyTorch/vLLM inference. Its results answer L40S-specific questions. They do not replace H100 evidence for H100-specific research questions.
+L40S is suitable for single-GPU baselines, 1/2/4-GPU scaling, DDP/FSDP/ZeRO comparisons, memory optimisation, data-movement studies, power/energy analysis, and supported PyTorch inference. Its results answer L40S-specific questions. They do not replace H100 evidence for H100-specific research questions.
 
 ### H100: deferred collection path, already materializable
 
-When the node returns, generate the 182 planned H100 conditions from the same matrix and begin with wave 0. This is
+Generate the 144 planned H100 conditions from the same matrix and begin with wave 0. This is
 the only target that supports the dissertation's current wording about one-to-four H100 scaling and H100 NVLink
 behaviour. No L40S result is promoted or relabelled; matched conditions are compared only after both exist.
 
@@ -92,7 +92,8 @@ Use the H100 node for the core baseline trials, 1/2/4-GPU scaling, distributed-s
 
 | IDs | Reason | Required before release |
 | --- | --- | --- |
-| `E007@l40s` | The saved-engine adapter is implemented, but an L40S-compatible TensorRT-LLM engine environment is not prepared. | A compatible pinned environment, local TinyLlama checkpoint, and successful build/load/request result. `E007@h100` remains an H100 acceptance condition. |
+| `E006`, `E130`, `E132-E148`, `E178`, `E180-E196` | The cluster has no site-compatible vLLM package and no usable CUDA compiler toolchain for a compatible build. | An administrator-provided vLLM module, compatible container, or supported CUDA/PyTorch/vLLM build environment. |
+| `E007` | TensorRT-LLM requires a compatible environment, usable CUDA build toolchain, pinned model, and saved-engine contract. | A compatible pinned environment, local TinyLlama checkpoint, and successful build/load/request result on each target platform. |
 | `E131`, `E155`, `E179` | TensorRT-LLM performance integration is absent; `E155` is also not a valid generic DistilBERT classification adapter. | Reuse the validated E007 engine contract in causal-LM benchmarks; design a separate classification contract for E155. |
 | `E086`, `E089`, `E093`, `E096`, `E151`, `E175`, `E199` | FP8 backend/model implementation is not selected or validated. | A documented, tested backend and model path on the target GPU. |
 | `E152`, `E176`, `E200` | Quantization method, calibration, and immutable quantized artefact are absent. | Named method, calibration protocol, artefact hash, and matching serving runtime. |
@@ -103,7 +104,7 @@ Use the H100 node for the core baseline trials, 1/2/4-GPU scaling, distributed-s
 | Order | Mac M1 | L40/L40S | H100 | Why |
 | ---: | --- | --- | --- | --- |
 | 0 | Smoke and dev profile | Inspect GPU name, memory, CUDA, and topology | Inspect GPU name, memory, CUDA, and topology | Avoid model/profile mismatch before spending queue time. |
-| 1 | Baseline-shaped dev checks | Wave 0: `E001-E006` | H100 wave 0 when available | Establish CUDA, NCCL, FSDP, DeepSpeed, and serving viability. |
+| 1 | Baseline-shaped dev checks | Wave 0: `E001-E005` | Wave 0: `E001-E005` | Establish CUDA, NCCL, FSDP, and DeepSpeed viability before collecting evidence. |
 | 2 | GPT-2/DistilBERT adapter checks | Wave 1, then wave 2 direct hardware pairs | H100 wave 1, then wave 2 when available | Build repeatable reference measurements and matched platform anchors. |
 | 3 | No further publishable work | Wave 3 scaling and strategy pilots | H100 wave 3 later | Check 1/2/4-GPU availability and strategy stability before large sweeps. |
 | 4 | Optional local shape checks | Waves 4, 4b, and 5 | Matching H100 waves later | Collect depth only after the core path is stable. |

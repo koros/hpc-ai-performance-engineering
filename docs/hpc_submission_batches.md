@@ -46,10 +46,10 @@ DS_BUILD_OPS=0 DS_BUILD_AIO=0 python -m pip install \
 
 Review `slurm/modules_for_hpc_ai` on the cluster before submitting. If the module stack changes, edit that helper or replace it in `setup_commands` with the appropriate `module load ...` commands.
 
-From an allocated GPU node, run the runtime gate before environment-validation batches:
+From an allocated GPU node, run the core runtime gate before environment-validation batches:
 
 ```bash
-python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed --require-vllm
+python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed
 ```
 
 Use the profile while rendering:
@@ -74,18 +74,19 @@ make dry-run-submit-slurm-first
 
 ## Batch 1: Environment Validation
 
-Purpose: confirm CUDA, PyTorch DDP/NCCL, FSDP, and inference serving dependencies on the target cluster.
+Purpose: confirm CUDA, PyTorch DDP/NCCL, FSDP, and DeepSpeed dependencies on the target cluster. vLLM and
+TensorRT-LLM rows are temporarily deferred because the site does not provide their compatible build environments.
 
 Generate scripts:
 
 ```bash
-make render-slurm-env-validation
+make render-slurm-env-validation PLATFORM=l40s
 ```
 
 Or with site defaults:
 
 ```bash
-SLURM_PROFILE=slurm/profiles/cluster.local.json make render-slurm-env-validation
+SLURM_PROFILE=slurm/profiles/cluster.local.json make render-slurm-env-validation PLATFORM=l40s
 ```
 
 Expected scripts:
@@ -96,7 +97,7 @@ Expected scripts:
 | `E002` | DDP/NCCL 2-GPU validation |
 | `E003` | DDP/NCCL 4-GPU validation |
 | `E004` | FSDP 2-GPU validation |
-| `E006` | vLLM 1-GPU inference validation |
+| `E005` | DeepSpeed ZeRO 2-GPU validation |
 
 Review before submission:
 

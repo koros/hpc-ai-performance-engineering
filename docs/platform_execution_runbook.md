@@ -36,9 +36,10 @@ sinfo -p gpu_l40s,gpu_h100
 Do not use `--upgrade-strategy eager` on Lovelace; it can mix PyPI Torch/Numpy wheels with the Spack CUDA/PyTorch
 runtime and invalidate both DeepSpeed and vLLM checks.
 
-Before E006 or any later vLLM wave, install vLLM separately for the exact active CUDA/PyTorch/driver stack. If PyTorch
-reports CUDA 12.x but `import vllm` fails looking for `libcudart.so.13`, the installed vLLM wheel targets a different
-CUDA runtime and must be replaced before the result can be accepted.
+The current execution matrix deliberately defers E006 and all other vLLM-serving rows. The PyTorch CUDA runtime is
+healthy, but the site has neither a compatible vLLM package nor a usable CUDA compiler toolchain for a supported build.
+Do not install a generic PyPI vLLM wheel into this environment. Re-enable those rows only after an administrator
+provides a compatible vLLM module, container, or build environment and its dedicated preflight passes.
 
 On an L40S allocation, capture the actual device and topology before accepting results:
 
@@ -60,17 +61,12 @@ source .venv/bin/activate
 python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --expected-gpus 2 --require-deepspeed
 '
 
-srun -p gpu_l40s --gres=gpu:1 --cpus-per-task=8 --time=00:10:00 bash -lc '
-cd ./
-source slurm/modules_for_hpc_ai
-source .venv/bin/activate
-python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --expected-gpus 1 --require-vllm
-'
 ```
 
 The DeepSpeed check may warn when `nvcc` is unavailable, but it must still pass `deepspeed_import`. If DeepSpeed 0.17.x
 is installed without a full CUDA toolkit, upgrade to the project-supported DeepSpeed 0.18.9+ line or load a toolkit whose
-`CUDA_HOME/bin/nvcc` exists before running E005. The vLLM check must pass before E006 can become accepted evidence.
+`CUDA_HOME/bin/nvcc` exists before running E005. The current wave 0 scope is E001-E005; do not run a vLLM check or E006
+until the separate serving environment has been supplied.
 
 ## 2. Import L40S Trials Already Run
 
@@ -114,16 +110,16 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 
 | Wave | Conditions | Trials | Release gate |
 | --- | --- | ---: | --- |
-| `0` | `E001-E006` environment validation | 1 | All six Complete; observed L40S/CUDA/distributed/backend checks agree. |
+| `0` | `E001-E005` core environment validation | 1 | All five Complete; observed L40S/CUDA/distributed/DeepSpeed checks agree. |
 | `1` | `E008-E015`, `E018-E031` baselines and characterisation | 3 | Core rows Complete; variance and provenance reviewed. |
 | `2` | `E123`, `E124`, `E127`, `E128` direct L40S comparison anchors | 3 | All matched L40S anchors Complete. |
 | `3` | `E032-E043`, `E047-E062` scaling and strategies | 3 | 1-GPU reference valid; 2/4-GPU pilot stable. |
 | `4` | Supported memory, precision, and data movement rows | 3 | No silent OOM-driven shape changes; precision backend observed. |
 | `4b` | `E113-E120` communication | 3 | Interpret as NCCL over installed PCIe topology; no NVLink claims. |
-| `5` | Supported inference rows | 3 | Engine, request shape, concurrency, and precision verified. |
+| `5` | Supported PyTorch inference rows | 3 | PyTorch engine, request shape, concurrency, and precision verified; vLLM rows stay deferred. |
 | `optional` | `E016-E017`, `E044-E046` | 3 | Run only if memory and queue budget remain. |
 
-`E007@l40s` and backend/adapter rows listed as Deferred are not rendered by platform batch commands.
+E006, E007, all vLLM-serving rows, and backend/adapter rows listed as Deferred are not rendered by platform batch commands.
 
 ## 4. Render, Review, and Submit One Wave
 

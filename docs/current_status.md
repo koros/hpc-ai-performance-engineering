@@ -14,7 +14,7 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | Distributed execution | One-process-per-GPU `torchrun`, DDP, FSDP, DeepSpeed ZeRO, rank binding, global work accounting, and rank-safe result writing are implemented. |
 | Profiling | nvidia-smi power/utilisation/memory/clock/temperature sampling, PyTorch traces, workload timing, and NCCL microbenchmark metrics are implemented. |
 | Slurm support | Semantic-gated single/bulk rendering, H100/L40S profile matching, CPU allocation checks, and three transformer smoke presets are available. |
-| Platform execution | All 200 logical rows route exactly once per platform. There are 181 planned L40S conditions and 182 planned H100 conditions, with generated configs, wave-based Slurm batches, and separate trial trackers. |
+| Platform execution | All 200 logical rows route exactly once per platform. There are 144 planned L40S conditions and 144 planned H100 conditions; vLLM and TensorRT-LLM rows are explicitly deferred until their site-compatible build environments exist. |
 | Evidence retention | L40S/H100 JSON is imported non-destructively into separate roots, scanned for sensitive keys, validated, and covered by tracked SHA-256 manifests. |
 | Dashboard | Static dashboard reads processed results, analysis summaries, and readiness report output. |
 | Quality gates | `pytest`, `ruff`, and `pre-commit` are configured and passing. |
@@ -41,10 +41,9 @@ This snapshot summarises the repository state before full HPC submission. It sho
 
 ## Current HPC State
 
-The L40S node is the active execution target. The H100 node is unavailable, so H100 rows remain unrun rather than
-being marked failed or replaced by L40S measurements. Follow
-[the L40S-first platform runbook](platform_execution_runbook.md); the same matrix can render H100 conditions when the
-node returns.
+Both L40S and H100 are available execution targets. They remain separate evidence streams: an L40S result is never
+relabelled as H100 evidence. Follow [the platform execution runbook](platform_execution_runbook.md) and render the
+same supported matrix scope for each platform.
 
 ## Before Each L40S Wave
 
@@ -58,21 +57,21 @@ node returns.
      -e ".[dev,yaml,workloads,distributed]"
    ```
 
-   Install vLLM separately for the active CUDA/PyTorch module stack before E006 or any later vLLM row. A wheel built
-   against another CUDA runtime, such as one expecting `libcudart.so.13` while the active PyTorch reports CUDA 12.x,
-   must be replaced with a site-compatible vLLM install.
+   Do not install a generic vLLM wheel into this environment. The platform matrix currently defers E006 and all vLLM
+   serving rows because the cluster lacks both a site-compatible vLLM package and a usable CUDA compiler toolchain for
+   a supported build.
 
 2. Validate the active profile and render the selected platform wave:
 
    ```bash
    python -m hpc_ai_perf.cli check-slurm-profile --slurm-profile slurm/profiles/cluster_l40s.json
-   python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed --require-vllm
+   python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed
    make render-l40s-wave PLATFORM_WAVE=0
    ```
 
    Run `check-runtime` from an allocated GPU node. The DeepSpeed portion must pass import/accelerator checks; if
    DeepSpeed 0.17.x is installed without `nvcc`, upgrade to the project-supported 0.18.9+ line or load a full CUDA
-   toolkit before E005. The vLLM portion must pass before E006 can be accepted.
+   toolkit before E005. The active wave 0 scope is E001-E005; vLLM is not a precondition for this supported scope.
 
 3. Review, initialize, and dry-run the Slurm batch:
 
@@ -100,15 +99,15 @@ node returns.
 
 | Area | Remaining work |
 | --- | --- |
-| HPC verification | Run L40S wave 0, then baseline and 1/2/4-GPU pilots. H100 wave 0 waits for node recovery; local tests cannot validate CUDA/NCCL/Slurm behaviour. |
+| HPC verification | Run the E001-E005 core wave on each platform, then baseline and 1/2/4-GPU pilots. Local tests cannot validate CUDA/NCCL/Slurm behaviour. |
 | Independent trials | Baseline scripts render as three-task Slurm arrays; execute them on Lovelace and inspect confidence intervals and variance from preserved trial records. |
-| Backend-dependent rows | FP8 and INT8 rows still require named backend/calibration artefacts. E007 now has a saved-engine build/load/request adapter and remains deferred only until target-H100 validation; TensorRT-LLM benchmark rows still require performance-adapter integration. |
+| Backend-dependent rows | vLLM rows are deferred until the administrator provides a compatible module/container/build environment. TensorRT-LLM E007 also needs a usable CUDA build toolchain and compatible engine environment; FP8/INT8 rows still need named backend/calibration artefacts. |
 | Invalid DistilBERT framework rows | `E154-E155` must be removed from executable scope or redesigned around classification-compatible backends. |
-| vLLM NCCL telemetry | `E147-E148` and `E195-E196` no longer claim request-path NCCL telemetry; they remain executable with serving-latency and system profilers. |
+| vLLM NCCL telemetry | `E147-E148` and `E195-E196` remain deferred with the other vLLM rows; they do not claim unavailable request-path NCCL telemetry. |
 | Communication depth | The NCCL microbenchmark and PyTorch trace do not yet provide NVLink counters or full communication/compute attribution. |
 | Quality scope | Synthetic held-out checks detect instability; final RQ3 quality claims still need a preregistered real evaluation protocol. |
 | Dashboard | Trial confidence intervals and explicit insufficient-data states are connected; dedicated RQ views and conclusion-to-trial traceability remain. |
 
 ## Deferred Research Scope
 
-Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative gate; it must pass with zero blockers. The platform tracker lists deferred rows that are intentionally excluded from generated deployment waves. `E007@h100` is an acceptance condition for when H100 returns; `E007@l40s` stays deferred until a compatible L40S engine environment exists. Other deferred rows still require their documented FP8, quantization, or serving prerequisites.
+Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative gate; it must pass with zero blockers. The platform tracker lists deferred rows that are intentionally excluded from generated deployment waves. E006 and the vLLM serving studies remain deferred on both platforms until a compatible site environment exists; E007 remains deferred pending its CUDA-toolkit/TensorRT-LLM prerequisites. Other deferred rows still require their documented FP8, quantization, or serving prerequisites.

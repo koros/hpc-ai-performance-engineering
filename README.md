@@ -142,10 +142,10 @@ DS_BUILD_OPS=0 DS_BUILD_AIO=0 python -m pip install \
   -e ".[dev,yaml,workloads,distributed]"
 ```
 
-Install vLLM separately only after confirming the cluster CUDA/PyTorch stack. Its wheels are CUDA-ABI-specific, so a
-generic latest PyPI install can import a wheel that expects a different CUDA runtime. For example, if `torch.version.cuda`
-reports `12.4` but `import vllm` fails looking for `libcudart.so.13`, remove that vLLM wheel and install or build one
-matching the site runtime before running E006 or later vLLM rows.
+The current platform matrix defers vLLM rows because this site has no compatible vLLM package and no usable CUDA
+compiler toolchain for a supported build. Do not install a generic PyPI vLLM wheel into the shared environment. Its
+wheels are CUDA-ABI-specific and may expect another runtime (for example `libcudart.so.13` while PyTorch reports CUDA
+12.4). Re-enable vLLM only after the site provides a compatible module, container, or build environment.
 
 Do not use `--upgrade-strategy eager` on Lovelace because it can install PyPI Torch/Numpy over the Spack-provided CUDA
 runtime stack.
@@ -153,7 +153,7 @@ runtime stack.
 Before running environment-validation waves from an allocated GPU node, check the active runtime:
 
 ```bash
-python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed --require-vllm
+python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed
 ```
 
 DeepSpeed 0.17.x can still require `CUDA_HOME/bin/nvcc` during import-time optional-op probes. Use the project
