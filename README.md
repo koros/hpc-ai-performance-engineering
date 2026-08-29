@@ -135,7 +135,11 @@ python -m pip install -e ".[dev,yaml,workloads]"
 On the Linux GPU cluster, install the extras required by the selected batch:
 
 ```bash
-python -m pip install -e ".[dev,yaml,workloads,distributed]"
+source slurm/modules_for_hpc_ai
+DS_BUILD_OPS=0 DS_BUILD_AIO=0 python -m pip install \
+  --constraint slurm/constraints/lovelace_py311_cuda124.txt \
+  --upgrade-strategy only-if-needed \
+  -e ".[dev,yaml,workloads,distributed]"
 ```
 
 Install vLLM separately only after confirming the cluster CUDA/PyTorch stack. Its wheels are CUDA-ABI-specific, so a
@@ -143,10 +147,13 @@ generic latest PyPI install can import a wheel that expects a different CUDA run
 reports `12.4` but `import vllm` fails looking for `libcudart.so.13`, remove that vLLM wheel and install or build one
 matching the site runtime before running E006 or later vLLM rows.
 
+Do not use `--upgrade-strategy eager` on Lovelace because it can install PyPI Torch/Numpy over the Spack-provided CUDA
+runtime stack.
+
 Before running environment-validation waves from an allocated GPU node, check the active runtime:
 
 ```bash
-python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --require-deepspeed --require-vllm
+python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed --require-vllm
 ```
 
 DeepSpeed 0.17.x can still require `CUDA_HOME/bin/nvcc` during import-time optional-op probes. Use the project

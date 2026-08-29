@@ -9,11 +9,18 @@ Clone or update the project on the cluster login node, then work from the projec
 ```bash
 cd ~/hpc-ai-performance-engineering
 git pull
+source slurm/modules_for_hpc_ai
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e ".[dev,yaml,workloads,distributed]"
+DS_BUILD_OPS=0 DS_BUILD_AIO=0 python -m pip install \
+  --constraint slurm/constraints/lovelace_py311_cuda124.txt \
+  --upgrade-strategy only-if-needed \
+  -e ".[dev,yaml,workloads,distributed]"
 ```
+
+Do not use `--upgrade-strategy eager` on the cluster. It can replace the site-provided PyTorch/Numpy runtime with PyPI
+wheels and create a mixed Spack/PyPI environment.
 
 Install vLLM separately for the active cluster CUDA/PyTorch stack before running E006 or later vLLM experiments. Do not
 treat a generic latest PyPI vLLM wheel as portable across CUDA runtimes; if `import vllm` fails with a missing
@@ -31,13 +38,29 @@ Review `slurm/modules_for_hpc_ai` on the cluster and adjust module names if Love
 Before submitting environment-validation jobs, run the runtime preflight from an allocated GPU node:
 
 ```bash
-python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --require-deepspeed --require-vllm
+python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed --require-vllm
 ```
 
 Run the DeepSpeed check inside an allocation with the same GPU count as E005. A missing-`nvcc` warning is acceptable
 only if `deepspeed_import` and `deepspeed_accelerator` still pass. If DeepSpeed 0.17.x is installed without a full CUDA
 toolkit, upgrade to the project-supported DeepSpeed 0.18.9+ line or load a toolkit whose `CUDA_HOME/bin/nvcc` exists.
 If the vLLM check fails, fix the vLLM install before running E006.
+
+If pip has already upgraded Torch, Numpy, or vLLM inside `.venv`, move that environment aside and rebuild it:
+
+```bash
+deactivate 2>/dev/null || true
+mv .venv ".venv-contaminated-$(date -u +%Y%m%dT%H%M%SZ)"
+source slurm/modules_for_hpc_ai
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+DS_BUILD_OPS=0 DS_BUILD_AIO=0 python -m pip install \
+  --constraint slurm/constraints/lovelace_py311_cuda124.txt \
+  --upgrade-strategy only-if-needed \
+  -e ".[dev,yaml,workloads,distributed]"
+python -m pip uninstall -y vllm vllm-flash-attn torchvision
+```
 
 ## 2. Validate Repository State
 

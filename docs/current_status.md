@@ -51,7 +51,11 @@ node returns.
 1. Install the workload extra on the cluster:
 
    ```bash
-   python -m pip install -e ".[dev,yaml,workloads,distributed]"
+   source slurm/modules_for_hpc_ai
+   DS_BUILD_OPS=0 DS_BUILD_AIO=0 python -m pip install \
+     --constraint slurm/constraints/lovelace_py311_cuda124.txt \
+     --upgrade-strategy only-if-needed \
+     -e ".[dev,yaml,workloads,distributed]"
    ```
 
    Install vLLM separately for the active CUDA/PyTorch module stack before E006 or any later vLLM row. A wheel built
@@ -62,7 +66,7 @@ node returns.
 
    ```bash
    python -m hpc_ai_perf.cli check-slurm-profile --slurm-profile slurm/profiles/cluster_l40s.json
-   python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --require-deepspeed --require-vllm
+   python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed --require-vllm
    make render-l40s-wave PLATFORM_WAVE=0
    ```
 

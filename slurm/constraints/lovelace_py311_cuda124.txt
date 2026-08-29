@@ -1,0 +1,10 @@
+# Lovelace Spack module stack used by slurm/modules_for_hpc_ai.
+# Use this with pip's -c/--constraint option after sourcing the cluster modules.
+#
+# These constraints stop pip from replacing site-provided binary runtime
+# packages with unrelated PyPI wheels during editable project installs.
+torch==2.8.0
+numpy==1.26.4
+numba==0.59.1
+aiohttp==3.11.16
+deepspeed>=0.18.9,<0.20

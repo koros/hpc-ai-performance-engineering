@@ -18,7 +18,7 @@ dev = [
 yaml = ["PyYAML>=6.0"]
 workloads = [
     "datasets>=2.20,<5",
-    "torch>=2.4,<3",
+    "torch>=2.8,<2.9",
     "transformers>=4.44,<5",
 ]
 distributed = ["deepspeed>=0.18.9,<0.20"]

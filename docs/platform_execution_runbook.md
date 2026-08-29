@@ -23,11 +23,18 @@ and keeps raw evidence physically and semantically separate.
 From a clean checkout on the HPC login node:
 
 ```bash
-python3 -m pip install -e ".[dev,yaml,workloads,distributed]"
+source slurm/modules_for_hpc_ai
+python3 -m pip install \
+  --constraint slurm/constraints/lovelace_py311_cuda124.txt \
+  --upgrade-strategy only-if-needed \
+  -e ".[dev,yaml,workloads,distributed]"
 python3 -m hpc_ai_perf.cli validate --skip-results --research-ready
 python3 -m hpc_ai_perf.cli check-slurm-profile --slurm-profile slurm/profiles/cluster_l40s.json
 sinfo -p gpu_l40s,gpu_h100
 ```
+
+Do not use `--upgrade-strategy eager` on Lovelace; it can mix PyPI Torch/Numpy wheels with the Spack CUDA/PyTorch
+runtime and invalidate both DeepSpeed and vLLM checks.
 
 Before E006 or any later vLLM wave, install vLLM separately for the exact active CUDA/PyTorch/driver stack. If PyTorch
 reports CUDA 12.x but `import vllm` fails looking for `libcudart.so.13`, the installed vLLM wheel targets a different
@@ -50,14 +57,14 @@ srun -p gpu_l40s --gres=gpu:2 --cpus-per-task=8 --time=00:10:00 bash -lc '
 cd ./
 source slurm/modules_for_hpc_ai
 source .venv/bin/activate
-python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-gpus 2 --require-deepspeed
+python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --expected-gpus 2 --require-deepspeed
 '
 
 srun -p gpu_l40s --gres=gpu:1 --cpus-per-task=8 --time=00:10:00 bash -lc '
 cd ./
 source slurm/modules_for_hpc_ai
 source .venv/bin/activate
-python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-gpus 1 --require-vllm
+python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --expected-gpus 1 --require-vllm
 '
 ```
 

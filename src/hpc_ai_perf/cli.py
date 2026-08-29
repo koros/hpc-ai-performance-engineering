@@ -226,6 +226,8 @@ def main() -> None:
         checks = run_cluster_runtime_checks(
             expected_gpu_model=args.expected_gpu_model,
             expected_gpus=args.expected_gpus,
+            expected_torch_version=args.expected_torch_version,
+            expected_torch_cuda=args.expected_torch_cuda,
             require_deepspeed=args.require_deepspeed,
             require_vllm=args.require_vllm,
             require_clean_git=not args.allow_dirty_git,
@@ -508,6 +510,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--expected-gpu-model", default=None, help="Substring expected in each CUDA device name."
     )
     runtime_parser.add_argument("--expected-gpus", type=int, default=None, help="Exact visible CUDA device count.")
+    runtime_parser.add_argument("--expected-torch-version", default=None, help="Expected torch version prefix.")
+    runtime_parser.add_argument("--expected-torch-cuda", default=None, help="Expected torch.version.cuda string.")
     runtime_parser.add_argument(
         "--require-deepspeed", action="store_true", help="Require DeepSpeed import and CUDA accelerator detection."
     )

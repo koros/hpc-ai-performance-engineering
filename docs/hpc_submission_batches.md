@@ -38,6 +38,10 @@ The default local profile assumes jobs are submitted from the project root. Load
 ```bash
 source slurm/modules_for_hpc_ai
 source .venv/bin/activate
+DS_BUILD_OPS=0 DS_BUILD_AIO=0 python -m pip install \
+  --constraint slurm/constraints/lovelace_py311_cuda124.txt \
+  --upgrade-strategy only-if-needed \
+  -e ".[dev,yaml,workloads,distributed]"
 ```
 
 Review `slurm/modules_for_hpc_ai` on the cluster before submitting. If the module stack changes, edit that helper or replace it in `setup_commands` with the appropriate `module load ...` commands.
@@ -45,7 +49,7 @@ Review `slurm/modules_for_hpc_ai` on the cluster before submitting. If the modul
 From an allocated GPU node, run the runtime gate before environment-validation batches:
 
 ```bash
-python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --require-deepspeed --require-vllm
+python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed --require-vllm
 ```
 
 Use the profile while rendering:

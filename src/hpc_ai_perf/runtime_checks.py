@@ -88,6 +88,8 @@ def run_cluster_runtime_checks(
     *,
     expected_gpu_model: str | None = None,
     expected_gpus: int | None = None,
+    expected_torch_version: str | None = None,
+    expected_torch_cuda: str | None = None,
     require_deepspeed: bool = False,
     require_vllm: bool = False,
     require_clean_git: bool = True,
@@ -116,7 +118,9 @@ def run_cluster_runtime_checks(
     if torch_module is None:
         return tuple(checks)
 
-    checks.extend(_torch_cuda_checks(torch_module, expected_gpu_model, expected_gpus))
+    checks.extend(
+        _torch_cuda_checks(torch_module, expected_gpu_model, expected_gpus, expected_torch_version, expected_torch_cuda)
+    )
 
     if require_deepspeed:
         checks.extend(_deepspeed_checks(torch_module))
@@ -175,14 +179,38 @@ def _torch_cuda_checks(
     torch: Any,
     expected_gpu_model: str | None,
     expected_gpus: int | None,
+    expected_torch_version: str | None,
+    expected_torch_cuda: str | None,
 ) -> list[RuntimeCheck]:
+    torch_version = str(getattr(torch, "__version__", "unknown"))
+    torch_cuda = str(getattr(torch.version, "cuda", "unknown"))
     checks: list[RuntimeCheck] = [
         RuntimeCheck(
             "torch_import",
             "pass",
-            f"torch {getattr(torch, '__version__', 'unknown')} cuda {getattr(torch.version, 'cuda', 'unknown')}",
+            f"torch {torch_version} cuda {torch_cuda}",
         )
     ]
+    if expected_torch_version:
+        status = "pass" if torch_version.startswith(expected_torch_version) else "fail"
+        checks.append(
+            RuntimeCheck(
+                "torch_version",
+                status,
+                f"expected {expected_torch_version}, observed {torch_version}",
+                "Rebuild the venv with slurm/constraints/lovelace_py311_cuda124.txt." if status == "fail" else None,
+            )
+        )
+    if expected_torch_cuda:
+        status = "pass" if torch_cuda == expected_torch_cuda else "fail"
+        checks.append(
+            RuntimeCheck(
+                "torch_cuda_version",
+                status,
+                f"expected {expected_torch_cuda}, observed {torch_cuda}",
+                "Load the Lovelace PyTorch/CUDA module stack before activating the venv." if status == "fail" else None,
+            )
+        )
     try:
         cuda_available = bool(torch.cuda.is_available())
     except Exception as exc:  # pragma: no cover - depends on active environment

@@ -9,6 +9,8 @@ PLATFORM_SLURM_DIR ?= slurm/generated/$(PLATFORM)/wave_$(PLATFORM_WAVE)
 PLATFORM_RUN_OUTPUT_DIR ?= build/platform_results/$(PLATFORM)/wave_$(PLATFORM_WAVE)
 PLATFORM_STATUS ?= results/processed/slurm_$(PLATFORM)_wave_$(PLATFORM_WAVE)_status.csv
 RUNTIME_EXPECTED_GPU_MODEL ?= $(if $(filter h100,$(PLATFORM)),H100,L40S)
+EXPECTED_TORCH_VERSION ?= 2.8.0
+EXPECTED_TORCH_CUDA ?= 12.4
 EXPECTED_GPUS ?=
 EXPECTED_GPUS_ARG := $(if $(EXPECTED_GPUS),--expected-gpus $(EXPECTED_GPUS),)
 REQUIRE_DEEPSPEED ?=
@@ -66,7 +68,7 @@ check-slurm-profile:
 	$(PYTHON) -m hpc_ai_perf.cli check-slurm-profile --slurm-profile $(SLURM_PROFILE)
 
 check-platform-runtime:
-	$(PYTHON) -m hpc_ai_perf.cli check-runtime --expected-gpu-model $(RUNTIME_EXPECTED_GPU_MODEL) $(EXPECTED_GPUS_ARG) $(REQUIRE_DEEPSPEED_ARG) $(REQUIRE_VLLM_ARG)
+	$(PYTHON) -m hpc_ai_perf.cli check-runtime --expected-gpu-model $(RUNTIME_EXPECTED_GPU_MODEL) --expected-torch-version $(EXPECTED_TORCH_VERSION) --expected-torch-cuda $(EXPECTED_TORCH_CUDA) $(EXPECTED_GPUS_ARG) $(REQUIRE_DEEPSPEED_ARG) $(REQUIRE_VLLM_ARG)
 
 check-l40s-runtime:
 	$(MAKE) check-platform-runtime PLATFORM=l40s
