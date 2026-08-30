@@ -51,6 +51,8 @@ following:
 - bootstraps private `setuptools` 77–80 and vLLM `0.10.2`'s undeclared editable-build metadata dependency
   (`setuptools_scm`), placing the private site-packages ahead of Spack's `PYTHONPATH`, before building with
   verbose `uv pip install --no-build-isolation -e .` output against the module Torch runtime; and
+- passes `-fbracket-depth=1024` to the selected Clang host compiler through `nvcc`, which is required for vLLM's
+  generated Marlin CUDA source on this stack; and
 - targets both L40S (`sm_89`) and H100 (`sm_90`) by default.
 
 The Slurm log paths are printed by `sbatch` and are named `slurm/vllm-build-<job-id>.out` and `.err`. Verbose mode

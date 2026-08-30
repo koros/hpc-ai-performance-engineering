@@ -357,6 +357,7 @@ def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -
     makefile = Path("Makefile").read_text(encoding="utf-8")
 
     assert 'VLLM_VERSION="${HPC_AI_VLLM_VERSION:-0.10.2}"' in builder
+    assert 'VLLM_CLANG_BRACKET_DEPTH="${HPC_AI_VLLM_CLANG_BRACKET_DEPTH:-1024}"' in builder
     assert "python3 -m venv --system-site-packages" not in builder
     assert '"$BOOTSTRAP_PYTHON" -m venv --system-site-packages "$VLLM_ENV"' in builder
     assert '"setuptools>=77,<81"' in builder
@@ -365,6 +366,7 @@ def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -
     assert "Using private setuptools" in builder
     assert "uv --verbose pip install" in builder
     assert "TORCH_CUDA_ARCH_LIST" in builder
+    assert "-Xcompiler=-fbracket-depth=${VLLM_CLANG_BRACKET_DEPTH}" in builder
     assert "#SBATCH --partition=gpu_l40s" in build_job
     assert "setup_vllm_environment.sh" in build_job
     assert "--require-vllm" in acceptance

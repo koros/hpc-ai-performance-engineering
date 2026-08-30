@@ -14,6 +14,7 @@ VLLM_BASE="${HPC_AI_VLLM_BASE:-${HOME}/.local/share/hpc-ai-performance-engineeri
 VLLM_ENV="${HPC_AI_VLLM_ENV:-${VLLM_BASE}/vllm-${VLLM_VERSION}}"
 VLLM_SOURCE="${HPC_AI_VLLM_SOURCE:-${VLLM_BASE}/src/vllm-${VLLM_TAG}}"
 VLLM_MAX_JOBS="${HPC_AI_VLLM_MAX_JOBS:-${SLURM_CPUS_PER_TASK:-4}}"
+VLLM_CLANG_BRACKET_DEPTH="${HPC_AI_VLLM_CLANG_BRACKET_DEPTH:-1024}"
 
 usage() {
   cat <<'EOF'
@@ -30,8 +31,9 @@ Options:
 
 Environment overrides: HPC_AI_VLLM_VERSION, HPC_AI_VLLM_BASE,
 HPC_AI_VLLM_ENV, HPC_AI_VLLM_SOURCE, HPC_AI_VLLM_MAX_JOBS, and
-HPC_AI_VLLM_TORCH_CUDA_ARCH_LIST. The default architecture list is 8.9;9.0,
-so one isolated build can be used on the L40S and H100 nodes.
+HPC_AI_VLLM_TORCH_CUDA_ARCH_LIST. HPC_AI_VLLM_CLANG_BRACKET_DEPTH defaults
+to 1024 for vLLM's generated Marlin code. The default architecture list is
+8.9;9.0, so one isolated build can be used on the L40S and H100 nodes.
 EOF
 }
 
@@ -71,6 +73,10 @@ VLLM_SOURCE="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' 
 
 if [[ ! "$VLLM_MAX_JOBS" =~ ^[1-9][0-9]*$ ]]; then
   echo "ERROR: --max-jobs must be a positive integer; got $VLLM_MAX_JOBS" >&2
+  exit 2
+fi
+if [[ ! "$VLLM_CLANG_BRACKET_DEPTH" =~ ^[1-9][0-9]*$ ]]; then
+  echo "ERROR: HPC_AI_VLLM_CLANG_BRACKET_DEPTH must be a positive integer; got $VLLM_CLANG_BRACKET_DEPTH" >&2
   exit 2
 fi
 
@@ -153,6 +159,14 @@ export CXX="${CXX:-clang++}"
 export MAX_JOBS="$VLLM_MAX_JOBS"
 export TORCH_CUDA_ARCH_LIST="${HPC_AI_VLLM_TORCH_CUDA_ARCH_LIST:-8.9;9.0}"
 
+# CUDA 12.4 forwards the generated Marlin source to the selected Clang host
+# compiler. vLLM 0.10.2's gptq_marlin.cu exceeds Clang 14's default nesting
+# limit of 256, so initialise CMake's CUDA flags with the documented host
+# compiler override. CUDAFLAGS becomes CMAKE_CUDA_FLAGS during configure.
+if "$CXX" --version 2>&1 | grep -qi 'clang version'; then
+  export CUDAFLAGS="${CUDAFLAGS:+${CUDAFLAGS} }-Xcompiler=-fbracket-depth=${VLLM_CLANG_BRACKET_DEPTH}"
+fi
+
 # The Spack modules expose their Python packages through PYTHONPATH. That path
 # otherwise wins over a --system-site-packages venv and makes the build import
 # the site's setuptools 76.1 instead of the private compatible version below.
@@ -166,6 +180,7 @@ echo "  source:      $VLLM_SOURCE"
 echo "  compiler:    $CC / $CXX"
 echo "  CUDA_HOME:   $CUDA_HOME"
 echo "  architectures: $TORCH_CUDA_ARCH_LIST"
+echo "  CUDAFLAGS:   ${CUDAFLAGS:-unset}"
 
 # vLLM documents uv pip install -e . for a source build. The target environment
 # inherits the Spack Torch runtime read-only, while its vLLM/Python packages are
