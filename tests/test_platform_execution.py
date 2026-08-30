@@ -308,9 +308,18 @@ def test_render_platform_slurm_uses_profile_partition_and_matrix_trials(tmp_path
     assert f"#SBATCH --output={slurm_dir / 'logs'}/%x-%A_%a.out" in script
     assert "--output-dir build/platform_results/l40s/wave_1" in script
     assert "source slurm/modules_for_hpc_ai" in script
-    assert "export DS_IGNORE_CUDA_DETECTION=1" in script
+    assert "DS_IGNORE_CUDA_DETECTION" not in script
     assert "export PYTORCH_NVML_BASED_CUDA_CHECK=1" in script
     assert f"--config {config_dir / 'E008.json'}" in script
+
+
+def test_lovelace_module_helper_uses_verified_cuda_build_stack() -> None:
+    helper = Path("slurm/modules_for_hpc_ai").read_text(encoding="utf-8")
+
+    assert "module load spack-modules/217" in helper
+    assert "module load py-torch/2.8.0-rmohf3g" in helper
+    assert "unset DS_IGNORE_CUDA_DETECTION" in helper
+    assert 'export CUDA_HOME="$(cd "$(dirname "$_hpc_ai_nvcc")/.." && pwd)"' in helper
 
 
 def test_render_platform_slurm_reuses_frozen_bundle_configs_without_rewriting(tmp_path: Path) -> None:

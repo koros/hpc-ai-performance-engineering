@@ -1,39 +1,32 @@
 #!/usr/bin/env bash
-# Lovelace module stack used by the Slurm smoke scripts and generated profiles.
-# Update these module names on the cluster if the site-provided stack changes.
+# Verified Lovelace module stack for CUDA 12.4.1 builds and PyTorch 2.8.0.
+# Confirmed on an allocated L40S node with nvcc, clang, Torch CUDA, and
+# DeepSpeed 0.19.6 all available. Keep the exact site-provided module hashes.
 
 module purge
-module load spack-modules/293
-module load compilers/llvm/14.0.6-xpvm6vv
-module load openmpi/5.0.5-pplxwdu
-module load python-science/py-numpy-py3.11/1.26.4-k5adanv
-module load python-science/py-numba-py3.11/0.59.1-ijsufvg
-module load py-virtualenv-py3.11/20.26.6-xqjpfog
-module load deeplearning/py-torch-py3.11/2.8.0-3feiiad
-module load python-science/py-matplotlib-py3.11/3.10.6-ogsaoll
-module load python-science/py-pandas-py3.11/2.3.2-wr7hjzs
-module load python-science/py-scipy-py3.11/1.16.1-g5b6aib
+module load spack-modules/217
+module load openmpi/5.0.5-skres45
+module load py-numpy/1.26.4-k5adanv
+module load py-numba/0.59.1-lmrlnav
+module load py-virtualenv/20.26.6-xqjpfog
+module load py-torch/2.8.0-rmohf3g
+module load py-matplotlib/3.10.6-ogsaoll
+module load py-pandas/2.3.2-wr7hjzs
+module load py-scipy/1.16.1-g7wlhfp
 
-# Keep CUDA/DeepSpeed discovery deterministic on Lovelace. The PyTorch module
-# exposes the CUDA runtime, but CUDA_HOME can point at a toolkit path without
-# bin/nvcc on some nodes. DeepSpeed's optional-op probes should not block the
-# ZeRO runtime smoke path merely because nvcc is unavailable.
+# This stack supplies the full toolkit through the PyTorch dependency chain.
+# Resolve CUDA_HOME from the actual compiler so DeepSpeed and source builds
+# cannot accidentally probe a stale runtime-only CUDA path.
 export PYTORCH_NVML_BASED_CUDA_CHECK="${PYTORCH_NVML_BASED_CUDA_CHECK:-1}"
-export DS_IGNORE_CUDA_DETECTION="${DS_IGNORE_CUDA_DETECTION:-1}"
+unset DS_IGNORE_CUDA_DETECTION
 export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-$PWD/build/torch_extensions}"
 mkdir -p "$TORCH_EXTENSIONS_DIR"
 
 _hpc_ai_nvcc="$(command -v nvcc || true)"
-_hpc_ai_cuda_home="${CUDA_HOME:-${CUDA_PATH:-}}"
-if [[ -n "$_hpc_ai_cuda_home" && ! -x "$_hpc_ai_cuda_home/bin/nvcc" ]]; then
-  if [[ -n "$_hpc_ai_nvcc" ]]; then
-    export CUDA_HOME="$(cd "$(dirname "$_hpc_ai_nvcc")/.." && pwd)"
-  else
-    unset CUDA_HOME
-    unset CUDA_PATH
-  fi
-elif [[ -z "$_hpc_ai_cuda_home" && -n "$_hpc_ai_nvcc" ]]; then
-  export CUDA_HOME="$(cd "$(dirname "$_hpc_ai_nvcc")/.." && pwd)"
+if [[ -z "$_hpc_ai_nvcc" ]]; then
+  echo "ERROR: Lovelace CUDA build stack did not provide nvcc" >&2
+  return 1
 fi
+export CUDA_HOME="$(cd "$(dirname "$_hpc_ai_nvcc")/.." && pwd)"
+export CUDA_PATH="$CUDA_HOME"
 unset _hpc_ai_nvcc
-unset _hpc_ai_cuda_home

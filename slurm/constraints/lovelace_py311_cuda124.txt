@@ -1,4 +1,4 @@
-# Lovelace Spack module stack used by slurm/modules_for_hpc_ai.
+# Lovelace Spack module stack (spack-modules/217) used by slurm/modules_for_hpc_ai.
 # Use this with pip's -c/--constraint option after sourcing the cluster modules.
 #
 # These constraints stop pip from replacing site-provided binary runtime
