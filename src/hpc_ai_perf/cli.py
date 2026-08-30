@@ -4,7 +4,6 @@ import argparse
 import json
 import logging
 import subprocess
-from dataclasses import replace
 from pathlib import Path
 from shlex import quote
 from typing import Any
@@ -1052,7 +1051,6 @@ def _create_platform_submission_bundle(args: argparse.Namespace):
             experiment_ids=set(args.experiment_id) if args.experiment_id else None,
             include_deferred=False,
         )
-        _route_bundle_runtime_outputs(config_paths, bundle.cache_dir / "runtime")
         write_submission_manifest(
             bundle,
             platform_id=profile.platform_id,
@@ -1084,6 +1082,7 @@ def _create_platform_submission_bundle(args: argparse.Namespace):
             "HPC_AI_SUBMISSION_BUNDLE_MANIFEST_SHA256": manifest_hash,
             "HPC_AI_SUBMISSION_BUNDLE_PLATFORM": profile.platform_id,
             "HPC_AI_SUBMISSION_BUNDLE_WAVE": str(args.wave or "all"),
+            "HPC_AI_ARTIFACT_OUTPUT_DIR": str(bundle.cache_dir / "runtime"),
         }
         _, script_paths = _render_platform_slurm(
             platform_profile=str(source_profile),
@@ -1135,20 +1134,6 @@ def _bundle_snapshot_path(bundle, source_path: str) -> Path:
     if not snapshot_path.exists():
         raise FileNotFoundError(f"Submission snapshot is missing requested input: {relative}")
     return snapshot_path
-
-
-def _route_bundle_runtime_outputs(config_paths: list[Path], runtime_output_dir: Path) -> None:
-    """Keep workload side artifacts out of the immutable bundle source snapshot.
-
-    Result JSON files already use the bundle's ``results/`` directory through
-    the Slurm ``--output-dir`` argument.  Some workloads and profilers use the
-    resolved config's runtime output directory directly, so freeze that setting
-    to the bundle's external cache before manifesting the configs.
-    """
-    for config_path in config_paths:
-        config = load_experiment_config(config_path)
-        routed = replace(config, runtime=replace(config.runtime, output_dir=str(runtime_output_dir)))
-        config_path.write_text(json.dumps(routed.to_dict(), indent=2) + "\n", encoding="utf-8")
 
 
 def _submit_platform_wave(args: argparse.Namespace):

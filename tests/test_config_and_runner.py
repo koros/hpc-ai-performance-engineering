@@ -19,7 +19,7 @@ from hpc_ai_perf.config import (
     filter_config_entries,
     load_experiment_config,
 )
-from hpc_ai_perf.profiling.system import TorchMemoryProfiler, TorchProfiler
+from hpc_ai_perf.profiling.system import TorchMemoryProfiler, TorchProfiler, build_profiler
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
@@ -597,6 +597,17 @@ def test_torch_profiler_paths_are_unique_per_trial_and_rank(monkeypatch, tmp_pat
 
     assert first._path == tmp_path / "profiler" / "E024" / "r001" / "rank1.json"
     assert second._path == tmp_path / "profiler" / "E024" / "r002" / "rank1.json"
+
+
+def test_torch_profiler_uses_bundle_artifact_directory_when_provided(monkeypatch, tmp_path: Path) -> None:
+    config = load_experiment_config(Path("configs/workload_characterisation/E024_distilbert_compute.json"))
+    monkeypatch.setenv("HPC_AI_ARTIFACT_OUTPUT_DIR", str(tmp_path / "bundle" / "cache" / "runtime"))
+
+    profiler = build_profiler(config, repetition_number=2)
+
+    assert profiler._profilers[1]._path == (
+        tmp_path / "bundle" / "cache" / "runtime" / "profiler" / "E024" / "r002" / "rank0.json"
+    )
 
 
 def test_deepspeed_import_environment_unsets_stale_cuda_home(monkeypatch, tmp_path: Path) -> None:

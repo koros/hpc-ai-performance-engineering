@@ -222,8 +222,9 @@ def build_profiler(config: ExperimentConfig, *, repetition_number: int | None = 
         elif name == "torch_memory":
             profilers.append(TorchMemoryProfiler())
         elif name == "torch_profiler":
+            artifact_output_dir = os.environ.get("HPC_AI_ARTIFACT_OUTPUT_DIR", config.runtime.output_dir)
             profilers.append(
-                TorchProfiler(config.runtime.output_dir, config.experiment_id, repetition_number=repetition_number)
+                TorchProfiler(artifact_output_dir, config.experiment_id, repetition_number=repetition_number)
             )
         else:
             # NCCL, serving-latency, and DataLoader timings are emitted by the

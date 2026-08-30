@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from hpc_ai_perf.cli import _materialize_platform_batch, _render_platform_slurm, _route_bundle_runtime_outputs
+from hpc_ai_perf.cli import _materialize_platform_batch, _render_platform_slurm
 from hpc_ai_perf.config import (
     config_sha256,
     discover_experiment_configs,
@@ -46,19 +46,6 @@ def test_platform_profiles_load() -> None:
 
 def test_submission_bundle_id_accepts_documented_utc_timestamp() -> None:
     assert _BUNDLE_ID.fullmatch("l40s-wave-1-f18d325-20260829T231916Z")
-
-
-def test_bundle_routes_runtime_artifacts_outside_snapshot(tmp_path: Path) -> None:
-    source = Path("configs/workload_characterisation/E024_distilbert_compute.json")
-    resolved_path = tmp_path / "E024.json"
-    resolved_path.write_bytes(source.read_bytes())
-    cache_root = tmp_path / "bundle" / "cache" / "runtime"
-
-    _route_bundle_runtime_outputs([resolved_path], cache_root)
-
-    routed = load_experiment_config(resolved_path)
-    assert routed.runtime.output_dir == str(cache_root)
-    assert config_sha256(routed) == config_sha256(json.loads(resolved_path.read_text(encoding="utf-8")))
 
 
 def test_bundle_manifest_separates_file_and_config_identities(tmp_path: Path) -> None:
@@ -337,7 +324,6 @@ def test_render_platform_slurm_reuses_frozen_bundle_configs_without_rewriting(tm
         experiment_ids={"E008"},
         include_deferred=False,
     )
-    _route_bundle_runtime_outputs(config_paths, tmp_path / "bundle" / "cache" / "runtime")
     frozen_bytes = config_paths[0].read_bytes()
 
     _render_platform_slurm(
