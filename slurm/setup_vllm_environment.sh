@@ -153,6 +153,13 @@ export CXX="${CXX:-clang++}"
 export MAX_JOBS="$VLLM_MAX_JOBS"
 export TORCH_CUDA_ARCH_LIST="${HPC_AI_VLLM_TORCH_CUDA_ARCH_LIST:-8.9;9.0}"
 
+# The Spack modules expose their Python packages through PYTHONPATH. That path
+# otherwise wins over a --system-site-packages venv and makes the build import
+# the site's setuptools 76.1 instead of the private compatible version below.
+# Keep the module paths for Torch, but put this venv's site-packages first.
+VLLM_SITE_PACKAGES="$("$VLLM_ENV/bin/python" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
+export PYTHONPATH="${VLLM_SITE_PACKAGES}${PYTHONPATH:+:${PYTHONPATH}}"
+
 echo "Building $VLLM_TAG"
 echo "  environment: $VLLM_ENV"
 echo "  source:      $VLLM_SOURCE"
@@ -170,6 +177,14 @@ cd "$VLLM_SOURCE"
 # Build isolation is deliberately disabled so the extension sees the
 # module-provided Torch ABI; bootstrap these metadata requirements privately.
 uv pip install --python "$VLLM_ENV/bin/python" "setuptools>=77,<81" "setuptools_scm[toml]>=8,<9"
+"$VLLM_ENV/bin/python" - <<'PY'
+import setuptools
+
+major = int(setuptools.__version__.split(".", 1)[0])
+if major < 77:
+    raise SystemExit(f"Expected private setuptools >=77; found {setuptools.__version__} at {setuptools.__file__}")
+print(f"Using private setuptools {setuptools.__version__} at {setuptools.__file__}")
+PY
 uv pip install --python "$VLLM_ENV/bin/python" --no-build-isolation -e .
 
 "$VLLM_ENV/bin/python" - <<PY
