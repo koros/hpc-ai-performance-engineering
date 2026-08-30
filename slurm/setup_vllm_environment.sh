@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+# Build vLLM in an isolated virtual environment for the verified Lovelace stack.
+#
+# This intentionally leaves the repository's .venv unchanged: that environment
+# remains the known-good runtime for the non-vLLM experiment waves. The vLLM
+# source tree and virtual environment live outside the repository so generated
+# build files cannot make a submission snapshot dirty.
+set -euo pipefail
+
+VLLM_VERSION="${HPC_AI_VLLM_VERSION:-0.10.2}"
+VLLM_TAG="v${VLLM_VERSION}"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VLLM_BASE="${HPC_AI_VLLM_BASE:-${HOME}/.local/share/hpc-ai-performance-engineering}"
+VLLM_ENV="${HPC_AI_VLLM_ENV:-${VLLM_BASE}/vllm-${VLLM_VERSION}}"
+VLLM_SOURCE="${HPC_AI_VLLM_SOURCE:-${VLLM_BASE}/src/vllm-${VLLM_TAG}}"
+VLLM_MAX_JOBS="${HPC_AI_VLLM_MAX_JOBS:-${SLURM_CPUS_PER_TASK:-4}}"
+
+usage() {
+  cat <<'EOF'
+Usage: bash slurm/setup_vllm_environment.sh [options]
+
+Build the pinned vLLM source release into a separate virtual environment.
+
+Options:
+  --project-root PATH  Repository containing slurm/modules_for_hpc_ai.
+  --env-dir PATH       Destination virtual environment.
+  --source-dir PATH    Destination vLLM source checkout.
+  --max-jobs COUNT     Parallel compiler jobs (default: SLURM_CPUS_PER_TASK or 4).
+  --help               Show this message.
+
+Environment overrides: HPC_AI_VLLM_VERSION, HPC_AI_VLLM_BASE,
+HPC_AI_VLLM_ENV, HPC_AI_VLLM_SOURCE, HPC_AI_VLLM_MAX_JOBS, and
+HPC_AI_VLLM_TORCH_CUDA_ARCH_LIST. The default architecture list is 8.9;9.0,
+so one isolated build can be used on the L40S and H100 nodes.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --project-root)
+      PROJECT_ROOT="$2"
+      shift 2
+      ;;
+    --env-dir)
+      VLLM_ENV="$2"
+      shift 2
+      ;;
+    --source-dir)
+      VLLM_SOURCE="$2"
+      shift 2
+      ;;
+    --max-jobs)
+      VLLM_MAX_JOBS="$2"
+      shift 2
+      ;;
+    --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "ERROR: unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd)"
+VLLM_ENV="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$VLLM_ENV")"
+VLLM_SOURCE="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$VLLM_SOURCE")"
+
+if [[ ! "$VLLM_MAX_JOBS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "ERROR: --max-jobs must be a positive integer; got $VLLM_MAX_JOBS" >&2
+  exit 2
+fi
+
+# A normal venv activation only prepends one path entry. Strip it in this
+# child process so the virtual environment is created from the module-provided
+# Python, even if the caller happens to have the project .venv activated.
+if [[ -n "${VIRTUAL_ENV:-}" && "$PATH" == "$VIRTUAL_ENV/bin:"* ]]; then
+  export PATH="${PATH#"$VIRTUAL_ENV/bin:"}"
+fi
+unset VIRTUAL_ENV PYTHONHOME
+hash -r
+
+if [[ ! -f "$PROJECT_ROOT/slurm/modules_for_hpc_ai" ]]; then
+  echo "ERROR: project root does not contain slurm/modules_for_hpc_ai: $PROJECT_ROOT" >&2
+  exit 2
+fi
+
+# The project helper is the single source of truth for the site module stack,
+# nvcc, CUDA_HOME, and the compiler selected by Laurence's validated modules.
+cd "$PROJECT_ROOT"
+source "$PROJECT_ROOT/slurm/modules_for_hpc_ai"
+
+if ! command -v uv >/dev/null 2>&1 && [[ -x "${HOME}/.local/bin/uv" ]]; then
+  export PATH="${HOME}/.local/bin:${PATH}"
+fi
+if ! command -v uv >/dev/null 2>&1; then
+  cat >&2 <<'EOF'
+ERROR: uv is not available on PATH.
+Install it once in your user account, then rerun this job:
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+EOF
+  exit 3
+fi
+
+for command in nvcc clang clang++ git; do
+  if ! command -v "$command" >/dev/null 2>&1; then
+    echo "ERROR: required build command is unavailable: $command" >&2
+    exit 3
+  fi
+done
+
+BOOTSTRAP_PYTHON="$(command -v python3)"
+"$BOOTSTRAP_PYTHON" - <<'PY'
+import torch
+
+if not torch.__version__.startswith("2.8.") or torch.version.cuda != "12.4":
+    raise SystemExit(
+        f"Expected the Lovelace Torch 2.8/CUDA 12.4 stack; found torch {torch.__version__}, CUDA {torch.version.cuda}."
+    )
+print(f"Using module Torch {torch.__version__} with CUDA {torch.version.cuda}")
+PY
+
+if [[ -e "$VLLM_ENV" && ! -x "$VLLM_ENV/bin/python" ]]; then
+  echo "ERROR: vLLM environment path exists but is not a virtual environment: $VLLM_ENV" >&2
+  exit 3
+fi
+if [[ ! -e "$VLLM_ENV" ]]; then
+  mkdir -p "$(dirname "$VLLM_ENV")"
+  "$BOOTSTRAP_PYTHON" -m venv --system-site-packages "$VLLM_ENV"
+fi
+
+if [[ -e "$VLLM_SOURCE" ]]; then
+  if [[ ! -d "$VLLM_SOURCE/.git" ]]; then
+    echo "ERROR: vLLM source path exists but is not a git checkout: $VLLM_SOURCE" >&2
+    exit 3
+  fi
+  existing_tag="$(git -C "$VLLM_SOURCE" describe --tags --exact-match HEAD 2>/dev/null || true)"
+  if [[ "$existing_tag" != "$VLLM_TAG" ]]; then
+    echo "ERROR: refusing to modify existing vLLM checkout at $VLLM_SOURCE (expected $VLLM_TAG, found ${existing_tag:-untagged})." >&2
+    echo "       Choose a new HPC_AI_VLLM_SOURCE path or inspect that checkout first." >&2
+    exit 3
+  fi
+else
+  mkdir -p "$(dirname "$VLLM_SOURCE")"
+  git clone --branch "$VLLM_TAG" --depth 1 https://github.com/vllm-project/vllm.git "$VLLM_SOURCE"
+fi
+
+export CC="${CC:-clang}"
+export CXX="${CXX:-clang++}"
+export MAX_JOBS="$VLLM_MAX_JOBS"
+export TORCH_CUDA_ARCH_LIST="${HPC_AI_VLLM_TORCH_CUDA_ARCH_LIST:-8.9;9.0}"
+
+echo "Building $VLLM_TAG"
+echo "  environment: $VLLM_ENV"
+echo "  source:      $VLLM_SOURCE"
+echo "  compiler:    $CC / $CXX"
+echo "  CUDA_HOME:   $CUDA_HOME"
+echo "  architectures: $TORCH_CUDA_ARCH_LIST"
+
+# vLLM documents uv pip install -e . for a source build. The target environment
+# inherits the Spack Torch runtime read-only, while its vLLM/Python packages are
+# installed privately. No package is written into the project .venv.
+cd "$VLLM_SOURCE"
+uv pip install --python "$VLLM_ENV/bin/python" --no-build-isolation -e .
+
+"$VLLM_ENV/bin/python" - <<PY
+from importlib.metadata import version
+import torch
+
+print("vllm", version("vllm"))
+print("torch", torch.__version__)
+print("torch_cuda", torch.version.cuda)
+if version("vllm") != "$VLLM_VERSION":
+    raise SystemExit("vLLM version does not match the pinned source tag")
+if not torch.__version__.startswith("2.8.") or torch.version.cuda != "12.4":
+    raise SystemExit("isolated environment no longer resolves the verified Torch 2.8/CUDA 12.4 runtime")
+PY
+
+cat <<EOF
+vLLM build completed successfully.
+
+Use this exact environment for the serving acceptance job:
+  export HPC_AI_VLLM_ENV=$VLLM_ENV
+  sbatch $PROJECT_ROOT/slurm/smoke/vllm_acceptance.sbatch
+
+Do not un-defer E006 or the wider vLLM rows until that job completes with
+vllm_import, engine_start, and request_served all true.
+EOF

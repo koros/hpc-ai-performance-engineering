@@ -322,6 +322,28 @@ def test_lovelace_module_helper_uses_verified_cuda_build_stack() -> None:
     assert 'export CUDA_HOME="$(cd "$(dirname "$_hpc_ai_nvcc")/.." && pwd)"' in helper
 
 
+def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -> None:
+    builder = Path("slurm/setup_vllm_environment.sh").read_text(encoding="utf-8")
+    build_job = Path("slurm/smoke/vllm_build_l40s.sbatch").read_text(encoding="utf-8")
+    acceptance = Path("slurm/smoke/vllm_acceptance.sbatch").read_text(encoding="utf-8")
+    makefile = Path("Makefile").read_text(encoding="utf-8")
+
+    assert 'VLLM_VERSION="${HPC_AI_VLLM_VERSION:-0.10.2}"' in builder
+    assert "python3 -m venv --system-site-packages" not in builder
+    assert '"$BOOTSTRAP_PYTHON" -m venv --system-site-packages "$VLLM_ENV"' in builder
+    assert "uv pip install" in builder
+    assert "TORCH_CUDA_ARCH_LIST" in builder
+    assert "#SBATCH --partition=gpu_l40s" in build_job
+    assert "setup_vllm_environment.sh" in build_job
+    assert "--require-vllm" in acceptance
+    assert "E006_vllm_1gpu.json" in acceptance
+    assert "build/vllm_acceptance" in acceptance
+    assert "submit-vllm-build:" in makefile
+    assert "submit-vllm-acceptance:" in makefile
+    assert "HPC_AI_VLLM_SOURCE" in makefile
+    assert "--venv-activate $(VENV_ACTIVATE)" in makefile
+
+
 def test_render_platform_slurm_reuses_frozen_bundle_configs_without_rewriting(tmp_path: Path) -> None:
     config_dir = tmp_path / "configs"
     config_paths = _materialize_platform_batch(

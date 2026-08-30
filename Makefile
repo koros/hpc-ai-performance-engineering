@@ -11,6 +11,8 @@ PLATFORM_STATUS ?= results/processed/slurm_$(PLATFORM)_wave_$(PLATFORM_WAVE)_sta
 SUBMISSION_BUNDLE_ROOT ?= ../hpc-ai-submissions
 SUBMISSION_BUNDLE_ID ?=
 SUBMISSION_BUNDLE_ID_ARG := $(if $(SUBMISSION_BUNDLE_ID),--bundle-id $(SUBMISSION_BUNDLE_ID),)
+VENV_ACTIVATE ?=
+VENV_ACTIVATE_ARG := $(if $(VENV_ACTIVATE),--venv-activate $(VENV_ACTIVATE),)
 SUBMISSION_BUNDLE_DIR ?=
 PLATFORM_WAVE_STATE ?= build/platform_waves/$(PLATFORM)/wave_$(PLATFORM_WAVE).json
 RUNTIME_EXPECTED_GPU_MODEL ?= $(if $(filter h100,$(PLATFORM)),H100,L40S)
@@ -22,13 +24,17 @@ REQUIRE_DEEPSPEED ?=
 REQUIRE_DEEPSPEED_ARG := $(if $(REQUIRE_DEEPSPEED),--require-deepspeed,)
 REQUIRE_VLLM ?=
 REQUIRE_VLLM_ARG := $(if $(REQUIRE_VLLM),--require-vllm,)
+VLLM_VERSION ?= 0.10.2
+VLLM_BASE ?= $(HOME)/.local/share/hpc-ai-performance-engineering
+VLLM_ENV ?= $(VLLM_BASE)/vllm-$(VLLM_VERSION)
+VLLM_SOURCE ?= $(VLLM_BASE)/src/vllm-v$(VLLM_VERSION)
 
 DEV_CONFIGS := $(sort $(wildcard configs/dev/*.json))
 DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
 
 # Dev targets run local Mac/workstation checks; matrix tracking stays separate.
 .PHONY: check-cuda-toolchain
-.PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile check-platform-runtime check-l40s-runtime check-h100-runtime materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-rendered-platform-wave submit-rendered-platform-wave submit-platform-wave status-platform-wave collect-platform-wave retry-platform-wave stage-platform-wave create-platform-wave-bundle plan-platform-wave-bundle init-platform-wave-bundle-status dry-run-submit-platform-wave-bundle submit-platform-wave-bundle import-platform-wave-bundle track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate validate-result-evidence readiness-report refresh serve-dashboard
+.PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile check-platform-runtime check-l40s-runtime check-h100-runtime check-cuda-toolchain setup-vllm-environment submit-vllm-build submit-vllm-acceptance materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-rendered-platform-wave submit-rendered-platform-wave submit-platform-wave status-platform-wave collect-platform-wave retry-platform-wave stage-platform-wave create-platform-wave-bundle plan-platform-wave-bundle init-platform-wave-bundle-status dry-run-submit-platform-wave-bundle submit-platform-wave-bundle import-platform-wave-bundle track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate validate-result-evidence readiness-report refresh serve-dashboard
 
 install-dev:
 	$(PYTHON) -m pip install -e ".[dev,yaml]"
@@ -79,6 +85,19 @@ check-platform-runtime:
 check-cuda-toolchain:
 	$(PYTHON) scripts/check_cuda_toolchain.py --expected-gpu-model $(RUNTIME_EXPECTED_GPU_MODEL) $(EXPECTED_GPUS_ARG) --require-deepspeed
 
+# vLLM is deliberately isolated from .venv because its CUDA/PyTorch ABI must
+# stay coupled to the module stack. The build target is safe to rerun; it
+# refuses to overwrite a non-vLLM directory or a differently pinned checkout.
+setup-vllm-environment:
+	HPC_AI_VLLM_VERSION="$(VLLM_VERSION)" bash slurm/setup_vllm_environment.sh --project-root "$(CURDIR)" --env-dir "$(VLLM_ENV)" --source-dir "$(VLLM_SOURCE)"
+
+submit-vllm-build:
+	sbatch --export=ALL,HPC_AI_VLLM_VERSION="$(VLLM_VERSION)",HPC_AI_VLLM_ENV="$(VLLM_ENV)",HPC_AI_VLLM_SOURCE="$(VLLM_SOURCE)" slurm/smoke/vllm_build_l40s.sbatch
+
+submit-vllm-acceptance:
+	test -r "$(VLLM_ENV)/bin/activate" || (echo "Run make submit-vllm-build and wait for it to succeed first" && exit 1)
+	sbatch --export=ALL,HPC_AI_VLLM_VERSION="$(VLLM_VERSION)",HPC_AI_VLLM_ENV="$(VLLM_ENV)" slurm/smoke/vllm_acceptance.sbatch
+
 check-l40s-runtime:
 	$(MAKE) check-platform-runtime PLATFORM=l40s
 
@@ -114,7 +133,7 @@ submit-rendered-platform-wave:
 # ignored build state file, so monitoring, collection, and staging need no
 # copied path or shell environment variable.
 submit-platform-wave:
-	$(PYTHON) -m hpc_ai_perf.cli submit-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG)
+	$(PYTHON) -m hpc_ai_perf.cli submit-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG) $(VENV_ACTIVATE_ARG)
 
 status-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli status-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE)
@@ -123,7 +142,7 @@ collect-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli collect-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE) --result-root results/raw
 
 retry-platform-wave:
-	$(PYTHON) -m hpc_ai_perf.cli retry-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG)
+	$(PYTHON) -m hpc_ai_perf.cli retry-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG) $(VENV_ACTIVATE_ARG)
 
 stage-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli stage-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE)
@@ -132,7 +151,7 @@ stage-platform-wave:
 # recovery, but the targets above are the standard L40S/H100 workflow.
 create-platform-wave-bundle:
 	test -n "$(SUBMISSION_BUNDLE_ID)" || (echo "Set SUBMISSION_BUNDLE_ID to a stable wave identifier" && exit 1)
-	$(PYTHON) -m hpc_ai_perf.cli create-platform-submission-bundle --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) --bundle-id $(SUBMISSION_BUNDLE_ID) $(SLURM_PROFILE_ARG)
+	$(PYTHON) -m hpc_ai_perf.cli create-platform-submission-bundle --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) --bundle-id $(SUBMISSION_BUNDLE_ID) $(SLURM_PROFILE_ARG) $(VENV_ACTIVATE_ARG)
 
 plan-platform-wave-bundle:
 	test -n "$(SUBMISSION_BUNDLE_DIR)" || (echo "Set SUBMISSION_BUNDLE_DIR to the created bundle path" && exit 1)

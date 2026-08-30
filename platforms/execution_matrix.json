@@ -142,7 +142,7 @@
       "name": "vLLM serving blocked by site environment",
       "experiment_ids": ["E006", "E130", "E132-E148", "E178", "E180-E196"],
       "comparability": "platform_specific",
-      "reason": "The active site environment has a working PyTorch CUDA runtime but no site-compatible vLLM install or usable CUDA compiler toolchain. Do not schedule these rows until an administrator provides a compatible vLLM module, container, or build environment."
+      "reason": "The site now has a verified CUDA 12.4.1 source-build stack, but no isolated vLLM 0.10.2 environment has passed the E006 import, engine-start, and served-request gate. Do not schedule these rows until that acceptance job passes on the target platform."
     },
     {
       "platforms": ["l40s", "h100"],
