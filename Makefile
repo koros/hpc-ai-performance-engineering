@@ -27,6 +27,7 @@ DEV_CONFIGS := $(sort $(wildcard configs/dev/*.json))
 DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
 
 # Dev targets run local Mac/workstation checks; matrix tracking stays separate.
+.PHONY: check-cuda-toolchain
 .PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile check-platform-runtime check-l40s-runtime check-h100-runtime materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-rendered-platform-wave submit-rendered-platform-wave submit-platform-wave status-platform-wave collect-platform-wave retry-platform-wave stage-platform-wave create-platform-wave-bundle plan-platform-wave-bundle init-platform-wave-bundle-status dry-run-submit-platform-wave-bundle submit-platform-wave-bundle import-platform-wave-bundle track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate validate-result-evidence readiness-report refresh serve-dashboard
 
 install-dev:
@@ -74,6 +75,9 @@ check-slurm-profile:
 
 check-platform-runtime:
 	$(PYTHON) -m hpc_ai_perf.cli check-runtime --expected-gpu-model $(RUNTIME_EXPECTED_GPU_MODEL) --expected-torch-version $(EXPECTED_TORCH_VERSION) --expected-torch-cuda $(EXPECTED_TORCH_CUDA) $(EXPECTED_GPUS_ARG) $(REQUIRE_DEEPSPEED_ARG) $(REQUIRE_VLLM_ARG)
+
+check-cuda-toolchain:
+	$(PYTHON) scripts/check_cuda_toolchain.py --expected-gpu-model $(RUNTIME_EXPECTED_GPU_MODEL) $(EXPECTED_GPUS_ARG) --require-deepspeed
 
 check-l40s-runtime:
 	$(MAKE) check-platform-runtime PLATFORM=l40s
