@@ -142,11 +142,12 @@ DS_BUILD_OPS=0 DS_BUILD_AIO=0 python -m pip install \
   -e ".[dev,yaml,workloads,distributed]"
 ```
 
-The current platform matrix defers vLLM rows because this site has no compatible vLLM package or dedicated vLLM
-environment yet. Lovelace's verified module helper now exposes a CUDA 12.4.1 compiler for a source build, but do not
-install a generic PyPI vLLM wheel into the shared environment. Its wheels are CUDA-ABI-specific and may expect another
-runtime (for example `libcudart.so.13` while PyTorch reports CUDA 12.4). Re-enable vLLM only after its isolated build
-and serving preflight pass.
+The current platform matrix defers vLLM rows until a dedicated environment passes its serving gate. Lovelace's verified
+module helper exposes a CUDA 12.4.1 compiler for the pinned vLLM `0.10.2` source build, but do not install a generic
+PyPI vLLM wheel into the shared environment. Its wheels are CUDA-ABI-specific and may expect another runtime (for
+example `libcudart.so.13` while PyTorch reports CUDA 12.4). Follow the
+[vLLM environment runbook](docs/vllm_environment_runbook.md): build the private environment, then run E006's import,
+engine-start, and request-served gate before re-enabling any vLLM matrix rows.
 
 Do not use `--upgrade-strategy eager` on Lovelace because it can install PyPI Torch/Numpy over the Spack-provided CUDA
 runtime stack.

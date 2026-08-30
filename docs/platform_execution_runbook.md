@@ -37,9 +37,10 @@ Do not use `--upgrade-strategy eager` on Lovelace; it can mix PyPI Torch/Numpy w
 runtime and invalidate both DeepSpeed and vLLM checks.
 
 The current execution matrix deliberately defers E006 and all other vLLM-serving rows until their isolated environment
-is built. The verified Lovelace helper now provides a CUDA 12.4.1 compiler for a supported source build, but the site
-still has no compatible vLLM package. Do not install a generic PyPI vLLM wheel into this environment. Re-enable these
-rows only after the vLLM build and dedicated serving preflight pass.
+is built. The verified Lovelace helper now provides a CUDA 12.4.1 compiler for the pinned source build, but vLLM is not
+part of the shared environment. Do not install a generic PyPI vLLM wheel into this environment. Follow the
+[vLLM environment runbook](vllm_environment_runbook.md) to build it privately and run the E006 serving acceptance gate.
+Re-enable these rows only after the vLLM build and dedicated preflight pass.
 
 On an L40S allocation, capture the actual device and topology before accepting results:
 
@@ -105,6 +106,10 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `optional` | `E016-E017`, `E044-E046` | 3 | Run only if memory and queue budget remain. |
 
 E006, E007, all vLLM-serving rows, and backend/adapter rows listed as Deferred are not rendered by platform batch commands.
+
+The vLLM acceptance result is a diagnostic gate, not formal matrix evidence. After it succeeds, schedule E006 in a
+dedicated immutable pilot wave with `VENV_ACTIVATE` set to the private vLLM environment; do not mix it into a standard
+shared-`.venv` wave.
 
 ## 4. Submit, Monitor, and Recover an Immutable Wave
 
