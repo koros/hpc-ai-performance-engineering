@@ -326,6 +326,43 @@ def test_render_platform_slurm_uses_profile_partition_and_matrix_trials(tmp_path
     assert f"--config {config_dir / 'E008.json'}" in script
 
 
+def test_render_platform_slurm_reuses_frozen_bundle_configs_without_rewriting(tmp_path: Path) -> None:
+    config_dir = tmp_path / "configs"
+    config_paths = _materialize_platform_batch(
+        platform_profile="platforms/l40s.json",
+        execution_matrix="platforms/execution_matrix.json",
+        config_root="configs",
+        output_dir=str(config_dir),
+        wave="1",
+        experiment_ids={"E008"},
+        include_deferred=False,
+    )
+    _route_bundle_runtime_outputs(config_paths, tmp_path / "bundle" / "cache" / "runtime")
+    frozen_bytes = config_paths[0].read_bytes()
+
+    _render_platform_slurm(
+        platform_profile="platforms/l40s.json",
+        execution_matrix="platforms/execution_matrix.json",
+        config_root="configs",
+        config_output_dir=str(config_dir),
+        output_dir=str(tmp_path / "slurm"),
+        run_output_dir=str(tmp_path / "bundle" / "results"),
+        log_dir=str(tmp_path / "bundle" / "logs"),
+        wave="1",
+        experiment_ids={"E008"},
+        profile_path=None,
+        partition=None,
+        account=None,
+        time_limit=None,
+        cpus_per_task=None,
+        modules=[],
+        env_values=[],
+        reuse_resolved_configs=True,
+    )
+
+    assert config_paths[0].read_bytes() == frozen_bytes
+
+
 def test_platform_condition_rejects_duplicate_matrix_rows(tmp_path: Path) -> None:
     matrix_path = tmp_path / "duplicate.json"
     matrix_path.write_text(

@@ -939,6 +939,7 @@ def _render_platform_slurm(
     environment_overrides: dict[str, str] | None = None,
     submission_manifest: Path | None = None,
     submission_manifest_sha256: str | None = None,
+    reuse_resolved_configs: bool = False,
 ) -> tuple[list[Path], list[Path]]:
     """Resolve and render a platform batch without changing logical matrix configs."""
     profile = load_platform_profile(platform_profile)
@@ -954,7 +955,14 @@ def _render_platform_slurm(
         raise ValueError(f"No planned {profile.platform_id} conditions matched the requested platform batch")
 
     resolved_dir = Path(config_output_dir or f"build/platform_configs/{profile.platform_id}")
-    config_paths = materialize_platform_configs(profile, conditions, resolved_dir, config_root=config_root)
+    if reuse_resolved_configs:
+        config_paths = [resolved_dir / f"{condition.matrix_id}.json" for condition in conditions]
+        missing_configs = [path for path in config_paths if not path.is_file()]
+        if missing_configs:
+            rendered = ", ".join(str(path) for path in missing_configs)
+            raise FileNotFoundError(f"Frozen platform configs are missing: {rendered}")
+    else:
+        config_paths = materialize_platform_configs(profile, conditions, resolved_dir, config_root=config_root)
     condition_by_id = {condition.matrix_id: condition for condition in conditions}
     slurm_dir = Path(output_dir or f"slurm/generated/{profile.platform_id}/wave_{wave or 'all'}")
     staged_result_dir = Path(run_output_dir or f"build/platform_results/{profile.platform_id}/wave_{wave or 'all'}")
@@ -1098,6 +1106,7 @@ def _create_platform_submission_bundle(args: argparse.Namespace):
             environment_overrides=environment,
             submission_manifest=bundle.manifest_path,
             submission_manifest_sha256=manifest_hash,
+            reuse_resolved_configs=True,
         )
         if sorted(config_paths) != sorted(bundle.config_dir.glob("E*.json")):
             raise RuntimeError("Submission bundle config set changed while rendering Slurm scripts")
