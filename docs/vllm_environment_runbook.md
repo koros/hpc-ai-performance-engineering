@@ -48,8 +48,9 @@ following:
 - checks `nvcc`, Clang, Torch 2.8.x, and CUDA 12.4;
 - creates `~/.local/share/hpc-ai-performance-engineering/vllm-0.10.2` with `--system-site-packages`;
 - clones the exact `v0.10.2` source tag outside the repository;
-- bootstraps vLLM `0.10.2`'s undeclared editable-build metadata dependency (`setuptools_scm`) before building with
-  `uv pip install --no-build-isolation -e .` against the module Torch runtime; and
+- bootstraps private `setuptools` 77–80 and vLLM `0.10.2`'s undeclared editable-build metadata dependency
+  (`setuptools_scm`) before building with `uv pip install --no-build-isolation -e .` against the module Torch runtime;
+  and
 - targets both L40S (`sm_89`) and H100 (`sm_90`) by default.
 
 The Slurm log paths are printed by `sbatch` and are named `slurm/vllm-build-<job-id>.out` and `.err`. Do not remove a
