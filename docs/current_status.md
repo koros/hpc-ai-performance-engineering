@@ -14,7 +14,7 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | Distributed execution | One-process-per-GPU `torchrun`, DDP, FSDP, DeepSpeed ZeRO, rank binding, global work accounting, and rank-safe result writing are implemented. |
 | Profiling | nvidia-smi power/utilisation/memory/clock/temperature sampling, PyTorch traces, workload timing, and NCCL microbenchmark metrics are implemented. |
 | Slurm support | Semantic-gated single/bulk rendering, H100/L40S profile matching, CPU allocation checks, and three transformer smoke presets are available. |
-| Platform execution | All 200 logical rows route exactly once per platform. There are 144 planned L40S conditions and 144 planned H100 conditions; vLLM rows remain deferred until the isolated pinned source build passes E006, and TensorRT-LLM remains deferred pending its engine environment. |
+| Platform execution | All 200 logical rows route exactly once per platform. There are 145 planned L40S conditions and 144 planned H100 conditions; L40S E006 is a one-trial isolated-vLLM pilot after acceptance, while the remaining vLLM rows and TensorRT-LLM remain deferred. |
 | Evidence retention | L40S/H100 JSON is imported non-destructively into separate roots, scanned for sensitive keys, validated, and covered by tracked SHA-256 manifests. |
 | Dashboard | Static dashboard reads processed results, analysis summaries, and readiness report output. |
 | Quality gates | `pytest`, `ruff`, and `pre-commit` are configured and passing. |
@@ -58,9 +58,9 @@ commits in the primary checkout.
      -e ".[dev,yaml,workloads,distributed]"
    ```
 
-   Do not install a generic vLLM wheel into this environment. The platform matrix currently defers E006 and all vLLM
-   serving rows until the isolated vLLM `0.10.2` source build and E006 acceptance gate pass. The verified Lovelace
-   helper exposes the CUDA 12.4.1 compiler needed by that build; see the
+   Do not install a generic vLLM wheel into this environment. The platform matrix reserves E006 as a one-trial L40S
+   pilot after its isolated vLLM `0.10.2` source build and acceptance gate pass; the remaining serving rows stay
+   deferred. The verified Lovelace helper exposes the CUDA 12.4.1 compiler needed by that build; see the
    [vLLM environment runbook](vllm_environment_runbook.md).
 
 2. Validate the active profile and submit the selected immutable platform wave:
@@ -103,7 +103,7 @@ commits in the primary checkout.
 | --- | --- |
 | HPC verification | Run the E001-E005 core wave on each platform, then baseline and 1/2/4-GPU pilots. Local tests cannot validate CUDA/NCCL/Slurm behaviour. |
 | Independent trials | Baseline scripts render as three-task Slurm arrays; execute them on Lovelace and inspect confidence intervals and variance from preserved trial records. |
-| Backend-dependent rows | vLLM rows are deferred until the isolated pinned source build passes E006. TensorRT-LLM E007 still needs a compatible engine environment and engine/model contract; FP8/INT8 rows still need named backend/calibration artefacts. |
+| Backend-dependent rows | The L40S E006 pilot follows the isolated source build and acceptance gate; remaining vLLM rows stay deferred pending its canonical evidence review. TensorRT-LLM E007 still needs a compatible engine environment and engine/model contract; FP8/INT8 rows still need named backend/calibration artefacts. |
 | Invalid DistilBERT framework rows | `E154-E155` must be removed from executable scope or redesigned around classification-compatible backends. |
 | vLLM NCCL telemetry | `E147-E148` and `E195-E196` remain deferred with the other vLLM rows; they do not claim unavailable request-path NCCL telemetry. |
 | Communication depth | The NCCL microbenchmark and PyTorch trace do not yet provide NVLink counters or full communication/compute attribution. |
@@ -112,4 +112,4 @@ commits in the primary checkout.
 
 ## Deferred Research Scope
 
-Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative gate; it must pass with zero blockers. The platform tracker lists deferred rows that are intentionally excluded from generated deployment waves. E006 and the vLLM serving studies remain deferred on both platforms until a compatible site environment exists; E007 remains deferred pending its CUDA-toolkit/TensorRT-LLM prerequisites. Other deferred rows still require their documented FP8, quantization, or serving prerequisites.
+Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative gate; it must pass with zero blockers. The platform tracker lists deferred rows that are intentionally excluded from generated deployment waves. E006 is available only as the L40S `vllm-pilot` after acceptance; the remaining vLLM studies remain deferred on both platforms. E007 remains deferred pending its CUDA-toolkit/TensorRT-LLM prerequisites. Other deferred rows still require their documented FP8, quantization, or serving prerequisites.

@@ -55,8 +55,8 @@ make submit-vllm-acceptance
 
 The acceptance job runs `check-runtime --require-vllm` and E006's pinned GPT-2 request. It must record a successful
 vLLM import, engine start, and served request. Its result is deliberately written to ignored `build/vllm_acceptance/`:
-it is an environment gate, not canonical matrix evidence. Keep all vLLM matrix rows deferred until this gate passes;
-the formal E006 evidence will be submitted as a later immutable platform wave.
+it is an environment gate, not canonical matrix evidence. After it passes, use `make submit-vllm-pilot` for the formal
+one-trial E006 evidence; the remaining vLLM matrix rows stay deferred.
 
 Edit the partition if needed, replace the module-loading helper if the site stack changes, and add an account line only if the target HPC site requires one.
 

@@ -11,8 +11,8 @@ The process has two gates:
 1. Build pinned vLLM `0.10.2` in an external environment.
 2. Run E006 as a one-GPU acceptance job and require import, engine start, and one served request.
 
-Only after both gates pass should a later change re-enable the formal vLLM matrix waves. The acceptance JSON is not
-matrix evidence and is never imported into `results/raw/`.
+After both gates pass, submit the already-defined canonical L40S E006 pilot. The acceptance JSON is not matrix evidence
+and is never imported into `results/raw/`; the other vLLM rows remain deferred until the canonical pilot is reviewed.
 
 ## One-Time Preparation
 
@@ -93,14 +93,24 @@ The H100 job uses the same multi-architecture private build. If the user chose a
 
 ## After Acceptance
 
-Do not manually edit or import the acceptance record. Share its status and JSON with the project review, then make a
-separate, reviewable change that moves E006 into a dedicated immutable pilot wave. Once the pilot produces canonical
-evidence successfully, re-enable the other 36 vLLM rows in controlled waves using:
+Do not manually edit or import the acceptance record. After reviewing its successful status and JSON, submit the
+dedicated immutable L40S E006 pilot:
 
 ```bash
-make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=<vllm-wave> \
-  VENV_ACTIVATE="$HOME/.local/share/hpc-ai-performance-engineering/vllm-0.10.2/bin/activate"
+source slurm/modules_for_hpc_ai
+source .venv/bin/activate
+make submit-vllm-pilot
 ```
 
-`VENV_ACTIVATE` makes the immutable bundle activate the isolated vLLM environment rather than the shared `.venv`. It is
-optional for every non-vLLM wave and should not be set there.
+Monitor and collect it through the standard lifecycle:
+
+```bash
+make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot
+make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot
+make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot
+git commit -m "data: add completed L40S vLLM E006 trial"
+```
+
+`submit-vllm-pilot` freezes the platform-resolved E006 configuration and activates the isolated vLLM environment inside
+the bundle. Once the canonical pilot produces valid evidence, review it before re-enabling the other 36 vLLM rows in
+controlled waves. `VENV_ACTIVATE` remains available for those later vLLM waves and should not be set for non-vLLM work.

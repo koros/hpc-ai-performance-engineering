@@ -97,6 +97,7 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | Wave | Conditions | Trials | Release gate |
 | --- | --- | ---: | --- |
 | `0` | `E001-E005` core environment validation | 1 | All five Complete; observed L40S/CUDA/distributed/DeepSpeed checks agree. |
+| `vllm-pilot` | `E006` canonical vLLM validation | 1 | The separate isolated-environment acceptance job has passed import, engine start, and request served. |
 | `1` | `E008-E015`, `E018-E031` baselines and characterisation | 3 | Core rows Complete; variance and provenance reviewed. |
 | `2` | `E123`, `E124`, `E127`, `E128` direct L40S comparison anchors | 3 | All matched L40S anchors Complete. |
 | `3` | `E032-E043`, `E047-E062` scaling and strategies | 3 | 1-GPU reference valid; 2/4-GPU pilot stable. |
@@ -105,11 +106,11 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `5` | Supported PyTorch inference rows | 3 | PyTorch engine, request shape, concurrency, and precision verified; vLLM rows stay deferred. |
 | `optional` | `E016-E017`, `E044-E046` | 3 | Run only if memory and queue budget remain. |
 
-E006, E007, all vLLM-serving rows, and backend/adapter rows listed as Deferred are not rendered by platform batch commands.
+E007, the remaining vLLM-serving rows, and backend/adapter rows listed as Deferred are not rendered by platform batch
+commands. E006 is the sole exception: it is available only as the separate one-trial `vllm-pilot` after acceptance.
 
-The vLLM acceptance result is a diagnostic gate, not formal matrix evidence. After it succeeds, schedule E006 in a
-dedicated immutable pilot wave with `VENV_ACTIVATE` set to the private vLLM environment; do not mix it into a standard
-shared-`.venv` wave.
+The vLLM acceptance result is a diagnostic gate, not formal matrix evidence. After it succeeds, submit
+`make submit-vllm-pilot`; do not mix E006 into a standard shared-`.venv` wave.
 
 ## 4. Submit, Monitor, and Recover an Immutable Wave
 
