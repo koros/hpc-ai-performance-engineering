@@ -50,10 +50,11 @@ following:
 - clones the exact `v0.10.2` source tag outside the repository;
 - bootstraps private `setuptools` 77–80 and vLLM `0.10.2`'s undeclared editable-build metadata dependency
   (`setuptools_scm`), placing the private site-packages ahead of Spack's `PYTHONPATH`, before building with
-  `uv pip install --no-build-isolation -e .` against the module Torch runtime; and
+  verbose `uv pip install --no-build-isolation -e .` output against the module Torch runtime; and
 - targets both L40S (`sm_89`) and H100 (`sm_90`) by default.
 
-The Slurm log paths are printed by `sbatch` and are named `slurm/vllm-build-<job-id>.out` and `.err`. Do not remove a
+The Slurm log paths are printed by `sbatch` and are named `slurm/vllm-build-<job-id>.out` and `.err`. Verbose mode
+retains CMake/Ninja compiler diagnostics in the `.err` log if a native extension fails. Do not remove a
 failed external environment or source checkout automatically. Read the log first; the setup script refuses to overwrite
 an unexpected existing directory or source revision. Use a new `HPC_AI_VLLM_ENV` / `HPC_AI_VLLM_SOURCE` path if a clean
 retry is required.

@@ -363,7 +363,7 @@ def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -
     assert '"setuptools_scm[toml]>=8,<9"' in builder
     assert 'export PYTHONPATH="${VLLM_SITE_PACKAGES}${PYTHONPATH:+:${PYTHONPATH}}"' in builder
     assert "Using private setuptools" in builder
-    assert "uv pip install" in builder
+    assert "uv --verbose pip install" in builder
     assert "TORCH_CUDA_ARCH_LIST" in builder
     assert "#SBATCH --partition=gpu_l40s" in build_job
     assert "setup_vllm_environment.sh" in build_job

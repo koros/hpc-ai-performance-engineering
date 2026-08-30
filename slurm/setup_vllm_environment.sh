@@ -185,7 +185,11 @@ if major < 77:
     raise SystemExit(f"Expected private setuptools >=77; found {setuptools.__version__} at {setuptools.__file__}")
 print(f"Using private setuptools {setuptools.__version__} at {setuptools.__file__}")
 PY
-uv pip install --python "$VLLM_ENV/bin/python" --no-build-isolation -e .
+# Native extension errors are emitted by CMake/Ninja under the package builder.
+# Keep uv verbose so the Slurm stderr log contains the compiler diagnostic rather
+# than only the final editable-wheel traceback. This makes a failed build
+# actionable without having to recover an ephemeral uv build directory.
+uv --verbose pip install --python "$VLLM_ENV/bin/python" --no-build-isolation -e .
 
 "$VLLM_ENV/bin/python" - <<PY
 from importlib.metadata import version
