@@ -164,6 +164,11 @@ echo "  architectures: $TORCH_CUDA_ARCH_LIST"
 # inherits the Spack Torch runtime read-only, while its vLLM/Python packages are
 # installed privately. No package is written into the project .venv.
 cd "$VLLM_SOURCE"
+# vLLM v0.10.2 imports setuptools_scm while preparing editable metadata but
+# does not declare it in its build-system requirements. Build isolation is
+# deliberately disabled so the extension sees the module-provided Torch ABI;
+# bootstrap the missing metadata dependency into the private environment first.
+uv pip install --python "$VLLM_ENV/bin/python" "setuptools_scm[toml]>=8,<9"
 uv pip install --python "$VLLM_ENV/bin/python" --no-build-isolation -e .
 
 "$VLLM_ENV/bin/python" - <<PY

@@ -359,6 +359,7 @@ def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -
     assert 'VLLM_VERSION="${HPC_AI_VLLM_VERSION:-0.10.2}"' in builder
     assert "python3 -m venv --system-site-packages" not in builder
     assert '"$BOOTSTRAP_PYTHON" -m venv --system-site-packages "$VLLM_ENV"' in builder
+    assert '"setuptools_scm[toml]>=8,<9"' in builder
     assert "uv pip install" in builder
     assert "TORCH_CUDA_ARCH_LIST" in builder
     assert "#SBATCH --partition=gpu_l40s" in build_job
