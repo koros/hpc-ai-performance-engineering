@@ -36,10 +36,10 @@ sinfo -p gpu_l40s,gpu_h100
 Do not use `--upgrade-strategy eager` on Lovelace; it can mix PyPI Torch/Numpy wheels with the Spack CUDA/PyTorch
 runtime and invalidate both DeepSpeed and vLLM checks.
 
-The current execution matrix deliberately defers E006 and all other vLLM-serving rows. The PyTorch CUDA runtime is
-healthy, but the site has neither a compatible vLLM package nor a usable CUDA compiler toolchain for a supported build.
-Do not install a generic PyPI vLLM wheel into this environment. Re-enable those rows only after an administrator
-provides a compatible vLLM module, container, or build environment and its dedicated preflight passes.
+The current execution matrix deliberately defers E006 and all other vLLM-serving rows until their isolated environment
+is built. The verified Lovelace helper now provides a CUDA 12.4.1 compiler for a supported source build, but the site
+still has no compatible vLLM package. Do not install a generic PyPI vLLM wheel into this environment. Re-enable these
+rows only after the vLLM build and dedicated serving preflight pass.
 
 On an L40S allocation, capture the actual device and topology before accepting results:
 
@@ -63,10 +63,10 @@ python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-to
 
 ```
 
-The DeepSpeed check may warn when `nvcc` is unavailable, but it must still pass `deepspeed_import`. If DeepSpeed 0.17.x
-is installed without a full CUDA toolkit, upgrade to the project-supported DeepSpeed 0.18.9+ line or load a toolkit whose
-`CUDA_HOME/bin/nvcc` exists before running E005. The current wave 0 scope is E001-E005; do not run a vLLM check or E006
-until the separate serving environment has been supplied.
+The helper must expose `nvcc` and set `CUDA_HOME` to the matching compiler root before running E005. Run
+`make check-cuda-toolchain PLATFORM=l40s EXPECTED_GPUS=2` in this allocation to verify the complete toolchain. The
+current wave 0 scope is E001-E005; do not run a vLLM check or E006 until the separate serving environment passes its
+dedicated preflight.
 
 ## 2. Preserve and Collect L40S Trials
 

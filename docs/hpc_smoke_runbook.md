@@ -22,9 +22,10 @@ DS_BUILD_OPS=0 DS_BUILD_AIO=0 python -m pip install \
 Do not use `--upgrade-strategy eager` on the cluster. It can replace the site-provided PyTorch/Numpy runtime with PyPI
 wheels and create a mixed Spack/PyPI environment.
 
-The current platform matrix defers E006 and all vLLM experiments. Do not treat a generic latest PyPI vLLM wheel as
-portable across CUDA runtimes or install it into this shared environment. Re-enable the serving rows only after the
-site provides a compatible vLLM module, container, or CUDA/PyTorch build environment.
+The current platform matrix defers E006 and all vLLM experiments until their dedicated environment is built. Do not
+treat a generic latest PyPI vLLM wheel as portable across CUDA runtimes or install it into this shared environment.
+The verified Lovelace helper now exposes a CUDA 12.4.1 compiler for a source build; re-enable serving rows only after
+the isolated vLLM environment and serving preflight pass.
 
 The Slurm scripts assume jobs are submitted from the project root. Load the required cluster modules for CUDA, Python, and PyTorch before activating the project virtual environment. On Lovelace, the project helper can be used:
 
@@ -41,9 +42,13 @@ Before submitting environment-validation jobs, run the runtime preflight from an
 python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed
 ```
 
-Run the DeepSpeed check inside an allocation with the same GPU count as E005. A missing-`nvcc` warning is acceptable
-only if `deepspeed_import` and `deepspeed_accelerator` still pass. If DeepSpeed 0.17.x is installed without a full CUDA
-toolkit, upgrade to the project-supported DeepSpeed 0.18.9+ line or load a toolkit whose `CUDA_HOME/bin/nvcc` exists.
+Run the DeepSpeed check inside an allocation with the same GPU count as E005. The Lovelace helper must provide `nvcc`,
+a valid `CUDA_HOME`, and a passing DeepSpeed CUDA accelerator check. Confirm the full build toolchain with:
+
+```bash
+make check-cuda-toolchain PLATFORM=l40s EXPECTED_GPUS=1
+```
+
 E006 is not part of the current runnable scope, so a vLLM check is not required for the core preflight.
 
 If pip has already upgraded Torch, Numpy, or vLLM inside `.venv`, move that environment aside and rebuild it:

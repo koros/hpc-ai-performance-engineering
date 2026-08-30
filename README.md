@@ -142,10 +142,11 @@ DS_BUILD_OPS=0 DS_BUILD_AIO=0 python -m pip install \
   -e ".[dev,yaml,workloads,distributed]"
 ```
 
-The current platform matrix defers vLLM rows because this site has no compatible vLLM package and no usable CUDA
-compiler toolchain for a supported build. Do not install a generic PyPI vLLM wheel into the shared environment. Its
-wheels are CUDA-ABI-specific and may expect another runtime (for example `libcudart.so.13` while PyTorch reports CUDA
-12.4). Re-enable vLLM only after the site provides a compatible module, container, or build environment.
+The current platform matrix defers vLLM rows because this site has no compatible vLLM package or dedicated vLLM
+environment yet. Lovelace's verified module helper now exposes a CUDA 12.4.1 compiler for a source build, but do not
+install a generic PyPI vLLM wheel into the shared environment. Its wheels are CUDA-ABI-specific and may expect another
+runtime (for example `libcudart.so.13` while PyTorch reports CUDA 12.4). Re-enable vLLM only after its isolated build
+and serving preflight pass.
 
 Do not use `--upgrade-strategy eager` on Lovelace because it can install PyPI Torch/Numpy over the Spack-provided CUDA
 runtime stack.
@@ -156,8 +157,9 @@ Before running environment-validation waves from an allocated GPU node, check th
 python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed
 ```
 
-DeepSpeed 0.17.x can still require `CUDA_HOME/bin/nvcc` during import-time optional-op probes. Use the project
-`distributed` extra, which requires DeepSpeed 0.18.9 or newer, or load a full CUDA toolkit before running E005.
+The Lovelace helper resolves `CUDA_HOME` from its verified `nvcc`. Use the project `distributed` extra, which requires
+DeepSpeed 0.18.9 or newer, and run `make check-cuda-toolchain PLATFORM=l40s EXPECTED_GPUS=1` from an allocated GPU node
+before source builds or CUDA-op experiments.
 
 TensorRT-LLM, vLLM, and FP8/quantized model tooling remain vendor/backend-specific and are not silently substituted by
 these extras.

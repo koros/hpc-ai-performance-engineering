@@ -59,8 +59,8 @@ commits in the primary checkout.
    ```
 
    Do not install a generic vLLM wheel into this environment. The platform matrix currently defers E006 and all vLLM
-   serving rows because the cluster lacks both a site-compatible vLLM package and a usable CUDA compiler toolchain for
-   a supported build.
+   serving rows because the cluster lacks a site-compatible vLLM package and dedicated serving environment. The
+   verified Lovelace helper now exposes a CUDA 12.4.1 compiler for a supported source build.
 
 2. Validate the active profile and submit the selected immutable platform wave:
 
@@ -71,9 +71,9 @@ commits in the primary checkout.
    make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
    ```
 
-   Run `check-runtime` from an allocated GPU node. The DeepSpeed portion must pass import/accelerator checks; if
-   DeepSpeed 0.17.x is installed without `nvcc`, upgrade to the project-supported 0.18.9+ line or load a full CUDA
-   toolkit before E005. The active wave 0 scope is E001-E005; vLLM is not a precondition for this supported scope.
+   Run `check-runtime` from an allocated GPU node. The DeepSpeed portion must pass import/accelerator checks, and
+   `make check-cuda-toolchain PLATFORM=l40s EXPECTED_GPUS=1` must pass before CUDA source builds. The active wave 0
+   scope is E001-E005; vLLM is not a precondition for this supported scope.
 
 3. Monitor validated trial coverage. The bundle location and Slurm status record are saved automatically under
    ignored `build/platform_waves/`:
