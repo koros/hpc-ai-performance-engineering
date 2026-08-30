@@ -12,10 +12,23 @@ from hpc_ai_perf.slurm.bundle import (
     write_submission_manifest,
 )
 from hpc_ai_perf.slurm.job import SlurmJob, render_slurm_script, write_slurm_script
+from hpc_ai_perf.slurm.lifecycle import (
+    BundleResultStatus,
+    ExperimentResultStatus,
+    append_wave_attempt,
+    current_wave_attempt,
+    format_bundle_result_status,
+    load_wave_state,
+    mark_current_attempt_collected,
+    mark_wave_collected,
+    summarize_bundle_results,
+    wave_state_path,
+)
 from hpc_ai_perf.slurm.status import (
     build_job_status_report,
     build_job_status_rows,
     record_job_submission,
+    refresh_job_status_csv,
     submit_job_scripts,
     write_job_status_csv,
     write_job_status_report,
@@ -24,17 +37,27 @@ from hpc_ai_perf.slurm.submission import build_submission_plan, write_submission
 
 __all__ = [
     "SlurmJob",
+    "BundleResultStatus",
+    "ExperimentResultStatus",
     "SubmissionBundle",
     "build_job_status_report",
     "build_job_status_rows",
     "build_submission_plan",
+    "append_wave_attempt",
     "capture_environment_contract",
+    "current_wave_attempt",
+    "format_bundle_result_status",
+    "load_wave_state",
     "manifest_sha256",
+    "mark_current_attempt_collected",
+    "mark_wave_collected",
     "prepare_submission_bundle",
     "record_job_submission",
+    "refresh_job_status_csv",
     "remove_submission_bundle",
     "render_slurm_script",
     "submit_job_scripts",
+    "summarize_bundle_results",
     "validate_result_bundle_provenance",
     "verify_submission_bundle",
     "write_job_status_csv",
@@ -43,4 +66,5 @@ __all__ = [
     "write_slurm_script",
     "write_submission_manifest",
     "write_submission_plan",
+    "wave_state_path",
 ]

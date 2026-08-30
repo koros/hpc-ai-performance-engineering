@@ -140,7 +140,7 @@ def write_submission_manifest(
         raise ValueError(f"No resolved configs found in submission bundle: {bundle.config_dir}")
 
     manifest = {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "bundle_id": bundle.bundle_id,
         "platform_id": platform_id,
         "wave": str(wave),
@@ -193,7 +193,6 @@ def capture_environment_contract() -> dict[str, Any]:
     contract: dict[str, Any] = {
         "python_version": platform.python_version(),
         "python_executable": str(Path(sys.executable).resolve()),
-        "virtual_env": os.environ.get("VIRTUAL_ENV"),
         "loaded_modules": os.environ.get("LOADEDMODULES"),
         "packages": packages,
         "torch_cuda": torch_cuda,

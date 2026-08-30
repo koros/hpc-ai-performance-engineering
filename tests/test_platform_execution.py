@@ -22,7 +22,13 @@ from hpc_ai_perf.results import (
     import_result_evidence,
     verify_result_evidence,
 )
-from hpc_ai_perf.slurm.bundle import _BUNDLE_ID
+from hpc_ai_perf.slurm.bundle import _BUNDLE_ID, SubmissionBundle, write_submission_manifest
+from hpc_ai_perf.slurm.lifecycle import (
+    append_wave_attempt,
+    current_wave_attempt,
+    mark_wave_collected,
+    summarize_bundle_results,
+)
 from hpc_ai_perf.tracking import build_platform_progress_rows, track_platform_progress
 from hpc_ai_perf.validation import validate_result_records
 
@@ -53,6 +59,123 @@ def test_bundle_routes_runtime_artifacts_outside_snapshot(tmp_path: Path) -> Non
     routed = load_experiment_config(resolved_path)
     assert routed.runtime.output_dir == str(cache_root)
     assert config_sha256(routed) == config_sha256(json.loads(resolved_path.read_text(encoding="utf-8")))
+
+
+def test_bundle_manifest_separates_file_and_config_identities(tmp_path: Path) -> None:
+    root = tmp_path / "bundle"
+    config_dir = root / "configs"
+    result_dir = root / "results"
+    for directory in (config_dir, result_dir, root / "repo", root / "scripts", root / "logs", root / "cache"):
+        directory.mkdir(parents=True, exist_ok=True)
+    entry = next(entry for entry in discover_experiment_configs() if entry.config.experiment_id == "E123")
+    config = resolve_platform_config(
+        entry,
+        load_platform_profile("platforms/l40s.json"),
+        load_platform_conditions(
+            "platforms/execution_matrix.json", "l40s", experiment_ids={"E123"}, include_deferred=False
+        )[0],
+    )
+    config_path = config_dir / "E123.json"
+    config_path.write_text(json.dumps(config.to_dict(), indent=2) + "\n", encoding="utf-8")
+    profile_path = root / "profile.json"
+    profile_path.write_text("{}\n", encoding="utf-8")
+    bundle = SubmissionBundle(
+        bundle_id="l40s-wave-1-test",
+        root=root,
+        source_repository=tmp_path,
+        repo_dir=root / "repo",
+        config_dir=config_dir,
+        script_dir=root / "scripts",
+        result_dir=result_dir,
+        log_dir=root / "logs",
+        cache_dir=root / "cache",
+        manifest_path=root / "SUBMISSION_MANIFEST.json",
+        result_manifest_path=result_dir / "SUBMISSION_MANIFEST.json",
+        script_checksums_path=root / "SCRIPT_SHA256SUMS",
+        git_commit="a" * 40,
+        created_at="2026-08-30T12:00:00+00:00",
+    )
+
+    manifest = write_submission_manifest(
+        bundle, platform_id="l40s", wave="1", input_files={"platform_profile": profile_path}
+    )
+    identities = manifest["configs"]["E123"]
+
+    assert manifest["schema_version"] == "1.1"
+    assert identities["config_sha256"] == config_sha256(config)
+    assert identities["file_sha256"] == hashlib.sha256(config_path.read_bytes()).hexdigest()
+    assert identities["file_sha256"] != identities["config_sha256"]
+
+
+def test_wave_state_and_result_summary_track_complete_bundle(tmp_path: Path) -> None:
+    entry = next(entry for entry in discover_experiment_configs() if entry.config.experiment_id == "E123")
+    config = resolve_platform_config(
+        entry,
+        load_platform_profile("platforms/l40s.json"),
+        load_platform_conditions(
+            "platforms/execution_matrix.json", "l40s", experiment_ids={"E123"}, include_deferred=False
+        )[0],
+    )
+    bundle_dir = tmp_path / "bundle"
+    result_dir = bundle_dir / "results"
+    result_dir.mkdir(parents=True)
+    manifest = {
+        "schema_version": "1.1",
+        "bundle_id": "l40s-wave-1-test",
+        "platform_id": "l40s",
+        "wave": "1",
+        "repository": {"git_commit": "a" * 40, "snapshot_directory": "repo"},
+        "configs": {
+            "E123": {
+                "path": "E123.json",
+                "file_sha256": "f" * 64,
+                "config_sha256": config_sha256(config),
+                "required_trials": 1,
+            }
+        },
+    }
+    manifest_path = result_dir / "SUBMISSION_MANIFEST.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    result = ExperimentResult.from_config(
+        config,
+        status="completed",
+        started_at="2026-08-30T12:00:00+00:00",
+        completed_at="2026-08-30T12:01:00+00:00",
+        runtime_seconds=60.0,
+        repetition_number=1,
+        metrics={"measured_seconds": 50.0, "gpu_hours": 50.0 / 3600, "total_tokens": 1000},
+        environment={
+            "git_commit": "a" * 40,
+            "git_dirty": False,
+            "config_sha256": config_sha256(config),
+            "command": "python -m hpc_ai_perf.cli run",
+            "observed_gpu_model": "NVIDIA L40S",
+            "submission_bundle_id": "l40s-wave-1-test",
+            "submission_bundle_manifest_sha256": manifest_hash,
+            "submission_bundle_platform": "l40s",
+            "submission_bundle_wave": "1",
+        },
+    )
+    result.write_json(result_dir, preserve_trial=True)
+
+    status = summarize_bundle_results(bundle_dir)
+    state_path = tmp_path / "wave_1.json"
+    append_wave_attempt(
+        state_path,
+        platform_id="l40s",
+        wave="1",
+        bundle_dir=bundle_dir,
+        bundle_id="l40s-wave-1-test",
+        manifest_sha256=manifest_hash,
+        status_path=bundle_dir / "SLURM_STATUS.csv",
+        experiment_ids=["E123"],
+    )
+    mark_wave_collected(state_path, ["results/raw/l40s/E123/result.json"])
+
+    assert status.complete
+    assert status.completed_trials == 1
+    assert current_wave_attempt(state_path)["bundle_id"] == "l40s-wave-1-test"
 
 
 def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
@@ -539,7 +662,7 @@ def test_import_result_evidence_accepts_verified_submission_bundle(tmp_path: Pat
     staged = tmp_path / "bundle" / "results"
     staged.mkdir(parents=True)
     manifest = {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "bundle_id": "l40s-wave-2-test",
         "platform_id": "l40s",
         "wave": "2",

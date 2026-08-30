@@ -1,4 +1,4 @@
-PYTHON ?= python3
+PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 SLURM_PROFILE ?=
 SLURM_PROFILE_ARG := $(if $(SLURM_PROFILE),--slurm-profile $(SLURM_PROFILE),)
 PLATFORM ?= l40s
@@ -10,7 +10,9 @@ PLATFORM_RUN_OUTPUT_DIR ?= build/platform_results/$(PLATFORM)/wave_$(PLATFORM_WA
 PLATFORM_STATUS ?= results/processed/slurm_$(PLATFORM)_wave_$(PLATFORM_WAVE)_status.csv
 SUBMISSION_BUNDLE_ROOT ?= ../hpc-ai-submissions
 SUBMISSION_BUNDLE_ID ?=
+SUBMISSION_BUNDLE_ID_ARG := $(if $(SUBMISSION_BUNDLE_ID),--bundle-id $(SUBMISSION_BUNDLE_ID),)
 SUBMISSION_BUNDLE_DIR ?=
+PLATFORM_WAVE_STATE ?= build/platform_waves/$(PLATFORM)/wave_$(PLATFORM_WAVE).json
 RUNTIME_EXPECTED_GPU_MODEL ?= $(if $(filter h100,$(PLATFORM)),H100,L40S)
 EXPECTED_TORCH_VERSION ?= 2.8.0
 EXPECTED_TORCH_CUDA ?= 12.4
@@ -25,7 +27,7 @@ DEV_CONFIGS := $(sort $(wildcard configs/dev/*.json))
 DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
 
 # Dev targets run local Mac/workstation checks; matrix tracking stays separate.
-.PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile check-platform-runtime check-l40s-runtime check-h100-runtime materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-platform-wave submit-platform-wave create-platform-wave-bundle plan-platform-wave-bundle init-platform-wave-bundle-status dry-run-submit-platform-wave-bundle submit-platform-wave-bundle import-platform-wave-bundle track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate validate-result-evidence readiness-report refresh serve-dashboard
+.PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile check-platform-runtime check-l40s-runtime check-h100-runtime materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-rendered-platform-wave submit-rendered-platform-wave submit-platform-wave status-platform-wave collect-platform-wave retry-platform-wave stage-platform-wave create-platform-wave-bundle plan-platform-wave-bundle init-platform-wave-bundle-status dry-run-submit-platform-wave-bundle submit-platform-wave-bundle import-platform-wave-bundle track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate validate-result-evidence readiness-report refresh serve-dashboard
 
 install-dev:
 	$(PYTHON) -m pip install -e ".[dev,yaml]"
@@ -98,15 +100,32 @@ plan-platform-wave: render-platform-wave
 init-platform-wave-status:
 	$(PYTHON) -m hpc_ai_perf.cli init-slurm-status --script-dir $(PLATFORM_SLURM_DIR) --output $(PLATFORM_STATUS) --batch-name "$(PLATFORM) wave $(PLATFORM_WAVE)"
 
-dry-run-submit-platform-wave:
+dry-run-submit-rendered-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli submit-slurm-batch --script-dir $(PLATFORM_SLURM_DIR) --status $(PLATFORM_STATUS) --dry-run
 
-submit-platform-wave:
+submit-rendered-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli submit-slurm-batch --script-dir $(PLATFORM_SLURM_DIR) --status $(PLATFORM_STATUS)
 
-# Immutable bundles are the recommended path for real Slurm submissions. They
-# run from a detached source snapshot, so importing evidence cannot invalidate
-# jobs that are still queued from the same wave.
+# One-command platform lifecycle. It records the generated bundle path in an
+# ignored build state file, so monitoring, collection, and staging need no
+# copied path or shell environment variable.
+submit-platform-wave:
+	$(PYTHON) -m hpc_ai_perf.cli submit-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG)
+
+status-platform-wave:
+	$(PYTHON) -m hpc_ai_perf.cli status-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE)
+
+collect-platform-wave:
+	$(PYTHON) -m hpc_ai_perf.cli collect-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE) --result-root results/raw
+
+retry-platform-wave:
+	$(PYTHON) -m hpc_ai_perf.cli retry-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG)
+
+stage-platform-wave:
+	$(PYTHON) -m hpc_ai_perf.cli stage-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE)
+
+# Legacy bundle primitives remain available for inspection and one-off
+# recovery, but the targets above are the standard L40S/H100 workflow.
 create-platform-wave-bundle:
 	test -n "$(SUBMISSION_BUNDLE_ID)" || (echo "Set SUBMISSION_BUNDLE_ID to a stable wave identifier" && exit 1)
 	$(PYTHON) -m hpc_ai_perf.cli create-platform-submission-bundle --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) --bundle-id $(SUBMISSION_BUNDLE_ID) $(SLURM_PROFILE_ARG)

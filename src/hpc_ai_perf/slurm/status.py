@@ -146,6 +146,39 @@ def submit_job_scripts(
     return submissions
 
 
+def refresh_job_status_csv(
+    status_path: str | Path,
+    *,
+    runner: Callable[[str], str] | None = None,
+) -> list[dict[str, str]]:
+    """Refresh persisted Slurm states from ``sacct`` when accounting is available.
+
+    Result coverage remains the acceptance gate, but scheduler state makes it
+    clear whether a missing trial is queued, still running, or genuinely ready
+    for a recovery bundle.  Jobs absent from accounting are left unchanged.
+    """
+    path = Path(status_path)
+    rows = _read_rows(path)
+    changed = False
+    timestamp = _utc_now()
+    for row in rows:
+        job_id = row.get("job_id", "")
+        if not job_id:
+            continue
+        try:
+            output = (runner or _run_sacct)(job_id)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        state = _aggregate_sacct_state(job_id, output)
+        if state and row.get("state") != state:
+            row["state"] = state
+            row["updated_at"] = timestamp
+            changed = True
+    if changed:
+        _write_rows(path, rows)
+    return rows
+
+
 def build_job_status_report(status_path: str | Path) -> str:
     """Render a Markdown summary from a Slurm job-status CSV."""
     rows = _read_rows(Path(status_path))
@@ -232,6 +265,40 @@ def _run_sbatch(script: Path) -> str:
         text=True,
     )
     return completed.stdout.strip()
+
+
+def _run_sacct(job_id: str) -> str:
+    completed = subprocess.run(
+        ["sacct", "--noheader", "--parsable2", "--jobs", job_id, "--format=JobIDRaw,State"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout
+
+
+def _aggregate_sacct_state(job_id: str, output: str) -> str:
+    """Collapse array-child accounting states into one readable script status."""
+    states: list[str] = []
+    for line in output.splitlines():
+        fields = line.split("|", 1)
+        if len(fields) != 2:
+            continue
+        observed_id, raw_state = fields
+        if observed_id != job_id and not observed_id.startswith(f"{job_id}_"):
+            continue
+        states.append(raw_state.strip().removesuffix("+"))
+    if not states:
+        return ""
+    if any(state in {"FAILED", "CANCELLED", "TIMEOUT", "OUT_OF_MEMORY", "NODE_FAIL", "BOOT_FAIL"} for state in states):
+        return "FAILED"
+    if any(state in {"RUNNING", "COMPLETING", "STAGE_OUT"} for state in states):
+        return "RUNNING"
+    if any(state in {"PENDING", "CONFIGURING", "SUSPENDED"} for state in states):
+        return "PENDING"
+    if all(state == "COMPLETED" for state in states):
+        return "COMPLETED"
+    return sorted(set(states))[0]
 
 
 def _read_rows(path: Path) -> list[dict[str, str]]:

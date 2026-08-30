@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import subprocess
 from dataclasses import replace
 from pathlib import Path
 from shlex import quote
@@ -24,13 +25,21 @@ from hpc_ai_perf.results import aggregate_results, import_result_evidence, verif
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.runtime_checks import format_runtime_checks, run_cluster_runtime_checks, runtime_checks_to_json
 from hpc_ai_perf.slurm import (
+    append_wave_attempt,
+    current_wave_attempt,
+    format_bundle_result_status,
+    load_wave_state,
     manifest_sha256,
+    mark_wave_collected,
     prepare_submission_bundle,
     record_job_submission,
+    refresh_job_status_csv,
     remove_submission_bundle,
     render_slurm_script,
     submit_job_scripts,
+    summarize_bundle_results,
     verify_submission_bundle,
+    wave_state_path,
     write_job_status_csv,
     write_job_status_report,
     write_script_checksums,
@@ -129,6 +138,48 @@ def main() -> None:
         bundle = _create_platform_submission_bundle(args)
         LOGGER.info("Created submission bundle %s", bundle.root)
         LOGGER.info("Review %s, then submit scripts from %s", bundle.root / "SUBMISSION_PLAN.md", bundle.script_dir)
+        return
+
+    if args.command == "submit-platform-wave":
+        bundle, state_path, submissions = _submit_platform_wave(args)
+        LOGGER.info("Submitted %d job script(s) from %s", len(submissions), bundle.root)
+        LOGGER.info(
+            "Track this wave with: python -m hpc_ai_perf.cli status-platform-wave --platform-profile %s --wave %s",
+            args.platform_profile,
+            args.wave,
+        )
+        LOGGER.info("Saved wave state to %s", state_path)
+        return
+
+    if args.command == "status-platform-wave":
+        _, attempt, status = _current_platform_wave_status(args)
+        scheduler_rows = refresh_job_status_csv(attempt["status_path"])
+        scheduler_summary = _summarize_scheduler_rows(scheduler_rows)
+        print(format_bundle_result_status(status))
+        print(f"Slurm scheduler states: {scheduler_summary}")
+        print(f"Slurm submission record: {attempt['status_path']}")
+        return
+
+    if args.command == "collect-platform-wave":
+        imported_paths = _collect_platform_wave(args)
+        LOGGER.info("Collected %d immutable evidence file(s)", len(imported_paths))
+        return
+
+    if args.command == "retry-platform-wave":
+        _, _, status = _current_platform_wave_status(args)
+        retry_ids = list(status.retry_experiment_ids)
+        if not retry_ids:
+            raise ValueError("The current platform-wave attempt is already complete; no recovery bundle is needed")
+        args.experiment_id = retry_ids
+        bundle, state_path, submissions = _submit_platform_wave(args)
+        LOGGER.info("Submitted recovery bundle %s for %s", bundle.root, ", ".join(retry_ids))
+        LOGGER.info("Saved wave state to %s", state_path)
+        LOGGER.info("Submitted %d recovery job script(s)", len(submissions))
+        return
+
+    if args.command == "stage-platform-wave":
+        staged_paths = _stage_platform_wave(args)
+        LOGGER.info("Staged %d evidence path(s); review with git diff --cached --stat", len(staged_paths))
         return
 
     if args.command == "verify-submission-bundle":
@@ -462,33 +513,37 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Create an immutable source/configuration bundle for one platform Slurm wave.",
     )
     _add_platform_options(bundle_parser)
-    bundle_parser.add_argument(
-        "--bundle-root",
-        default=None,
-        help="Parent for immutable bundles; defaults to ../hpc-ai-submissions beside the repository.",
+    _add_bundle_submission_options(bundle_parser)
+
+    wave_submit_parser = subparsers.add_parser(
+        "submit-platform-wave",
+        help="Create, record, and submit one immutable platform-wave bundle.",
     )
-    bundle_parser.add_argument(
-        "--bundle-id",
-        default=None,
-        help="Optional stable bundle identifier; defaults to platform-wave-commit-timestamp.",
-    )
-    bundle_parser.add_argument(
-        "--venv-activate",
-        default=None,
-        help="Virtualenv activation script shared by snapshot jobs; defaults to <repository>/.venv/bin/activate.",
-    )
-    bundle_parser.add_argument("--slurm-profile", default=None, help="Override the platform Slurm profile.")
-    bundle_parser.add_argument("--partition", default=None, help="Override the platform partition.")
-    bundle_parser.add_argument("--account", default=None, help="Optional Slurm account override.")
-    bundle_parser.add_argument("--time", default=None, help="Optional Slurm time limit override.")
-    bundle_parser.add_argument("--cpus-per-task", type=int, default=None)
-    bundle_parser.add_argument("--module", action="append", default=[], help="Additional module to load.")
-    bundle_parser.add_argument(
-        "--env",
-        action="append",
-        default=[],
-        help="Additional environment variable in KEY=VALUE form.",
-    )
+    _add_platform_options(wave_submit_parser)
+    _add_bundle_submission_options(wave_submit_parser)
+    wave_submit_parser.add_argument("--state-file", default=None, help="Optional ignored local state-file override.")
+
+    for command, help_text in [
+        ("status-platform-wave", "Report validated result coverage for the latest saved platform-wave attempt."),
+        ("collect-platform-wave", "Import a complete platform wave without manual bundle copying."),
+        ("retry-platform-wave", "Submit a new immutable bundle for incomplete experiments only."),
+        ("stage-platform-wave", "Stage exactly the collected raw evidence for one platform wave."),
+    ]:
+        lifecycle_parser = subparsers.add_parser(command, help=help_text)
+        if command == "retry-platform-wave":
+            _add_platform_options(lifecycle_parser)
+        else:
+            lifecycle_parser.add_argument(
+                "--platform-profile", required=True, help="Path to platforms/l40s.json or h100.json."
+            )
+            lifecycle_parser.add_argument("--wave", required=True, help="Wave identifier, such as 0, 1, or 4b.")
+        lifecycle_parser.add_argument("--state-file", default=None, help="Optional ignored local state-file override.")
+        if command == "collect-platform-wave":
+            lifecycle_parser.add_argument(
+                "--result-root", default="results/raw", help="Canonical raw evidence directory."
+            )
+        if command == "retry-platform-wave":
+            _add_bundle_submission_options(lifecycle_parser)
 
     verify_bundle_parser = subparsers.add_parser(
         "verify-submission-bundle",
@@ -774,6 +829,37 @@ def _add_platform_options(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_bundle_submission_options(parser: argparse.ArgumentParser) -> None:
+    """Attach the scheduler settings needed to freeze and submit a bundle."""
+    parser.add_argument(
+        "--bundle-root",
+        default=None,
+        help="Parent for immutable bundles; defaults to ../hpc-ai-submissions beside the repository.",
+    )
+    parser.add_argument(
+        "--bundle-id",
+        default=None,
+        help="Optional stable bundle identifier; defaults to platform-wave-commit-timestamp.",
+    )
+    parser.add_argument(
+        "--venv-activate",
+        default=None,
+        help="Virtualenv activation script shared by snapshot jobs; defaults to <repository>/.venv/bin/activate.",
+    )
+    parser.add_argument("--slurm-profile", default=None, help="Override the platform Slurm profile.")
+    parser.add_argument("--partition", default=None, help="Override the platform partition.")
+    parser.add_argument("--account", default=None, help="Optional Slurm account override.")
+    parser.add_argument("--time", default=None, help="Optional Slurm time limit override.")
+    parser.add_argument("--cpus-per-task", type=int, default=None)
+    parser.add_argument("--module", action="append", default=[], help="Additional module to load.")
+    parser.add_argument(
+        "--env",
+        action="append",
+        default=[],
+        help="Additional environment variable in KEY=VALUE form.",
+    )
+
+
 def _run_local_config(config_path: str, output_dir: str | None, *, repetition_number: int | None = None) -> None:
     """Run one experiment configuration through the local benchmark runner.
 
@@ -1054,6 +1140,126 @@ def _route_bundle_runtime_outputs(config_paths: list[Path], runtime_output_dir: 
         config = load_experiment_config(config_path)
         routed = replace(config, runtime=replace(config.runtime, output_dir=str(runtime_output_dir)))
         config_path.write_text(json.dumps(routed.to_dict(), indent=2) + "\n", encoding="utf-8")
+
+
+def _submit_platform_wave(args: argparse.Namespace):
+    """Create a bundle, persist its location, and submit its scripts in one action."""
+    if not args.wave:
+        raise ValueError("submit-platform-wave requires --wave")
+    profile = load_platform_profile(args.platform_profile)
+    state_path = _wave_state_path_for_args(args, profile.platform_id)
+    bundle = _create_platform_submission_bundle(args)
+    manifest = json.loads(bundle.manifest_path.read_text(encoding="utf-8"))
+    config_entries = manifest.get("configs") if isinstance(manifest, dict) else None
+    if not isinstance(config_entries, dict):
+        raise ValueError(f"Created bundle has invalid config manifest: {bundle.manifest_path}")
+    status_path = write_job_status_csv(
+        bundle.script_dir,
+        bundle.root / "SLURM_STATUS.csv",
+        batch_name=f"{profile.platform_id} wave {args.wave} ({bundle.bundle_id})",
+    )
+    append_wave_attempt(
+        state_path,
+        platform_id=profile.platform_id,
+        wave=str(args.wave),
+        bundle_dir=bundle.root,
+        bundle_id=bundle.bundle_id,
+        manifest_sha256=manifest_sha256(bundle.manifest_path),
+        status_path=status_path,
+        experiment_ids=sorted(str(experiment_id) for experiment_id in config_entries),
+    )
+    submissions = submit_job_scripts(bundle.script_dir, status_path)
+    return bundle, state_path, submissions
+
+
+def _current_platform_wave_status(args: argparse.Namespace):
+    """Resolve the latest recorded attempt and its evidence coverage summary."""
+    profile = load_platform_profile(args.platform_profile)
+    state_path = _wave_state_path_for_args(args, profile.platform_id)
+    attempt = current_wave_attempt(state_path)
+    status = summarize_bundle_results(attempt["bundle_dir"])
+    return state_path, attempt, status
+
+
+def _collect_platform_wave(args: argparse.Namespace) -> list[str]:
+    """Import only complete experiments, combining older attempts with retries safely."""
+    profile = load_platform_profile(args.platform_profile)
+    state_path = _wave_state_path_for_args(args, profile.platform_id)
+    state = load_wave_state(state_path)
+    attempts = state["attempts"]
+    summaries: list[tuple[dict[str, Any], Any]] = []
+    for attempt in attempts:
+        if not isinstance(attempt, dict):
+            raise ValueError(f"Platform-wave state contains an invalid attempt: {state_path}")
+        summaries.append((attempt, summarize_bundle_results(attempt["bundle_dir"])))
+
+    expected_ids: set[str] = set()
+    selected: dict[str, tuple[dict[str, Any], Any]] = {}
+    for attempt, status in summaries:
+        for experiment in status.experiments:
+            expected_ids.add(experiment.experiment_id)
+            if experiment.complete:
+                selected[experiment.experiment_id] = (attempt, experiment)
+    missing = sorted(expected_ids - set(selected))
+    if missing:
+        raise ValueError(
+            "Wave evidence is incomplete; run retry-platform-wave before collection for: " + ", ".join(missing)
+        )
+
+    imported_paths: list[str] = []
+    result_root = Path(args.result_root)
+    repository = Path.cwd().resolve()
+    for experiment_id in sorted(selected):
+        attempt, _ = selected[experiment_id]
+        source = Path(attempt["bundle_dir"]) / "results" / experiment_id
+        summary = import_result_evidence(source, result_root)
+        for path in (*summary.imported, *summary.unchanged):
+            resolved = path.resolve()
+            try:
+                imported_paths.append(str(resolved.relative_to(repository)))
+            except ValueError as exc:
+                raise ValueError(f"Collected evidence must remain inside the repository: {resolved}") from exc
+    problems = verify_result_evidence(result_root)
+    if problems:
+        raise ValueError("Evidence verification failed after collection: " + "; ".join(problems))
+    track_platform_progress(args.platform_profile, result_dir=result_root)
+    mark_wave_collected(state_path, imported_paths)
+    return sorted(set(imported_paths))
+
+
+def _stage_platform_wave(args: argparse.Namespace) -> list[str]:
+    """Stage exactly the collected raw evidence and its checksum manifest."""
+    profile = load_platform_profile(args.platform_profile)
+    state_path = _wave_state_path_for_args(args, profile.platform_id)
+    state = load_wave_state(state_path)
+    imported_paths = state.get("imported_paths")
+    if not isinstance(imported_paths, list) or not imported_paths:
+        raise ValueError("No collected evidence is recorded; run collect-platform-wave first")
+    platform_evidence_root = Path("results") / "raw" / profile.platform_id
+    checksum = platform_evidence_root / "SHA256SUMS"
+    # SHA256SUMS covers the full platform tree. Stage the same complete set so
+    # a commit can never contain a manifest that refers to an omitted trial.
+    paths = sorted(str(path) for path in platform_evidence_root.rglob("*.json")) + [str(checksum)]
+    missing = [path for path in paths if not Path(path).is_file()]
+    if missing:
+        raise FileNotFoundError("Collected evidence is missing: " + ", ".join(missing))
+    subprocess.run(["git", "add", "--", *paths], check=True)
+    return paths
+
+
+def _wave_state_path_for_args(args: argparse.Namespace, platform_id: str) -> Path:
+    wave = str(args.wave)
+    if not wave or wave == "None":
+        raise ValueError("Platform-wave commands require --wave")
+    return Path(args.state_file) if args.state_file else wave_state_path(Path.cwd(), platform_id, wave)
+
+
+def _summarize_scheduler_rows(rows: list[dict[str, str]]) -> str:
+    counts: dict[str, int] = {}
+    for row in rows:
+        state = row.get("state", "UNKNOWN") or "UNKNOWN"
+        counts[state] = counts.get(state, 0) + 1
+    return ", ".join(f"{state}={count}" for state, count in sorted(counts.items())) or "no jobs recorded"
 
 
 def _resolve_bundle_venv(repository: Path, requested_path: str | None) -> Path:

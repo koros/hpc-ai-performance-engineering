@@ -29,6 +29,7 @@ from hpc_ai_perf.slurm import (
     build_job_status_rows,
     build_submission_plan,
     record_job_submission,
+    refresh_job_status_csv,
     render_slurm_script,
     submit_job_scripts,
     write_job_status_csv,
@@ -275,6 +276,26 @@ def test_submit_job_scripts_records_mocked_sbatch_output(tmp_path: Path) -> None
         rows = list(csv.DictReader(file_obj))
     assert rows[0]["job_id"] == "123456"
     assert rows[0]["state"] == "SUBMITTED"
+
+
+def test_refresh_job_status_collapses_array_accounting_states(tmp_path: Path) -> None:
+    write_slurm_script("#!/bin/bash\n", tmp_path, "E001")
+    status_path = write_job_status_csv(tmp_path, tmp_path / "slurm_status.csv")
+    record_job_submission(status_path, experiment_id="E001", job_id="123456")
+
+    rows = refresh_job_status_csv(
+        status_path,
+        runner=lambda job_id: "\n".join(
+            [
+                f"{job_id}|COMPLETED",
+                f"{job_id}_1|COMPLETED",
+                f"{job_id}_2|FAILED",
+                f"{job_id}_2.batch|FAILED",
+            ]
+        ),
+    )
+
+    assert rows[0]["state"] == "FAILED"
 
 
 def test_render_slurm_bulk(tmp_path: Path) -> None:
@@ -1372,10 +1393,10 @@ def test_readme_documents_hpc_submission_workflow() -> None:
 
     assert "## HPC Submission Workflow" in readme
     assert "slurm/profiles/cluster_l40s.json" in readme
-    assert "make create-platform-wave-bundle" in readme
-    assert "make init-platform-wave-bundle-status PLATFORM=l40s PLATFORM_WAVE=0" in readme
-    assert "make submit-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0" in readme
-    assert "make import-platform-wave-bundle" in readme
+    assert "make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0" in readme
+    assert "make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=0" in readme
+    assert "make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=0" in readme
+    assert "make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=0" in readme
 
 
 def test_slurm_status_make_targets_do_not_rerender_scripts() -> None:
