@@ -62,35 +62,32 @@ commits in the primary checkout.
    serving rows because the cluster lacks both a site-compatible vLLM package and a usable CUDA compiler toolchain for
    a supported build.
 
-2. Validate the active profile and create the selected immutable platform-wave bundle:
+2. Validate the active profile and submit the selected immutable platform wave:
 
    ```bash
    python -m hpc_ai_perf.cli check-slurm-profile --slurm-profile slurm/profiles/cluster_l40s.json
    python -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --require-deepspeed
-   make create-platform-wave-bundle \
-     PLATFORM=l40s PLATFORM_WAVE=0 \
-     SUBMISSION_BUNDLE_ID=l40s-wave-0-$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%SZ)
+   make check-slurm-profile SLURM_PROFILE=slurm/profiles/cluster_l40s.json
+   make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
    ```
 
    Run `check-runtime` from an allocated GPU node. The DeepSpeed portion must pass import/accelerator checks; if
    DeepSpeed 0.17.x is installed without `nvcc`, upgrade to the project-supported 0.18.9+ line or load a full CUDA
    toolkit before E005. The active wave 0 scope is E001-E005; vLLM is not a precondition for this supported scope.
 
-3. Set the printed bundle path, then review, initialize, and dry-run the Slurm batch:
+3. Monitor validated trial coverage. The bundle location and Slurm status record are saved automatically under
+   ignored `build/platform_waves/`:
 
    ```bash
-   export SUBMISSION_BUNDLE_DIR=../hpc-ai-submissions/<bundle-id>
-   make plan-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0
-   make init-platform-wave-bundle-status PLATFORM=l40s PLATFORM_WAVE=0
-   make dry-run-submit-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0
+   make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
    ```
 
-4. After completion, import and verify result evidence:
+4. After the status command reports all required trials complete, collect and stage verified result evidence:
 
    ```bash
-   make import-platform-wave-bundle SUBMISSION_BUNDLE_DIR="$SUBMISSION_BUNDLE_DIR"
-   make validate-result-evidence
-   make track-l40s-progress
+   make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
+   make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
+   git commit -m "data: add completed L40S wave 0 trials"
    ```
 
 5. Review:

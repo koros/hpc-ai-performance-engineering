@@ -224,47 +224,48 @@ Use an immutable submission bundle for every real Slurm wave. The bundle is a de
 platform configs, Slurm scripts, an environment contract, and staging outside the primary checkout. This means that
 importing or committing an earlier result cannot invalidate jobs that are still waiting in Slurm.
 
-After loading the same runtime used by jobs, create a stable L40S Wave 0 bundle:
+Validate the profile, then submit a complete wave with one command:
 
 ```bash
 source slurm/modules_for_hpc_ai
-source .venv/bin/activate
-python3 -m hpc_ai_perf.cli check-slurm-profile --slurm-profile slurm/profiles/cluster_l40s.json
-
-make create-platform-wave-bundle \
-  PLATFORM=l40s PLATFORM_WAVE=0 \
-  SUBMISSION_BUNDLE_ID=l40s-wave-0-$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%SZ)
+make check-slurm-profile SLURM_PROFILE=slurm/profiles/cluster_l40s.json
+make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
 ```
 
-The command prints the resulting directory, normally `../hpc-ai-submissions/<bundle-id>`. Set it once for the
-remaining actions:
+`submit-platform-wave` creates the detached bundle, records its location under ignored `build/platform_waves/`, writes
+the Slurm status file, and submits every script. No bundle path needs to be copied into the shell. The Makefile uses
+`.venv/bin/python` automatically when it exists.
+
+Monitor result coverage while the wave runs:
 
 ```bash
-export SUBMISSION_BUNDLE_DIR=../hpc-ai-submissions/<bundle-id>
-make plan-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0
-make init-platform-wave-bundle-status PLATFORM=l40s PLATFORM_WAVE=0
-make dry-run-submit-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0
-make submit-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0
+make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
 ```
 
 Each script verifies the source commit, manifest SHA-256, resolved config SHA-256, clean snapshot, and dependency
-contract before running. Results and logs remain in `$SUBMISSION_BUNDLE_DIR`, so the main checkout may safely receive
-and commit completed trials while other array tasks are queued.
+contract before running. Workload-side files, including profiler traces, are written to the bundle cache rather than
+the immutable source snapshot; each trial/rank receives a separate trace path.
 
-Import completed bundle results incrementally or after the wave, then verify and track them:
+When the status command reports every trial complete, collect and stage the verified raw evidence:
 
 ```bash
-make import-platform-wave-bundle SUBMISSION_BUNDLE_DIR="$SUBMISSION_BUNDLE_DIR"
-make validate-result-evidence
-make track-l40s-progress
+make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
+make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
+git diff --cached --stat
+git commit -m "data: add completed L40S wave 0 trials"
 ```
+
+Collection validates every expected result and its bundle manifest, imports only complete experiments, refreshes the
+checksum manifest, and updates the ignored platform tracker. If a wave has missing or failed trials, collection stops
+without importing a partial dataset; run `make retry-platform-wave PLATFORM=l40s PLATFORM_WAVE=0` to submit a fresh
+bundle for the incomplete experiments only.
 
 Wave 0 uses one acceptance trial per condition. Core performance waves use three-task Slurm arrays based on the
 tracked execution matrix; see the [measurement protocol](docs/measurement_protocol.md). H100 uses the same bundle
 workflow with `PLATFORM=h100`; its evidence remains in a separate platform root.
 
-The older `render-platform-wave` targets remain available for inspection and local script development, but they are
-not the recommended path for queued research collection.
+The older `render-platform-wave` and `*-bundle` targets remain available for inspection and one-off recovery, but they
+are not the recommended path for queued research collection.
 
 Detailed gated instructions are tracked in the [L40S-first execution runbook](docs/platform_execution_runbook.md).
 

@@ -68,34 +68,26 @@ is installed without a full CUDA toolkit, upgrade to the project-supported DeepS
 `CUDA_HOME/bin/nvcc` exists before running E005. The current wave 0 scope is E001-E005; do not run a vLLM check or E006
 until the separate serving environment has been supplied.
 
-## 2. Preserve and Import L40S Trials
+## 2. Preserve and Collect L40S Trials
 
 Do not delete a failed or provenance-rejected staging directory. Move it to a clearly named quarantine/archive
 directory and retain its Slurm logs for diagnosis. New certified runs use an immutable submission bundle, whose
 `results/SUBMISSION_MANIFEST.json` travels with the JSON records and proves the exact source/configuration snapshot.
 
-Import from the completed bundle, including while other jobs from the same bundle remain queued:
+The standard workflow stores the current bundle location in ignored `build/platform_waves/`; do not copy result files or
+export a bundle-path variable. When every required trial is complete, collect and stage evidence with:
 
 ```bash
-export SUBMISSION_BUNDLE_DIR=../hpc-ai-submissions/<bundle-id>
-make import-platform-wave-bundle SUBMISSION_BUNDLE_DIR="$SUBMISSION_BUNDLE_DIR"
-make validate-result-evidence
-make track-l40s-progress
+make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
+make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
+git diff --cached --stat
+git commit -m "data: add completed L40S wave 0 trials"
 ```
 
-The importer preserves original JSON bytes, verifies the adjacent submission manifest for bundle results, infers one
-unambiguous platform, rejects credential-like fields and invalid records, refuses conflicting overwrites, and refreshes
-`results/raw/l40s/SHA256SUMS`. An empty `results/raw/h100/` directory is harmless; it does not require an H100
-checksum manifest until it contains evidence.
-
-Inspect and commit one experiment or tightly related batch at a time:
-
-```bash
-git status --short results/raw/l40s
-git diff -- results/raw/l40s
-git add results/raw/l40s/E123 results/raw/l40s/SHA256SUMS
-git commit -m "results(l40s): add E123 trials"
-```
+Collection preserves original JSON bytes, verifies the adjacent submission manifest, infers one unambiguous platform,
+rejects credential-like fields and invalid records, refreshes `results/raw/l40s/SHA256SUMS`, and updates the ignored
+tracker. It refuses an incomplete wave rather than asking the user to select result folders manually. An empty
+`results/raw/h100/` directory is harmless; it does not require an H100 checksum manifest until it contains evidence.
 
 Keep the HPC originals until the commits are pushed and independently backed up.
 
@@ -114,7 +106,7 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 
 E006, E007, all vLLM-serving rows, and backend/adapter rows listed as Deferred are not rendered by platform batch commands.
 
-## 4. Create, Review, and Submit an Immutable Wave Bundle
+## 4. Submit, Monitor, and Recover an Immutable Wave
 
 From a login node, load the exact module stack and virtual environment which the generated job will activate. Commit
 all changes to `src/`, `configs/`, `platforms/`, `slurm/`, and `pyproject.toml` first. Result evidence, reports, and
@@ -123,21 +115,15 @@ ignored build output may remain present: they are deliberately excluded from the
 ```bash
 cd ./
 source slurm/modules_for_hpc_ai
-source .venv/bin/activate
-
-make create-platform-wave-bundle \
-  PLATFORM=l40s PLATFORM_WAVE=0 \
-  SUBMISSION_BUNDLE_ID=l40s-wave-0-$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%SZ)
+make check-slurm-profile SLURM_PROFILE=slurm/profiles/cluster_l40s.json
+make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
 ```
 
-Record the printed path, then initialize and submit from that immutable bundle:
+The command creates the bundle, writes its Slurm status record and ignored run-state file, then submits every script.
+Generated scripts activate the shared environment themselves. Monitor it with:
 
 ```bash
-export SUBMISSION_BUNDLE_DIR=../hpc-ai-submissions/<bundle-id>
-make plan-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0
-make init-platform-wave-bundle-status PLATFORM=l40s PLATFORM_WAVE=0
-make dry-run-submit-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0
-make submit-platform-wave-bundle PLATFORM=l40s PLATFORM_WAVE=0
+make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
 ```
 
 The bundle contains `repo/` (detached source snapshot), `configs/` (frozen resolved configs), `scripts/`, `logs/`,
@@ -145,9 +131,13 @@ The bundle contains `repo/` (detached source snapshot), `configs/` (frozen resol
 snapshot, config hash, manifest hash, and runtime dependency contract before invoking the workload. Its logs and JSON
 never modify the main repository checkout.
 
-You may import and commit completed trial evidence while later jobs are queued. Do not alter an existing bundle or add
-new scripts to it; create another bundle for a changed commit, environment, platform, wave, or experiment selection.
-Do not advance based only on Slurm `COMPLETED`; the platform tracker must show valid trial evidence.
+Do not alter an existing bundle or add new scripts to it. Do not advance based only on Slurm `COMPLETED`:
+`collect-platform-wave` requires valid trial evidence for the whole wave. If the status report lists incomplete
+experiments, submit only those from a new immutable bundle:
+
+```bash
+make retry-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
+```
 
 ## 5. H100 Recovery Path
 
@@ -157,13 +147,12 @@ When `gpu_h100` returns, verify the node and start its independent wave 0:
 python3 -m hpc_ai_perf.cli check-slurm-profile --slurm-profile slurm/profiles/cluster_h100.json
 source slurm/modules_for_hpc_ai
 source .venv/bin/activate
-make create-platform-wave-bundle \
-  PLATFORM=h100 PLATFORM_WAVE=0 \
-  SUBMISSION_BUNDLE_ID=h100-wave-0-$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%SZ)
+make submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=0
 make track-h100-progress
 ```
 
-Use the same bundle process with `PLATFORM=h100` and a separate `SUBMISSION_BUNDLE_DIR`. H100 staged JSON is accepted
+Use the same `status-platform-wave`, `collect-platform-wave`, and `stage-platform-wave` commands with
+`PLATFORM=h100`. H100 staged JSON is accepted
 under its own evidence root, never changing L40S status. Only compare rows whose workload, revisions, seed,
 useful-work definition, and `comparability` contract match. The hardware-comparison anchors are `E121/E123`,
 `E122/E124`, `E125/E127`, and `E126/E128`.
