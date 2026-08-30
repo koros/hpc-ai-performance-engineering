@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+from dataclasses import replace
 from pathlib import Path
 from shlex import quote
 from typing import Any
@@ -957,6 +958,7 @@ def _create_platform_submission_bundle(args: argparse.Namespace):
             experiment_ids=set(args.experiment_id) if args.experiment_id else None,
             include_deferred=False,
         )
+        _route_bundle_runtime_outputs(config_paths, bundle.cache_dir / "runtime")
         write_submission_manifest(
             bundle,
             platform_id=profile.platform_id,
@@ -1038,6 +1040,20 @@ def _bundle_snapshot_path(bundle, source_path: str) -> Path:
     if not snapshot_path.exists():
         raise FileNotFoundError(f"Submission snapshot is missing requested input: {relative}")
     return snapshot_path
+
+
+def _route_bundle_runtime_outputs(config_paths: list[Path], runtime_output_dir: Path) -> None:
+    """Keep workload side artifacts out of the immutable bundle source snapshot.
+
+    Result JSON files already use the bundle's ``results/`` directory through
+    the Slurm ``--output-dir`` argument.  Some workloads and profilers use the
+    resolved config's runtime output directory directly, so freeze that setting
+    to the bundle's external cache before manifesting the configs.
+    """
+    for config_path in config_paths:
+        config = load_experiment_config(config_path)
+        routed = replace(config, runtime=replace(config.runtime, output_dir=str(runtime_output_dir)))
+        config_path.write_text(json.dumps(routed.to_dict(), indent=2) + "\n", encoding="utf-8")
 
 
 def _resolve_bundle_venv(repository: Path, requested_path: str | None) -> Path:

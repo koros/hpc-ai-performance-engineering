@@ -19,7 +19,7 @@ from hpc_ai_perf.config import (
     filter_config_entries,
     load_experiment_config,
 )
-from hpc_ai_perf.profiling.system import TorchMemoryProfiler
+from hpc_ai_perf.profiling.system import TorchMemoryProfiler, TorchProfiler
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
@@ -566,6 +566,16 @@ def test_torch_memory_profiler_sets_explicit_local_rank_device(monkeypatch) -> N
     assert ("reset_peak_memory_stats", expected_device) in events
     assert metrics["memory_used_gb"] == 1
     assert metrics["memory_reserved_gb"] == 2
+
+
+def test_torch_profiler_paths_are_unique_per_trial_and_rank(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("RANK", "1")
+
+    first = TorchProfiler(tmp_path, "E024", repetition_number=1)
+    second = TorchProfiler(tmp_path, "E024", repetition_number=2)
+
+    assert first._path == tmp_path / "profiler" / "E024" / "r001" / "rank1.json"
+    assert second._path == tmp_path / "profiler" / "E024" / "r002" / "rank1.json"
 
 
 def test_deepspeed_import_environment_unsets_stale_cuda_home(monkeypatch, tmp_path: Path) -> None:

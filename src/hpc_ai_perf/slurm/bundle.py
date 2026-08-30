@@ -22,6 +22,8 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
+from hpc_ai_perf.config import config_sha256
+
 _BUNDLE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _MUTABLE_RESULT_PATHS = (
     "build/",
@@ -129,7 +131,8 @@ def write_submission_manifest(
         metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
         config_entries[experiment_id] = {
             "path": config_path.name,
-            "sha256": _sha256_path(config_path),
+            "file_sha256": _sha256_path(config_path),
+            "config_sha256": config_sha256(data),
             "condition_id": str(metadata.get("condition_id", "")),
             "required_trials": int(metadata.get("required_trials", 1)),
         }
@@ -236,7 +239,7 @@ def verify_submission_bundle(
     expected_config = manifest["configs"].get(experiment_id)
     if not isinstance(expected_config, dict):
         problems.append(f"config is not listed in the submission manifest: {config_file.name}")
-    elif not config_file.is_file() or _sha256_path(config_file) != expected_config.get("sha256"):
+    elif not config_file.is_file() or _sha256_path(config_file) != expected_config.get("file_sha256"):
         problems.append(f"resolved config SHA-256 does not match the submission manifest: {config_file.name}")
 
     expected_contract = manifest.get("environment_contract")
@@ -269,7 +272,7 @@ def validate_result_bundle_provenance(record: dict[str, Any], result_path: str |
     expected_config = manifest["configs"].get(experiment_id)
     if not isinstance(expected_config, dict):
         problems.append("experiment is not listed in SUBMISSION_MANIFEST.json")
-    elif record.get("config_sha256") != expected_config.get("sha256"):
+    elif record.get("config_sha256") != expected_config.get("config_sha256"):
         problems.append("result config_sha256 does not match SUBMISSION_MANIFEST.json")
     if record.get("git_commit") != manifest["repository"]["git_commit"]:
         problems.append("result git_commit does not match SUBMISSION_MANIFEST.json")

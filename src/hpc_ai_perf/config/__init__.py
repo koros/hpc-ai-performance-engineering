@@ -19,6 +19,7 @@ from hpc_ai_perf.config.experiment import (
     WorkloadConfig,
     load_experiment_config,
 )
+from hpc_ai_perf.config.identity import canonical_config_bytes, config_sha256
 from hpc_ai_perf.config.platform import (
     PlatformCondition,
     PlatformProfile,
@@ -41,6 +42,8 @@ __all__ = [
     "ProfilingConfig",
     "RuntimeConfig",
     "WorkloadConfig",
+    "canonical_config_bytes",
+    "config_sha256",
     "discover_experiment_configs",
     "entries_to_json",
     "entries_to_table",

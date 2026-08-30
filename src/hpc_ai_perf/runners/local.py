@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import json
 import os
 import platform
 import socket
@@ -11,7 +9,7 @@ import time
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 
-from hpc_ai_perf.config import ExperimentConfig
+from hpc_ai_perf.config import ExperimentConfig, config_sha256
 from hpc_ai_perf.profiling import Profiler, build_profiler, missing_workload_profiler_metrics
 from hpc_ai_perf.results import ExperimentResult
 from hpc_ai_perf.workloads import WorkloadRegistry, default_registry
@@ -56,7 +54,7 @@ class LocalBenchmarkRunner:
 
         try:
             workload = self._registry.get(config.workload.name)
-            profiler = profiler or build_profiler(config)
+            profiler = profiler or build_profiler(config, repetition_number=repetition_number)
             # Preparation is allowed to perform dependency checks or lightweight
             # setup before the measured workload starts.
             workload.prepare(config)
@@ -125,9 +123,7 @@ def _environment(
         "requested_platform": config.hardware.platform,
         "requested_gpu_model": config.hardware.gpu_model,
         "command": " ".join(sys.argv),
-        "config_sha256": hashlib.sha256(
-            json.dumps(config.to_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
-        ).hexdigest(),
+        "config_sha256": config_sha256(config),
         "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
         "deterministic_algorithms_requested": config.runtime.deterministic,
     }

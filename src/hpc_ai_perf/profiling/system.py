@@ -164,8 +164,13 @@ class TorchProfiler(Profiler):
 
     name = "torch_profiler"
 
-    def __init__(self, output_dir: str | Path, experiment_id: str) -> None:
-        self._path = Path(output_dir) / "profiler" / f"{experiment_id}.rank{_rank()}.json"
+    def __init__(self, output_dir: str | Path, experiment_id: str, *, repetition_number: int | None = None) -> None:
+        trial = repetition_number
+        if trial is None:
+            raw_trial = os.environ.get("SLURM_ARRAY_TASK_ID")
+            trial = int(raw_trial) if raw_trial and raw_trial.isdigit() else None
+        trial_name = f"r{trial:03d}" if trial is not None else "single"
+        self._path = Path(output_dir) / "profiler" / experiment_id / trial_name / f"rank{_rank()}.json"
         self._profiler: Any | None = None
 
     def start(self, config: ExperimentConfig) -> None:
@@ -200,7 +205,7 @@ class TorchProfiler(Profiler):
         }
 
 
-def build_profiler(config: ExperimentConfig) -> Profiler:
+def build_profiler(config: ExperimentConfig, *, repetition_number: int | None = None) -> Profiler:
     """Build exactly the profiler set declared by an experiment config."""
     if not config.profiling.enabled:
         return NullProfiler()
@@ -217,7 +222,9 @@ def build_profiler(config: ExperimentConfig) -> Profiler:
         elif name == "torch_memory":
             profilers.append(TorchMemoryProfiler())
         elif name == "torch_profiler":
-            profilers.append(TorchProfiler(config.runtime.output_dir, config.experiment_id))
+            profilers.append(
+                TorchProfiler(config.runtime.output_dir, config.experiment_id, repetition_number=repetition_number)
+            )
         else:
             # NCCL, serving-latency, and DataLoader timings are emitted by the
             # execution path where their timing boundaries are well defined.

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -273,9 +272,9 @@ def _validate_result_mapping(path: Path, data: dict[str, Any]) -> list[Validatio
             issues.append(ValidationIssue(path, "submission_bundle_manifest_sha256 must be a SHA-256 hex digest"))
         recorded_hash = data.get("config_sha256")
         if isinstance(recorded_hash, str) and config:
-            expected_hash = hashlib.sha256(
-                json.dumps(config, sort_keys=True, separators=(",", ":")).encode("utf-8")
-            ).hexdigest()
+            from hpc_ai_perf.config.identity import config_sha256
+
+            expected_hash = config_sha256(config)
             if recorded_hash != expected_hash:
                 issues.append(ValidationIssue(path, "config_sha256 does not match the embedded config"))
         if int(data.get("gpus", 0) or 0) > 0 and not environment.get("observed_gpu_model"):
