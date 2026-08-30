@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -22,7 +23,12 @@ from hpc_ai_perf.results import (
     import_result_evidence,
     verify_result_evidence,
 )
-from hpc_ai_perf.slurm.bundle import _BUNDLE_ID, SubmissionBundle, write_submission_manifest
+from hpc_ai_perf.slurm.bundle import (
+    _BUNDLE_ID,
+    SubmissionBundle,
+    capture_environment_contract,
+    write_submission_manifest,
+)
 from hpc_ai_perf.slurm.lifecycle import (
     append_wave_attempt,
     current_wave_attempt,
@@ -83,8 +89,13 @@ def test_bundle_manifest_separates_file_and_config_identities(tmp_path: Path) ->
         created_at="2026-08-30T12:00:00+00:00",
     )
 
+    environment_contract = {"selected_environment": "isolated-vllm"}
     manifest = write_submission_manifest(
-        bundle, platform_id="l40s", wave="1", input_files={"platform_profile": profile_path}
+        bundle,
+        platform_id="l40s",
+        wave="1",
+        input_files={"platform_profile": profile_path},
+        environment_contract=environment_contract,
     )
     identities = manifest["configs"]["E123"]
 
@@ -92,6 +103,14 @@ def test_bundle_manifest_separates_file_and_config_identities(tmp_path: Path) ->
     assert identities["config_sha256"] == config_sha256(config)
     assert identities["file_sha256"] == hashlib.sha256(config_path.read_bytes()).hexdigest()
     assert identities["file_sha256"] != identities["config_sha256"]
+    assert manifest["environment_contract"] == environment_contract
+
+
+def test_capture_environment_contract_can_probe_a_selected_virtualenv_python() -> None:
+    contract = capture_environment_contract(python_executable=sys.executable)
+
+    assert contract["python_executable"] == str(Path(sys.executable).resolve())
+    assert isinstance(contract["packages"], dict)
 
 
 def test_wave_state_and_result_summary_track_complete_bundle(tmp_path: Path) -> None:
@@ -176,7 +195,7 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     expected_ids = {f"E{index:03d}" for index in range(1, 201)}
 
-    for platform_id, planned_count in [("l40s", 144), ("h100", 144)]:
+    for platform_id, planned_count in [("l40s", 145), ("h100", 144)]:
         conditions = load_platform_conditions("platforms/execution_matrix.json", platform_id)
 
         assert len(conditions) == 200
@@ -184,9 +203,8 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         assert sum(condition.status == "planned" for condition in conditions) == planned_count
 
 
-def test_execution_matrix_defers_vllm_and_cuda_toolkit_rows_on_both_platforms() -> None:
-    expected_ids = {
-        "E006",
+def test_execution_matrix_defers_vllm_and_cuda_toolkit_rows_until_the_l40s_pilot() -> None:
+    shared_deferred_ids = {
         "E007",
         "E130",
         *(f"E{index:03d}" for index in range(132, 149)),
@@ -195,6 +213,9 @@ def test_execution_matrix_defers_vllm_and_cuda_toolkit_rows_on_both_platforms() 
     }
 
     for platform_id in ("l40s", "h100"):
+        expected_ids = set(shared_deferred_ids)
+        if platform_id == "h100":
+            expected_ids.add("E006")
         conditions = load_platform_conditions(
             "platforms/execution_matrix.json",
             platform_id,
@@ -204,6 +225,13 @@ def test_execution_matrix_defers_vllm_and_cuda_toolkit_rows_on_both_platforms() 
         assert {condition.matrix_id for condition in conditions} == expected_ids
         assert {condition.status for condition in conditions} == {"deferred"}
         assert all(condition.wave == "deferred" for condition in conditions)
+
+
+def test_execution_matrix_schedules_only_l40s_e006_as_a_vllm_pilot() -> None:
+    conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s", wave="vllm-pilot")
+
+    actual = [(condition.condition_id, condition.required_trials, condition.comparability) for condition in conditions]
+    assert actual == [("E006@l40s", 1, "platform_specific")]
 
 
 def test_deferred_platform_conditions_are_tracked() -> None:
@@ -340,6 +368,7 @@ def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -
     assert "build/vllm_acceptance" in acceptance
     assert "submit-vllm-build:" in makefile
     assert "submit-vllm-acceptance:" in makefile
+    assert "submit-vllm-pilot:" in makefile
     assert "HPC_AI_VLLM_SOURCE" in makefile
     assert "--venv-activate $(VENV_ACTIVATE)" in makefile
 

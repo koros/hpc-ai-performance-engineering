@@ -25,6 +25,7 @@ from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.runtime_checks import format_runtime_checks, run_cluster_runtime_checks, runtime_checks_to_json
 from hpc_ai_perf.slurm import (
     append_wave_attempt,
+    capture_environment_contract,
     current_wave_attempt,
     format_bundle_result_status,
     load_wave_state,
@@ -1051,6 +1052,8 @@ def _create_platform_submission_bundle(args: argparse.Namespace):
             experiment_ids=set(args.experiment_id) if args.experiment_id else None,
             include_deferred=False,
         )
+        venv_activate = _resolve_bundle_venv(repository, args.venv_activate)
+        venv_python = _venv_python_executable(venv_activate)
         write_submission_manifest(
             bundle,
             platform_id=profile.platform_id,
@@ -1060,9 +1063,9 @@ def _create_platform_submission_bundle(args: argparse.Namespace):
                 "execution_matrix": source_matrix,
                 "slurm_profile": effective_profile,
             },
+            environment_contract=capture_environment_contract(python_executable=venv_python),
         )
         manifest_hash = manifest_sha256(bundle.manifest_path)
-        venv_activate = _resolve_bundle_venv(repository, args.venv_activate)
         base_options = _resolve_slurm_options(
             profile_path=str(effective_profile),
             partition=args.partition or profile.partition,
@@ -1264,6 +1267,17 @@ def _resolve_bundle_venv(repository: Path, requested_path: str | None) -> Path:
             f"Virtualenv activation script is missing: {resolved}. Use --venv-activate to select the shared runtime."
         )
     return resolved
+
+
+def _venv_python_executable(venv_activate: Path) -> Path:
+    """Resolve the interpreter selected by a standard ``bin/activate`` script."""
+    python_executable = venv_activate.parent / "python"
+    if not python_executable.is_file():
+        raise FileNotFoundError(
+            f"Virtualenv Python executable is missing: {python_executable}. "
+            "Recreate the environment or select a valid --venv-activate path."
+        )
+    return python_executable.resolve()
 
 
 def _bundle_setup_commands(

@@ -118,6 +118,7 @@ def write_submission_manifest(
     platform_id: str,
     wave: str,
     input_files: dict[str, Path],
+    environment_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Write the immutable provenance manifest after platform configs are frozen."""
     config_entries: dict[str, dict[str, Any]] = {}
@@ -153,7 +154,9 @@ def write_submission_manifest(
         "input_files": {
             name: {"path": str(path), "sha256": _sha256_path(path)} for name, path in sorted(input_files.items())
         },
-        "environment_contract": capture_environment_contract(),
+        "environment_contract": (
+            environment_contract if environment_contract is not None else capture_environment_contract()
+        ),
     }
     _write_json(bundle.manifest_path, manifest)
     _write_json(bundle.result_manifest_path, manifest)
@@ -175,8 +178,58 @@ def manifest_sha256(path: str | Path) -> str:
     return _sha256_path(Path(path))
 
 
-def capture_environment_contract() -> dict[str, Any]:
-    """Capture dependency and module identities that must not silently drift in a queued wave."""
+def capture_environment_contract(*, python_executable: str | Path | None = None) -> dict[str, Any]:
+    """Capture dependency and module identities that must not silently drift in a queued wave.
+
+    Bundles normally use the Python process creating them. A serving wave can
+    instead select an isolated virtual environment with ``--venv-activate``;
+    inspect that interpreter so the manifest matches the Python process that
+    will run on Slurm rather than the shared submission environment.
+    """
+    if python_executable is not None:
+        executable = Path(python_executable).expanduser().resolve()
+        if not executable.is_file():
+            raise FileNotFoundError(f"Virtualenv Python executable is missing: {executable}")
+        probe = """
+import json
+import os
+import platform
+import sys
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+
+packages = {}
+for package in (\"torch\", \"transformers\", \"datasets\", \"deepspeed\", \"vllm\"):
+    try:
+        packages[package] = version(package)
+    except PackageNotFoundError:
+        packages[package] = None
+torch_cuda = None
+try:
+    import torch
+    torch_cuda = str(torch.version.cuda)
+except ImportError:
+    pass
+print(json.dumps({
+    \"python_version\": platform.python_version(),
+    \"python_executable\": str(Path(sys.executable).resolve()),
+    \"loaded_modules\": os.environ.get(\"LOADEDMODULES\"),
+    \"packages\": packages,
+    \"torch_cuda\": torch_cuda,
+}))
+"""
+        completed = subprocess.run(
+            [str(executable), "-c", probe],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        contract = json.loads(completed.stdout)
+        if not isinstance(contract, dict):  # pragma: no cover - defensive subprocess guard
+            raise ValueError(f"Virtualenv contract probe returned invalid JSON: {executable}")
+        return contract
+
     packages: dict[str, str | None] = {}
     for package in ("torch", "transformers", "datasets", "deepspeed", "vllm"):
         try:

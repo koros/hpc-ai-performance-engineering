@@ -12,6 +12,14 @@
     },
     {
       "platform": "l40s",
+      "wave": "vllm-pilot",
+      "name": "L40S vLLM E006 canonical pilot",
+      "experiment_ids": ["E006"],
+      "required_trials": 1,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "l40s",
       "wave": "1",
       "name": "L40S core baselines and characterisation",
       "experiment_ids": ["E008-E015", "E018-E031"],
@@ -138,11 +146,18 @@
   ],
   "deferred": [
     {
-      "platforms": ["l40s", "h100"],
-      "name": "vLLM serving blocked by site environment",
+      "platforms": ["l40s"],
+      "name": "vLLM serving awaiting the E006 pilot",
+      "experiment_ids": ["E130", "E132-E148", "E178", "E180-E196"],
+      "comparability": "platform_specific",
+      "reason": "E006 has a dedicated one-trial L40S pilot, but the remaining serving rows stay deferred until its isolated vLLM 0.10.2 environment and canonical evidence pass review."
+    },
+    {
+      "platforms": ["h100"],
+      "name": "vLLM serving blocked pending H100 acceptance",
       "experiment_ids": ["E006", "E130", "E132-E148", "E178", "E180-E196"],
       "comparability": "platform_specific",
-      "reason": "The site now has a verified CUDA 12.4.1 source-build stack, but no isolated vLLM 0.10.2 environment has passed the E006 import, engine-start, and served-request gate. Do not schedule these rows until that acceptance job passes on the target platform."
+      "reason": "The site has a verified CUDA 12.4.1 source-build stack, but no isolated vLLM 0.10.2 environment has passed the E006 import, engine-start, and served-request gate on H100."
     },
     {
       "platforms": ["l40s", "h100"],
