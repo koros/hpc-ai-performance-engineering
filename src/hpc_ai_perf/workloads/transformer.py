@@ -153,10 +153,12 @@ def _run_training_loop(
     learning_rate = float(parameters.get("learning_rate", 5e-5))
     device = torch.device("cuda", runtime.local_rank) if torch.cuda.is_available() else torch.device("cpu")
 
+    activation_checkpointing_backend = "disabled"
     if bool(parameters.get("activation_checkpointing", False)):
-        if not hasattr(model, "gradient_checkpointing_enable"):
-            raise RuntimeError(f"{type(model).__name__} does not support activation checkpointing")
-        model.gradient_checkpointing_enable()
+        activation_checkpointing_backend = _enable_activation_checkpointing(
+            model,
+            prefer_non_reentrant=config.distributed.strategy == "fsdp",
+        )
         if hasattr(model.config, "use_cache"):
             model.config.use_cache = False
 
@@ -309,6 +311,7 @@ def _run_training_loop(
         "world_size": runtime.world_size,
         "rank": runtime.rank,
         "activation_checkpointing": bool(parameters.get("activation_checkpointing", False)),
+        "activation_checkpointing_backend": activation_checkpointing_backend,
         "precision_backend": _precision_backend(
             config.runtime.precision,
             managed_by_deepspeed=deepspeed_managed_precision,
@@ -950,6 +953,20 @@ def _training_precision(
         except (AttributeError, TypeError):  # pragma: no cover
             scaler = torch.cuda.amp.GradScaler()
     return context, scaler
+
+
+def _enable_activation_checkpointing(model: Any, *, prefer_non_reentrant: bool) -> str:
+    if not hasattr(model, "gradient_checkpointing_enable"):
+        raise RuntimeError(f"{type(model).__name__} does not support activation checkpointing")
+    if prefer_non_reentrant:
+        try:
+            model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+            return "hf_gradient_checkpointing_non_reentrant"
+        except TypeError:
+            model.gradient_checkpointing_enable()
+            return "hf_gradient_checkpointing_default_kwargs_unavailable"
+    model.gradient_checkpointing_enable()
+    return "hf_gradient_checkpointing_default"
 
 
 def _inference_dtype(torch: Any, precision: str, device: Any) -> Any:

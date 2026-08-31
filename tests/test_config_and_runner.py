@@ -666,6 +666,40 @@ def test_deepspeed_managed_precision_does_not_nest_native_amp() -> None:
     assert transformer_module._precision_backend("bf16", managed_by_deepspeed=True) == "deepspeed_bf16"
 
 
+def test_fsdp_activation_checkpointing_prefers_non_reentrant_kwargs() -> None:
+    class FakeModel:
+        def __init__(self) -> None:
+            self.kwargs = None
+
+        def gradient_checkpointing_enable(self, **kwargs) -> None:
+            self.kwargs = kwargs
+
+    model = FakeModel()
+
+    backend = transformer_module._enable_activation_checkpointing(model, prefer_non_reentrant=True)
+
+    assert backend == "hf_gradient_checkpointing_non_reentrant"
+    assert model.kwargs == {"gradient_checkpointing_kwargs": {"use_reentrant": False}}
+
+
+def test_activation_checkpointing_falls_back_when_kwargs_are_unavailable() -> None:
+    class FakeModel:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def gradient_checkpointing_enable(self, **kwargs) -> None:
+            if kwargs:
+                raise TypeError("unexpected keyword")
+            self.calls.append(kwargs)
+
+    model = FakeModel()
+
+    backend = transformer_module._enable_activation_checkpointing(model, prefer_non_reentrant=True)
+
+    assert backend == "hf_gradient_checkpointing_default_kwargs_unavailable"
+    assert model.calls == [{}]
+
+
 def test_runtime_check_rejects_old_deepspeed_without_nvcc(monkeypatch, tmp_path: Path) -> None:
     stale_cuda_home = tmp_path / "cuda_without_nvcc"
     stale_cuda_home.mkdir()
