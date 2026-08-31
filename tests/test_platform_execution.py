@@ -365,6 +365,7 @@ def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -
     assert 'export PYTHONPATH="${VLLM_SITE_PACKAGES}${PYTHONPATH:+:${PYTHONPATH}}"' in builder
     assert "Using private setuptools" in builder
     assert "uv --verbose pip install" in builder
+    assert "Version(installed_vllm_version).base_version" in builder
     assert "TORCH_CUDA_ARCH_LIST" in builder
     assert "-Xcompiler=-fbracket-depth=${VLLM_CLANG_BRACKET_DEPTH}" in builder
     assert "#SBATCH --partition=gpu_l40s" in build_job

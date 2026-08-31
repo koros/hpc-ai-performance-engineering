@@ -55,6 +55,10 @@ following:
   generated Marlin CUDA source on this stack; and
 - targets both L40S (`sm_89`) and H100 (`sm_90`) by default.
 
+The installed source build reports `vllm==0.10.2+cu124`: the `+cu124` suffix records the linked CUDA toolkit. The
+build gate verifies the pinned base version (`0.10.2`) and the module Torch/CUDA runtime, so this expected local version
+suffix is accepted.
+
 The Slurm log paths are printed by `sbatch` and are named `slurm/vllm-build-<job-id>.out` and `.err`. Verbose mode
 retains CMake/Ninja compiler diagnostics in the `.err` log if a native extension fails. Do not remove a
 failed external environment or source checkout automatically. Read the log first; the setup script refuses to overwrite

@@ -208,13 +208,15 @@ uv --verbose pip install --python "$VLLM_ENV/bin/python" --no-build-isolation -e
 
 "$VLLM_ENV/bin/python" - <<PY
 from importlib.metadata import version
+from packaging.version import Version
 import torch
 
-print("vllm", version("vllm"))
+installed_vllm_version = version("vllm")
+print("vllm", installed_vllm_version)
 print("torch", torch.__version__)
 print("torch_cuda", torch.version.cuda)
-if version("vllm") != "$VLLM_VERSION":
-    raise SystemExit("vLLM version does not match the pinned source tag")
+if Version(installed_vllm_version).base_version != "$VLLM_VERSION":
+    raise SystemExit("vLLM base version does not match the pinned source tag")
 if not torch.__version__.startswith("2.8.") or torch.version.cuda != "12.4":
     raise SystemExit("isolated environment no longer resolves the verified Torch 2.8/CUDA 12.4 runtime")
 PY
