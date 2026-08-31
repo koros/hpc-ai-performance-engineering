@@ -170,7 +170,13 @@ def _run_training_loop(
         batch_size,
         accumulation_steps,
     )
-    amp_context, scaler = _training_precision(torch, config.runtime.precision, device)
+    deepspeed_managed_precision = engine is not None
+    amp_context, scaler = _training_precision(
+        torch,
+        config.runtime.precision,
+        device,
+        managed_by_deepspeed=deepspeed_managed_precision,
+    )
     data_iterator = _training_data_iterator(
         torch,
         config,
@@ -303,7 +309,10 @@ def _run_training_loop(
         "world_size": runtime.world_size,
         "rank": runtime.rank,
         "activation_checkpointing": bool(parameters.get("activation_checkpointing", False)),
-        "precision_backend": _precision_backend(config.runtime.precision),
+        "precision_backend": _precision_backend(
+            config.runtime.precision,
+            managed_by_deepspeed=deepspeed_managed_precision,
+        ),
         "compute_dtype_observed": config.runtime.precision,
         "parameter_dtype_observed": str(next(model.parameters()).dtype),
         "dataset_execution": "cpu_dataloader" if data_iterator is not None else "synthetic_device_tensors",
@@ -909,7 +918,18 @@ def _configure_training_strategy(
     return model, optimizer, None, False
 
 
-def _training_precision(torch: Any, precision: str, device: Any) -> tuple[Any, Any | None]:
+def _training_precision(
+    torch: Any,
+    precision: str,
+    device: Any,
+    *,
+    managed_by_deepspeed: bool = False,
+) -> tuple[Any, Any | None]:
+    if managed_by_deepspeed:
+        # DeepSpeed owns mixed precision and loss scaling through the bf16/fp16
+        # section of its configuration. Nesting native AMP around its engine
+        # produces an advisory warning and makes the observed backend unclear.
+        return nullcontext, None
     if precision == "fp32":
         return nullcontext, None
     if precision not in {"fp16", "bf16"}:
@@ -1231,7 +1251,13 @@ def _percentile(values: list[float], percentile: float) -> float:
     return ordered[lower] * (1 - fraction) + ordered[upper] * fraction
 
 
-def _precision_backend(precision: str) -> str:
+def _precision_backend(precision: str, *, managed_by_deepspeed: bool = False) -> str:
+    if managed_by_deepspeed:
+        return {
+            "fp32": "deepspeed_fp32",
+            "fp16": "deepspeed_fp16",
+            "bf16": "deepspeed_bf16",
+        }.get(precision, f"deepspeed_unsupported_{precision}")
     return {
         "fp32": "pytorch_fp32",
         "fp16": "pytorch_amp_fp16",

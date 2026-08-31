@@ -651,6 +651,19 @@ def test_deepspeed_nvtx_annotations_can_be_explicitly_enabled(monkeypatch) -> No
     assert deepspeed_nvtx.enable_nvtx is True
 
 
+def test_deepspeed_managed_precision_does_not_nest_native_amp() -> None:
+    context, scaler = transformer_module._training_precision(
+        object(),
+        "bf16",
+        object(),
+        managed_by_deepspeed=True,
+    )
+
+    assert context is transformer_module.nullcontext
+    assert scaler is None
+    assert transformer_module._precision_backend("bf16", managed_by_deepspeed=True) == "deepspeed_bf16"
+
+
 def test_runtime_check_rejects_old_deepspeed_without_nvcc(monkeypatch, tmp_path: Path) -> None:
     stale_cuda_home = tmp_path / "cuda_without_nvcc"
     stale_cuda_home.mkdir()

@@ -110,7 +110,8 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 DeepSpeed's own optional NVTX annotations are disabled by default for ZeRO rows. The installed Lovelace NVTX binding
 does not accept the keyword arguments used by DeepSpeed 0.19.6, while the project NCCL and `nvidia-smi` collectors
 remain active. Set `HPC_AI_ENABLE_DEEPSPEED_NVTX=1` only after verifying a compatible NVTX binding for a dedicated
-Nsight study.
+Nsight study. The DeepSpeed `bf16`/`fp16` configuration is the sole mixed-precision controller for ZeRO rows; the
+runner does not nest PyTorch native AMP around the DeepSpeed engine.
 
 E006, E007, all vLLM-serving rows, E032, four-GPU L40S rows, and backend/adapter rows listed as Deferred are not
 rendered by platform batch commands. E032 exhausted the exact one-GPU GPT-2 shape on the observed L40S capacity; a
