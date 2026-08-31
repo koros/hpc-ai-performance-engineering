@@ -381,7 +381,24 @@ def _vllm_checks(torch: Any) -> list[RuntimeCheck]:
                 remediation,
             )
         ]
-    return [RuntimeCheck("vllm_import", "pass", f"vllm {getattr(vllm, '__version__', 'unknown')}")]
+    checks = [RuntimeCheck("vllm_import", "pass", f"vllm {getattr(vllm, '__version__', 'unknown')}")]
+    distributed = getattr(torch, "distributed", None)
+    is_gloo_available = getattr(distributed, "is_gloo_available", None)
+    gloo_available = bool(is_gloo_available()) if callable(is_gloo_available) else False
+    checks.append(
+        RuntimeCheck(
+            "vllm_gloo",
+            "pass" if gloo_available else "fail",
+            "PyTorch Gloo backend is available" if gloo_available else "PyTorch was built without the Gloo backend",
+            None
+            if gloo_available
+            else (
+                "vLLM 0.10.2 creates a Gloo CPU process group, including for one-GPU serving. "
+                "Load or request a Gloo-enabled PyTorch module before E006 or other vLLM experiments."
+            ),
+        )
+    )
+    return checks
 
 
 def _torch_cpp_extension(torch: Any | None) -> Any | None:

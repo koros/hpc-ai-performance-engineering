@@ -384,13 +384,11 @@ def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -
     assert "--require-vllm" in acceptance
     assert "E006_vllm_1gpu.json" in acceptance
     assert "build/vllm_acceptance" in acceptance
-    assert "export VLLM_USE_V1=0" in acceptance
     assert "submit-vllm-build:" in makefile
     assert "submit-vllm-acceptance:" in makefile
     assert "submit-vllm-pilot:" in makefile
     assert "HPC_AI_VLLM_SOURCE" in makefile
     assert "--venv-activate $(VENV_ACTIVATE)" in makefile
-    assert 'SLURM_ENV_ARGS="--env VLLM_USE_V1=0"' in makefile
 
 
 def test_render_platform_slurm_reuses_frozen_bundle_configs_without_rewriting(tmp_path: Path) -> None:

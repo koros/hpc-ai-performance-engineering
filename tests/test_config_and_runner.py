@@ -670,6 +670,43 @@ def test_runtime_check_rejects_old_deepspeed_without_nvcc(monkeypatch, tmp_path:
     assert "deepspeed>=0.18.9" in str(failing_checks["deepspeed_version"].remediation)
 
 
+def test_runtime_check_requires_gloo_for_vllm_serving(monkeypatch) -> None:
+    class FakeCuda:
+        @staticmethod
+        def is_available() -> bool:
+            return True
+
+        @staticmethod
+        def device_count() -> int:
+            return 1
+
+        @staticmethod
+        def get_device_name(index: int) -> str:
+            return "NVIDIA L40S"
+
+    fake_torch = types.ModuleType("torch")
+    fake_torch.__version__ = "2.8.0"
+    fake_torch.version = types.SimpleNamespace(cuda="12.4")
+    fake_torch.cuda = FakeCuda()
+    fake_torch.distributed = types.SimpleNamespace(is_gloo_available=lambda: False)
+    fake_vllm = types.ModuleType("vllm")
+    fake_vllm.__version__ = "0.10.2+cu124"
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setitem(sys.modules, "vllm", fake_vllm)
+    monkeypatch.setattr("hpc_ai_perf.runtime_checks.importlib.util.find_spec", lambda name: object())
+
+    checks = run_cluster_runtime_checks(
+        expected_gpu_model="L40S",
+        expected_gpus=1,
+        require_vllm=True,
+        require_clean_git=False,
+    )
+
+    failing_checks = {check.name: check for check in checks if check.failed}
+    assert "vllm_gloo" in failing_checks
+    assert "Gloo-enabled PyTorch" in str(failing_checks["vllm_gloo"].remediation)
+
+
 def test_fsdp_environment_validation_uses_explicit_cuda_device(monkeypatch) -> None:
     config = load_experiment_config(Path("configs/environment_validation/E004_fsdp_2gpu.json"))
     devices_seen: list[object] = []

@@ -28,10 +28,6 @@ fi
 source "$HPC_AI_VLLM_ENV/bin/activate"
 export PYTHONPATH="$PROJECT_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 export TOKENIZERS_PARALLELISM=false
-# The cluster Torch does not include the CPU Gloo backend required by vLLM V1,
-# even for a one-GPU engine. V0 is the supported compatibility mode for this
-# single-GPU text-serving acceptance gate.
-export VLLM_USE_V1=0
 
 python -m hpc_ai_perf.cli check-runtime \
   --expected-gpu-model "$EXPECTED_GPU_MODEL" \

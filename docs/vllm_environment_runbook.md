@@ -92,11 +92,10 @@ check-runtime --require-vllm
 E006: vLLM import → engine start → pinned GPT-2 request served
 ```
 
-The cluster-provided Torch does not include the CPU Gloo distributed backend. vLLM 0.10.2's default V1 engine creates
-a Gloo process group even for this one-GPU job, so the acceptance script explicitly selects vLLM's supported V0
-compatibility mode (`VLLM_USE_V1=0`). This scope is deliberate: E006 and its canonical pilot are single-GPU text
-serving gates. Do not use this result to enable multi-GPU vLLM experiments; those need a separately verified
-distributed runtime.
+vLLM 0.10.2 creates a Gloo CPU process group even for its one-GPU engine. The acceptance preflight therefore requires
+the active PyTorch build to report `torch.distributed.is_gloo_available() == True`. If it fails, do not retry E006 or
+submit the canonical pilot: ask the cluster team for a Gloo-enabled PyTorch module built for the same CUDA runtime.
+This is also a prerequisite for the later multi-GPU vLLM experiments.
 
 Its result is retained under `build/vllm_acceptance/l40s/`; review the JSON and job log. Success requires:
 
@@ -138,6 +137,5 @@ git commit -m "data: add completed L40S vLLM E006 trial"
 ```
 
 `submit-vllm-pilot` freezes the platform-resolved E006 configuration and activates the isolated vLLM environment inside
-the bundle. It also freezes `VLLM_USE_V1=0` into that pilot's Slurm environment, matching the acceptance gate. Once the
-canonical pilot produces valid evidence, review it before re-enabling the other 36 vLLM rows in controlled waves.
-`VENV_ACTIVATE` remains available for those later vLLM waves and should not be set for non-vLLM work.
+the bundle. Once the canonical pilot produces valid evidence, review it before re-enabling the other 36 vLLM rows in
+controlled waves. `VENV_ACTIVATE` remains available for those later vLLM waves and should not be set for non-vLLM work.
