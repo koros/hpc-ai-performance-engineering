@@ -166,10 +166,12 @@ def main() -> None:
         return
 
     if args.command == "retry-platform-wave":
+        profile = load_platform_profile(args.platform_profile)
         _, _, status = _current_platform_wave_status(args)
-        retry_ids = list(status.retry_experiment_ids)
+        planned_ids = _planned_wave_experiment_ids(profile.platform_id, str(args.wave))
+        retry_ids = [experiment_id for experiment_id in status.retry_experiment_ids if experiment_id in planned_ids]
         if not retry_ids:
-            raise ValueError("The current platform-wave attempt is already complete; no recovery bundle is needed")
+            raise ValueError("No incomplete planned conditions remain in the current platform-wave policy")
         args.experiment_id = retry_ids
         bundle, state_path, submissions = _submit_platform_wave(args)
         LOGGER.info("Submitted recovery bundle %s for %s", bundle.root, ", ".join(retry_ids))
