@@ -26,6 +26,7 @@ from hpc_ai_perf.results import (
 from hpc_ai_perf.slurm.bundle import (
     _BUNDLE_ID,
     SubmissionBundle,
+    _environment_contract_problems,
     capture_environment_contract,
     write_submission_manifest,
 )
@@ -112,6 +113,33 @@ def test_capture_environment_contract_can_probe_a_selected_virtualenv_python() -
 
     assert contract["python_executable"] == str(Path(sys.executable).resolve())
     assert isinstance(contract["packages"], dict)
+    assert "loaded_modules" not in contract
+
+
+def test_environment_contract_ignores_inherited_module_state() -> None:
+    expected = {
+        "python_version": "3.11.11",
+        "packages": {"torch": "2.8.0"},
+        "torch_cuda": "12.4",
+        "loaded_modules": "submit-shell-only-module",
+    }
+    observed = {**expected, "loaded_modules": "slurm-job-module-state"}
+
+    assert _environment_contract_problems(expected, observed) == []
+
+
+def test_environment_contract_reports_runtime_identity_changes() -> None:
+    expected = {
+        "python_version": "3.11.11",
+        "packages": {"torch": "2.8.0"},
+        "torch_cuda": "12.4",
+    }
+    observed = {**expected, "packages": {"torch": "2.9.0"}, "torch_cuda": "12.5"}
+
+    assert _environment_contract_problems(expected, observed) == [
+        "runtime environment contract differs for packages",
+        "runtime environment contract differs for torch_cuda",
+    ]
 
 
 def test_wave_state_and_result_summary_track_complete_bundle(tmp_path: Path) -> None:

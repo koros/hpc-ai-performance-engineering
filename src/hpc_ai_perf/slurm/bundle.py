@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import platform
 import re
 import shutil
@@ -192,7 +191,6 @@ def capture_environment_contract(*, python_executable: str | Path | None = None)
             raise FileNotFoundError(f"Virtualenv Python executable is missing: {executable}")
         probe = """
 import json
-import os
 import platform
 import sys
 from importlib.metadata import PackageNotFoundError, version
@@ -213,7 +211,6 @@ except ImportError:
 print(json.dumps({
     \"python_version\": platform.python_version(),
     \"python_executable\": str(Path(sys.executable).resolve()),
-    \"loaded_modules\": os.environ.get(\"LOADEDMODULES\"),
     \"packages\": packages,
     \"torch_cuda\": torch_cuda,
 }))
@@ -246,7 +243,6 @@ print(json.dumps({
     contract: dict[str, Any] = {
         "python_version": platform.python_version(),
         "python_executable": str(Path(sys.executable).resolve()),
-        "loaded_modules": os.environ.get("LOADEDMODULES"),
         "packages": packages,
         "torch_cuda": torch_cuda,
     }
@@ -297,8 +293,30 @@ def verify_submission_bundle(
     expected_contract = manifest.get("environment_contract")
     if isinstance(expected_contract, dict):
         observed_contract = capture_environment_contract()
-        if observed_contract != expected_contract:
-            problems.append("runtime environment does not match the submission environment contract")
+        problems.extend(_environment_contract_problems(expected_contract, observed_contract))
+    return problems
+
+
+def _environment_contract_problems(expected: dict[str, Any], observed: dict[str, Any]) -> list[str]:
+    """Compare only runtime identities that affect executable evidence.
+
+    ``LOADEDMODULES`` is intentionally not captured here. A Slurm job can
+    inherit module state from the submit shell before its setup script purges
+    and reloads the exact project stack; its string representation is therefore
+    an unstable transport detail rather than an execution identity. The
+    snapshot includes and hashes that setup script, while this contract checks
+    the resulting interpreter version, dependency versions, and CUDA build
+    identity. The resolved interpreter path is retained in the manifest for
+    auditability but is not compared: virtual-environment launcher symlinks can
+    resolve differently across otherwise equivalent compute-node mounts.
+    """
+    fields = ("python_version", "packages", "torch_cuda")
+    problems: list[str] = []
+    for field in fields:
+        if field not in expected:
+            continue
+        if observed.get(field) != expected[field]:
+            problems.append(f"runtime environment contract differs for {field}")
     return problems
 
 

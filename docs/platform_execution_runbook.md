@@ -131,8 +131,10 @@ make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
 
 The bundle contains `repo/` (detached source snapshot), `configs/` (frozen resolved configs), `scripts/`, `logs/`,
 `results/`, `SUBMISSION_MANIFEST.json`, and `SCRIPT_SHA256SUMS`. Every task validates its source commit, clean
-snapshot, config hash, manifest hash, and runtime dependency contract before invoking the workload. Its logs and JSON
-never modify the main repository checkout.
+snapshot, config hash, manifest hash, and stable runtime identities (interpreter version, package versions, and Torch CUDA
+build) before invoking the workload. The project setup script itself is snapshot-hashed; inherited module-list text is
+not compared because Slurm and Lmod may represent an equivalent reloaded stack differently. Its logs and JSON never
+modify the main repository checkout.
 
 Do not alter an existing bundle or add new scripts to it. Do not advance based only on Slurm `COMPLETED`:
 `collect-platform-wave` requires valid trial evidence for the whole wave. If the status report lists incomplete
