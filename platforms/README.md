@@ -1,6 +1,6 @@
 # Platform Execution Policy
 
-The files in this directory turn the logical `E001-E200` matrix into separately identifiable L40S and H100
+The files in this directory turn the logical source matrix into separately identifiable L40S and H100
 conditions. They are the source of truth for platform routing; generated configs under `build/` are disposable.
 
 ## Files

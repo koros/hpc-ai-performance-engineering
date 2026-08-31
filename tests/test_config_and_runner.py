@@ -79,9 +79,11 @@ def test_all_json_configs_load() -> None:
 def test_discover_matrix_configs() -> None:
     entries = discover_experiment_configs()
     experiment_ids = {entry.config.experiment_id for entry in entries}
+    source_ids = {f"E{index:03d}" for index in range(1, 201)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 205)}
 
-    assert len(entries) == 200
-    assert experiment_ids == {f"E{index:03d}" for index in range(1, 201)}
+    assert len(entries) == 204
+    assert experiment_ids == source_ids | supplemental_ids
 
 
 def test_filter_config_entries_by_phase_priority_and_workload() -> None:
@@ -1456,7 +1458,8 @@ def test_hpc_smoke_runbook_exists() -> None:
 def test_current_status_snapshot_exists() -> None:
     status = Path("docs/current_status.md").read_text(encoding="utf-8")
 
-    assert "Total matrix configs | 200" in status
+    assert "Source matrix configs | 200" in status
+    assert "L40S supplemental capacity probes | 4" in status
     assert "Smoke-Ready Workloads" in status
     assert "python -m hpc_ai_perf.cli refresh" in status
 
@@ -1494,7 +1497,9 @@ def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
     report_path = write_readiness_report(tmp_path / "readiness_report.md")
     report = report_path.read_text(encoding="utf-8")
 
-    assert "Matrix configs discovered: 200" in report
+    assert "Source matrix configs discovered: 200" in report
+    assert "Supplemental platform probes discovered: 4" in report
+    assert "Total E-number configs discovered: 204" in report
     assert "`gpt2_small`" in report
     assert "slurm/smoke/gpt2_small_smoke.sbatch" in report
     assert "Submission Gate" in report
@@ -1536,14 +1541,16 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
     e033 = next(row for row in rows if row["experiment_id"] == "E033")
     e034 = next(row for row in rows if row["experiment_id"] == "E034")
     e086 = next(row for row in rows if row["experiment_id"] == "E086")
+    e201 = next(row for row in rows if row["experiment_id"] == "E201")
 
     assert csv_path == output_csv
     assert markdown_path == output_markdown
-    assert len(rows) == 200
+    assert len(rows) == 204
     assert e033["status"] == "Completed"
     assert e033["runtime_seconds"] == "600.0"
     assert e034["status"] == "Configured"
     assert e086["status"] == "Deferred"
+    assert e201["status"] == "Configured"
     assert "precision fp8" in e086["notes"]
     assert "| Completed | 1 |" in markdown_path.read_text(encoding="utf-8")
 

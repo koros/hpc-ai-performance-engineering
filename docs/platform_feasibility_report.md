@@ -29,9 +29,11 @@ The companion [platform experiment matrix](platform_experiment_matrix.md) gives 
 
 | Scope | Count | Interpretation |
 | --- | ---: | --- |
-| Total matrix configs | 200 | `E001-E200` |
-| Planned L40S conditions | 127 | Generated as `E###@l40s`; run in gated waves on the validated PyTorch CUDA stack. |
-| Deferred L40S conditions | 73 | Backend/adapter rows, site-blocked vLLM/TensorRT-LLM work, H100-specific hardware rows, four-GPU rows, and the exact-shape E032/E033 L40S OOMs. |
+| Source matrix configs | 200 | `E001-E200` |
+| Supplemental L40S capacity probes | 4 | `E201-E204`; capacity-adjusted GPT-2 micro-batch rows derived from the E067/E068 L40S OOM boundary. |
+| Planned L40S source conditions | 125 | Generated as exact `E###@l40s`; run in gated waves on the validated PyTorch CUDA stack. |
+| Planned L40S supplemental conditions | 4 | Generated as capacity-adjusted `E201-E204@l40s`; do not pool with exact H100 evidence. |
+| Deferred L40S source conditions | 75 | Backend/adapter rows, site-blocked vLLM/TensorRT-LLM work, H100-specific hardware rows, four-GPU rows, and the exact-shape E032/E033/E067/E068 L40S OOMs. |
 | Planned H100 conditions | 144 | Generated as `E###@h100`; run the same supported scope when allocation is available. |
 | Deferred H100 conditions | 56 | Existing backend/adapter rows, 37 site-blocked vLLM rows, TensorRT-LLM `E007`, and four L40S-specific hardware rows. |
 | Mac M1 smoke configs | 4 | `configs/local/*`; minimal workflow checks. |
@@ -78,7 +80,7 @@ companion:
 - use the `gpu_l40s` queue/profile and repeat the L40S environment-validation sequence before matrix collection; and
 - report communication as NCCL/PCIe behaviour, not NVLink behaviour.
 
-L40S is suitable for supported single- and two-GPU baselines, DistilBERT scaling, DDP/FSDP/ZeRO comparisons, memory optimisation, data-movement studies, power/energy analysis, and PyTorch inference. The active node does not support its four-GPU rows, and the exact E032/E033 GPT-2 strong-scaling shapes are deferred after observed OOMs; any smaller replacement must be registered as capacity-adjusted. Its results answer L40S-specific questions and do not replace H100 evidence for H100-specific research questions.
+L40S is suitable for supported single- and two-GPU baselines, DistilBERT scaling, DDP/FSDP/ZeRO comparisons, memory optimisation, data-movement studies, power/energy analysis, and PyTorch inference. The active node does not support its four-GPU rows. The exact E032/E033 GPT-2 strong-scaling shapes and E067/E068 GPT-2 micro-batch 32/64 shapes are deferred after observed OOMs; E201-E204 provide separately labelled L40S capacity-adjusted probes. Its results answer L40S-specific questions and do not replace H100 evidence for H100-specific research questions.
 
 ### H100: deferred collection path, already materializable
 
@@ -107,7 +109,7 @@ Use the H100 node for the core baseline trials, 1/2/4-GPU scaling, distributed-s
 | 1 | Baseline-shaped dev checks | Wave 0: `E001`, `E002`, `E004-E005` | Wave 0: `E001-E005` | The active L40S node has two GPUs, so its four-GPU E003 condition remains deferred. |
 | 2 | GPT-2/DistilBERT adapter checks | Wave 1, then wave 2 direct hardware pairs | H100 wave 1, then wave 2 when available | Build repeatable reference measurements and matched platform anchors. |
 | 3 | No further publishable work | Supported one-/two-GPU wave 3 scaling and strategy pilots | H100 wave 3 later | The L40S four-GPU rows and exact E032/E033 OOM conditions remain deferred. |
-| 4 | Optional local shape checks | Waves 4, 4b, and 5 | Matching H100 waves later | Collect depth only after the core path is stable. |
+| 4 | Optional local shape checks | Waves 4, 4c, 4b, and 5 | Matching H100 waves later | Collect exact depth first, then labelled L40S capacity probes, then communication and inference. |
 
 ## Interpretation Rules
 

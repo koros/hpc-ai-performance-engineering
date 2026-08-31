@@ -40,9 +40,17 @@
       "wave": "4",
       "name": "L40S supported precision memory and data",
       "experiment_ids": ["E063-E085", "E087-E088", "E090-E092", "E094-E112"],
-      "exclude_ids": ["E096"],
+      "exclude_ids": ["E067-E068", "E096"],
       "required_trials": 3,
       "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "4c",
+      "name": "L40S capacity-adjusted GPT-2 memory probes",
+      "experiment_ids": ["E201-E204"],
+      "required_trials": 3,
+      "comparability": "capacity_adjusted"
     },
     {
       "platform": "l40s",
@@ -181,6 +189,13 @@
       "experiment_ids": ["E032", "E033"],
       "comparability": "platform_specific",
       "reason": "The exact GPT-2 strong-scaling shapes exceed the observed 44.52 GiB L40S capacity: E032 exhausted the one-GPU allocation after 43.32 GiB was allocated, and E033 exhausted the two-GPU allocation with 42.03 GiB allocated on rank 0 before a further 6.14 GiB request failed. Define and validate separate capacity-adjusted L40S conditions before changing batch size or accumulation; do not pool them with the exact E032/E033 conditions."
+    },
+    {
+      "platforms": ["l40s"],
+      "name": "L40S GPT-2 micro-batch exact shapes exceed available memory",
+      "experiment_ids": ["E067", "E068"],
+      "comparability": "platform_specific",
+      "reason": "The exact GPT-2 micro-batch 32/64 rows exceed the observed 44.52 GiB L40S capacity. Isolated L40S retries still OOMed: E067 allocated 41.55 GiB before a further 6.14 GiB request failed, and E068 allocated 43.31 GiB before a further 768 MiB request failed. Keep E067/E068 for H100 exact evidence and run E201-E204 as capacity-adjusted L40S boundary probes instead."
     },
     {
       "platforms": ["l40s"],

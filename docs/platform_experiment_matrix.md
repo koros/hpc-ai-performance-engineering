@@ -26,7 +26,8 @@ deferred rather than allowed to fail in a batch.
 | `E034`, `E038-E040`, `E044-E046` | Strong scaling | No | Run supported DistilBERT one-/two-GPU rows; defer four-GPU rows | Resolved when H100 returns | The active L40S node has two GPUs. Four-GPU rows wait for a matching allocation, and exact GPT-2 strong-scaling rows wait for H100 capacity. |
 | `E035-E037`, `E041-E043` | Weak scaling | No | Resolved; wave 3 | Resolved; wave 3 | Requires concurrent GPUs; keep work-per-GPU definitions unchanged. |
 | `E047-E062` | DDP, FSDP, and ZeRO strategy comparison | No | Resolved after the L40S NCCL/FSDP pilot | Resolved after the H100 pilot | Multi-process CUDA/NCCL/DeepSpeed execution is HPC-only. Interconnect differences are part of the result. |
-| `E063-E082` | Memory optimisation: checkpointing, micro-batch, accumulation | Dev proxy only for GPT-2 micro-batch | Resolved; wave 4 | Resolved; wave 4 | Mac cannot report target GPU memory. Any capacity adjustment must remain a separately labelled condition and cannot be pooled as exact. |
+| `E063-E082` | Memory optimisation: checkpointing, micro-batch, accumulation | Dev proxy only for GPT-2 micro-batch | Resolved exact wave 4 except E067/E068; those are deferred | Resolved; wave 4 | Mac cannot report target GPU memory. E067/E068 exact GPT-2 micro-batch 32/64 rows OOM on L40S and remain H100-exact conditions. |
+| `E201-E204` | L40S capacity-adjusted GPT-2 micro-batch boundary probes | No | Resolved; wave 4c | No | These supplemental rows test L40S batch sizes 20/24/28/30 after E067/E068 OOM. They answer the L40S capacity boundary question and must not be pooled with exact H100 E067/E068 evidence. |
 | `E083-E085`, `E087-E088`, `E090-E092`, `E094-E095` | Supported FP32/FP16/BF16 precision study | No | Resolved; wave 4 | Resolved; wave 4 | Valid NVIDIA precision comparisons after target-platform validation. Mac runs fp32 dev paths only. |
 | `E086`, `E089`, `E093`, `E096` | FP8 precision study | No | Deferred | Deferred | A selected, validated FP8 backend/model path is not yet implemented. |
 | `E097-E112` | Data movement: workers, pinned memory, prefetch | No | Resolved; wave 4 | Resolved; wave 4 | Pinned-memory and transfer results are CUDA/node dependent; platform profiles preserve the different CPU allocation policies. |
@@ -45,7 +46,7 @@ deferred rather than allowed to fail in a batch.
 | Platform | Current configs you can run without changing target hardware labels | Important condition |
 | --- | --- | --- |
 | Mac M1 | `configs/local/*.json` (4 smoke configs) and `configs/dev/*.json` (15 dev configs) | Workflow validation only. Keep results out of the `E001-E200` evidence set. |
-| L40/L40S | 127 planned `E###@l40s` conditions | Generated configs use `gpu_l40s`, 8 CPUs/GPU, PCIe, and accepted evidence root `results/raw/l40s`. Seventy-three rows are explicitly deferred, including the site-blocked vLLM/TensorRT-LLM scope, four-GPU rows, and the exact-shape E032/E033 OOMs. |
+| L40/L40S | 125 planned exact source `E###@l40s` conditions plus 4 capacity-adjusted supplemental probes | Generated configs use `gpu_l40s`, 8 CPUs/GPU, PCIe, and accepted evidence root `results/raw/l40s`. Seventy-five source rows are explicitly deferred, including the site-blocked vLLM/TensorRT-LLM scope, four-GPU rows, and exact-shape E032/E033/E067/E068 OOMs. |
 | H100 | 144 planned `E###@h100` conditions | Generated configs use `gpu_h100`, 16 CPUs/GPU, NVLink, and accepted evidence root `results/raw/h100`. Fifty-six rows are explicitly deferred, including the site-blocked vLLM/TensorRT-LLM scope. |
 
 ## Generated Companion-Config Contract
@@ -64,5 +65,5 @@ deferred rather than allowed to fail in a batch.
 | --- | --- | --- | --- |
 | 0 — prove the path | 4 smoke configs, then 15 dev configs | Resolved `E001`, `E002`, `E004-E005`; defer `E003` | Resolved `E001-E005` |
 | 1 — core evidence | Dev proxies only | Wave 1 baselines/characterisation, direct hardware pairs, then wave 3 pilot | Wave 1 baselines/characterisation, direct hardware pairs, then wave 3 pilot |
-| 2 — depth | Local shape checks | Waves 4, 4b, and supported-PyTorch wave 5 | Waves 4, 4b, and supported-PyTorch wave 5 |
+| 2 — depth | Local shape checks | Waves 4, 4c, 4b, and supported-PyTorch wave 5 | Waves 4, 4b, and supported-PyTorch wave 5 |
 | 3 — future work | Not applicable | Deferred rows only after prerequisites | Deferred rows only after prerequisites |

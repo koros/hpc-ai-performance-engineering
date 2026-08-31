@@ -78,7 +78,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "list-configs":
-        # Config listing defaults to the real E001-E200 matrix. Templates and
+        # Config listing defaults to real E-number matrix configs. Templates and
         # dev/local configs are only shown when the caller opts into them.
         entries = discover_experiment_configs(args.config_root, matrix_only=not args.include_templates)
         entries = filter_config_entries(
@@ -821,7 +821,7 @@ def _add_platform_options(parser: argparse.ArgumentParser) -> None:
         default="platforms/execution_matrix.json",
         help="Platform wave/defer policy.",
     )
-    parser.add_argument("--config-root", default="configs", help="Root containing the logical E001-E200 configs.")
+    parser.add_argument("--config-root", default="configs", help="Root containing the logical E-number configs.")
     parser.add_argument("--wave", default=None, help="Wave identifier to select, such as 0, 1, or 4b.")
     parser.add_argument(
         "--experiment-id",
@@ -1374,7 +1374,7 @@ def _refresh_outputs(
     analysis_paths = analyze_results(result_path, analysis_dir)
     LOGGER.info("Wrote %d analysis tables to %s", len(analysis_paths), analysis_dir)
 
-    # Keep refresh focused on the real E001-E200 matrix tracker; dev has its own Make target.
+    # Keep refresh focused on the real E-number matrix tracker; dev has its own Make target.
     tracker_csv_path, tracker_markdown_path = track_experiment_progress(
         config_root,
         result_dir,
@@ -1468,7 +1468,7 @@ def _render_slurm_bulk(
     """Render Slurm scripts for every matrix config matching the supplied filters.
 
     Bulk rendering is deliberately matrix-only because generated HPC batches
-    should correspond to real E001-E200 dissertation experiments. The filters
+    should correspond to real E-number dissertation experiments. The filters
     make it possible to render conservative batches, such as Must Have
     environment-validation jobs, without touching the rest of the matrix.
     """

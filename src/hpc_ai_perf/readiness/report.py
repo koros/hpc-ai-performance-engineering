@@ -56,6 +56,8 @@ def build_readiness_report(
     gates must be cleared before larger Slurm batches.
     """
     entries = discover_experiment_configs(config_root)
+    source_entries = [entry for entry in entries if _matrix_number(entry.config.experiment_id) <= 200]
+    supplemental_entries = [entry for entry in entries if _matrix_number(entry.config.experiment_id) > 200]
     validation_issues = validate_project(config_root, result_dir)
     research_issues = validate_project(config_root, result_dir, include_results=False, research_ready=True)
     deferred_entries = [
@@ -86,7 +88,9 @@ def build_readiness_report(
         "",
         "## Summary",
         "",
-        f"- Matrix configs discovered: {len(entries)}",
+        f"- Source matrix configs discovered: {len(source_entries)}",
+        f"- Supplemental platform probes discovered: {len(supplemental_entries)}",
+        f"- Total E-number configs discovered: {len(entries)}",
         f"- Validation issues: {len(validation_issues)}",
         f"- Research-readiness blockers: {len(research_issues)}",
         f"- Deferred scope rows: {len(deferred_entries)}",
@@ -217,6 +221,13 @@ def build_readiness_report(
 def _counter_rows(counter: Counter[str]) -> list[str]:
     """Format sorted counter entries as Markdown table rows."""
     return [f"| {key or 'Unassigned'} | {counter[key]} |" for key in sorted(counter)]
+
+
+def _matrix_number(experiment_id: str) -> int:
+    """Return the numeric part of an E-number experiment identifier."""
+    if len(experiment_id) == 4 and experiment_id.startswith("E") and experiment_id[1:].isdigit():
+        return int(experiment_id[1:])
+    return 10_000
 
 
 def _valid_completed_trial_counts(result_dir: str | Path, validation_issues: list[ValidationIssue]) -> dict[str, int]:

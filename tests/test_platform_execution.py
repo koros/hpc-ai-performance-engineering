@@ -240,14 +240,29 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
 
 
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
-    expected_ids = {f"E{index:03d}" for index in range(1, 201)}
+    source_ids = {f"E{index:03d}" for index in range(1, 201)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 205)}
 
-    for platform_id, planned_count in [("l40s", 127), ("h100", 144)]:
-        conditions = load_platform_conditions("platforms/execution_matrix.json", platform_id)
+    l40s_conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s")
+    h100_conditions = load_platform_conditions("platforms/execution_matrix.json", "h100")
 
-        assert len(conditions) == 200
-        assert {condition.matrix_id for condition in conditions} == expected_ids
-        assert sum(condition.status == "planned" for condition in conditions) == planned_count
+    assert len([condition for condition in l40s_conditions if condition.matrix_id in source_ids]) == 200
+    assert {condition.matrix_id for condition in l40s_conditions if condition.matrix_id in source_ids} == source_ids
+    assert {condition.matrix_id for condition in l40s_conditions if condition.matrix_id not in source_ids} == (
+        supplemental_ids
+    )
+    assert len(h100_conditions) == 200
+    assert {condition.matrix_id for condition in h100_conditions} == source_ids
+    l40s_planned_source_count = sum(
+        condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in source_ids
+    )
+
+    assert l40s_planned_source_count == 125
+    assert (
+        sum(condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in supplemental_ids)
+        == 4
+    )
+    assert sum(condition.status == "planned" for condition in h100_conditions) == 144
 
 
 def test_runnable_l40s_conditions_fit_the_verified_two_gpu_node() -> None:
@@ -270,6 +285,36 @@ def test_l40s_wave_three_collection_scope_excludes_gpt2_strong_scaling_oom_defer
     assert "E032" not in wave_three
     assert "E033" not in wave_three
     assert {"E036", "E049", "E062"} <= wave_three
+
+
+def test_l40s_wave_four_collection_scope_excludes_exact_micro_batch_oom_deferrals() -> None:
+    wave_four = _planned_wave_experiment_ids("l40s", "4")
+
+    assert len(wave_four) == 44
+    assert "E067" not in wave_four
+    assert "E068" not in wave_four
+    assert "E096" not in wave_four
+    assert {"E064", "E074", "E112"} <= wave_four
+
+
+def test_l40s_capacity_adjusted_wave_materializes_boundary_probes(tmp_path: Path) -> None:
+    profile = load_platform_profile("platforms/l40s.json")
+    conditions = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "l40s",
+        wave="4c",
+        include_deferred=False,
+    )
+
+    paths = materialize_platform_configs(profile, conditions, tmp_path)
+
+    assert [path.name for path in paths] == ["E201.json", "E202.json", "E203.json", "E204.json"]
+    config = load_experiment_config(paths[-1])
+    assert config.experiment_id == "E204"
+    assert config.workload.parameters["micro_batch_size"] == 30
+    assert config.metadata["condition_id"] == "E204@l40s"
+    assert config.metadata["comparability"] == "capacity_adjusted"
+    assert config.runtime.output_dir == "results/raw/l40s"
 
 
 def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -> None:
@@ -295,6 +340,8 @@ def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -
                     "E040",
                     "E043",
                     "E046",
+                    "E067",
+                    "E068",
                     "E048",
                     "E050",
                     "E056",

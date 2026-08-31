@@ -21,7 +21,7 @@ Primary planning documents:
 - [Comprehensive experiment matrix](docs/experiment_matrix.md): full source-of-truth matrix with `E001` to `E200`, priority levels, metrics, and GPU-hour estimates.
 - [Local dev runbook](docs/local_dev_runbook.md): Mac/local baseline-style runs for development while HPC access is unavailable.
 - [Dev experiment matrix](docs/dev_experiment_matrix.md): rationale, parameters, and local-dev versus HPC-only experiment boundaries.
-- [Generated experiment tracker](results/processed/experiment_tracker.md): current `E001-E200` matrix status generated from configs and raw results.
+- [Generated experiment tracker](results/processed/experiment_tracker.md): current source matrix status generated from configs and raw results, with separately labelled supplemental platform probes when present.
 - [Editable experiment tracker](docs/experiment_tracker.md): planning notes for every planned experiment and analysis task.
 - [HPC smoke runbook](docs/hpc_smoke_runbook.md): checklist for validating the cluster environment before full matrix submission.
 - [HPC submission batches](docs/hpc_submission_batches.md): first environment-validation and baseline Slurm batches after smoke tests pass.

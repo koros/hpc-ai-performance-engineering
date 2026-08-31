@@ -70,4 +70,4 @@ results/processed/dev_experiment_tracker.md
 results/analysis/*.csv
 ```
 
-Keep `dev_` results separate in your interpretation. The default `experiment_tracker.*` files remain the real `E001-E200` HPC matrix tracker; the `dev_experiment_tracker.*` files summarize local Mac readiness only.
+Keep `dev_` results separate in your interpretation. The default `experiment_tracker.*` files remain the real HPC matrix tracker, including separately labelled supplemental platform probes when present; the `dev_experiment_tracker.*` files summarize local Mac readiness only.

@@ -88,7 +88,7 @@ def import_result_evidence(
         affected_platforms.add(platform_id)
 
     if not prepared:
-        raise ValueError(f"No E001-E200 result records found under evidence source: {source_path}")
+        raise ValueError(f"No E-number result records found under evidence source: {source_path}")
     for target, source_bytes, _ in prepared:
         if target.exists():
             unchanged.append(target)
