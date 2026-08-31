@@ -368,13 +368,9 @@ def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -
     assert 'export PYTHONPATH="${VLLM_SITE_PACKAGES}${PYTHONPATH:+:${PYTHONPATH}}"' in builder
     assert "Using private setuptools" in builder
     assert "uv --verbose pip install" in builder
-    assert (
-        'uv pip install --python "$VLLM_ENV/bin/python" --no-deps '
-        '"transformers==${VLLM_TRANSFORMERS_VERSION}"' in builder
-    )
-    assert (
-        'uv pip install --python "$VLLM_ENV/bin/python" --no-deps "tokenizers==${VLLM_TOKENIZERS_VERSION}"' in builder
-    )
+    assert 'uv pip install --python "$VLLM_ENV/bin/python" \\' in builder
+    assert '"transformers==${VLLM_TRANSFORMERS_VERSION}"' in builder
+    assert '"tokenizers==${VLLM_TOKENIZERS_VERSION}"' in builder
     assert "Version(installed_vllm_version).base_version" in builder
     assert "pip uninstall -y torchaudio" in builder
     assert "from transformers import ProcessorMixin" in builder

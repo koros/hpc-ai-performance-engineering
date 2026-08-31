@@ -223,13 +223,15 @@ uv --verbose pip install --python "$VLLM_ENV/bin/python" --no-build-isolation -e
 
 # vLLM 0.10.2 permits any Transformers release >=4.55.2, but Transformers 5
 # removed GPT-2 tokenizer API used by the current text-serving workloads.
-# Reinstall only the Python package at the known compatible version after the
-# vLLM resolver has completed; --no-deps leaves the verified Torch/CUDA stack
-# and the rest of the isolated environment untouched.
-echo "Pinning Transformers $VLLM_TRANSFORMERS_VERSION for vLLM text serving"
-uv pip install --python "$VLLM_ENV/bin/python" --no-deps "transformers==${VLLM_TRANSFORMERS_VERSION}"
-echo "Pinning Tokenizers $VLLM_TOKENIZERS_VERSION for the Transformers runtime"
-uv pip install --python "$VLLM_ENV/bin/python" --no-deps "tokenizers==${VLLM_TOKENIZERS_VERSION}"
+# Resolve the complete Transformers 4.x Python dependency set after the vLLM
+# resolver has completed. In particular, this replaces a Transformers 5-era
+# huggingface-hub/tokenizers combination with one accepted by 4.57.6. Neither
+# package requires Torch, so this leaves the module-provided CUDA runtime
+# untouched.
+echo "Resolving Transformers $VLLM_TRANSFORMERS_VERSION and Tokenizers $VLLM_TOKENIZERS_VERSION for vLLM text serving"
+uv pip install --python "$VLLM_ENV/bin/python" \
+  "transformers==${VLLM_TRANSFORMERS_VERSION}" \
+  "tokenizers==${VLLM_TOKENIZERS_VERSION}"
 
 # PyPI's TorchAudio 2.8 wheel is built against CUDA 12.8, but the cluster
 # provides Torch 2.8 compiled for CUDA 12.4. Transformers imports TorchAudio
