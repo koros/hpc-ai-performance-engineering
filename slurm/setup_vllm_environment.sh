@@ -16,6 +16,7 @@ VLLM_SOURCE="${HPC_AI_VLLM_SOURCE:-${VLLM_BASE}/src/vllm-${VLLM_TAG}}"
 VLLM_MAX_JOBS="${HPC_AI_VLLM_MAX_JOBS:-${SLURM_CPUS_PER_TASK:-4}}"
 VLLM_CLANG_BRACKET_DEPTH="${HPC_AI_VLLM_CLANG_BRACKET_DEPTH:-1024}"
 VLLM_TEXT_ONLY="${HPC_AI_VLLM_TEXT_ONLY:-1}"
+VLLM_TRANSFORMERS_VERSION="${HPC_AI_VLLM_TRANSFORMERS_VERSION:-4.57.6}"
 
 usage() {
   cat <<'EOF'
@@ -39,6 +40,8 @@ HPC_AI_VLLM_TEXT_ONLY defaults to 1: it removes an incompatible PyPI
 TorchAudio wheel because the current experiment matrix contains text-only
 serving workloads. Set it to 0 only after providing TorchAudio built for the
 cluster's Torch/CUDA runtime.
+HPC_AI_VLLM_TRANSFORMERS_VERSION defaults to 4.57.6, the pinned Transformers
+release compatible with vLLM 0.10.2's text-model tokenizer API.
 EOF
 }
 
@@ -215,6 +218,14 @@ PY
 # actionable without having to recover an ephemeral uv build directory.
 uv --verbose pip install --python "$VLLM_ENV/bin/python" --no-build-isolation -e .
 
+# vLLM 0.10.2 permits any Transformers release >=4.55.2, but Transformers 5
+# removed GPT-2 tokenizer API used by the current text-serving workloads.
+# Reinstall only the Python package at the known compatible version after the
+# vLLM resolver has completed; --no-deps leaves the verified Torch/CUDA stack
+# and the rest of the isolated environment untouched.
+echo "Pinning Transformers $VLLM_TRANSFORMERS_VERSION for vLLM text serving"
+uv pip install --python "$VLLM_ENV/bin/python" --no-deps "transformers==${VLLM_TRANSFORMERS_VERSION}"
+
 # PyPI's TorchAudio 2.8 wheel is built against CUDA 12.8, but the cluster
 # provides Torch 2.8 compiled for CUDA 12.4. Transformers imports TorchAudio
 # when it is present, even for a text LLM, which prevents vLLM's LLM entry
@@ -234,13 +245,17 @@ from transformers import ProcessorMixin
 from vllm import LLM, SamplingParams
 
 installed_vllm_version = version("vllm")
+installed_transformers_version = version("transformers")
 print("vllm", installed_vllm_version)
+print("transformers", installed_transformers_version)
 print("torch", torch.__version__)
 print("torch_cuda", torch.version.cuda)
 if Version(installed_vllm_version).base_version != "$VLLM_VERSION":
     raise SystemExit("vLLM base version does not match the pinned source tag")
 if not torch.__version__.startswith("2.8.") or torch.version.cuda != "12.4":
     raise SystemExit("isolated environment no longer resolves the verified Torch 2.8/CUDA 12.4 runtime")
+if installed_transformers_version != "$VLLM_TRANSFORMERS_VERSION":
+    raise SystemExit("isolated environment no longer resolves the pinned Transformers runtime")
 print("transformers ProcessorMixin import OK")
 print("vLLM LLM and SamplingParams imports OK")
 PY

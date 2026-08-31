@@ -59,6 +59,10 @@ The installed source build reports `vllm==0.10.2+cu124`: the `+cu124` suffix rec
 build gate verifies the pinned base version (`0.10.2`) and the module Torch/CUDA runtime, so this expected local version
 suffix is accepted.
 
+vLLM `0.10.2` allows Transformers `>=4.55.2`, but the current release line can otherwise resolve Transformers 5,
+which removed a GPT-2 tokenizer API used by these workloads. The isolated profile pins `transformers==4.57.6` after
+building vLLM. This is a Python-only change and does not replace the module Torch/CUDA runtime.
+
 The current vLLM matrix consists only of text workloads (GPT-2, TinyLlama, and DistilBERT). The build therefore removes
 PyPI TorchAudio from the isolated environment by default: its available wheel is compiled for CUDA 12.8 and cannot load
 beside the cluster's CUDA 12.4 Torch. This permits Transformers and vLLM's text `LLM` entry point to import normally.
