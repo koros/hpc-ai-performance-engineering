@@ -360,6 +360,7 @@ def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -
     assert 'VLLM_CLANG_BRACKET_DEPTH="${HPC_AI_VLLM_CLANG_BRACKET_DEPTH:-1024}"' in builder
     assert 'VLLM_TEXT_ONLY="${HPC_AI_VLLM_TEXT_ONLY:-1}"' in builder
     assert 'VLLM_TRANSFORMERS_VERSION="${HPC_AI_VLLM_TRANSFORMERS_VERSION:-4.57.6}"' in builder
+    assert 'VLLM_TOKENIZERS_VERSION="${HPC_AI_VLLM_TOKENIZERS_VERSION:-0.22.1}"' in builder
     assert "python3 -m venv --system-site-packages" not in builder
     assert '"$BOOTSTRAP_PYTHON" -m venv --system-site-packages "$VLLM_ENV"' in builder
     assert '"setuptools>=77,<81"' in builder
@@ -371,11 +372,15 @@ def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -
         'uv pip install --python "$VLLM_ENV/bin/python" --no-deps '
         '"transformers==${VLLM_TRANSFORMERS_VERSION}"' in builder
     )
+    assert (
+        'uv pip install --python "$VLLM_ENV/bin/python" --no-deps "tokenizers==${VLLM_TOKENIZERS_VERSION}"' in builder
+    )
     assert "Version(installed_vllm_version).base_version" in builder
     assert "pip uninstall -y torchaudio" in builder
     assert "from transformers import ProcessorMixin" in builder
     assert "from vllm import LLM, SamplingParams" in builder
     assert 'installed_transformers_version != "$VLLM_TRANSFORMERS_VERSION"' in builder
+    assert 'installed_tokenizers_version != "$VLLM_TOKENIZERS_VERSION"' in builder
     assert "TORCH_CUDA_ARCH_LIST" in builder
     assert "-Xcompiler=-fbracket-depth=${VLLM_CLANG_BRACKET_DEPTH}" in builder
     assert "#SBATCH --partition=gpu_l40s" in build_job
