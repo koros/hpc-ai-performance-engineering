@@ -107,6 +107,11 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `5` | Supported PyTorch inference rows | 3 | PyTorch engine, request shape, concurrency, and precision verified; vLLM rows stay deferred. |
 | `optional` | `E016-E017`, `E044-E045` | 3 | Run only if memory and queue budget remain. |
 
+DeepSpeed's own optional NVTX annotations are disabled by default for ZeRO rows. The installed Lovelace NVTX binding
+does not accept the keyword arguments used by DeepSpeed 0.19.6, while the project NCCL and `nvidia-smi` collectors
+remain active. Set `HPC_AI_ENABLE_DEEPSPEED_NVTX=1` only after verifying a compatible NVTX binding for a dedicated
+Nsight study.
+
 E006, E007, all vLLM-serving rows, E032, four-GPU L40S rows, and backend/adapter rows listed as Deferred are not
 rendered by platform batch commands. E032 exhausted the exact one-GPU GPT-2 shape on the observed L40S capacity; a
 future reduced-batch study must be registered as a distinct capacity-adjusted condition. The active L40S node exposes

@@ -23,7 +23,11 @@ from hpc_ai_perf.profiling.system import TorchMemoryProfiler, TorchProfiler, bui
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import ExperimentResult, aggregate_results
 from hpc_ai_perf.runners import LocalBenchmarkRunner
-from hpc_ai_perf.runtime_checks import prepare_deepspeed_import_environment, run_cluster_runtime_checks
+from hpc_ai_perf.runtime_checks import (
+    disable_deepspeed_nvtx_annotations,
+    prepare_deepspeed_import_environment,
+    run_cluster_runtime_checks,
+)
 from hpc_ai_perf.slurm import (
     build_job_status_report,
     build_job_status_rows,
@@ -626,6 +630,25 @@ def test_deepspeed_import_environment_unsets_stale_cuda_home(monkeypatch, tmp_pa
     assert metadata["nvcc_available"] is False
     assert metadata["deepspeed_cuda_detection_ignored"] is True
     assert os.environ["DS_IGNORE_CUDA_DETECTION"] == "1"
+
+
+def test_deepspeed_nvtx_annotations_are_disabled_by_default(monkeypatch) -> None:
+    deepspeed_nvtx = types.ModuleType("deepspeed.utils.nvtx")
+    deepspeed_nvtx.enable_nvtx = True
+    monkeypatch.setitem(sys.modules, "deepspeed.utils.nvtx", deepspeed_nvtx)
+
+    assert disable_deepspeed_nvtx_annotations() is True
+    assert deepspeed_nvtx.enable_nvtx is False
+
+
+def test_deepspeed_nvtx_annotations_can_be_explicitly_enabled(monkeypatch) -> None:
+    deepspeed_nvtx = types.ModuleType("deepspeed.utils.nvtx")
+    deepspeed_nvtx.enable_nvtx = True
+    monkeypatch.setitem(sys.modules, "deepspeed.utils.nvtx", deepspeed_nvtx)
+    monkeypatch.setenv("HPC_AI_ENABLE_DEEPSPEED_NVTX", "1")
+
+    assert disable_deepspeed_nvtx_annotations() is False
+    assert deepspeed_nvtx.enable_nvtx is True
 
 
 def test_runtime_check_rejects_old_deepspeed_without_nvcc(monkeypatch, tmp_path: Path) -> None:

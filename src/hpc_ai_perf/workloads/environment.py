@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from hpc_ai_perf.config import ExperimentConfig
-from hpc_ai_perf.runtime_checks import prepare_deepspeed_import_environment
+from hpc_ai_perf.runtime_checks import disable_deepspeed_nvtx_annotations, prepare_deepspeed_import_environment
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
 from hpc_ai_perf.workloads.tensorrt_llm import validate_tensorrt_llm_environment
 
@@ -143,6 +143,7 @@ class EnvironmentValidationWorkload(Workload):
                     f"Prepared runtime details: {deepspeed_runtime}. Original error: {exc}"
                 ) from exc
             raise
+        deepspeed_nvtx_annotations_disabled = disable_deepspeed_nvtx_annotations()
 
         local_rank = int(os.environ.get("LOCAL_RANK", "0"))
         rank = int(os.environ.get("RANK", "0"))
@@ -182,6 +183,7 @@ class EnvironmentValidationWorkload(Workload):
             "torch_optimizer": "AdamW",
             "deepspeed_nvcc_available": bool(deepspeed_runtime["nvcc_available"]),
             "deepspeed_cuda_detection_ignored": bool(deepspeed_runtime["deepspeed_cuda_detection_ignored"]),
+            "deepspeed_nvtx_annotations_disabled": deepspeed_nvtx_annotations_disabled,
             "cuda_home": str(deepspeed_runtime["cuda_home_after"] or ""),
             "nvcc_path": str(deepspeed_runtime["cuda_home_nvcc_after"] or deepspeed_runtime["nvcc_path_after"] or ""),
         }

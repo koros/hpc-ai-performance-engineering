@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import json
 import os
@@ -82,6 +83,31 @@ def prepare_deepspeed_import_environment(torch: Any | None = None) -> dict[str, 
         "pytorch_nvml_based_cuda_check": os.environ.get("PYTORCH_NVML_BASED_CUDA_CHECK"),
         "selected_cuda_home": selected_cuda_home,
     }
+
+
+def disable_deepspeed_nvtx_annotations() -> bool:
+    """Disable DeepSpeed's optional NVTX annotations when not explicitly requested.
+
+    DeepSpeed 0.19.6 sends keyword arguments to the optional ``nvtx`` domain
+    binding.  The Lovelace binding accepts only positional arguments, which
+    aborts ZeRO initialisation before any benchmark work runs.  The project
+    collects NCCL and nvidia-smi metrics independently, so disabling only
+    DeepSpeed's internal annotations does not remove required measurements.
+
+    Set ``HPC_AI_ENABLE_DEEPSPEED_NVTX=1`` only on an environment whose NVTX
+    binding has been verified to support DeepSpeed's domain API.
+    """
+
+    if os.environ.get("HPC_AI_ENABLE_DEEPSPEED_NVTX") == "1":
+        return False
+    try:
+        deepspeed_nvtx = importlib.import_module("deepspeed.utils.nvtx")
+    except ImportError:
+        return False
+    if not hasattr(deepspeed_nvtx, "enable_nvtx"):
+        return False
+    deepspeed_nvtx.enable_nvtx = False
+    return True
 
 
 def run_cluster_runtime_checks(

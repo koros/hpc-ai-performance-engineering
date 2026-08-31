@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from hpc_ai_perf.config import ExperimentConfig
-from hpc_ai_perf.runtime_checks import prepare_deepspeed_import_environment
+from hpc_ai_perf.runtime_checks import disable_deepspeed_nvtx_annotations, prepare_deepspeed_import_environment
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
 
 
@@ -160,7 +160,7 @@ def _run_training_loop(
         if hasattr(model.config, "use_cache"):
             model.config.use_cache = False
 
-    model, optimizer, engine = _configure_training_strategy(
+    model, optimizer, engine, deepspeed_nvtx_annotations_disabled = _configure_training_strategy(
         torch,
         config,
         runtime,
@@ -307,6 +307,7 @@ def _run_training_loop(
         "compute_dtype_observed": config.runtime.precision,
         "parameter_dtype_observed": str(next(model.parameters()).dtype),
         "dataset_execution": "cpu_dataloader" if data_iterator is not None else "synthetic_device_tensors",
+        "deepspeed_nvtx_annotations_disabled": deepspeed_nvtx_annotations_disabled,
     }
     if cuda_event_seconds is not None:
         metrics["cuda_event_seconds"] = cuda_event_seconds
@@ -834,7 +835,7 @@ def _configure_training_strategy(
     learning_rate: float,
     batch_size: int,
     accumulation_steps: int,
-) -> tuple[Any, Any, Any | None]:
+) -> tuple[Any, Any, Any | None, bool]:
     strategy = config.distributed.strategy
     parameters = config.workload.parameters
     if strategy.startswith("deepspeed"):
@@ -851,6 +852,7 @@ def _configure_training_strategy(
                     f"Prepared runtime details: {deepspeed_runtime}. Original error: {exc}"
                 ) from exc
             raise
+        deepspeed_nvtx_annotations_disabled = disable_deepspeed_nvtx_annotations()
 
         stage = int(strategy[-1])
         requested = parameters.get("deepspeed_config", {})
@@ -873,7 +875,7 @@ def _configure_training_strategy(
             optimizer=optimizer,
             config=ds_config,
         )
-        return engine, optimizer, engine
+        return engine, optimizer, engine, deepspeed_nvtx_annotations_disabled
 
     model = model.to(device)
     if strategy == "ddp" and runtime.world_size > 1:
@@ -904,7 +906,7 @@ def _configure_training_strategy(
     elif strategy not in {"none", "ddp", "fsdp"}:
         raise ValueError(f"Unsupported training strategy: {strategy}")
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-    return model, optimizer, None
+    return model, optimizer, None, False
 
 
 def _training_precision(torch: Any, precision: str, device: Any) -> tuple[Any, Any | None]:
