@@ -13,6 +13,7 @@ SUBMISSION_BUNDLE_ID ?=
 SUBMISSION_BUNDLE_ID_ARG := $(if $(SUBMISSION_BUNDLE_ID),--bundle-id $(SUBMISSION_BUNDLE_ID),)
 VENV_ACTIVATE ?=
 VENV_ACTIVATE_ARG := $(if $(VENV_ACTIVATE),--venv-activate $(VENV_ACTIVATE),)
+SLURM_ENV_ARGS ?=
 SUBMISSION_BUNDLE_DIR ?=
 PLATFORM_WAVE_STATE ?= build/platform_waves/$(PLATFORM)/wave_$(PLATFORM_WAVE).json
 RUNTIME_EXPECTED_GPU_MODEL ?= $(if $(filter h100,$(PLATFORM)),H100,L40S)
@@ -102,11 +103,11 @@ submit-vllm-acceptance:
 # produces the one canonical E006@l40s record, frozen in a normal bundle.
 submit-vllm-pilot:
 	test -r "$(VLLM_ENV)/bin/activate" || (echo "Run and review make submit-vllm-acceptance first" && exit 1)
-	$(MAKE) submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot VENV_ACTIVATE="$(VLLM_ENV)/bin/activate"
+	$(MAKE) submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot VENV_ACTIVATE="$(VLLM_ENV)/bin/activate" SLURM_ENV_ARGS="--env VLLM_USE_V1=0"
 
 retry-vllm-pilot:
 	test -r "$(VLLM_ENV)/bin/activate" || (echo "The isolated vLLM environment is missing" && exit 1)
-	$(MAKE) retry-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot VENV_ACTIVATE="$(VLLM_ENV)/bin/activate"
+	$(MAKE) retry-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot VENV_ACTIVATE="$(VLLM_ENV)/bin/activate" SLURM_ENV_ARGS="--env VLLM_USE_V1=0"
 
 check-l40s-runtime:
 	$(MAKE) check-platform-runtime PLATFORM=l40s
@@ -143,7 +144,7 @@ submit-rendered-platform-wave:
 # ignored build state file, so monitoring, collection, and staging need no
 # copied path or shell environment variable.
 submit-platform-wave:
-	$(PYTHON) -m hpc_ai_perf.cli submit-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG) $(VENV_ACTIVATE_ARG)
+	$(PYTHON) -m hpc_ai_perf.cli submit-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG) $(VENV_ACTIVATE_ARG) $(SLURM_ENV_ARGS)
 
 status-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli status-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE)
@@ -152,7 +153,7 @@ collect-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli collect-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE) --result-root results/raw
 
 retry-platform-wave:
-	$(PYTHON) -m hpc_ai_perf.cli retry-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG) $(VENV_ACTIVATE_ARG)
+	$(PYTHON) -m hpc_ai_perf.cli retry-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG) $(VENV_ACTIVATE_ARG) $(SLURM_ENV_ARGS)
 
 stage-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli stage-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE)
@@ -161,7 +162,7 @@ stage-platform-wave:
 # recovery, but the targets above are the standard L40S/H100 workflow.
 create-platform-wave-bundle:
 	test -n "$(SUBMISSION_BUNDLE_ID)" || (echo "Set SUBMISSION_BUNDLE_ID to a stable wave identifier" && exit 1)
-	$(PYTHON) -m hpc_ai_perf.cli create-platform-submission-bundle --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) --bundle-id $(SUBMISSION_BUNDLE_ID) $(SLURM_PROFILE_ARG) $(VENV_ACTIVATE_ARG)
+	$(PYTHON) -m hpc_ai_perf.cli create-platform-submission-bundle --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) --bundle-id $(SUBMISSION_BUNDLE_ID) $(SLURM_PROFILE_ARG) $(VENV_ACTIVATE_ARG) $(SLURM_ENV_ARGS)
 
 plan-platform-wave-bundle:
 	test -n "$(SUBMISSION_BUNDLE_DIR)" || (echo "Set SUBMISSION_BUNDLE_DIR to the created bundle path" && exit 1)
