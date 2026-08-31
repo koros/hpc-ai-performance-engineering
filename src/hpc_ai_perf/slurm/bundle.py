@@ -186,7 +186,11 @@ def capture_environment_contract(*, python_executable: str | Path | None = None)
     will run on Slurm rather than the shared submission environment.
     """
     if python_executable is not None:
-        executable = Path(python_executable).expanduser().resolve()
+        # Do not resolve the standard ``.venv/bin/python`` launcher symlink.
+        # Executing its final target bypasses the virtual environment and makes
+        # the submission contract incorrectly report venv-only packages as
+        # absent.
+        executable = Path(python_executable).expanduser()
         if not executable.is_file():
             raise FileNotFoundError(f"Virtualenv Python executable is missing: {executable}")
         probe = """
@@ -210,7 +214,7 @@ except ImportError:
     pass
 print(json.dumps({
     \"python_version\": platform.python_version(),
-    \"python_executable\": str(Path(sys.executable).resolve()),
+    \"python_executable\": str(Path(sys.executable)),
     \"packages\": packages,
     \"torch_cuda\": torch_cuda,
 }))
@@ -242,7 +246,7 @@ print(json.dumps({
         pass
     contract: dict[str, Any] = {
         "python_version": platform.python_version(),
-        "python_executable": str(Path(sys.executable).resolve()),
+        "python_executable": str(Path(sys.executable)),
         "packages": packages,
         "torch_cuda": torch_cuda,
     }

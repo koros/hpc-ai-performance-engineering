@@ -1270,14 +1270,17 @@ def _resolve_bundle_venv(repository: Path, requested_path: str | None) -> Path:
 
 
 def _venv_python_executable(venv_activate: Path) -> Path:
-    """Resolve the interpreter selected by a standard ``bin/activate`` script."""
+    """Return the virtualenv launcher selected by a standard ``bin/activate`` script."""
     python_executable = venv_activate.parent / "python"
     if not python_executable.is_file():
         raise FileNotFoundError(
             f"Virtualenv Python executable is missing: {python_executable}. "
             "Recreate the environment or select a valid --venv-activate path."
         )
-    return python_executable.resolve()
+    # Keep the launcher path rather than following it to the base interpreter.
+    # Python discovers ``pyvenv.cfg`` from this path; following the symlink
+    # would cause bundle contract capture to run outside the selected venv.
+    return python_executable
 
 
 def _bundle_setup_commands(

@@ -3,11 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+import venv
 from pathlib import Path
 
 import pytest
 
-from hpc_ai_perf.cli import _materialize_platform_batch, _render_platform_slurm
+from hpc_ai_perf.cli import _materialize_platform_batch, _render_platform_slurm, _venv_python_executable
 from hpc_ai_perf.config import (
     config_sha256,
     discover_experiment_configs,
@@ -111,9 +112,21 @@ def test_bundle_manifest_separates_file_and_config_identities(tmp_path: Path) ->
 def test_capture_environment_contract_can_probe_a_selected_virtualenv_python() -> None:
     contract = capture_environment_contract(python_executable=sys.executable)
 
-    assert contract["python_executable"] == str(Path(sys.executable).resolve())
+    assert contract["python_executable"] == str(Path(sys.executable))
     assert isinstance(contract["packages"], dict)
     assert "loaded_modules" not in contract
+
+
+def test_capture_environment_contract_uses_virtualenv_launcher(tmp_path: Path) -> None:
+    environment = tmp_path / ".venv"
+    venv.create(environment, with_pip=False)
+    executable = environment / "bin" / "python"
+
+    selected_executable = _venv_python_executable(environment / "bin" / "activate")
+    contract = capture_environment_contract(python_executable=selected_executable)
+
+    assert selected_executable == executable
+    assert contract["python_executable"] == str(executable)
 
 
 def test_environment_contract_ignores_inherited_module_state() -> None:
