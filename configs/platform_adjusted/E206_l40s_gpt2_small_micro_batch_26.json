@@ -1,0 +1,75 @@
+{
+  "experiment_id": "E206",
+  "experiment": "capacity_adjusted_l40s_gpt2_small_micro_batch_26",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "memory_study_type": "micro_batch",
+      "batch_size": 26,
+      "micro_batch_size": 26,
+      "sequence_length": 1024,
+      "activation_checkpointing": false,
+      "gradient_accumulation_steps": 1,
+      "effective_batch_size": 26
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpus": 1,
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw/l40s"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory"
+    ],
+    "parameters": {
+      "collect_memory_trace": true,
+      "collect_oom_risk": true,
+      "collect_effective_batch_metrics": false
+    }
+  },
+  "metadata": {
+    "matrix_id": "E206",
+    "template": "l40s_capacity_adjusted_memory_probe",
+    "phase": "Memory optimisation",
+    "priority": "Supplemental",
+    "gpu_hours_estimate": 0.6,
+    "objective": "Capacity-adjusted L40S GPT-2 micro-batch boundary probe at batch size 26",
+    "source_experiment_ids": [
+      "E065",
+      "E066",
+      "E067",
+      "E068",
+      "E201",
+      "E202",
+      "E203",
+      "E204"
+    ],
+    "capacity_adjusted_reason": "E201/E202 succeeded at micro-batch 20/24, while E203/E204 OOMed at 28/30. This probe tests the middle of the remaining 24-to-28 L40S boundary.",
+    "key_metrics": [
+      "throughput",
+      "memory",
+      "oom",
+      "loss_stability"
+    ]
+  }
+}

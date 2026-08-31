@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from hpc_ai_perf.cli import (
+    _incomplete_planned_wave_experiment_ids,
     _materialize_platform_batch,
     _planned_wave_experiment_ids,
     _render_platform_slurm,
@@ -37,6 +38,8 @@ from hpc_ai_perf.slurm.bundle import (
     write_submission_manifest,
 )
 from hpc_ai_perf.slurm.lifecycle import (
+    BundleResultStatus,
+    ExperimentResultStatus,
     append_wave_attempt,
     current_wave_attempt,
     mark_wave_collected,
@@ -241,7 +244,7 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
 
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 205)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 208)}
 
     l40s_conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s")
     h100_conditions = load_platform_conditions("platforms/execution_matrix.json", "h100")
@@ -260,7 +263,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     assert l40s_planned_source_count == 125
     assert (
         sum(condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in supplemental_ids)
-        == 4
+        == 5
     )
     assert sum(condition.status == "planned" for condition in h100_conditions) == 144
 
@@ -308,13 +311,42 @@ def test_l40s_capacity_adjusted_wave_materializes_boundary_probes(tmp_path: Path
 
     paths = materialize_platform_configs(profile, conditions, tmp_path)
 
-    assert [path.name for path in paths] == ["E201.json", "E202.json", "E203.json", "E204.json"]
+    assert [path.name for path in paths] == ["E201.json", "E202.json", "E205.json", "E206.json", "E207.json"]
     config = load_experiment_config(paths[-1])
-    assert config.experiment_id == "E204"
-    assert config.workload.parameters["micro_batch_size"] == 30
-    assert config.metadata["condition_id"] == "E204@l40s"
+    assert config.experiment_id == "E207"
+    assert config.workload.parameters["micro_batch_size"] == 27
+    assert config.metadata["condition_id"] == "E207@l40s"
     assert config.metadata["comparability"] == "capacity_adjusted"
     assert config.runtime.output_dir == "results/raw/l40s"
+
+
+def test_retry_scope_includes_new_policy_conditions_missing_from_prior_attempt(monkeypatch, tmp_path: Path) -> None:
+    state_path = tmp_path / "wave_4c.json"
+
+    monkeypatch.setattr(
+        "hpc_ai_perf.cli._planned_wave_experiment_ids",
+        lambda platform_id, wave: {"E201", "E202", "E205", "E206", "E207"},
+    )
+    monkeypatch.setattr(
+        "hpc_ai_perf.cli.load_wave_state",
+        lambda path: {"attempts": [{"bundle_dir": str(tmp_path / "old_bundle")}]},
+    )
+    monkeypatch.setattr(
+        "hpc_ai_perf.cli.summarize_bundle_results",
+        lambda bundle_dir: BundleResultStatus(
+            Path(bundle_dir),
+            (
+                ExperimentResultStatus("E201", 3, (1, 2, 3), (), 0),
+                ExperimentResultStatus("E202", 3, (1, 2, 3), (), 0),
+                ExperimentResultStatus("E203", 3, (), (1, 2, 3), 0),
+                ExperimentResultStatus("E204", 3, (), (1, 2, 3), 0),
+            ),
+        ),
+    )
+
+    retry_ids = _incomplete_planned_wave_experiment_ids("l40s", "4c", state_path)
+
+    assert retry_ids == ["E205", "E206", "E207"]
 
 
 def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -> None:
@@ -342,6 +374,8 @@ def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -
                     "E046",
                     "E067",
                     "E068",
+                    "E203",
+                    "E204",
                     "E048",
                     "E050",
                     "E056",

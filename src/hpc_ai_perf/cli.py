@@ -167,9 +167,8 @@ def main() -> None:
 
     if args.command == "retry-platform-wave":
         profile = load_platform_profile(args.platform_profile)
-        _, _, status = _current_platform_wave_status(args)
-        planned_ids = _planned_wave_experiment_ids(profile.platform_id, str(args.wave))
-        retry_ids = [experiment_id for experiment_id in status.retry_experiment_ids if experiment_id in planned_ids]
+        state_path = _wave_state_path_for_args(args, profile.platform_id)
+        retry_ids = _incomplete_planned_wave_experiment_ids(profile.platform_id, str(args.wave), state_path)
         if not retry_ids:
             raise ValueError("No incomplete planned conditions remain in the current platform-wave policy")
         args.experiment_id = retry_ids
@@ -1225,6 +1224,21 @@ def _collect_platform_wave(args: argparse.Namespace) -> list[str]:
     track_platform_progress(args.platform_profile, result_dir=result_root)
     mark_wave_collected(state_path, imported_paths)
     return sorted(set(imported_paths))
+
+
+def _incomplete_planned_wave_experiment_ids(platform_id: str, wave: str, state_path: str | Path) -> list[str]:
+    """Return planned conditions without complete evidence across all attempts."""
+    planned_ids = _planned_wave_experiment_ids(platform_id, wave)
+    state = load_wave_state(state_path)
+    complete_ids: set[str] = set()
+    for attempt in state["attempts"]:
+        if not isinstance(attempt, dict):
+            raise ValueError(f"Platform-wave state contains an invalid attempt: {state_path}")
+        status = summarize_bundle_results(attempt["bundle_dir"])
+        for experiment in status.experiments:
+            if experiment.experiment_id in planned_ids and experiment.complete:
+                complete_ids.add(experiment.experiment_id)
+    return sorted(planned_ids - complete_ids)
 
 
 def _planned_wave_experiment_ids(platform_id: str, wave: str) -> set[str]:

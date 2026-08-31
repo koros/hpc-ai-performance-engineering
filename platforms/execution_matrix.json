@@ -48,7 +48,7 @@
       "platform": "l40s",
       "wave": "4c",
       "name": "L40S capacity-adjusted GPT-2 memory probes",
-      "experiment_ids": ["E201-E204"],
+      "experiment_ids": ["E201-E202", "E205-E207"],
       "required_trials": 3,
       "comparability": "capacity_adjusted"
     },
@@ -195,7 +195,14 @@
       "name": "L40S GPT-2 micro-batch exact shapes exceed available memory",
       "experiment_ids": ["E067", "E068"],
       "comparability": "platform_specific",
-      "reason": "The exact GPT-2 micro-batch 32/64 rows exceed the observed 44.52 GiB L40S capacity. Isolated L40S retries still OOMed: E067 allocated 41.55 GiB before a further 6.14 GiB request failed, and E068 allocated 43.31 GiB before a further 768 MiB request failed. Keep E067/E068 for H100 exact evidence and run E201-E204 as capacity-adjusted L40S boundary probes instead."
+      "reason": "The exact GPT-2 micro-batch 32/64 rows exceed the observed 44.52 GiB L40S capacity. Isolated L40S retries still OOMed: E067 allocated 41.55 GiB before a further 6.14 GiB request failed, and E068 allocated 43.31 GiB before a further 768 MiB request failed. Keep E067/E068 for H100 exact evidence and run E201-E202/E205-E207 as capacity-adjusted L40S boundary probes instead."
+    },
+    {
+      "platforms": ["l40s"],
+      "name": "L40S capacity-adjusted GPT-2 upper-bound probes exceed available memory",
+      "experiment_ids": ["E203-E204"],
+      "comparability": "capacity_adjusted",
+      "reason": "The capacity-adjusted GPT-2 micro-batch 28/30 probes exceeded the observed 44.52 GiB L40S capacity in all three trials. E203 failed before a further 5.37 GiB allocation after 37.40 GiB was allocated by PyTorch, and E204 failed before a further 5.75 GiB allocation after 39.04 GiB was allocated. Keep E201/E202 as successful lower-bound probes and use E205-E207 to narrow the 24-to-28 boundary."
     },
     {
       "platforms": ["l40s"],
