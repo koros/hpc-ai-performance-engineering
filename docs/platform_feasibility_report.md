@@ -30,8 +30,8 @@ The companion [platform experiment matrix](platform_experiment_matrix.md) gives 
 | Scope | Count | Interpretation |
 | --- | ---: | --- |
 | Total matrix configs | 200 | `E001-E200` |
-| Planned L40S conditions | 144 | Generated as `E###@l40s`; run in gated waves on the validated PyTorch CUDA stack. |
-| Deferred L40S conditions | 56 | Existing backend/adapter rows, 37 site-blocked vLLM rows, TensorRT-LLM `E007`, and four H100-specific hardware rows. |
+| Planned L40S conditions | 128 | Generated as `E###@l40s`; run in gated waves on the validated PyTorch CUDA stack. |
+| Deferred L40S conditions | 72 | Backend/adapter rows, site-blocked vLLM/TensorRT-LLM work, H100-specific hardware rows, four-GPU rows, and the exact-shape E032 L40S OOM. |
 | Planned H100 conditions | 144 | Generated as `E###@h100`; run the same supported scope when allocation is available. |
 | Deferred H100 conditions | 56 | Existing backend/adapter rows, 37 site-blocked vLLM rows, TensorRT-LLM `E007`, and four L40S-specific hardware rows. |
 | Mac M1 smoke configs | 4 | `configs/local/*`; minimal workflow checks. |
@@ -78,7 +78,7 @@ companion:
 - use the `gpu_l40s` queue/profile and repeat the L40S environment-validation sequence before matrix collection; and
 - report communication as NCCL/PCIe behaviour, not NVLink behaviour.
 
-L40S is suitable for single-GPU baselines, 1/2/4-GPU scaling, DDP/FSDP/ZeRO comparisons, memory optimisation, data-movement studies, power/energy analysis, and supported PyTorch inference. Its results answer L40S-specific questions. They do not replace H100 evidence for H100-specific research questions.
+L40S is suitable for supported single- and two-GPU baselines, scaling, DDP/FSDP/ZeRO comparisons, memory optimisation, data-movement studies, power/energy analysis, and PyTorch inference. The active node does not support its four-GPU rows, and the exact E032 one-GPU GPT-2 shape is deferred after an observed OOM; any smaller replacement must be registered as capacity-adjusted. Its results answer L40S-specific questions and do not replace H100 evidence for H100-specific research questions.
 
 ### H100: deferred collection path, already materializable
 
@@ -106,7 +106,7 @@ Use the H100 node for the core baseline trials, 1/2/4-GPU scaling, distributed-s
 | 0 | Smoke and dev profile | Inspect GPU name, memory, CUDA, and topology | Inspect GPU name, memory, CUDA, and topology | Avoid model/profile mismatch before spending queue time. |
 | 1 | Baseline-shaped dev checks | Wave 0: `E001`, `E002`, `E004-E005` | Wave 0: `E001-E005` | The active L40S node has two GPUs, so its four-GPU E003 condition remains deferred. |
 | 2 | GPT-2/DistilBERT adapter checks | Wave 1, then wave 2 direct hardware pairs | H100 wave 1, then wave 2 when available | Build repeatable reference measurements and matched platform anchors. |
-| 3 | No further publishable work | One-/two-GPU wave 3 scaling and strategy pilots | H100 wave 3 later | The L40S four-GPU rows remain deferred until that capacity is available. |
+| 3 | No further publishable work | Supported one-/two-GPU wave 3 scaling and strategy pilots | H100 wave 3 later | The L40S four-GPU rows and exact E032 OOM condition remain deferred. |
 | 4 | Optional local shape checks | Waves 4, 4b, and 5 | Matching H100 waves later | Collect depth only after the core path is stable. |
 
 ## Interpretation Rules

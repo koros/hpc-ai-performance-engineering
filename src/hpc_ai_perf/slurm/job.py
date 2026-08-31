@@ -54,9 +54,11 @@ class SlurmJob:
         """Create a Slurm job description from an experiment config.
 
         GPU count comes from the distributed section when available, otherwise
-        from the hardware section. Multi-GPU training uses torchrun so every
-        allocated GPU receives one process; serving engines retain one launcher
-        process and manage tensor parallel workers internally.
+        from the hardware section. Multi-GPU training uses the PyTorch
+        distributed launcher through the activated ``python`` so every
+        allocated GPU receives one process and venv-only workload dependencies
+        remain visible; serving engines retain one launcher process and manage
+        tensor parallel workers internally.
         """
         if repetitions < 1:
             raise ValueError("repetitions must be at least 1")
@@ -72,7 +74,14 @@ class SlurmJob:
             config.mode in {"training", "profiling"} and config.distributed.strategy != "none" and gpus_per_node > 1
         )
         if distributed_training:
-            command = f"torchrun --standalone --nnodes=1 --nproc-per-node={gpus_per_node} {base_command}"
+            # On Lovelace, the module-provided ``torchrun`` entry point is
+            # bound to the base Spack Python. Invoking the module through the
+            # activated interpreter preserves project-venv dependencies such
+            # as Transformers and DeepSpeed in every worker process.
+            command = (
+                f"python -m torch.distributed.run --standalone --nnodes=1 "
+                f"--nproc-per-node={gpus_per_node} {base_command}"
+            )
         else:
             command = f"python {base_command}"
         workers = int(config.workload.parameters.get("num_workers", 0))

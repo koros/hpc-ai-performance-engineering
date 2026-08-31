@@ -102,7 +102,7 @@ def test_render_slurm_script_from_config() -> None:
     assert "#SBATCH --gres=gpu:2" in script
     assert "#SBATCH --partition=gpu" in script
     assert "module load cuda/12.4" in script
-    assert "torchrun --standalone --nnodes=1 --nproc-per-node=2" in script
+    assert "python -m torch.distributed.run --standalone --nnodes=1 --nproc-per-node=2" in script
     assert "-m hpc_ai_perf.cli run --config configs/scaling_studies/E033_gpt2_small_strong_2gpu.json" in script
 
 

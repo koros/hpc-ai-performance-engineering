@@ -11,10 +11,10 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | Local smoke runner | CPU-only synthetic workload is ready and covered by tests. |
 | Semantic launch gate | `validate --research-ready` blocks unsupported precision/backend/framework combinations before Slurm rendering or execution. |
 | Result pipeline | Immutable, repetition-aware matrix trials, verified config/provenance fields, aggregation, 11 objective-specific analysis tables, progress tracking, and readiness reporting are wired into `python -m hpc_ai_perf.cli refresh`. |
-| Distributed execution | One-process-per-GPU `torchrun`, DDP, FSDP, DeepSpeed ZeRO, rank binding, global work accounting, and rank-safe result writing are implemented. |
+| Distributed execution | One-process-per-GPU `python -m torch.distributed.run`, DDP, FSDP, DeepSpeed ZeRO, rank binding, global work accounting, and rank-safe result writing are implemented. |
 | Profiling | nvidia-smi power/utilisation/memory/clock/temperature sampling, PyTorch traces, workload timing, and NCCL microbenchmark metrics are implemented. |
 | Slurm support | Semantic-gated single/bulk rendering, H100/L40S profile matching, CPU allocation checks, and three transformer smoke presets are available. |
-| Platform execution | All 200 logical rows route exactly once per platform. There are 129 planned L40S conditions and 144 planned H100 conditions; L40S E006 and the remaining vLLM rows are deferred pending a Gloo-enabled Torch module, while TensorRT-LLM remains deferred. |
+| Platform execution | All 200 logical rows route exactly once per platform. There are 128 planned L40S conditions and 144 planned H100 conditions; L40S E006 and the remaining vLLM rows are deferred pending a Gloo-enabled Torch module, E032 is deferred after an exact-shape L40S OOM, and TensorRT-LLM remains deferred. |
 | Evidence retention | L40S/H100 JSON is imported non-destructively into separate roots, scanned for sensitive keys, validated, and covered by tracked SHA-256 manifests. |
 | Dashboard | Static dashboard reads processed results, analysis summaries, and readiness report output. |
 | Quality gates | `pytest`, `ruff`, and `pre-commit` are configured and passing. |

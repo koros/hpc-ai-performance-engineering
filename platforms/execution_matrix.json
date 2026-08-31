@@ -31,7 +31,7 @@
       "wave": "3",
       "name": "L40S scaling and strategies",
       "experiment_ids": ["E032-E043", "E047-E062"],
-      "exclude_ids": ["E034", "E037", "E040", "E043", "E048", "E050", "E056", "E058"],
+      "exclude_ids": ["E032", "E034", "E037", "E040", "E043", "E048", "E050", "E056", "E058"],
       "required_trials": 3,
       "comparability": "exact"
     },
@@ -174,6 +174,13 @@
       "experiment_ids": ["E121-E122", "E125-E126"],
       "comparability": "platform_specific",
       "reason": "These matrix rows are the H100 half of the controlled hardware comparison."
+    },
+    {
+      "platforms": ["l40s"],
+      "name": "L40S GPT-2 strong-scaling baseline exceeds available memory",
+      "experiment_ids": ["E032"],
+      "comparability": "platform_specific",
+      "reason": "The exact one-GPU GPT-2 strong-scaling shape exhausted the observed 44.52 GiB L40S allocation (43.32 GiB allocated, then a further 768 MiB request failed). Define and validate a separate capacity-adjusted L40S condition before changing batch size or accumulation; do not pool it with the exact E032 condition."
     },
     {
       "platforms": ["l40s"],
