@@ -46,6 +46,7 @@ def test_platform_profiles_load() -> None:
     assert l40s.platform_id == "l40s"
     assert l40s.partition == "gpu_l40s"
     assert l40s.output_root == "results/raw/l40s"
+    assert l40s.max_gpus == 2
     assert h100.platform_id == "h100"
     assert h100.max_gpus == 4
 
@@ -188,14 +189,14 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
     l40s = load_platform_conditions("platforms/execution_matrix.json", "l40s", wave="0")
     h100 = load_platform_conditions("platforms/execution_matrix.json", "h100", wave="0")
 
-    assert [condition.condition_id for condition in l40s] == [f"E{index:03d}@l40s" for index in range(1, 6)]
+    assert [condition.condition_id for condition in l40s] == ["E001@l40s", "E002@l40s", "E004@l40s", "E005@l40s"]
     assert [condition.condition_id for condition in h100] == [f"E{index:03d}@h100" for index in range(1, 6)]
 
 
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     expected_ids = {f"E{index:03d}" for index in range(1, 201)}
 
-    for platform_id, planned_count in [("l40s", 145), ("h100", 144)]:
+    for platform_id, planned_count in [("l40s", 129), ("h100", 144)]:
         conditions = load_platform_conditions("platforms/execution_matrix.json", platform_id)
 
         assert len(conditions) == 200
@@ -203,7 +204,20 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         assert sum(condition.status == "planned" for condition in conditions) == planned_count
 
 
-def test_execution_matrix_defers_vllm_and_cuda_toolkit_rows_until_the_l40s_pilot() -> None:
+def test_runnable_l40s_conditions_fit_the_verified_two_gpu_node() -> None:
+    profile = load_platform_profile("platforms/l40s.json")
+    entries = {entry.config.experiment_id: entry for entry in discover_experiment_configs()}
+    conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s")
+
+    planned = [condition for condition in conditions if condition.status == "planned"]
+
+    assert planned
+    assert all(entries[condition.matrix_id].config.hardware.gpus <= profile.max_gpus for condition in planned)
+    wave_two = [condition.matrix_id for condition in planned if condition.wave == "2"]
+    assert wave_two == ["E123", "E124", "E127", "E128"]
+
+
+def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -> None:
     shared_deferred_ids = {
         "E007",
         "E130",
@@ -214,7 +228,28 @@ def test_execution_matrix_defers_vllm_and_cuda_toolkit_rows_until_the_l40s_pilot
 
     for platform_id in ("l40s", "h100"):
         expected_ids = set(shared_deferred_ids)
-        if platform_id == "h100":
+        if platform_id == "l40s":
+            expected_ids.update(
+                {
+                    "E003",
+                    "E006",
+                    "E034",
+                    "E037",
+                    "E040",
+                    "E043",
+                    "E046",
+                    "E048",
+                    "E050",
+                    "E056",
+                    "E058",
+                    "E115",
+                    "E116",
+                    "E119",
+                    "E120",
+                    "E172",
+                }
+            )
+        else:
             expected_ids.add("E006")
         conditions = load_platform_conditions(
             "platforms/execution_matrix.json",
@@ -227,11 +262,10 @@ def test_execution_matrix_defers_vllm_and_cuda_toolkit_rows_until_the_l40s_pilot
         assert all(condition.wave == "deferred" for condition in conditions)
 
 
-def test_execution_matrix_schedules_only_l40s_e006_as_a_vllm_pilot() -> None:
+def test_execution_matrix_has_no_runnable_l40s_vllm_pilot() -> None:
     conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s", wave="vllm-pilot")
 
-    actual = [(condition.condition_id, condition.required_trials, condition.comparability) for condition in conditions]
-    assert actual == [("E006@l40s", 1, "platform_specific")]
+    assert conditions == []
 
 
 def test_deferred_platform_conditions_are_tracked() -> None:
@@ -386,7 +420,7 @@ def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -
     assert "build/vllm_acceptance" in acceptance
     assert "submit-vllm-build:" in makefile
     assert "submit-vllm-acceptance:" in makefile
-    assert "submit-vllm-pilot:" in makefile
+    assert "submit-vllm-pilot:" not in makefile
     assert "HPC_AI_VLLM_SOURCE" in makefile
     assert "--venv-activate $(VENV_ACTIVATE)" in makefile
 

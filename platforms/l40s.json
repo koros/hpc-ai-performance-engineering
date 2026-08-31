@@ -6,7 +6,7 @@
   "interconnect": "PCIe",
   "partition": "gpu_l40s",
   "cpus_per_gpu": 8,
-  "max_gpus": 8,
+  "max_gpus": 2,
   "output_root": "results/raw/l40s",
   "slurm_profile": "slurm/profiles/cluster_l40s.json",
   "unsupported_metrics": ["nvlink_utilization"]

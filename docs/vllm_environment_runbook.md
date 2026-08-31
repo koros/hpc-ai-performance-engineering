@@ -11,8 +11,9 @@ The process has two gates:
 1. Build pinned vLLM `0.10.2` in an external environment.
 2. Run E006 as a one-GPU acceptance job and require import, engine start, and one served request.
 
-After both gates pass, submit the already-defined canonical L40S E006 pilot. The acceptance JSON is not matrix evidence
-and is never imported into `results/raw/`; the other vLLM rows remain deferred until the canonical pilot is reviewed.
+E006 and the remaining vLLM rows are currently deferred because the active Torch module lacks Gloo. The acceptance JSON
+is diagnostic only and is never imported into `results/raw/`; resume this runbook only after the cluster provides a
+Gloo-enabled compatible Torch module.
 
 ## One-Time Preparation
 
@@ -116,26 +117,9 @@ sbatch --partition=gpu_h100 \
 The H100 job uses the same multi-architecture private build. If the user chose a custom environment location, include
 `HPC_AI_VLLM_ENV=/absolute/path/to/vllm-0.10.2` in that `--export` list as well.
 
-## After Acceptance
+## Re-enable Only After the Cluster Fix
 
-Do not manually edit or import the acceptance record. After reviewing its successful status and JSON, submit the
-dedicated immutable L40S E006 pilot:
-
-```bash
-source slurm/modules_for_hpc_ai
-source .venv/bin/activate
-make submit-vllm-pilot
-```
-
-Monitor and collect it through the standard lifecycle:
-
-```bash
-make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot
-make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot
-make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot
-git commit -m "data: add completed L40S vLLM E006 trial"
-```
-
-`submit-vllm-pilot` freezes the platform-resolved E006 configuration and activates the isolated vLLM environment inside
-the bundle. Once the canonical pilot produces valid evidence, review it before re-enabling the other 36 vLLM rows in
-controlled waves. `VENV_ACTIVATE` remains available for those later vLLM waves and should not be set for non-vLLM work.
+Do not manually import the acceptance record. After a Gloo-enabled Torch module is available, rebuild the isolated
+environment against that module, rerun the acceptance gate, and reintroduce E006 as a dedicated immutable pilot before
+re-enabling the remaining vLLM rows. `VENV_ACTIVATE` remains available for those later vLLM waves and should not be set
+for non-vLLM work.

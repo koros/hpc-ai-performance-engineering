@@ -146,8 +146,9 @@ The current platform matrix defers the wider vLLM serving scope. Lovelace's veri
 compiler for the pinned vLLM `0.10.2` source build, but do not install a generic PyPI vLLM wheel into the shared
 environment. Its wheels are CUDA-ABI-specific and may expect another runtime (for example `libcudart.so.13` while
 PyTorch reports CUDA 12.4). Follow the [vLLM environment runbook](docs/vllm_environment_runbook.md): build the private
-environment, run E006's import/engine/request acceptance gate, then submit its one-trial canonical L40S pilot before
-re-enabling any remaining vLLM matrix rows.
+environment, then run E006's import/engine/request acceptance gate before re-enabling any vLLM matrix rows. E006 and
+the remaining vLLM rows are currently deferred because the active cluster Torch module lacks the Gloo backend required
+by vLLM engine startup.
 
 Do not use `--upgrade-strategy eager` on Lovelace because it can install PyPI Torch/Numpy over the Spack-provided CUDA
 runtime stack.

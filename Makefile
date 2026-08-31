@@ -34,7 +34,7 @@ DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
 
 # Dev targets run local Mac/workstation checks; matrix tracking stays separate.
 .PHONY: check-cuda-toolchain
-.PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile check-platform-runtime check-l40s-runtime check-h100-runtime check-cuda-toolchain setup-vllm-environment submit-vllm-build submit-vllm-acceptance submit-vllm-pilot retry-vllm-pilot materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-rendered-platform-wave submit-rendered-platform-wave submit-platform-wave status-platform-wave collect-platform-wave retry-platform-wave stage-platform-wave create-platform-wave-bundle plan-platform-wave-bundle init-platform-wave-bundle-status dry-run-submit-platform-wave-bundle submit-platform-wave-bundle import-platform-wave-bundle track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate validate-result-evidence readiness-report refresh serve-dashboard
+.PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile check-platform-runtime check-l40s-runtime check-h100-runtime check-cuda-toolchain setup-vllm-environment submit-vllm-build submit-vllm-acceptance materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-rendered-platform-wave submit-rendered-platform-wave submit-platform-wave status-platform-wave collect-platform-wave retry-platform-wave stage-platform-wave create-platform-wave-bundle plan-platform-wave-bundle init-platform-wave-bundle-status dry-run-submit-platform-wave-bundle submit-platform-wave-bundle import-platform-wave-bundle track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results track-progress track-dev-progress validate validate-result-evidence readiness-report refresh serve-dashboard
 
 install-dev:
 	$(PYTHON) -m pip install -e ".[dev,yaml]"
@@ -97,16 +97,6 @@ submit-vllm-build:
 submit-vllm-acceptance:
 	test -r "$(VLLM_ENV)/bin/activate" || (echo "Run make submit-vllm-build and wait for it to succeed first" && exit 1)
 	sbatch --export=ALL,HPC_AI_VLLM_VERSION="$(VLLM_VERSION)",HPC_AI_VLLM_ENV="$(VLLM_ENV)" slurm/smoke/vllm_acceptance.sbatch
-
-# Submit only after the separate serving acceptance job has succeeded. This
-# produces the one canonical E006@l40s record, frozen in a normal bundle.
-submit-vllm-pilot:
-	test -r "$(VLLM_ENV)/bin/activate" || (echo "Run and review make submit-vllm-acceptance first" && exit 1)
-	$(MAKE) submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot VENV_ACTIVATE="$(VLLM_ENV)/bin/activate"
-
-retry-vllm-pilot:
-	test -r "$(VLLM_ENV)/bin/activate" || (echo "The isolated vLLM environment is missing" && exit 1)
-	$(MAKE) retry-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot VENV_ACTIVATE="$(VLLM_ENV)/bin/activate"
 
 check-l40s-runtime:
 	$(MAKE) check-platform-runtime PLATFORM=l40s

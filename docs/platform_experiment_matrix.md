@@ -15,13 +15,14 @@ deferred rather than allowed to fail in a batch.
 
 | Current IDs | Experiment family | Mac M1 | L40/L40S | H100 | Clear reason and constraint |
 | --- | --- | --- | --- | --- | --- |
-| `E001-E005` | CUDA, DDP/NCCL, FSDP, DeepSpeed environment validation | No matrix run; use smoke/dev only | Resolved; wave 0, run first | Resolved; wave 0, run first | Mac cannot prove CUDA/NCCL/Slurm. Generated configs bind the logical row to the observed GPU, partition, CPU policy, and result root. |
-| `E006` | vLLM environment validation | No | Deferred | Deferred | The site currently has no compatible vLLM installation or usable CUDA compiler toolchain for a compatible build. |
+| `E001`, `E002`, `E004-E005` | CUDA, DDP/NCCL, FSDP, DeepSpeed environment validation | No matrix run; use smoke/dev only | Resolved; wave 0, run first | Resolved; wave 0, run first | Mac cannot prove CUDA/NCCL/Slurm. Generated configs bind the logical row to the observed GPU, partition, CPU policy, and result root. |
+| `E003` | Four-GPU NCCL validation | No matrix run | Deferred | Resolved when four H100 GPUs are available | The active L40S node exposes two GPUs; four-GPU evidence must not be substituted with a two-GPU run. |
+| `E006` | vLLM environment validation | No | Deferred | Deferred | The isolated vLLM build imports, but the active Torch module lacks the Gloo backend required for engine startup. |
 | `E007` | TensorRT-LLM environment validation | No | Deferred | Deferred | The build/load/request adapter is implemented, but requires a compatible TensorRT-LLM environment, usable CUDA build toolchain, pinned model, and engine contract. |
 | `E008-E015`, `E018-E019` | GPT-2, DistilBERT, TinyLlama baseline trials | Dev proxy for `E008`, `E010`, `E012`, `E014`, `E018` | Resolved; wave 1, 3 trials | Resolved; wave 1, 3 trials | Mac validates adapters only. L40S/H100 establish separately tracked baseline evidence. |
 | `E016-E017` | TinyLlama training baseline/repeat | No; local tiny-random inference only | Resolved optional wave after memory pilot | Resolved optional wave after memory pilot | Full TinyLlama training is optional and memory/queue sensitive; do not substitute the tiny local model. |
 | `E020-E031` | Workload characterisation | Dev proxy only for DistilBERT shape checks | Resolved; wave 1 | Resolved; wave 1 | nvidia-smi, CUDA traces, memory, and data-loader timings need NVIDIA hardware. |
-| `E032-E034`, `E038-E040`, `E044-E046` | Strong scaling | No | Resolved; wave 3 or optional after 1/2/4-GPU allocation check | Resolved when H100 returns | L40S results characterise PCIe-topology scaling; H100 results are separate H100/NVLink conditions. |
+| `E032-E034`, `E038-E040`, `E044-E046` | Strong scaling | No | Run one-/two-GPU rows; defer four-GPU rows | Resolved when H100 returns | The active L40S node has two GPUs; retain only native one-/two-GPU scaling evidence. |
 | `E035-E037`, `E041-E043` | Weak scaling | No | Resolved; wave 3 | Resolved; wave 3 | Requires concurrent GPUs; keep work-per-GPU definitions unchanged. |
 | `E047-E062` | DDP, FSDP, and ZeRO strategy comparison | No | Resolved after the L40S NCCL/FSDP pilot | Resolved after the H100 pilot | Multi-process CUDA/NCCL/DeepSpeed execution is HPC-only. Interconnect differences are part of the result. |
 | `E063-E082` | Memory optimisation: checkpointing, micro-batch, accumulation | Dev proxy only for GPT-2 micro-batch | Resolved; wave 4 | Resolved; wave 4 | Mac cannot report target GPU memory. Any capacity adjustment must remain a separately labelled condition and cannot be pooled as exact. |
@@ -60,7 +61,7 @@ deferred rather than allowed to fail in a batch.
 
 | Tier | Mac M1 | L40/L40S | H100 |
 | --- | --- | --- | --- |
-| 0 — prove the path | 4 smoke configs, then 15 dev configs | Resolved `E001-E005` | Resolved `E001-E005` |
+| 0 — prove the path | 4 smoke configs, then 15 dev configs | Resolved `E001`, `E002`, `E004-E005`; defer `E003` | Resolved `E001-E005` |
 | 1 — core evidence | Dev proxies only | Wave 1 baselines/characterisation, direct hardware pairs, then wave 3 pilot | Wave 1 baselines/characterisation, direct hardware pairs, then wave 3 pilot |
 | 2 — depth | Local shape checks | Waves 4, 4b, and supported-PyTorch wave 5 | Waves 4, 4b, and supported-PyTorch wave 5 |
 | 3 — future work | Not applicable | Deferred rows only after prerequisites | Deferred rows only after prerequisites |

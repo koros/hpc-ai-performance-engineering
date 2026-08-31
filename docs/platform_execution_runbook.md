@@ -66,8 +66,8 @@ python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-to
 
 The helper must expose `nvcc` and set `CUDA_HOME` to the matching compiler root before running E005. Run
 `make check-cuda-toolchain PLATFORM=l40s EXPECTED_GPUS=2` in this allocation to verify the complete toolchain. The
-current wave 0 scope is E001-E005; do not run a vLLM check or E006 until the separate serving environment passes its
-dedicated preflight.
+current wave 0 scope is E001, E002, E004, and E005; E003 requires four GPUs and is deferred on the active L40S node.
+Do not run a vLLM check or E006 until the separate serving environment passes its dedicated preflight.
 
 ## 2. Preserve and Collect L40S Trials
 
@@ -96,21 +96,18 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 
 | Wave | Conditions | Trials | Release gate |
 | --- | --- | ---: | --- |
-| `0` | `E001-E005` core environment validation | 1 | All five Complete; observed L40S/CUDA/distributed/DeepSpeed checks agree. |
-| `vllm-pilot` | `E006` canonical vLLM validation | 1 | The separate isolated-environment acceptance job has passed import, engine start, and request served. |
+| `0` | `E001`, `E002`, `E004`, `E005` core environment validation | 1 | All four Complete; observed L40S/CUDA/distributed/DeepSpeed checks agree. |
 | `1` | `E008-E015`, `E018-E031` baselines and characterisation | 3 | Core rows Complete; variance and provenance reviewed. |
 | `2` | `E123`, `E124`, `E127`, `E128` direct L40S comparison anchors | 3 | All matched L40S anchors Complete. |
-| `3` | `E032-E043`, `E047-E062` scaling and strategies | 3 | 1-GPU reference valid; 2/4-GPU pilot stable. |
+| `3` | L40S 1/2-GPU scaling and strategy conditions | 3 | 1-GPU reference valid; 2-GPU pilot stable. Four-GPU conditions are deferred. |
 | `4` | Supported memory, precision, and data movement rows | 3 | No silent OOM-driven shape changes; precision backend observed. |
-| `4b` | `E113-E120` communication | 3 | Interpret as NCCL over installed PCIe topology; no NVLink claims. |
+| `4b` | `E113`, `E114`, `E117`, `E118` communication | 3 | Interpret as two-GPU NCCL over installed PCIe topology; no NVLink claims. |
 | `5` | Supported PyTorch inference rows | 3 | PyTorch engine, request shape, concurrency, and precision verified; vLLM rows stay deferred. |
-| `optional` | `E016-E017`, `E044-E046` | 3 | Run only if memory and queue budget remain. |
+| `optional` | `E016-E017`, `E044-E045` | 3 | Run only if memory and queue budget remain. |
 
-E007, the remaining vLLM-serving rows, and backend/adapter rows listed as Deferred are not rendered by platform batch
-commands. E006 is the sole exception: it is available only as the separate one-trial `vllm-pilot` after acceptance.
-
-The vLLM acceptance result is a diagnostic gate, not formal matrix evidence. After it succeeds, submit
-`make submit-vllm-pilot`; do not mix E006 into a standard shared-`.venv` wave.
+E006, E007, all vLLM-serving rows, four-GPU L40S rows, and backend/adapter rows listed as Deferred are not rendered by
+platform batch commands. The active L40S node exposes two GPUs, so the matrix preserves only its one- and two-GPU
+conditions in runnable waves.
 
 ## 4. Submit, Monitor, and Recover an Immutable Wave
 

@@ -6,15 +6,7 @@
       "wave": "0",
       "name": "L40S core environment gate",
       "experiment_ids": ["E001-E006"],
-      "exclude_ids": ["E006"],
-      "required_trials": 1,
-      "comparability": "platform_specific"
-    },
-    {
-      "platform": "l40s",
-      "wave": "vllm-pilot",
-      "name": "L40S vLLM E006 canonical pilot",
-      "experiment_ids": ["E006"],
+      "exclude_ids": ["E003", "E006"],
       "required_trials": 1,
       "comparability": "platform_specific"
     },
@@ -39,6 +31,7 @@
       "wave": "3",
       "name": "L40S scaling and strategies",
       "experiment_ids": ["E032-E043", "E047-E062"],
+      "exclude_ids": ["E034", "E037", "E040", "E043", "E048", "E050", "E056", "E058"],
       "required_trials": 3,
       "comparability": "exact"
     },
@@ -56,6 +49,7 @@
       "wave": "4b",
       "name": "L40S PCIe communication",
       "experiment_ids": ["E113-E120"],
+      "exclude_ids": ["E115-E116", "E119-E120"],
       "required_trials": 3,
       "comparability": "platform_specific"
     },
@@ -64,7 +58,7 @@
       "wave": "5",
       "name": "L40S supported PyTorch inference",
       "experiment_ids": ["E129-E130", "E132-E153", "E156-E178", "E180-E198"],
-      "exclude_ids": ["E130", "E132-E148", "E151-E152", "E175-E176", "E178", "E180-E196"],
+      "exclude_ids": ["E130", "E132-E148", "E151-E152", "E172", "E175-E176", "E178", "E180-E196"],
       "required_trials": 3,
       "comparability": "exact"
     },
@@ -73,6 +67,7 @@
       "wave": "optional",
       "name": "L40S optional large-model work",
       "experiment_ids": ["E016-E017", "E044-E046"],
+      "exclude_ids": ["E046"],
       "required_trials": 3,
       "comparability": "exact"
     },
@@ -147,10 +142,10 @@
   "deferred": [
     {
       "platforms": ["l40s"],
-      "name": "vLLM serving awaiting the E006 pilot",
-      "experiment_ids": ["E130", "E132-E148", "E178", "E180-E196"],
+      "name": "vLLM serving blocked by the PyTorch Gloo backend",
+      "experiment_ids": ["E006", "E130", "E132-E148", "E178", "E180-E196"],
       "comparability": "platform_specific",
-      "reason": "E006 has a dedicated one-trial L40S pilot, but the remaining serving rows stay deferred until its isolated vLLM 0.10.2 environment and canonical evidence pass review."
+      "reason": "The isolated vLLM 0.10.2 build imports, but the active Torch 2.8.0 CUDA 12.4 module lacks the Gloo backend required by vLLM engine startup. Do not schedule until a Gloo-enabled compatible Torch module is available and E006 passes its serving gate."
     },
     {
       "platforms": ["h100"],
@@ -179,6 +174,13 @@
       "experiment_ids": ["E121-E122", "E125-E126"],
       "comparability": "platform_specific",
       "reason": "These matrix rows are the H100 half of the controlled hardware comparison."
+    },
+    {
+      "platforms": ["l40s"],
+      "name": "L40S four-GPU conditions exceed the available node capacity",
+      "experiment_ids": ["E003", "E034", "E037", "E040", "E043", "E046", "E048", "E050", "E056", "E058", "E115-E116", "E119-E120", "E172"],
+      "comparability": "platform_specific",
+      "reason": "The active L40S node exposes two GPUs. These four-GPU conditions must wait for a verified four-GPU L40S allocation; do not substitute two-GPU results."
     },
     {
       "platforms": ["h100"],

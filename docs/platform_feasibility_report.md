@@ -92,7 +92,7 @@ Use the H100 node for the core baseline trials, 1/2/4-GPU scaling, distributed-s
 
 | IDs | Reason | Required before release |
 | --- | --- | --- |
-| `E006`, `E130`, `E132-E148`, `E178`, `E180-E196` | The cluster has no site-compatible vLLM package and no usable CUDA compiler toolchain for a compatible build. | An administrator-provided vLLM module, compatible container, or supported CUDA/PyTorch/vLLM build environment. |
+| `E006`, `E130`, `E132-E148`, `E178`, `E180-E196` | The isolated vLLM build imports, but the active Torch module lacks the Gloo backend required for vLLM engine startup. | A Gloo-enabled Torch build compatible with CUDA 12.4, followed by a successful E006 serving gate. |
 | `E007` | TensorRT-LLM requires a compatible environment, usable CUDA build toolchain, pinned model, and saved-engine contract. | A compatible pinned environment, local TinyLlama checkpoint, and successful build/load/request result on each target platform. |
 | `E131`, `E155`, `E179` | TensorRT-LLM performance integration is absent; `E155` is also not a valid generic DistilBERT classification adapter. | Reuse the validated E007 engine contract in causal-LM benchmarks; design a separate classification contract for E155. |
 | `E086`, `E089`, `E093`, `E096`, `E151`, `E175`, `E199` | FP8 backend/model implementation is not selected or validated. | A documented, tested backend and model path on the target GPU. |
@@ -104,9 +104,9 @@ Use the H100 node for the core baseline trials, 1/2/4-GPU scaling, distributed-s
 | Order | Mac M1 | L40/L40S | H100 | Why |
 | ---: | --- | --- | --- | --- |
 | 0 | Smoke and dev profile | Inspect GPU name, memory, CUDA, and topology | Inspect GPU name, memory, CUDA, and topology | Avoid model/profile mismatch before spending queue time. |
-| 1 | Baseline-shaped dev checks | Wave 0: `E001-E005` | Wave 0: `E001-E005` | Establish CUDA, NCCL, FSDP, and DeepSpeed viability before collecting evidence. |
+| 1 | Baseline-shaped dev checks | Wave 0: `E001`, `E002`, `E004-E005` | Wave 0: `E001-E005` | The active L40S node has two GPUs, so its four-GPU E003 condition remains deferred. |
 | 2 | GPT-2/DistilBERT adapter checks | Wave 1, then wave 2 direct hardware pairs | H100 wave 1, then wave 2 when available | Build repeatable reference measurements and matched platform anchors. |
-| 3 | No further publishable work | Wave 3 scaling and strategy pilots | H100 wave 3 later | Check 1/2/4-GPU availability and strategy stability before large sweeps. |
+| 3 | No further publishable work | One-/two-GPU wave 3 scaling and strategy pilots | H100 wave 3 later | The L40S four-GPU rows remain deferred until that capacity is available. |
 | 4 | Optional local shape checks | Waves 4, 4b, and 5 | Matching H100 waves later | Collect depth only after the core path is stable. |
 
 ## Interpretation Rules
