@@ -103,7 +103,7 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `2` | `E123`, `E124`, `E127`, `E128` direct L40S comparison anchors | 3 | All matched L40S anchors Complete. |
 | `3` | L40S 1/2-GPU scaling and strategy conditions, excluding E032/E033 | 3 | Supported 1/2-GPU rows are valid. E032 and E033 are deferred after exact-shape L40S OOMs; four-GPU conditions are also deferred. |
 | `4` | Supported exact memory, precision, and data movement rows, excluding E067/E068 | 3 | No silent OOM-driven shape changes; precision backend observed. E067/E068 remain H100-exact rows and L40S OOM deferrals. |
-| `4c` | `E201-E202`, `E205-E207` capacity-adjusted GPT-2 L40S micro-batch probes | 3 | Interpret only as L40S capacity-boundary evidence; E203/E204 are confirmed OOM upper-bound probes and must not be pooled with exact E067/E068. |
+| `4c` | `E201-E202`, `E205` capacity-adjusted GPT-2 L40S micro-batch probes | 3 | Interpret only as L40S capacity-boundary evidence; E203/E204/E206/E207 are confirmed OOM upper-bound probes and must not be pooled with exact E067/E068. |
 | `4b` | `E113`, `E114`, `E117`, `E118` communication | 3 | Interpret as two-GPU NCCL over installed PCIe topology; no NVLink claims. |
 | `5` | Supported PyTorch inference rows | 3 | PyTorch engine, request shape, concurrency, and precision verified; vLLM rows stay deferred. |
 | `optional` | `E016-E017`, `E044-E045` | 3 | Run only if memory and queue budget remain. |
@@ -118,7 +118,8 @@ E006, E007, all vLLM-serving rows, E032/E033/E067/E068 exact L40S rows, four-GPU
 listed as Deferred are not rendered by platform batch commands. E032 and E033 exhausted the exact GPT-2 strong-scaling
 shapes on the observed L40S capacity. E067 and E068 exhausted the exact GPT-2 micro-batch 32/64 shapes. Reduced-batch
 L40S studies are registered separately as capacity-adjusted conditions. E201/E202 succeeded at micro-batch 20/24,
-E203/E204 OOMed at 28/30, and E205-E207 narrow the remaining 25/26/27 boundary. The active L40S node exposes two GPUs,
+E205 succeeded at micro-batch 25, and E206/E207/E203/E204 OOMed at 26/27/28/30. The current L40S boundary is therefore
+micro-batch 25 as the largest passing integer probe. The active L40S node exposes two GPUs,
 so the matrix preserves only supported one- and two-GPU conditions in runnable waves.
 
 ## 4. Submit, Monitor, and Recover an Immutable Wave

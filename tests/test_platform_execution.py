@@ -263,7 +263,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     assert l40s_planned_source_count == 125
     assert (
         sum(condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in supplemental_ids)
-        == 5
+        == 3
     )
     assert sum(condition.status == "planned" for condition in h100_conditions) == 144
 
@@ -311,11 +311,11 @@ def test_l40s_capacity_adjusted_wave_materializes_boundary_probes(tmp_path: Path
 
     paths = materialize_platform_configs(profile, conditions, tmp_path)
 
-    assert [path.name for path in paths] == ["E201.json", "E202.json", "E205.json", "E206.json", "E207.json"]
+    assert [path.name for path in paths] == ["E201.json", "E202.json", "E205.json"]
     config = load_experiment_config(paths[-1])
-    assert config.experiment_id == "E207"
-    assert config.workload.parameters["micro_batch_size"] == 27
-    assert config.metadata["condition_id"] == "E207@l40s"
+    assert config.experiment_id == "E205"
+    assert config.workload.parameters["micro_batch_size"] == 25
+    assert config.metadata["condition_id"] == "E205@l40s"
     assert config.metadata["comparability"] == "capacity_adjusted"
     assert config.runtime.output_dir == "results/raw/l40s"
 
@@ -325,7 +325,7 @@ def test_retry_scope_includes_new_policy_conditions_missing_from_prior_attempt(m
 
     monkeypatch.setattr(
         "hpc_ai_perf.cli._planned_wave_experiment_ids",
-        lambda platform_id, wave: {"E201", "E202", "E205", "E206", "E207"},
+        lambda platform_id, wave: {"E201", "E202", "E205"},
     )
     monkeypatch.setattr(
         "hpc_ai_perf.cli.load_wave_state",
@@ -346,7 +346,7 @@ def test_retry_scope_includes_new_policy_conditions_missing_from_prior_attempt(m
 
     retry_ids = _incomplete_planned_wave_experiment_ids("l40s", "4c", state_path)
 
-    assert retry_ids == ["E205", "E206", "E207"]
+    assert retry_ids == ["E205"]
 
 
 def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -> None:
@@ -376,6 +376,8 @@ def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -
                     "E068",
                     "E203",
                     "E204",
+                    "E206",
+                    "E207",
                     "E048",
                     "E050",
                     "E056",
