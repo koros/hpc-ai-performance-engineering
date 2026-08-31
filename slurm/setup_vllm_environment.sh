@@ -15,6 +15,7 @@ VLLM_ENV="${HPC_AI_VLLM_ENV:-${VLLM_BASE}/vllm-${VLLM_VERSION}}"
 VLLM_SOURCE="${HPC_AI_VLLM_SOURCE:-${VLLM_BASE}/src/vllm-${VLLM_TAG}}"
 VLLM_MAX_JOBS="${HPC_AI_VLLM_MAX_JOBS:-${SLURM_CPUS_PER_TASK:-4}}"
 VLLM_CLANG_BRACKET_DEPTH="${HPC_AI_VLLM_CLANG_BRACKET_DEPTH:-1024}"
+VLLM_TEXT_ONLY="${HPC_AI_VLLM_TEXT_ONLY:-1}"
 
 usage() {
   cat <<'EOF'
@@ -34,6 +35,10 @@ HPC_AI_VLLM_ENV, HPC_AI_VLLM_SOURCE, HPC_AI_VLLM_MAX_JOBS, and
 HPC_AI_VLLM_TORCH_CUDA_ARCH_LIST. HPC_AI_VLLM_CLANG_BRACKET_DEPTH defaults
 to 1024 for vLLM's generated Marlin code. The default architecture list is
 8.9;9.0, so one isolated build can be used on the L40S and H100 nodes.
+HPC_AI_VLLM_TEXT_ONLY defaults to 1: it removes an incompatible PyPI
+TorchAudio wheel because the current experiment matrix contains text-only
+serving workloads. Set it to 0 only after providing TorchAudio built for the
+cluster's Torch/CUDA runtime.
 EOF
 }
 
@@ -77,6 +82,10 @@ if [[ ! "$VLLM_MAX_JOBS" =~ ^[1-9][0-9]*$ ]]; then
 fi
 if [[ ! "$VLLM_CLANG_BRACKET_DEPTH" =~ ^[1-9][0-9]*$ ]]; then
   echo "ERROR: HPC_AI_VLLM_CLANG_BRACKET_DEPTH must be a positive integer; got $VLLM_CLANG_BRACKET_DEPTH" >&2
+  exit 2
+fi
+if [[ "$VLLM_TEXT_ONLY" != "0" && "$VLLM_TEXT_ONLY" != "1" ]]; then
+  echo "ERROR: HPC_AI_VLLM_TEXT_ONLY must be 0 or 1; got $VLLM_TEXT_ONLY" >&2
   exit 2
 fi
 
@@ -206,10 +215,23 @@ PY
 # actionable without having to recover an ephemeral uv build directory.
 uv --verbose pip install --python "$VLLM_ENV/bin/python" --no-build-isolation -e .
 
+# PyPI's TorchAudio 2.8 wheel is built against CUDA 12.8, but the cluster
+# provides Torch 2.8 compiled for CUDA 12.4. Transformers imports TorchAudio
+# when it is present, even for a text LLM, which prevents vLLM's LLM entry
+# point from loading. The current matrix contains only text workloads, so
+# remove this optional incompatible wheel. A future audio workload must use a
+# TorchAudio build that matches the cluster runtime and set TEXT_ONLY=0.
+if [[ "$VLLM_TEXT_ONLY" == "1" ]]; then
+  echo "Removing incompatible optional TorchAudio wheel for the text-only vLLM profile"
+  "$VLLM_ENV/bin/python" -m pip uninstall -y torchaudio
+fi
+
 "$VLLM_ENV/bin/python" - <<PY
 from importlib.metadata import version
 from packaging.version import Version
 import torch
+from transformers import ProcessorMixin
+from vllm import LLM, SamplingParams
 
 installed_vllm_version = version("vllm")
 print("vllm", installed_vllm_version)
@@ -219,6 +241,8 @@ if Version(installed_vllm_version).base_version != "$VLLM_VERSION":
     raise SystemExit("vLLM base version does not match the pinned source tag")
 if not torch.__version__.startswith("2.8.") or torch.version.cuda != "12.4":
     raise SystemExit("isolated environment no longer resolves the verified Torch 2.8/CUDA 12.4 runtime")
+print("transformers ProcessorMixin import OK")
+print("vLLM LLM and SamplingParams imports OK")
 PY
 
 cat <<EOF

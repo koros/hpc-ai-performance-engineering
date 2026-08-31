@@ -59,6 +59,12 @@ The installed source build reports `vllm==0.10.2+cu124`: the `+cu124` suffix rec
 build gate verifies the pinned base version (`0.10.2`) and the module Torch/CUDA runtime, so this expected local version
 suffix is accepted.
 
+The current vLLM matrix consists only of text workloads (GPT-2, TinyLlama, and DistilBERT). The build therefore removes
+PyPI TorchAudio from the isolated environment by default: its available wheel is compiled for CUDA 12.8 and cannot load
+beside the cluster's CUDA 12.4 Torch. This permits Transformers and vLLM's text `LLM` entry point to import normally.
+Do not add audio or multimodal-audio workloads to this profile. First provide a TorchAudio build compiled for the same
+Torch/CUDA runtime, then set `HPC_AI_VLLM_TEXT_ONLY=0` when building.
+
 The Slurm log paths are printed by `sbatch` and are named `slurm/vllm-build-<job-id>.out` and `.err`. Verbose mode
 retains CMake/Ninja compiler diagnostics in the `.err` log if a native extension fails. Do not remove a
 failed external environment or source checkout automatically. Read the log first; the setup script refuses to overwrite
