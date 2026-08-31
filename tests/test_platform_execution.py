@@ -8,7 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from hpc_ai_perf.cli import _materialize_platform_batch, _render_platform_slurm, _venv_python_executable
+from hpc_ai_perf.cli import (
+    _materialize_platform_batch,
+    _planned_wave_experiment_ids,
+    _render_platform_slurm,
+    _venv_python_executable,
+)
 from hpc_ai_perf.config import (
     config_sha256,
     discover_experiment_configs,
@@ -256,6 +261,14 @@ def test_runnable_l40s_conditions_fit_the_verified_two_gpu_node() -> None:
     assert all(entries[condition.matrix_id].config.hardware.gpus <= profile.max_gpus for condition in planned)
     wave_two = [condition.matrix_id for condition in planned if condition.wave == "2"]
     assert wave_two == ["E123", "E124", "E127", "E128"]
+
+
+def test_l40s_wave_three_collection_scope_excludes_e032_after_oom_deferral() -> None:
+    wave_three = _planned_wave_experiment_ids("l40s", "3")
+
+    assert len(wave_three) == 19
+    assert "E032" not in wave_three
+    assert {"E033", "E049", "E062"} <= wave_three
 
 
 def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -> None:

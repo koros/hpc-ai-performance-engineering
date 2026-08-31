@@ -87,8 +87,10 @@ git commit -m "data: add completed L40S wave 0 trials"
 
 Collection preserves original JSON bytes, verifies the adjacent submission manifest, infers one unambiguous platform,
 rejects credential-like fields and invalid records, refreshes `results/raw/l40s/SHA256SUMS`, and updates the ignored
-tracker. It refuses an incomplete wave rather than asking the user to select result folders manually. An empty
-`results/raw/h100/` directory is harmless; it does not require an H100 checksum manifest until it contains evidence.
+tracker. It refuses an incomplete current-policy wave rather than asking the user to select result folders manually.
+If a failed row is subsequently deferred with a documented platform reason, collection combines the valid trials from
+earlier attempts and no longer requires that deferred row. An empty `results/raw/h100/` directory is harmless; it does
+not require an H100 checksum manifest until it contains evidence.
 
 Keep the HPC originals until the commits are pushed and independently backed up.
 

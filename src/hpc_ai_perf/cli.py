@@ -1179,10 +1179,13 @@ def _current_platform_wave_status(args: argparse.Namespace):
 
 
 def _collect_platform_wave(args: argparse.Namespace) -> list[str]:
-    """Import only complete experiments, combining older attempts with retries safely."""
+    """Import complete current-policy experiments, combining retries safely."""
     profile = load_platform_profile(args.platform_profile)
     state_path = _wave_state_path_for_args(args, profile.platform_id)
     state = load_wave_state(state_path)
+    expected_ids = _planned_wave_experiment_ids(profile.platform_id, str(args.wave))
+    if not expected_ids:
+        raise ValueError(f"No planned {profile.platform_id} conditions remain in wave {args.wave}")
     attempts = state["attempts"]
     summaries: list[tuple[dict[str, Any], Any]] = []
     for attempt in attempts:
@@ -1190,12 +1193,10 @@ def _collect_platform_wave(args: argparse.Namespace) -> list[str]:
             raise ValueError(f"Platform-wave state contains an invalid attempt: {state_path}")
         summaries.append((attempt, summarize_bundle_results(attempt["bundle_dir"])))
 
-    expected_ids: set[str] = set()
     selected: dict[str, tuple[dict[str, Any], Any]] = {}
     for attempt, status in summaries:
         for experiment in status.experiments:
-            expected_ids.add(experiment.experiment_id)
-            if experiment.complete:
+            if experiment.experiment_id in expected_ids and experiment.complete:
                 selected[experiment.experiment_id] = (attempt, experiment)
     missing = sorted(expected_ids - set(selected))
     if missing:
@@ -1222,6 +1223,24 @@ def _collect_platform_wave(args: argparse.Namespace) -> list[str]:
     track_platform_progress(args.platform_profile, result_dir=result_root)
     mark_wave_collected(state_path, imported_paths)
     return sorted(set(imported_paths))
+
+
+def _planned_wave_experiment_ids(platform_id: str, wave: str) -> set[str]:
+    """Return the present policy scope for collection, excluding newly deferred rows.
+
+    A failed attempt can cause a condition to be explicitly deferred after
+    evidence shows it is unsupported on a platform. Collection must not keep
+    requiring that historical condition once a newer matrix policy has removed
+    it from the runnable wave; completed trials from earlier compatible
+    attempts remain eligible.
+    """
+    conditions = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        platform_id,
+        wave=wave,
+        include_deferred=False,
+    )
+    return {condition.matrix_id for condition in conditions if condition.status == "planned"}
 
 
 def _stage_platform_wave(args: argparse.Namespace) -> list[str]:
