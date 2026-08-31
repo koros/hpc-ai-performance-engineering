@@ -22,8 +22,8 @@ deferred rather than allowed to fail in a batch.
 | `E008-E015`, `E018-E019` | GPT-2, DistilBERT, TinyLlama baseline trials | Dev proxy for `E008`, `E010`, `E012`, `E014`, `E018` | Resolved; wave 1, 3 trials | Resolved; wave 1, 3 trials | Mac validates adapters only. L40S/H100 establish separately tracked baseline evidence. |
 | `E016-E017` | TinyLlama training baseline/repeat | No; local tiny-random inference only | Resolved optional wave after memory pilot | Resolved optional wave after memory pilot | Full TinyLlama training is optional and memory/queue sensitive; do not substitute the tiny local model. |
 | `E020-E031` | Workload characterisation | Dev proxy only for DistilBERT shape checks | Resolved; wave 1 | Resolved; wave 1 | nvidia-smi, CUDA traces, memory, and data-loader timings need NVIDIA hardware. |
-| `E032` | GPT-2 Strong scaling, one GPU | No | Deferred | Resolved when H100 returns | The exact L40S shape OOMed after allocating 43.32 of the observed 44.52 GiB. A smaller L40S baseline must be a separate capacity-adjusted condition. |
-| `E033-E034`, `E038-E040`, `E044-E046` | Strong scaling | No | Run supported one-/two-GPU rows; defer four-GPU rows | Resolved when H100 returns | The active L40S node has two GPUs; E033 remains runnable as a two-GPU throughput condition but has no exact L40S E032 speedup baseline. |
+| `E032-E033` | GPT-2 Strong scaling exact shapes | No | Deferred | Resolved when H100 returns | The exact L40S shapes OOMed on the observed 44.52 GiB devices: E032 after allocating 43.32 GiB, and E033 before an additional 6.14 GiB allocation. Smaller L40S variants must be separate capacity-adjusted conditions. |
+| `E034`, `E038-E040`, `E044-E046` | Strong scaling | No | Run supported DistilBERT one-/two-GPU rows; defer four-GPU rows | Resolved when H100 returns | The active L40S node has two GPUs. Four-GPU rows wait for a matching allocation, and exact GPT-2 strong-scaling rows wait for H100 capacity. |
 | `E035-E037`, `E041-E043` | Weak scaling | No | Resolved; wave 3 | Resolved; wave 3 | Requires concurrent GPUs; keep work-per-GPU definitions unchanged. |
 | `E047-E062` | DDP, FSDP, and ZeRO strategy comparison | No | Resolved after the L40S NCCL/FSDP pilot | Resolved after the H100 pilot | Multi-process CUDA/NCCL/DeepSpeed execution is HPC-only. Interconnect differences are part of the result. |
 | `E063-E082` | Memory optimisation: checkpointing, micro-batch, accumulation | Dev proxy only for GPT-2 micro-batch | Resolved; wave 4 | Resolved; wave 4 | Mac cannot report target GPU memory. Any capacity adjustment must remain a separately labelled condition and cannot be pooled as exact. |
@@ -45,7 +45,7 @@ deferred rather than allowed to fail in a batch.
 | Platform | Current configs you can run without changing target hardware labels | Important condition |
 | --- | --- | --- |
 | Mac M1 | `configs/local/*.json` (4 smoke configs) and `configs/dev/*.json` (15 dev configs) | Workflow validation only. Keep results out of the `E001-E200` evidence set. |
-| L40/L40S | 128 planned `E###@l40s` conditions | Generated configs use `gpu_l40s`, 8 CPUs/GPU, PCIe, and accepted evidence root `results/raw/l40s`. Seventy-two rows are explicitly deferred, including the site-blocked vLLM/TensorRT-LLM scope, four-GPU rows, and the exact-shape E032 OOM. |
+| L40/L40S | 127 planned `E###@l40s` conditions | Generated configs use `gpu_l40s`, 8 CPUs/GPU, PCIe, and accepted evidence root `results/raw/l40s`. Seventy-three rows are explicitly deferred, including the site-blocked vLLM/TensorRT-LLM scope, four-GPU rows, and the exact-shape E032/E033 OOMs. |
 | H100 | 144 planned `E###@h100` conditions | Generated configs use `gpu_h100`, 16 CPUs/GPU, NVLink, and accepted evidence root `results/raw/h100`. Fifty-six rows are explicitly deferred, including the site-blocked vLLM/TensorRT-LLM scope. |
 
 ## Generated Companion-Config Contract

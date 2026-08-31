@@ -14,7 +14,7 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | Distributed execution | One-process-per-GPU `python -m torch.distributed.run`, DDP, FSDP, DeepSpeed ZeRO, rank binding, global work accounting, and rank-safe result writing are implemented. |
 | Profiling | nvidia-smi power/utilisation/memory/clock/temperature sampling, PyTorch traces, workload timing, and NCCL microbenchmark metrics are implemented. |
 | Slurm support | Semantic-gated single/bulk rendering, H100/L40S profile matching, CPU allocation checks, and three transformer smoke presets are available. |
-| Platform execution | All 200 logical rows route exactly once per platform. There are 128 planned L40S conditions and 144 planned H100 conditions; L40S E006 and the remaining vLLM rows are deferred pending a Gloo-enabled Torch module, E032 is deferred after an exact-shape L40S OOM, and TensorRT-LLM remains deferred. |
+| Platform execution | All 200 logical rows route exactly once per platform. There are 127 planned L40S conditions and 144 planned H100 conditions; L40S E006 and the remaining vLLM rows are deferred pending a Gloo-enabled Torch module, E032/E033 are deferred after exact-shape L40S OOMs, and TensorRT-LLM remains deferred. |
 | Evidence retention | L40S/H100 JSON is imported non-destructively into separate roots, scanned for sensitive keys, validated, and covered by tracked SHA-256 manifests. |
 | Dashboard | Static dashboard reads processed results, analysis summaries, and readiness report output. |
 | Quality gates | `pytest`, `ruff`, and `pre-commit` are configured and passing. |

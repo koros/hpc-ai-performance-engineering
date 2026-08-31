@@ -242,7 +242,7 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     expected_ids = {f"E{index:03d}" for index in range(1, 201)}
 
-    for platform_id, planned_count in [("l40s", 128), ("h100", 144)]:
+    for platform_id, planned_count in [("l40s", 127), ("h100", 144)]:
         conditions = load_platform_conditions("platforms/execution_matrix.json", platform_id)
 
         assert len(conditions) == 200
@@ -263,12 +263,13 @@ def test_runnable_l40s_conditions_fit_the_verified_two_gpu_node() -> None:
     assert wave_two == ["E123", "E124", "E127", "E128"]
 
 
-def test_l40s_wave_three_collection_scope_excludes_e032_after_oom_deferral() -> None:
+def test_l40s_wave_three_collection_scope_excludes_gpt2_strong_scaling_oom_deferrals() -> None:
     wave_three = _planned_wave_experiment_ids("l40s", "3")
 
-    assert len(wave_three) == 19
+    assert len(wave_three) == 18
     assert "E032" not in wave_three
-    assert {"E033", "E049", "E062"} <= wave_three
+    assert "E033" not in wave_three
+    assert {"E036", "E049", "E062"} <= wave_three
 
 
 def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -> None:
@@ -288,6 +289,7 @@ def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -
                     "E003",
                     "E006",
                     "E032",
+                    "E033",
                     "E034",
                     "E037",
                     "E040",

@@ -101,7 +101,7 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `0` | `E001`, `E002`, `E004`, `E005` core environment validation | 1 | All four Complete; observed L40S/CUDA/distributed/DeepSpeed checks agree. |
 | `1` | `E008-E015`, `E018-E031` baselines and characterisation | 3 | Core rows Complete; variance and provenance reviewed. |
 | `2` | `E123`, `E124`, `E127`, `E128` direct L40S comparison anchors | 3 | All matched L40S anchors Complete. |
-| `3` | L40S 1/2-GPU scaling and strategy conditions, excluding E032 | 3 | 1-GPU reference valid; 2-GPU pilot stable. E032 is deferred after an exact-shape L40S OOM; four-GPU conditions are also deferred. |
+| `3` | L40S 1/2-GPU scaling and strategy conditions, excluding E032/E033 | 3 | Supported 1/2-GPU rows are valid. E032 and E033 are deferred after exact-shape L40S OOMs; four-GPU conditions are also deferred. |
 | `4` | Supported memory, precision, and data movement rows | 3 | No silent OOM-driven shape changes; precision backend observed. |
 | `4b` | `E113`, `E114`, `E117`, `E118` communication | 3 | Interpret as two-GPU NCCL over installed PCIe topology; no NVLink claims. |
 | `5` | Supported PyTorch inference rows | 3 | PyTorch engine, request shape, concurrency, and precision verified; vLLM rows stay deferred. |
@@ -113,10 +113,10 @@ remain active. Set `HPC_AI_ENABLE_DEEPSPEED_NVTX=1` only after verifying a compa
 Nsight study. The DeepSpeed `bf16`/`fp16` configuration is the sole mixed-precision controller for ZeRO rows; the
 runner does not nest PyTorch native AMP around the DeepSpeed engine.
 
-E006, E007, all vLLM-serving rows, E032, four-GPU L40S rows, and backend/adapter rows listed as Deferred are not
-rendered by platform batch commands. E032 exhausted the exact one-GPU GPT-2 shape on the observed L40S capacity; a
-future reduced-batch study must be registered as a distinct capacity-adjusted condition. The active L40S node exposes
-two GPUs, so the matrix preserves only supported one- and two-GPU conditions in runnable waves.
+E006, E007, all vLLM-serving rows, E032/E033, four-GPU L40S rows, and backend/adapter rows listed as Deferred are not
+rendered by platform batch commands. E032 and E033 exhausted the exact GPT-2 strong-scaling shapes on the observed
+L40S capacity; future reduced-batch studies must be registered as distinct capacity-adjusted conditions. The active
+L40S node exposes two GPUs, so the matrix preserves only supported one- and two-GPU conditions in runnable waves.
 
 ## 4. Submit, Monitor, and Recover an Immutable Wave
 
