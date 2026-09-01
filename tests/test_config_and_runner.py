@@ -1300,8 +1300,26 @@ def test_gpt2_inference_dispatches_to_causal_lm_helper(monkeypatch) -> None:
     assert output.metrics["throughput_tokens_sec"] == 1.0
 
 
-def test_vllm_inference_uses_eager_execution_for_the_certified_runtime(monkeypatch) -> None:
-    config = load_experiment_config(Path("configs/inference/E130_gpt2_small_framework_vllm.json"))
+@pytest.mark.parametrize(
+    ("config_path", "expected_tensor_parallel_size", "expected_compilation_config", "expected_execution_mode"),
+    [
+        ("configs/inference/E130_gpt2_small_framework_vllm.json", 1, None, "eager"),
+        (
+            "configs/inference/E147_gpt2_small_multi_gpu_2gpu.json",
+            2,
+            {"level": 0, "use_inductor": False},
+            "eager_no_inductor",
+        ),
+    ],
+)
+def test_vllm_inference_uses_certified_eager_execution(
+    monkeypatch,
+    config_path: str,
+    expected_tensor_parallel_size: int,
+    expected_compilation_config: dict[str, object] | None,
+    expected_execution_mode: str,
+) -> None:
+    config = load_experiment_config(Path(config_path))
     config = replace(config, runtime=replace(config.runtime, max_steps=1))
     llm_kwargs: dict[str, object] = {}
 
@@ -1363,8 +1381,11 @@ def test_vllm_inference_uses_eager_execution_for_the_certified_runtime(monkeypat
 
     output = transformer_module._run_vllm_inference(config)
 
+    assert llm_kwargs["tensor_parallel_size"] == expected_tensor_parallel_size
     assert llm_kwargs["enforce_eager"] is True
-    assert output.metrics["vllm_execution_mode"] == "eager"
+    assert llm_kwargs.get("compilation_config") == expected_compilation_config
+    assert output.metrics["vllm_execution_mode"] == expected_execution_mode
+    assert output.metrics["vllm_inductor_disabled"] == (expected_compilation_config is not None)
 
 
 def test_tinyllama_training_dispatches_to_causal_training(monkeypatch) -> None:

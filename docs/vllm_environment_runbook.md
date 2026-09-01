@@ -25,9 +25,12 @@ they intentionally consume the cluster's site packages.
 
 The certified L40S vLLM runner uses `enforce_eager=True`. This is intentional: the private Torch 2.8.0/vLLM 0.10.2
 environment passes CUDA, NCCL, Gloo, engine-start, and request-serving gates, but its optional `torch.compile` path
-expects a Triton `triton_key` API that is not present in the compatible vLLM build. Eager mode avoids only that
-optional compilation path and is recorded in each result as `vllm_execution_mode=eager`. Do not compare these values
-with a compiled-vLLM run without explicitly separating the execution modes.
+expects a Triton `triton_key` API that is not present in the compatible vLLM build. For one-GPU workloads, eager mode
+is recorded as `vllm_execution_mode=eager`. vLLM 0.10.2 leaves its `use_inductor` setting enabled at compilation level
+zero, and the tensor-parallel embedding path can still invoke TorchInductor. Therefore every tensor-parallel workload
+also passes `compilation_config={"level": 0, "use_inductor": false}` and records
+`vllm_execution_mode=eager_no_inductor` plus `vllm_inductor_disabled=true`. Do not compare either execution mode with
+a compiled-vLLM run without explicitly separating the modes.
 
 ## One-Time Preparation
 
