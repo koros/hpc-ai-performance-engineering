@@ -608,6 +608,10 @@ def test_private_gloo_torch_and_vllm_builds_preserve_the_shared_venv() -> None:
     assert "--require-vllm" in acceptance
     assert "E006_vllm_1gpu.json" in acceptance
     assert "build/vllm_acceptance" in acceptance
+    assert 'os.environ["SLURM_JOB_ID"]' in acceptance
+    assert 'for key in ("vllm_import", "engine_start", "request_served")' in acceptance
+    assert "metrics.get(key) is not True" in acceptance
+    assert "E006 acceptance failed" in acceptance
     assert "setup-pytorch-gloo-environment:" in makefile
     assert "submit-pytorch-gloo-build:" in makefile
     assert "submit-vllm-build:" in makefile

@@ -46,7 +46,49 @@ python -m hpc_ai_perf.cli check-runtime \
   --expected-gpus 1 \
   --require-vllm
 
+ACCEPTANCE_OUTPUT_DIR="build/vllm_acceptance/$(tr '[:upper:]' '[:lower:]' <<<"$EXPECTED_GPU_MODEL")"
+export HPC_AI_VLLM_ACCEPTANCE_RESULT_DIR="$ACCEPTANCE_OUTPUT_DIR/E006"
+
 python -m hpc_ai_perf.cli run \
   --config configs/environment_validation/E006_vllm_1gpu.json \
-  --output-dir build/vllm_acceptance/"$(tr '[:upper:]' '[:lower:]' <<<"$EXPECTED_GPU_MODEL")" \
+  --output-dir "$ACCEPTANCE_OUTPUT_DIR" \
   --repetition 1
+
+# The benchmark runner preserves failed attempts as JSON evidence and therefore
+# does not make the CLI process fail. Convert the current job's E006 result into
+# a strict Slurm gate so sacct cannot report COMPLETED for a failed acceptance.
+python - <<'PY'
+import json
+import os
+from pathlib import Path
+
+result_dir = Path(os.environ["HPC_AI_VLLM_ACCEPTANCE_RESULT_DIR"])
+job_id = os.environ["SLURM_JOB_ID"]
+matches = []
+for path in result_dir.glob("*.json"):
+    record = json.loads(path.read_text(encoding="utf-8"))
+    if str(record.get("environment", {}).get("slurm_job_id")) == job_id:
+        matches.append((path, record))
+
+if len(matches) != 1:
+    raise SystemExit(f"Expected one E006 result for Slurm job {job_id}; found {len(matches)}")
+
+path, record = matches[0]
+metrics = record.get("metrics", {})
+issues = []
+if record.get("status") != "completed":
+    issues.append(f"status is {record.get('status')!r}")
+if record.get("error") is not None:
+    issues.append(f"error is {record.get('error')}")
+for key in ("vllm_import", "engine_start", "request_served"):
+    if metrics.get(key) is not True:
+        issues.append(f"{key} is not true")
+if int(metrics.get("generated_tokens") or 0) < 1:
+    issues.append("generated_tokens is not positive")
+if float(metrics.get("throughput_tokens_sec") or 0.0) <= 0:
+    issues.append("throughput_tokens_sec is not positive")
+
+if issues:
+    raise SystemExit(f"E006 acceptance failed for {path}: {'; '.join(issues)}")
+print(f"E006 acceptance passed: {path}")
+PY

@@ -1019,8 +1019,9 @@ def test_vllm_environment_validation_serves_a_real_request(monkeypatch) -> None:
             assert kwargs["model"] == "gpt2"
             assert kwargs["revision"] == config.workload.parameters["hf_model_revision"]
 
-        def generate(self, **kwargs):
-            assert kwargs["prompt_token_ids"] == [[15496]]
+        def generate(self, prompts, **kwargs):
+            assert prompts == [{"prompt_token_ids": [15496]}]
+            assert "prompt_token_ids" not in kwargs
             return [FakeOutput()]
 
     fake_vllm = types.ModuleType("vllm")

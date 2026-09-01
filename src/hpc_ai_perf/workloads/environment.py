@@ -219,11 +219,11 @@ class EnvironmentValidationWorkload(Workload):
             enforce_eager=True,
         )
         sampling = SamplingParams(temperature=0.0, max_tokens=max_new_tokens)
-        prompt_token_ids = [[prompt_token_id]]
-        engine.generate(prompt_token_ids=prompt_token_ids, sampling_params=sampling, use_tqdm=False)
+        prompts = [{"prompt_token_ids": [prompt_token_id]}]
+        engine.generate(prompts, sampling_params=sampling, use_tqdm=False)
         torch.cuda.synchronize()
         started = time.perf_counter()
-        outputs = engine.generate(prompt_token_ids=prompt_token_ids, sampling_params=sampling, use_tqdm=False)
+        outputs = engine.generate(prompts, sampling_params=sampling, use_tqdm=False)
         torch.cuda.synchronize()
         elapsed = max(time.perf_counter() - started, 1e-12)
         generated_tokens = sum(len(candidate.token_ids) for output in outputs for candidate in output.outputs)

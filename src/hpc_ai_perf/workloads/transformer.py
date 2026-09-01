@@ -723,10 +723,11 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         (requests_per_round, prompt_length),
         generator=generator,
     ).tolist()
+    prompts = [{"prompt_token_ids": token_ids} for token_ids in prompt_token_ids]
     measured_rounds = int(config.runtime.max_steps or 10)
     warmup_rounds = _warmup_steps(parameters, measured_rounds)
     for _ in range(warmup_rounds):
-        llm.generate(prompt_token_ids=prompt_token_ids, sampling_params=sampling, use_tqdm=False)
+        llm.generate(prompts, sampling_params=sampling, use_tqdm=False)
 
     latencies: list[float] = []
     ttft_samples: list[float] = []
@@ -736,7 +737,7 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     start_all = time.perf_counter()
     for _ in range(measured_rounds):
         start = time.perf_counter()
-        outputs = llm.generate(prompt_token_ids=prompt_token_ids, sampling_params=sampling, use_tqdm=False)
+        outputs = llm.generate(prompts, sampling_params=sampling, use_tqdm=False)
         elapsed = time.perf_counter() - start
         for output in outputs:
             generated_tokens += sum(len(candidate.token_ids) for candidate in output.outputs)

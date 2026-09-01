@@ -155,6 +155,11 @@ verifies that `torch.__file__` is inside the private environment and requires CU
 site PyTorch module from silently re-entering the environment through `PYTHONPATH`; it also repeats the one-rank NCCL
 and Gloo all-reduce smoke before starting vLLM.
 
+The adapters pass pre-tokenized requests through vLLM 0.10.2's positional `prompts` argument using the `TokensPrompt`
+schema (`{"prompt_token_ids": [...]}`). The older `LLM.generate(prompt_token_ids=...)` keyword form is not accepted by
+the pinned API. After writing the result, the acceptance job validates the current Slurm job's JSON and exits non-zero
+unless E006 completed with a served request and positive generated-token throughput.
+
 Its result is retained under `build/vllm_acceptance/l40s/`; review the JSON and job log. Success requires:
 
 - `status: completed`;
