@@ -915,6 +915,9 @@ def test_deepspeed_environment_validation_uses_explicit_cuda_device(monkeypatch)
         def __float__(self) -> float:
             return 0.5
 
+    class FakeParameter:
+        dtype = "bfloat16"
+
     class FakeModel:
         def __init__(self) -> None:
             self.device = None
@@ -931,6 +934,10 @@ def test_deepspeed_environment_validation_uses_explicit_cuda_device(monkeypatch)
             return FakeTensor()
 
     class FakeEngine:
+        @staticmethod
+        def parameters():
+            return iter([FakeParameter()])
+
         def __call__(self, inputs):
             return FakeTensor()
 
@@ -961,8 +968,9 @@ def test_deepspeed_environment_validation_uses_explicit_cuda_device(monkeypatch)
             return FakeDevice(kind, index)
 
         @staticmethod
-        def randn(*shape, device):
+        def randn(*shape, device, dtype):
             assert device == expected_device
+            assert dtype == "bfloat16"
             devices_seen.append(device)
             return FakeTensor()
 

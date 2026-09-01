@@ -167,7 +167,12 @@ class EnvironmentValidationWorkload(Workload):
             optimizer=optimizer,
             config=ds_config,
         )
-        inputs = torch.randn(8, 128, device=device)
+        # DeepSpeed BF16 converts the engine parameters during initialization.
+        # Keep the smoke input in the same dtype so the first linear layer can
+        # run and the gate verifies ZeRO rather than failing on a trivial dtype
+        # mismatch.
+        parameter_dtype = next(engine.parameters()).dtype
+        inputs = torch.randn(8, 128, device=device, dtype=parameter_dtype)
         labels = torch.randint(0, 2, (8,), device=device)
         loss = torch.nn.functional.cross_entropy(engine(inputs), labels)
         engine.backward(loss)
