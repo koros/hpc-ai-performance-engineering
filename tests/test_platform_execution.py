@@ -10,6 +10,7 @@ import pytest
 from scripts.check_private_torch import is_import_below_environment
 
 from hpc_ai_perf.cli import (
+    _bundle_setup_commands,
     _incomplete_planned_wave_experiment_ids,
     _materialize_platform_batch,
     _planned_wave_experiment_ids,
@@ -136,6 +137,71 @@ def test_capture_environment_contract_uses_virtualenv_launcher(tmp_path: Path) -
 
     assert selected_executable == executable
     assert contract["python_executable"] == str(executable)
+
+
+def test_bundle_setup_isolates_external_virtualenv_from_module_pythonpath(tmp_path: Path) -> None:
+    repository = tmp_path / "project"
+    bundle_root = tmp_path / "bundle"
+    bundle = SubmissionBundle(
+        bundle_id="l40s-wave-vllm-pilot-test",
+        root=bundle_root,
+        source_repository=repository,
+        repo_dir=bundle_root / "repo",
+        config_dir=bundle_root / "configs",
+        script_dir=bundle_root / "scripts",
+        result_dir=bundle_root / "results",
+        log_dir=bundle_root / "logs",
+        cache_dir=bundle_root / "cache",
+        manifest_path=bundle_root / "SUBMISSION_MANIFEST.json",
+        result_manifest_path=bundle_root / "results" / "SUBMISSION_MANIFEST.json",
+        script_checksums_path=bundle_root / "SCRIPT_SHA256SUMS",
+        git_commit="a" * 40,
+        created_at="2026-09-01T20:00:00+00:00",
+    )
+    private_activate = tmp_path / "private-vllm" / "bin" / "activate"
+
+    commands = _bundle_setup_commands(
+        ["source slurm/modules_for_hpc_ai", "source .venv/bin/activate"],
+        bundle=bundle,
+        venv_activate=private_activate,
+    )
+
+    module_index = commands.index("source slurm/modules_for_hpc_ai")
+    unset_index = commands.index("unset PYTHONPATH PYTHONHOME")
+    activate_index = commands.index(f"source {private_activate}")
+    assert module_index < unset_index < activate_index
+    assert commands[-1] == f"export PYTHONPATH={bundle.repo_dir / 'src'}"
+
+
+def test_bundle_setup_preserves_module_pythonpath_for_project_virtualenv(tmp_path: Path) -> None:
+    repository = tmp_path / "project"
+    bundle_root = tmp_path / "bundle"
+    bundle = SubmissionBundle(
+        bundle_id="l40s-wave-1-test",
+        root=bundle_root,
+        source_repository=repository,
+        repo_dir=bundle_root / "repo",
+        config_dir=bundle_root / "configs",
+        script_dir=bundle_root / "scripts",
+        result_dir=bundle_root / "results",
+        log_dir=bundle_root / "logs",
+        cache_dir=bundle_root / "cache",
+        manifest_path=bundle_root / "SUBMISSION_MANIFEST.json",
+        result_manifest_path=bundle_root / "results" / "SUBMISSION_MANIFEST.json",
+        script_checksums_path=bundle_root / "SCRIPT_SHA256SUMS",
+        git_commit="a" * 40,
+        created_at="2026-09-01T20:00:00+00:00",
+    )
+    project_activate = repository / ".venv" / "bin" / "activate"
+
+    commands = _bundle_setup_commands(
+        ["source slurm/modules_for_hpc_ai", "source .venv/bin/activate"],
+        bundle=bundle,
+        venv_activate=project_activate,
+    )
+
+    assert "unset PYTHONPATH PYTHONHOME" not in commands
+    assert commands[-1] == f"export PYTHONPATH={bundle.repo_dir / 'src'}${{PYTHONPATH:+:$PYTHONPATH}}"
 
 
 def test_environment_contract_ignores_inherited_module_state() -> None:

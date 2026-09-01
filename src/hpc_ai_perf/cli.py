@@ -1325,6 +1325,8 @@ def _bundle_setup_commands(
     venv_activate: Path,
 ) -> list[str]:
     """Run cluster setup in the snapshot while activating the explicitly shared virtualenv."""
+    project_venv_activate = (bundle.source_repository / ".venv" / "bin" / "activate").resolve()
+    isolate_python_environment = venv_activate.resolve() != project_venv_activate
     commands = [
         f"cd {quote(str(bundle.repo_dir))}",
         f"export TORCH_EXTENSIONS_DIR={quote(str(bundle.cache_dir / 'torch_extensions'))}",
@@ -1332,13 +1334,26 @@ def _bundle_setup_commands(
     activated = False
     for command in base_commands:
         if command.strip() == "source .venv/bin/activate":
+            if isolate_python_environment:
+                # Module stacks commonly inject their Python packages through
+                # PYTHONPATH. Preserve that behaviour for the project .venv,
+                # which intentionally consumes site packages, but clear it
+                # before an isolated serving environment so module Torch cannot
+                # shadow its private Gloo/NCCL-enabled build.
+                commands.append("unset PYTHONPATH PYTHONHOME")
             commands.append(f"source {quote(str(venv_activate))}")
             activated = True
         else:
             commands.append(command)
     if not activated:
+        if isolate_python_environment:
+            commands.append("unset PYTHONPATH PYTHONHOME")
         commands.append(f"source {quote(str(venv_activate))}")
-    commands.append(f"export PYTHONPATH={quote(str(bundle.repo_dir / 'src'))}${{PYTHONPATH:+:$PYTHONPATH}}")
+    source_path = quote(str(bundle.repo_dir / "src"))
+    if isolate_python_environment:
+        commands.append(f"export PYTHONPATH={source_path}")
+    else:
+        commands.append(f"export PYTHONPATH={source_path}${{PYTHONPATH:+:$PYTHONPATH}}")
     return commands
 
 

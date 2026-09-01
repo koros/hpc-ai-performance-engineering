@@ -17,6 +17,12 @@ All three gates have passed on L40S. The acceptance JSON is diagnostic only and 
 E006 must still run once through the immutable `vllm-pilot` wave before the performance waves are treated as released.
 H100 vLLM conditions remain deferred until this same acceptance gate passes on H100.
 
+Canonical `vllm-*` submission bundles treat this private environment as isolated: after loading the cluster modules,
+the generated Slurm script clears inherited `PYTHONPATH`/`PYTHONHOME`, activates the private environment, and then
+sets `PYTHONPATH` only to the immutable bundle snapshot. This prevents the module-provided Torch build from shadowing
+the accepted private Gloo/NCCL-enabled build. Ordinary project `.venv` waves retain the module Python path because
+they intentionally consume the cluster's site packages.
+
 ## One-Time Preparation
 
 Install `uv` in your user account if the command is unavailable:
