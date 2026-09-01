@@ -10,9 +10,9 @@ This report maps the current `E001-E200` experiment matrix to three execution ta
 
 It is a scheduling and evidence-quality guide. It does not change the authoritative matrix or permit results from one platform to be labelled as another.
 
-Operationally, the H100 node is currently unavailable. The active collection path is therefore L40S-first. The
-same logical matrix and measurement protocol are retained so H100 conditions can be generated later without
-rewriting source configs or mixing evidence.
+Operationally, both GPU targets are materializable and remain separate evidence streams. L40S collection is further
+advanced and now includes an accepted private vLLM environment. H100 collection can proceed independently, but its
+vLLM conditions remain deferred until the same E006 acceptance gate passes on H100.
 
 The companion [platform experiment matrix](platform_experiment_matrix.md) gives the phase-by-phase routing decision for every matrix ID.
 
@@ -31,12 +31,12 @@ The companion [platform experiment matrix](platform_experiment_matrix.md) gives 
 | --- | ---: | --- |
 | Source matrix configs | 200 | `E001-E200` |
 | Supplemental L40S capacity probes | 7 | `E201-E207`; capacity-adjusted GPT-2 micro-batch rows derived from the E067/E068 L40S OOM boundary. |
-| Planned L40S source conditions | 125 | Generated as exact `E###@l40s`; run in gated waves on the validated PyTorch CUDA stack. |
+| Planned L40S source conditions | 160 | Generated as `E###@l40s`; includes 35 platform-specific/exact vLLM conditions in dedicated waves. |
 | Planned L40S supplemental conditions | 3 | Generated as capacity-adjusted `E201-E202@l40s` and `E205@l40s`; do not pool with exact H100 evidence. |
 | Deferred L40S supplemental conditions | 4 | `E203-E204` and `E206-E207`; confirmed upper-bound OOM probes at micro-batch 26/27/28/30. |
-| Deferred L40S source conditions | 75 | Backend/adapter rows, site-blocked vLLM/TensorRT-LLM work, H100-specific hardware rows, four-GPU rows, and the exact-shape E032/E033/E067/E068 L40S OOMs. |
+| Deferred L40S source conditions | 40 | TensorRT-LLM/backend/adapter gaps, H100-specific hardware rows, four-GPU rows including E148/E196, and exact-shape E032/E033/E067/E068 L40S OOMs. |
 | Planned H100 conditions | 144 | Generated as `E###@h100`; run the same supported scope when allocation is available. |
-| Deferred H100 conditions | 56 | Existing backend/adapter rows, 37 site-blocked vLLM rows, TensorRT-LLM `E007`, and four L40S-specific hardware rows. |
+| Deferred H100 conditions | 56 | Backend/adapter rows, 37 vLLM rows pending H100 E006, TensorRT-LLM `E007`, and four L40S-specific hardware rows. |
 | Mac M1 smoke configs | 4 | `configs/local/*`; minimal workflow checks. |
 | Mac M1 dev configs | 15 | `configs/dev/*`; lightweight MPS/CPU development checks. |
 
@@ -81,7 +81,7 @@ companion:
 - use the `gpu_l40s` queue/profile and repeat the L40S environment-validation sequence before matrix collection; and
 - report communication as NCCL/PCIe behaviour, not NVLink behaviour.
 
-L40S is suitable for supported single- and two-GPU baselines, DistilBERT scaling, DDP/FSDP/ZeRO comparisons, memory optimisation, data-movement studies, power/energy analysis, and PyTorch inference. The active node does not support its four-GPU rows. The exact E032/E033 GPT-2 strong-scaling shapes and E067/E068 GPT-2 micro-batch 32/64 shapes are deferred after observed OOMs; E201/E202/E205 provide separately labelled L40S capacity-adjusted probes, while E203/E204/E206/E207 record the upper-bound OOMs at micro-batch 26/27/28/30. E205 establishes micro-batch 25 as the largest passing integer boundary observed so far. Its results answer L40S-specific questions and do not replace H100 evidence for H100-specific research questions.
+L40S is suitable for supported single- and two-GPU baselines, DistilBERT scaling, DDP/FSDP/ZeRO comparisons, memory optimisation, data-movement studies, power/energy analysis, PyTorch inference, and the accepted one-/two-GPU vLLM scope. The active node does not support its four-GPU rows, including vLLM E148/E196. The exact E032/E033 GPT-2 strong-scaling shapes and E067/E068 GPT-2 micro-batch 32/64 shapes are deferred after observed OOMs; E201/E202/E205 provide separately labelled L40S capacity-adjusted probes, while E203/E204/E206/E207 record the upper-bound OOMs at micro-batch 26/27/28/30. E205 establishes micro-batch 25 as the largest passing integer boundary observed so far. Its results answer L40S-specific questions and do not replace H100 evidence for H100-specific research questions.
 
 ### H100: deferred collection path, already materializable
 
@@ -91,12 +91,13 @@ behaviour. No L40S result is promoted or relabelled; matched conditions are comp
 
 Use the H100 node for the core baseline trials, 1/2/4-GPU scaling, distributed-strategy comparison, communication analysis, and H100 half of the hardware comparison. Preserve the three independent trials required for core comparisons; a successful one-off run is an environment check, not final performance evidence.
 
-## Deferred Rows: Do Not Schedule on Any Platform Yet
+## Remaining Deferred Rows
 
 | IDs | Reason | Required before release |
 | --- | --- | --- |
-| `E006`, `E130`, `E132-E148`, `E178`, `E180-E196` | The isolated vLLM build imports, but the active Torch module lacks the Gloo backend required for vLLM engine startup. | A Gloo-enabled Torch build compatible with CUDA 12.4, followed by a successful E006 serving gate. |
-| `E007` | TensorRT-LLM requires a compatible environment, usable CUDA build toolchain, pinned model, and saved-engine contract. | A compatible pinned environment, local TinyLlama checkpoint, and successful build/load/request result on each target platform. |
+| H100 `E006`, `E130`, `E132-E148`, `E178`, `E180-E196` | The private stack has passed on L40S, not H100. | Run E006 with the private stack on H100 and require import, engine-start, and served-request success before releasing H100 performance rows. |
+| L40S `E148`, `E196` | These tensor-parallel conditions request four GPUs while the active L40S node exposes two. | A verified four-GPU L40S allocation; do not substitute two-GPU results. |
+| `E007` | CUDA 12.4.1 is available, but TensorRT-LLM still lacks a compatible package, built engine, pinned model, and saved-engine contract. | A compatible pinned environment, immutable engine artefact, and successful build/load/request result on each target platform. |
 | `E131`, `E155`, `E179` | TensorRT-LLM performance integration is absent; `E155` is also not a valid generic DistilBERT classification adapter. | Reuse the validated E007 engine contract in causal-LM benchmarks; design a separate classification contract for E155. |
 | `E086`, `E089`, `E093`, `E096`, `E151`, `E175`, `E199` | FP8 backend/model implementation is not selected or validated. | A documented, tested backend and model path on the target GPU. |
 | `E152`, `E176`, `E200` | Quantization method, calibration, and immutable quantized artefact are absent. | Named method, calibration protocol, artefact hash, and matching serving runtime. |
@@ -110,7 +111,8 @@ Use the H100 node for the core baseline trials, 1/2/4-GPU scaling, distributed-s
 | 1 | Baseline-shaped dev checks | Wave 0: `E001`, `E002`, `E004-E005` | Wave 0: `E001-E005` | The active L40S node has two GPUs, so its four-GPU E003 condition remains deferred. |
 | 2 | GPT-2/DistilBERT adapter checks | Wave 1, then wave 2 direct hardware pairs | H100 wave 1, then wave 2 when available | Build repeatable reference measurements and matched platform anchors. |
 | 3 | No further publishable work | Supported one-/two-GPU wave 3 scaling and strategy pilots | H100 wave 3 later | The L40S four-GPU rows and exact E032/E033 OOM conditions remain deferred. |
-| 4 | Optional local shape checks | Waves 4, 4c, 4b, and 5 | Matching H100 waves later | Collect exact depth first, then labelled L40S capacity probes, then communication and inference. |
+| 4 | Optional local shape checks | Waves 4, 4c, 4b, and 5 | Matching H100 waves | Collect exact depth first, then labelled L40S capacity probes, communication, and PyTorch inference. |
+| 5 | No publishable vLLM evidence | `vllm-pilot`, then framework, batching, concurrency, prompt, and TP2 waves | Run H100 E006 first; release H100 vLLM waves only after it passes | Keep private-runtime evidence platform-specific and preserve the accepted environment contract in each immutable bundle. |
 
 ## Interpretation Rules
 

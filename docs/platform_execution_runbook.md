@@ -36,11 +36,10 @@ sinfo -p gpu_l40s,gpu_h100
 Do not use `--upgrade-strategy eager` on Lovelace; it can mix PyPI Torch/Numpy wheels with the Spack CUDA/PyTorch
 runtime and invalidate both DeepSpeed and vLLM checks.
 
-The current execution matrix deliberately defers E006 and all other vLLM-serving rows until their isolated environment
-is built. The verified Lovelace helper provides the CUDA 12.4.1 compiler, but its PyTorch module omits the Gloo backend
-required by vLLM's CPU coordination group. Do not install a generic PyPI vLLM wheel into the shared environment. Follow
-the [vLLM environment runbook](vllm_environment_runbook.md) to build private Gloo-enabled PyTorch, build vLLM against
-that wheel, and run the E006 serving acceptance gate. Re-enable these rows only after all gates pass.
+The L40S vLLM acceptance gate has passed using private PyTorch 2.8.0/CUDA 12.4 with Gloo/NCCL and vLLM 0.10.2. Do not
+install that stack into the shared `.venv`. Use `make submit-vllm-pilot` for E006 and `make submit-vllm-wave` for the
+dedicated performance waves; those targets bind the immutable bundle to the private environment. H100 vLLM rows remain
+deferred until the target-platform acceptance gate passes there.
 
 On an L40S allocation, capture the actual device and topology before accepting results:
 
@@ -67,7 +66,7 @@ python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-to
 The helper must expose `nvcc` and set `CUDA_HOME` to the matching compiler root before running E005. Run
 `make check-cuda-toolchain PLATFORM=l40s EXPECTED_GPUS=2` in this allocation to verify the complete toolchain. The
 current wave 0 scope is E001, E002, E004, and E005; E003 requires four GPUs and is deferred on the active L40S node.
-Do not run a vLLM check or E006 until the separate serving environment passes its dedicated preflight.
+Run E006 only through `make submit-vllm-pilot`; its separate serving environment has passed the L40S preflight.
 
 ## 2. Preserve and Collect L40S Trials
 
@@ -105,7 +104,13 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `4` | Supported exact memory, precision, and data movement rows, excluding E067/E068 | 3 | No silent OOM-driven shape changes; precision backend observed. E067/E068 remain H100-exact rows and L40S OOM deferrals. |
 | `4c` | `E201-E202`, `E205` capacity-adjusted GPT-2 L40S micro-batch probes | 3 | Interpret only as L40S capacity-boundary evidence; E203/E204/E206/E207 are confirmed OOM upper-bound probes and must not be pooled with exact E067/E068. |
 | `4b` | `E113`, `E114`, `E117`, `E118` communication | 3 | Interpret as two-GPU NCCL over installed PCIe topology; no NVLink claims. |
-| `5` | Supported PyTorch inference rows | 3 | PyTorch engine, request shape, concurrency, and precision verified; vLLM rows stay deferred. |
+| `5` | Supported PyTorch inference rows | 3 | PyTorch engine, request shape, concurrency, and precision verified. |
+| `vllm-pilot` | `E006` | 1 | Canonical import, engine-start, and served-request evidence in the accepted private environment. |
+| `vllm-framework` | `E130`, `E178` | 3 | One-GPU framework baselines pass before larger serving sweeps. |
+| `vllm-batching` | `E132-E137`, `E180-E185` | 3 | Batch-size sweep completes with request and generated-token metrics. |
+| `vllm-concurrency` | `E138-E142`, `E186-E190` | 3 | Concurrency sweep completes with latency and throughput metrics. |
+| `vllm-prompt` | `E143-E146`, `E191-E194` | 3 | Prompt-length sweep completes with TTFT and generation metrics. |
+| `vllm-tp2` | `E147`, `E195` | 3 | Two-GPU tensor-parallel rows run on both visible L40S devices. |
 | `optional` | `E016-E017`, `E044-E045` | 3 | Run only if memory and queue budget remain. |
 
 DeepSpeed's own optional NVTX annotations are disabled by default for ZeRO rows. The installed Lovelace NVTX binding
@@ -114,8 +119,9 @@ remain active. Set `HPC_AI_ENABLE_DEEPSPEED_NVTX=1` only after verifying a compa
 Nsight study. The DeepSpeed `bf16`/`fp16` configuration is the sole mixed-precision controller for ZeRO rows; the
 runner does not nest PyTorch native AMP around the DeepSpeed engine.
 
-E006, E007, all vLLM-serving rows, E032/E033/E067/E068 exact L40S rows, four-GPU L40S rows, and backend/adapter rows
-listed as Deferred are not rendered by platform batch commands. E032 and E033 exhausted the exact GPT-2 strong-scaling
+E007, H100-unaccepted vLLM rows, E032/E033/E067/E068 exact L40S rows, four-GPU L40S rows, and backend/adapter rows
+listed as Deferred are not rendered by platform batch commands. L40S E006 and supported one-/two-GPU GPT-2/TinyLlama
+vLLM rows are now rendered only by their dedicated private-environment waves. E032 and E033 exhausted the exact GPT-2 strong-scaling
 shapes on the observed L40S capacity. E067 and E068 exhausted the exact GPT-2 micro-batch 32/64 shapes. Reduced-batch
 L40S studies are registered separately as capacity-adjusted conditions. E201/E202 succeeded at micro-batch 20/24,
 E205 succeeded at micro-batch 25, and E206/E207/E203/E204 OOMed at 26/27/28/30. The current L40S boundary is therefore

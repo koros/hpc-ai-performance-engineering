@@ -142,13 +142,12 @@ DS_BUILD_OPS=0 DS_BUILD_AIO=0 python -m pip install \
   -e ".[dev,yaml,workloads,distributed]"
 ```
 
-The current platform matrix defers the wider vLLM serving scope. Lovelace's verified module helper exposes a CUDA 12.4.1
-compiler for the pinned vLLM `0.10.2` source build, but do not install a generic PyPI vLLM wheel into the shared
-environment. Its wheels are CUDA-ABI-specific and may expect another runtime (for example `libcudart.so.13` while
-PyTorch reports CUDA 12.4). Follow the [vLLM environment runbook](docs/vllm_environment_runbook.md): build the private
-environment, then run E006's import/engine/request acceptance gate before re-enabling any vLLM matrix rows. E006 and
-the remaining vLLM rows are currently deferred because the active cluster Torch module lacks the Gloo backend required
-by vLLM engine startup.
+The L40S vLLM gate now uses a private PyTorch 2.8.0/CUDA 12.4 build with Gloo and NCCL plus pinned vLLM `0.10.2`.
+Do not install a generic PyPI vLLM wheel into the shared environment: its CUDA ABI may target another runtime. The L40S
+E006 acceptance gate has passed, so E006 and the supported one-/two-GPU GPT-2/TinyLlama vLLM rows are scheduled in
+dedicated `vllm-*` waves that activate the private environment. H100 vLLM rows remain deferred until the same gate
+passes on H100, and four-GPU vLLM rows remain unavailable on the two-GPU L40S node. See the
+[vLLM environment runbook](docs/vllm_environment_runbook.md) and [deferred experiment audit](docs/deferred_experiment_audit.md).
 
 Do not use `--upgrade-strategy eager` on Lovelace because it can install PyPI Torch/Numpy over the Spack-provided CUDA
 runtime stack.
@@ -163,8 +162,8 @@ The Lovelace helper resolves `CUDA_HOME` from its verified `nvcc`. Use the proje
 DeepSpeed 0.18.9 or newer, and run `make check-cuda-toolchain PLATFORM=l40s EXPECTED_GPUS=1` from an allocated GPU node
 before source builds or CUDA-op experiments.
 
-TensorRT-LLM, vLLM, and FP8/quantized model tooling remain vendor/backend-specific and are not silently substituted by
-these extras.
+TensorRT-LLM and FP8/quantized model tooling remain vendor/backend-specific and are not silently substituted by these
+extras. vLLM waves use their separately pinned private runtime.
 
 Run the optional GPT-2 Small smoke workload after installing those dependencies:
 

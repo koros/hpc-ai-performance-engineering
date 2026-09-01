@@ -22,10 +22,10 @@ DS_BUILD_OPS=0 DS_BUILD_AIO=0 python -m pip install \
 Do not use `--upgrade-strategy eager` on the cluster. It can replace the site-provided PyTorch/Numpy runtime with PyPI
 wheels and create a mixed Spack/PyPI environment.
 
-The current platform matrix defers E006 and all vLLM experiments because the active Torch module lacks the Gloo backend
-required for vLLM engine startup. Do not treat a generic latest PyPI vLLM wheel as portable across CUDA runtimes or
-install it into this shared environment. Re-enable serving rows only after a Gloo-enabled Torch module, the isolated
-vLLM environment, and the serving preflight pass.
+The site Torch module lacks Gloo, so vLLM must not be installed into this shared environment. The private PyTorch
+2.8.0/CUDA 12.4 Gloo/NCCL wheel and vLLM 0.10.2 environment have passed the L40S serving gate. Submit canonical L40S
+vLLM waves through `make submit-vllm-pilot` or `make submit-vllm-wave`; these targets select the private environment.
+H100 vLLM rows remain deferred until their target-platform serving gate passes.
 
 The Slurm scripts assume jobs are submitted from the project root. Load the required cluster modules for CUDA, Python, and PyTorch before activating the project virtual environment. On Lovelace, the project helper can be used:
 
@@ -49,8 +49,8 @@ a valid `CUDA_HOME`, and a passing DeepSpeed CUDA accelerator check. Confirm the
 make check-cuda-toolchain PLATFORM=l40s EXPECTED_GPUS=1
 ```
 
-E003 and E006 are not part of the current L40S runnable scope: E003 needs four GPUs and E006 needs a Gloo-enabled
-Torch module. Neither is required for the core preflight.
+E003 is not part of core wave 0 because it needs four GPUs. E006 is now a separate one-trial `vllm-pilot` condition and
+must run through the private serving environment; it remains outside the shared `.venv` core preflight.
 
 If pip has already upgraded Torch, Numpy, or vLLM inside `.venv`, move that environment aside and rebuild it:
 

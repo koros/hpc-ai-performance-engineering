@@ -25,7 +25,7 @@ The executable framework currently distinguishes between validated smoke paths a
 | Workload adapter | Current state | Local smoke config | Notes |
 | --- | --- | --- | --- |
 | `synthetic` | Ready | `configs/local/synthetic_smoke.json` | CPU-only path used by tests and local validation. |
-| `gpt2_small` | Implemented; cluster verification pending | `configs/local/gpt2_small_smoke.json` | Causal-LM training, PyTorch inference, vLLM routing, DDP/FSDP/ZeRO, precision, and profiling paths are implemented. |
+| `gpt2_small` | Implemented; L40S vLLM gate passed | `configs/local/gpt2_small_smoke.json` | Causal-LM training, PyTorch inference, vLLM routing, DDP/FSDP/ZeRO, precision, and profiling paths are implemented. Canonical L40S vLLM waves are ready; H100 vLLM still needs its target-platform gate. |
 | `distilbert` | Implemented; cluster verification pending | `configs/local/distilbert_smoke.json` | Classification training, eager/concurrent/data-parallel inference, SST-2 quality checks, and distributed training paths are implemented. |
 | `tinyllama` | Implemented; optional full-size scope | `configs/local/tinyllama_inference_smoke.json` | Causal training and PyTorch/vLLM inference are implemented; full-size training remains optional for cost reasons. |
 

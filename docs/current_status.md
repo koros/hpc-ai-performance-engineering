@@ -14,7 +14,7 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | Distributed execution | One-process-per-GPU `python -m torch.distributed.run`, DDP, FSDP, DeepSpeed ZeRO, rank binding, global work accounting, and rank-safe result writing are implemented. |
 | Profiling | nvidia-smi power/utilisation/memory/clock/temperature sampling, PyTorch traces, workload timing, and NCCL microbenchmark metrics are implemented. |
 | Slurm support | Semantic-gated single/bulk rendering, H100/L40S profile matching, CPU allocation checks, and three transformer smoke presets are available. |
-| Platform execution | All 200 source rows route exactly once per platform. There are 125 planned exact L40S source conditions, 3 planned L40S capacity-adjusted probes, and 144 planned H100 conditions; L40S E006 and the remaining vLLM rows are deferred pending a Gloo-enabled Torch module, E032/E033/E067/E068 are deferred after exact-shape L40S OOMs, E203/E204/E206/E207 are deferred after capacity-adjusted L40S OOMs, and TensorRT-LLM remains deferred. |
+| Platform execution | All 200 source rows route exactly once per platform. There are 160 planned L40S source conditions, 3 planned L40S capacity-adjusted probes, and 144 planned H100 conditions. The private PyTorch 2.8.0/CUDA 12.4 stack has passed the L40S E006 vLLM gate, so 35 supported L40S vLLM conditions now have dedicated waves. H100 vLLM, four-GPU L40S rows, known L40S OOM shapes, TensorRT-LLM, and other backend-blocked rows remain deferred. |
 | Evidence retention | L40S/H100 JSON is imported non-destructively into separate roots, scanned for sensitive keys, validated, and covered by tracked SHA-256 manifests. |
 | Dashboard | Static dashboard reads processed results, analysis summaries, and readiness report output. |
 | Quality gates | `pytest`, `ruff`, and `pre-commit` are configured and passing. |
@@ -59,10 +59,9 @@ commits in the primary checkout.
      -e ".[dev,yaml,workloads,distributed]"
    ```
 
-   Do not install a generic vLLM wheel into this environment. The platform matrix reserves E006 as a one-trial L40S
-   pilot after its isolated vLLM `0.10.2` source build and acceptance gate pass; the remaining serving rows stay
-   deferred. The verified Lovelace helper exposes the CUDA 12.4.1 compiler needed by that build; see the
-   [vLLM environment runbook](vllm_environment_runbook.md).
+   Do not install a generic vLLM wheel into this environment. The isolated vLLM `0.10.2` environment has passed the
+   L40S acceptance gate and is activated only by the dedicated `vllm-*` waves. Keep the core `.venv` for ordinary
+   PyTorch waves; see the [vLLM environment runbook](vllm_environment_runbook.md).
 
 2. Validate the active profile and submit the selected immutable platform wave:
 
@@ -105,13 +104,13 @@ commits in the primary checkout.
 | --- | --- |
 | HPC verification | Run the L40S E001, E002, E004, and E005 core wave, then baseline and 1/2-GPU pilots. Four-GPU L40S work is deferred until that capacity is available. Local tests cannot validate CUDA/NCCL/Slurm behaviour. |
 | Independent trials | Baseline scripts render as three-task Slurm arrays; execute them on Lovelace and inspect confidence intervals and variance from preserved trial records. |
-| Backend-dependent rows | E006 and the remaining L40S vLLM rows need the private Gloo-enabled Torch/vLLM build and serving gate to pass. TensorRT-LLM E007 still needs a compatible engine environment and engine/model contract; FP8/INT8 rows still need named backend/calibration artefacts. |
+| Backend-dependent rows | Run canonical L40S E006 through `vllm-pilot`, then the dedicated L40S vLLM performance waves. H100 vLLM still needs its target-platform E006 gate. TensorRT-LLM E007 needs a compatible package, built engine, and engine/model contract; FP8/INT8 rows still need named backend/calibration artefacts. |
 | Invalid DistilBERT framework rows | `E154-E155` must be removed from executable scope or redesigned around classification-compatible backends. |
-| vLLM NCCL telemetry | `E147-E148` and `E195-E196` remain deferred with the other vLLM rows; they do not claim unavailable request-path NCCL telemetry. |
+| vLLM tensor parallelism | Two-GPU `E147` and `E195` are planned in `vllm-tp2`. Four-GPU `E148` and `E196` remain deferred on L40S because the active node exposes two GPUs. These rows measure serving performance, not unavailable request-path NCCL counters. |
 | Communication depth | The NCCL microbenchmark and PyTorch trace do not yet provide NVLink counters or full communication/compute attribution. |
 | Quality scope | Synthetic held-out checks detect instability; final RQ3 quality claims still need a preregistered real evaluation protocol. |
 | Dashboard | Trial confidence intervals and explicit insufficient-data states are connected; dedicated RQ views and conclusion-to-trial traceability remain. |
 
 ## Deferred Research Scope
 
-Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative gate; it must pass with zero blockers. The platform tracker lists deferred rows that are intentionally excluded from generated deployment waves. E006 and the remaining L40S vLLM studies remain deferred until the private Gloo-enabled PyTorch build, vLLM rebuild, and E006 acceptance gates pass. The active L40S node has two GPUs, so its four-GPU conditions are separately deferred. E032/E033/E067/E068 remain exact-shape L40S OOM deferrals; E203/E204/E206/E207 are also deferred after confirming the upper capacity-adjusted probes do not fit. Use the separately labelled E201-E202/E205 capacity-adjusted probes for the L40S GPT-2 micro-batch boundary; E205 at micro-batch 25 is the largest passing integer probe observed so far. E007 remains deferred pending its CUDA-toolkit/TensorRT-LLM prerequisites. Other deferred rows still require their documented FP8, quantization, or serving prerequisites.
+Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative gate; it must pass with zero blockers. The platform tracker lists deferred rows that are intentionally excluded from generated deployment waves. The L40S E006 gate has passed, and supported one-/two-GPU L40S vLLM studies are now planned in dedicated waves. H100 vLLM remains deferred until E006 passes there. The active L40S node has two GPUs, so all four-GPU conditions—including E148/E196—remain deferred. E032/E033/E067/E068 remain exact-shape L40S OOM deferrals; E203/E204/E206/E207 are also deferred after confirming the upper capacity-adjusted probes do not fit. Use the separately labelled E201-E202/E205 capacity-adjusted probes for the L40S GPT-2 micro-batch boundary; E205 at micro-batch 25 is the largest passing integer probe observed so far. E007 remains deferred because a compatible TensorRT-LLM package, built engine, and pinned load/request contract are missing. Other deferred rows still require their documented FP8, quantization, or adapter prerequisites. See [the deferred experiment audit](deferred_experiment_audit.md) for the complete platform-specific list.

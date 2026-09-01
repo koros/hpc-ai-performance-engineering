@@ -13,8 +13,9 @@ The process has three gates:
 2. Build pinned vLLM `0.10.2` against that exact private wheel.
 3. Run E006 as a one-GPU acceptance job and require import, engine start, and one served request.
 
-E006 and the remaining vLLM rows remain deferred until all three gates pass. The acceptance JSON is diagnostic only and
-is never imported into `results/raw/`.
+All three gates have passed on L40S. The acceptance JSON is diagnostic only and is never imported into `results/raw/`;
+E006 must still run once through the immutable `vllm-pilot` wave before the performance waves are treated as released.
+H100 vLLM conditions remain deferred until this same acceptance gate passes on H100.
 
 ## One-Time Preparation
 
@@ -179,8 +180,35 @@ sbatch --partition=gpu_h100 \
 The H100 job uses the same multi-architecture private build. If the user chose a custom environment location, include
 `HPC_AI_VLLM_ENV=/absolute/path/to/vllm-0.10.2-gloo` in that `--export` list as well.
 
-## Re-enable Only After Acceptance
+## Run Canonical L40S vLLM Waves
 
-Do not manually import the acceptance record. After the private stack and acceptance gate pass, reintroduce E006 as a
-dedicated immutable pilot before re-enabling the remaining vLLM rows. Use the private environment path as
-`VENV_ACTIVATE` for those later vLLM waves; never set it for non-vLLM work.
+Do not manually import the diagnostic acceptance record. Submit E006 as canonical matrix evidence first:
+
+```bash
+make submit-vllm-pilot
+make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot
+make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot
+make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot
+```
+
+After the pilot reports one provenance-valid completed trial, run the performance waves in this order:
+
+| Wave | Conditions | Trials | Purpose |
+| --- | --- | ---: | --- |
+| `vllm-framework` | `E130`, `E178` | 3 | GPT-2 and TinyLlama framework baselines. |
+| `vllm-batching` | `E132-E137`, `E180-E185` | 3 | Serving batch-size sweeps. |
+| `vllm-concurrency` | `E138-E142`, `E186-E190` | 3 | Concurrent-request sweeps. |
+| `vllm-prompt` | `E143-E146`, `E191-E194` | 3 | Prompt-length sweeps. |
+| `vllm-tp2` | `E147`, `E195` | 3 | Two-GPU tensor-parallel serving. |
+
+For example:
+
+```bash
+make submit-vllm-wave PLATFORM=l40s PLATFORM_WAVE=vllm-framework
+make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-framework
+make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-framework
+make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-framework
+```
+
+`submit-vllm-wave` always supplies the private environment to the immutable bundle. Never supply that environment to
+non-vLLM waves. L40S `E148` and `E196` remain deferred because they request four GPUs; the active node exposes two.
