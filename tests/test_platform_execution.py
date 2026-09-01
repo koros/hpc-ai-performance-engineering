@@ -11,6 +11,7 @@ from scripts.check_private_torch import is_import_below_environment
 
 from hpc_ai_perf.cli import (
     _bundle_setup_commands,
+    _completed_planned_wave_evidence_ids,
     _incomplete_planned_wave_experiment_ids,
     _materialize_platform_batch,
     _planned_wave_experiment_ids,
@@ -389,10 +390,15 @@ def test_l40s_capacity_adjusted_wave_materializes_boundary_probes(tmp_path: Path
 
 def test_retry_scope_includes_new_policy_conditions_missing_from_prior_attempt(monkeypatch, tmp_path: Path) -> None:
     state_path = tmp_path / "wave_4c.json"
+    state_path.write_text("{}", encoding="utf-8")
 
     monkeypatch.setattr(
         "hpc_ai_perf.cli._planned_wave_experiment_ids",
         lambda platform_id, wave: {"E201", "E202", "E205"},
+    )
+    monkeypatch.setattr(
+        "hpc_ai_perf.cli._completed_planned_wave_evidence_ids",
+        lambda platform_id, wave, result_dir: set(),
     )
     monkeypatch.setattr(
         "hpc_ai_perf.cli.load_wave_state",
@@ -414,6 +420,41 @@ def test_retry_scope_includes_new_policy_conditions_missing_from_prior_attempt(m
     retry_ids = _incomplete_planned_wave_experiment_ids("l40s", "4c", state_path)
 
     assert retry_ids == ["E205"]
+
+
+def test_retry_scope_bootstraps_from_accepted_evidence_without_state(monkeypatch, tmp_path: Path) -> None:
+    state_path = tmp_path / "missing-wave-state.json"
+    monkeypatch.setattr(
+        "hpc_ai_perf.cli._planned_wave_experiment_ids",
+        lambda platform_id, wave: {"E001", "E002", "E004", "E005"},
+    )
+    monkeypatch.setattr(
+        "hpc_ai_perf.cli._completed_planned_wave_evidence_ids",
+        lambda platform_id, wave, result_dir: {"E001"},
+    )
+
+    retry_ids = _incomplete_planned_wave_experiment_ids("l40s", "0", state_path)
+
+    assert retry_ids == ["E002", "E004", "E005"]
+
+
+def test_completed_wave_evidence_uses_validated_platform_tracker_rows(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "hpc_ai_perf.cli.load_platform_conditions",
+        lambda *args, **kwargs: [object()],
+    )
+    monkeypatch.setattr(
+        "hpc_ai_perf.cli.build_platform_progress_rows",
+        lambda conditions, result_dir: [
+            {"matrix_id": "E001", "status": "Complete"},
+            {"matrix_id": "E002", "status": "Ready"},
+            {"matrix_id": "E004", "status": "Failed"},
+        ],
+    )
+
+    completed = _completed_planned_wave_evidence_ids("l40s", "0")
+
+    assert completed == {"E001"}
 
 
 def test_execution_matrix_defers_only_unaccepted_or_unsupported_backend_and_platform_rows() -> None:

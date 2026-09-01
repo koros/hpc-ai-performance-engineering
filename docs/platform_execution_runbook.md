@@ -163,6 +163,11 @@ experiments, submit only those from a new immutable bundle:
 make retry-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
 ```
 
+The run-state file is ignored orchestration state and may be absent after moving to another checkout. If verified
+evidence for part of the wave is already committed under `results/raw`, `retry-platform-wave` reconstructs completed
+conditions from that evidence and submits only the missing conditions. Collection then combines the recovery bundle
+with existing accepted evidence without rerunning or duplicating completed trials.
+
 ## 5. H100 Recovery Path
 
 When `gpu_h100` returns, verify the node and start its independent wave 0:

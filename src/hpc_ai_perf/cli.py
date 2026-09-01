@@ -47,7 +47,7 @@ from hpc_ai_perf.slurm import (
     write_submission_manifest,
     write_submission_plan,
 )
-from hpc_ai_perf.tracking import track_experiment_progress, track_platform_progress
+from hpc_ai_perf.tracking import build_platform_progress_rows, track_experiment_progress, track_platform_progress
 from hpc_ai_perf.validation import capability_issues, format_validation_issues, validate_project
 
 LOGGER = logging.getLogger(__name__)
@@ -1194,12 +1194,17 @@ def _collect_platform_wave(args: argparse.Namespace) -> list[str]:
             raise ValueError(f"Platform-wave state contains an invalid attempt: {state_path}")
         summaries.append((attempt, summarize_bundle_results(attempt["bundle_dir"])))
 
+    completed_evidence_ids = _completed_planned_wave_evidence_ids(
+        profile.platform_id,
+        str(args.wave),
+        result_dir=args.result_root,
+    )
     selected: dict[str, tuple[dict[str, Any], Any]] = {}
     for attempt, status in summaries:
         for experiment in status.experiments:
             if experiment.experiment_id in expected_ids and experiment.complete:
                 selected[experiment.experiment_id] = (attempt, experiment)
-    missing = sorted(expected_ids - set(selected))
+    missing = sorted(expected_ids - completed_evidence_ids - set(selected))
     if missing:
         raise ValueError(
             "Wave evidence is incomplete; run retry-platform-wave before collection for: " + ", ".join(missing)
@@ -1226,19 +1231,43 @@ def _collect_platform_wave(args: argparse.Namespace) -> list[str]:
     return sorted(set(imported_paths))
 
 
-def _incomplete_planned_wave_experiment_ids(platform_id: str, wave: str, state_path: str | Path) -> list[str]:
-    """Return planned conditions without complete evidence across all attempts."""
+def _incomplete_planned_wave_experiment_ids(
+    platform_id: str,
+    wave: str,
+    state_path: str | Path,
+    *,
+    result_dir: str | Path = "results/raw",
+) -> list[str]:
+    """Return planned conditions without accepted evidence or a complete saved attempt."""
     planned_ids = _planned_wave_experiment_ids(platform_id, wave)
-    state = load_wave_state(state_path)
-    complete_ids: set[str] = set()
-    for attempt in state["attempts"]:
-        if not isinstance(attempt, dict):
-            raise ValueError(f"Platform-wave state contains an invalid attempt: {state_path}")
-        status = summarize_bundle_results(attempt["bundle_dir"])
-        for experiment in status.experiments:
-            if experiment.experiment_id in planned_ids and experiment.complete:
-                complete_ids.add(experiment.experiment_id)
+    complete_ids = _completed_planned_wave_evidence_ids(platform_id, wave, result_dir=result_dir)
+    if Path(state_path).is_file():
+        state = load_wave_state(state_path)
+        for attempt in state["attempts"]:
+            if not isinstance(attempt, dict):
+                raise ValueError(f"Platform-wave state contains an invalid attempt: {state_path}")
+            status = summarize_bundle_results(attempt["bundle_dir"])
+            for experiment in status.experiments:
+                if experiment.experiment_id in planned_ids and experiment.complete:
+                    complete_ids.add(experiment.experiment_id)
     return sorted(planned_ids - complete_ids)
+
+
+def _completed_planned_wave_evidence_ids(
+    platform_id: str,
+    wave: str,
+    *,
+    result_dir: str | Path = "results/raw",
+) -> set[str]:
+    """Return conditions already satisfied by validated evidence in the accepted result root."""
+    conditions = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        platform_id,
+        wave=wave,
+        include_deferred=False,
+    )
+    rows = build_platform_progress_rows(conditions, result_dir)
+    return {str(row["matrix_id"]) for row in rows if row["status"] == "Complete"}
 
 
 def _planned_wave_experiment_ids(platform_id: str, wave: str) -> set[str]:
