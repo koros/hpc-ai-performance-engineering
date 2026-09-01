@@ -13,134 +13,192 @@
         <h1>HPC AI Performance Dashboard</h1>
       </div>
       <div class="header-actions">
-        <label class="file-button">
-          Results CSV
-          <input id="resultsFile" type="file" accept=".csv" />
-        </label>
-        <label class="file-button">
-          Phase CSV
-          <input id="phaseFile" type="file" accept=".csv" />
-        </label>
-        <label class="file-button">
-          Trial CSV
-          <input id="trialFile" type="file" accept=".csv" />
-        </label>
-        <label class="file-button">
-          Readiness MD
-          <input id="readinessFile" type="file" accept=".md,text/markdown,text/plain" />
-        </label>
+        <label class="file-button">Results CSV<input id="resultsFile" type="file" accept=".csv" /></label>
+        <label class="file-button">Analysis CSVs<input id="analysisFiles" type="file" accept=".csv" multiple /></label>
+        <label class="file-button">Readiness MD<input id="readinessFile" type="file" accept=".md,text/markdown,text/plain" /></label>
       </div>
     </header>
 
     <main>
       <section class="toolbar" aria-label="Dashboard filters">
-        <label>
-          Platform
-          <select id="platformFilter"></select>
-        </label>
-        <label>
-          Comparability
-          <select id="comparabilityFilter"></select>
-        </label>
-        <label>
-          Phase
-          <select id="phaseFilter"></select>
-        </label>
-        <label>
-          Workload
-          <select id="workloadFilter"></select>
-        </label>
-        <label>
-          Throughput unit
-          <select id="throughputUnitFilter"></select>
-        </label>
-        <label>
-          Priority
-          <select id="priorityFilter"></select>
-        </label>
-        <label>
-          Status
-          <select id="statusFilter"></select>
+        <label>Platform<select id="platformFilter"></select></label>
+        <label>Comparability<select id="comparabilityFilter"></select></label>
+        <label>Phase<select id="phaseFilter"></select></label>
+        <label>Workload<select id="workloadFilter"></select></label>
+        <label>Throughput unit<select id="throughputUnitFilter"></select></label>
+        <label>Priority<select id="priorityFilter"></select></label>
+        <label>Status<select id="statusFilter"></select></label>
+        <label>Wave<select id="waveFilter"></select></label>
+        <label>Mode<select id="modeFilter"></select></label>
+        <label>Strategy<select id="strategyFilter"></select></label>
+        <label>Precision<select id="precisionFilter"></select></label>
+        <label>GPUs<select id="gpuFilter"></select></label>
+        <label>Evidence<select id="evidenceFilter"></select></label>
+        <label>Metric focus
+          <select id="metricFilter">
+            <option value="">All metrics</option>
+            <option value="throughput">Throughput</option>
+            <option value="runtime">Runtime</option>
+            <option value="memory">Memory</option>
+            <option value="energy">Energy and power</option>
+            <option value="latency">Latency</option>
+          </select>
         </label>
       </section>
 
+      <nav class="section-nav" aria-label="Dashboard sections">
+        <a href="#overview">Overview</a>
+        <a href="#performance">Training performance</a>
+        <a href="#memory">Memory and capacity</a>
+        <a href="#scaling">Scaling and communication</a>
+        <a href="#inference">Inference</a>
+        <a href="#evidence">Evidence quality</a>
+      </nav>
+
       <section class="kpi-grid" aria-label="Summary metrics">
-        <article>
-          <span>Experiments</span>
-          <strong id="kpiExperiments">0</strong>
-        </article>
-        <article>
-          <span>Completed</span>
-          <strong id="kpiCompleted">0</strong>
-        </article>
-        <article>
-          <span>GPU-hours</span>
-          <strong id="kpiGpuHours">0.0</strong>
-        </article>
-        <article>
-          <span>Best throughput</span>
-          <strong id="kpiBestThroughput">0</strong>
-        </article>
+        <article><span>Experiments</span><strong id="kpiExperiments">0</strong></article>
+        <article><span>Completed</span><strong id="kpiCompleted">0</strong></article>
+        <article><span>GPU-hours</span><strong id="kpiGpuHours">0.0</strong></article>
+        <article><span>Best throughput</span><strong id="kpiBestThroughput">0</strong></article>
       </section>
 
       <section class="panel">
-        <div class="panel-heading">
-          <h2>Submission Readiness</h2>
-          <span id="readinessStatus">No report loaded</span>
-        </div>
+        <div class="panel-heading"><h2>Submission Readiness</h2><span id="readinessStatus">No report loaded</span></div>
         <div id="readinessSummary" class="readiness-grid"></div>
       </section>
 
-      <section class="content-grid">
-        <article class="panel chart-panel">
-          <div class="panel-heading">
-            <h2>Phase Throughput</h2>
-            <span id="dataStatus">No data loaded</span>
-          </div>
-          <div id="phaseBars" class="bar-list"></div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-heading">
-            <h2>Top Experiments</h2>
-            <span id="rankingCount">0 rows</span>
-          </div>
-          <div class="table-wrap">
-            <table id="rankingTable">
-              <thead></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </article>
-      </section>
-
-      <section class="panel">
-        <div class="panel-heading">
-          <h2>Phase Summary</h2>
-          <span id="phaseCount">0 rows</span>
+      <section id="overview" class="dashboard-section">
+        <div class="section-heading">
+          <div><p class="eyebrow">Overview</p><h2>Recorded results at a glance</h2></div>
+          <p>Platform and comparability always remain separate.</p>
         </div>
-        <div class="table-wrap">
-          <table id="phaseTable">
-            <thead></thead>
-            <tbody></tbody>
-          </table>
+        <div class="content-grid">
+          <article class="panel chart-panel" data-metrics="throughput runtime">
+            <div class="panel-heading"><h2>Trial Progress</h2><span id="progressStatus">No data loaded</span></div>
+            <div id="progressChart" class="bar-list"></div>
+            <p class="chart-note">Counts are recorded trials, grouped by platform and comparability.</p>
+          </article>
+          <article class="panel chart-panel" data-metrics="throughput">
+            <div class="panel-heading"><h2>Phase Throughput</h2><span id="dataStatus">No data loaded</span></div>
+            <div id="phaseBars" class="bar-list"></div>
+            <p class="chart-note">Bars share a scale only within their throughput unit.</p>
+          </article>
+        </div>
+        <div class="content-grid">
+          <article class="panel chart-panel" data-metrics="energy">
+            <div class="panel-heading"><h2>Energy and Power</h2><span id="energyStatus">No energy evidence</span></div>
+            <div id="energyBars" class="bar-list"></div>
+            <p class="chart-note">Estimated energy and sampled power are per recorded condition; they are not hardware-normalised comparisons.</p>
+          </article>
+          <article class="panel" data-metrics="throughput runtime energy">
+            <div class="panel-heading"><h2>Top Experiments</h2><span id="rankingCount">0 rows</span></div>
+            <div class="table-wrap"><table id="rankingTable"><thead></thead><tbody></tbody></table></div>
+          </article>
         </div>
       </section>
 
-      <section class="panel">
-        <div class="panel-heading">
-          <h2>Trial Evidence and Uncertainty</h2>
-          <span id="trialCount">No trial evidence</span>
+      <section id="performance" class="dashboard-section">
+        <div class="section-heading">
+          <div><p class="eyebrow">Training performance</p><h2>Uncertainty, strategy, and precision</h2></div>
+          <p>Completed trial summaries only. Error bars are 95% confidence intervals.</p>
         </div>
-        <div class="table-wrap">
-          <table id="trialTable">
-            <thead></thead>
-            <tbody></tbody>
-          </table>
+        <article class="panel chart-panel" data-metrics="throughput runtime">
+          <div class="panel-heading"><h2>Trial Throughput Uncertainty</h2><span id="uncertaintyStatus">No trial evidence</span></div>
+          <div id="uncertaintyCharts" class="svg-chart-grid"></div>
+          <p class="chart-note">Small multiples never mix platforms, comparability classes, or throughput units.</p>
+        </article>
+        <div class="content-grid">
+          <article class="panel chart-panel" data-metrics="throughput memory">
+            <div class="panel-heading"><h2>Distributed Strategy</h2><span id="strategyStatus">No strategy evidence</span></div>
+            <div id="strategyBars" class="bar-list"></div>
+            <p class="chart-note">Each bar represents one already-grouped strategy condition.</p>
+          </article>
+          <article class="panel chart-panel" data-metrics="throughput memory latency">
+            <div class="panel-heading"><h2>Precision Trade-off</h2><span id="precisionStatus">No precision evidence</span></div>
+            <div id="precisionBars" class="bar-list"></div>
+            <p class="chart-note">Compare precision only within a matching platform, workload, mode, and unit.</p>
+          </article>
         </div>
+      </section>
+
+      <section id="memory" class="dashboard-section">
+        <div class="section-heading">
+          <div><p class="eyebrow">Memory and capacity</p><h2>Memory limits and optimisation choices</h2></div>
+          <p>Capacity-adjusted L40S rows are evidence about L40S limits, not substitutes for exact H100 rows.</p>
+        </div>
+        <div class="content-grid">
+          <article class="panel chart-panel" data-metrics="memory throughput">
+            <div class="panel-heading"><h2>Memory vs Micro-batch</h2><span id="memoryStatus">No memory evidence</span></div>
+            <div id="memoryCharts" class="svg-chart-grid"></div>
+            <p class="chart-note">Lines retain activation-checkpointing and gradient-accumulation settings in their labels.</p>
+          </article>
+          <article class="panel chart-panel" data-metrics="memory throughput">
+            <div class="panel-heading"><h2>L40S Capacity Boundary</h2><span id="capacityStatus">No capacity evidence</span></div>
+            <div id="capacityCharts" class="svg-chart-grid"></div>
+            <p class="chart-note">Only capacity-adjusted rows appear here; exact cross-hardware comparisons remain separate.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="scaling" class="dashboard-section">
+        <div class="section-heading">
+          <div><p class="eyebrow">Scaling and communication</p><h2>Parallel efficiency and data movement</h2></div>
+          <p>Scaling, NCCL, and data-loader measurements appear as each study completes.</p>
+        </div>
+        <div class="content-grid">
+          <article class="panel chart-panel" data-metrics="throughput runtime">
+            <div class="panel-heading"><h2>Scaling Speedup</h2><span id="scalingStatus">No scaling evidence</span></div>
+            <div id="scalingCharts" class="svg-chart-grid"></div>
+            <p class="chart-note">Speedup is plotted against GPU count; labels retain strategy and precision.</p>
+          </article>
+          <article class="panel chart-panel" data-metrics="throughput runtime">
+            <div class="panel-heading"><h2>NCCL Communication</h2><span id="communicationStatus">No communication evidence</span></div>
+            <div id="communicationBars" class="bar-list"></div>
+            <p class="chart-note">Bandwidth and communication-to-compute ratio are meaningful only on the recorded platform/interconnect.</p>
+          </article>
+        </div>
+        <article class="panel chart-panel" data-metrics="throughput runtime">
+          <div class="panel-heading"><h2>Data Movement</h2><span id="movementStatus">No data-movement evidence</span></div>
+          <div id="movementBars" class="bar-list"></div>
+          <p class="chart-note">Bars report observed loading time for the stated worker, pinned-memory, and prefetch configuration.</p>
+        </article>
+      </section>
+
+      <section id="inference" class="dashboard-section">
+        <div class="section-heading">
+          <div><p class="eyebrow">Inference</p><h2>Latency and throughput trade-offs</h2></div>
+          <p>Plots show p95 latency against throughput in matching throughput units.</p>
+        </div>
+        <article class="panel chart-panel" data-metrics="throughput latency memory energy">
+          <div class="panel-heading"><h2>Inference Throughput vs p95 Latency</h2><span id="inferenceStatus">No inference evidence</span></div>
+          <div id="inferenceCharts" class="svg-chart-grid"></div>
+          <p class="chart-note">A point is an aggregated inference condition, not a pooled hardware average.</p>
+        </article>
+      </section>
+
+      <section id="evidence" class="dashboard-section">
+        <div class="section-heading">
+          <div><p class="eyebrow">Evidence quality</p><h2>Traceable completed trials</h2></div>
+          <p>Check trial count, failures, outlier handling, and confidence intervals.</p>
+        </div>
+        <article class="panel" data-metrics="throughput runtime">
+          <div class="panel-heading"><h2>Trial Evidence and Uncertainty</h2><span id="trialCount">No trial evidence</span></div>
+          <div class="table-wrap"><table id="trialTable"><thead></thead><tbody></tbody></table></div>
+        </article>
+        <article class="panel" data-metrics="throughput runtime memory energy latency">
+          <div class="panel-heading"><h2>Phase Summary</h2><span id="phaseCount">0 rows</span></div>
+          <div class="table-wrap"><table id="phaseTable"><thead></thead><tbody></tbody></table></div>
+        </article>
+      </section>
+
+      <section id="pendingStudies" class="dashboard-section pending-section" hidden>
+        <div class="section-heading">
+          <div><p class="eyebrow">Awaiting evidence</p><h2>Studies not shown above</h2></div>
+          <p>These panels will move into the main dashboard automatically after their analysis CSVs contain completed evidence.</p>
+        </div>
+        <div id="pendingStudyGrid" class="pending-grid"></div>
       </section>
     </main>
-
     <script src="app.js"></script>
   </body>
 </html>
