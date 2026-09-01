@@ -25,7 +25,7 @@ sbatch slurm/smoke/tinyllama_inference_smoke.sbatch
 
 ## Isolated vLLM Acceptance
 
-vLLM is not installed into the shared `.venv`: its build is coupled to the CUDA compiler and the module-provided
+vLLM is not installed into the shared `.venv`: its build is coupled to the CUDA compiler and private Gloo-enabled
 PyTorch ABI. The project provides a reproducible private build path pinned to vLLM `0.10.2`. It preserves `.venv` for
 all supported PyTorch and DeepSpeed waves, and stores the vLLM environment outside the repository by default.
 
@@ -35,7 +35,14 @@ First install `uv` once in your user account if it is not already on `PATH`:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Then, from the project root, submit the build and wait for it to complete:
+Then, from the project root, build the private Gloo-enabled PyTorch wheel and wait for it to complete:
+
+```bash
+make submit-pytorch-gloo-build
+squeue -u "$USER"
+```
+
+After that job passes its private-import, CUDA, Gloo, and NCCL checks, build vLLM against the wheel:
 
 ```bash
 make submit-vllm-build
@@ -44,7 +51,7 @@ squeue -u "$USER"
 
 The build uses the verified Lovelace module helper, Clang, CUDA 12.4.1, and an architecture list covering L40S
 (`sm_89`) and H100 (`sm_90`). Its private paths default to
-`~/.local/share/hpc-ai-performance-engineering/vllm-0.10.2` and can be changed with `HPC_AI_VLLM_ENV` and
+`~/.local/share/hpc-ai-performance-engineering/vllm-0.10.2-gloo` and can be changed with `HPC_AI_VLLM_ENV` and
 `HPC_AI_VLLM_SOURCE`.
 
 After the build log confirms success, run the single-GPU serving gate:
@@ -55,8 +62,8 @@ make submit-vllm-acceptance
 
 The acceptance job runs `check-runtime --require-vllm` and E006's pinned GPT-2 request. It must record a successful
 vLLM import, engine start, and served request. Its result is deliberately written to ignored `build/vllm_acceptance/`:
-it is an environment gate, not canonical matrix evidence. After it passes, use `make submit-vllm-pilot` for the formal
-one-trial E006 evidence; the remaining vLLM matrix rows stay deferred.
+it is an environment gate, not canonical matrix evidence. After it passes, re-enable and submit a formal one-trial E006
+pilot through the immutable platform-wave workflow; the remaining vLLM matrix rows stay deferred until that pilot passes.
 
 Edit the partition if needed, replace the module-loading helper if the site stack changes, and add an account line only if the target HPC site requires one.
 

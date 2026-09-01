@@ -2,18 +2,19 @@
 
 ## Purpose
 
-This runbook creates a private, reproducible vLLM environment without changing the repository `.venv`. The shared
-`.venv` remains the certified runtime for all non-vLLM PyTorch and DeepSpeed waves. vLLM is source-built because it
-must match Lovelace's Torch 2.8.0, CUDA 12.4.1, driver, and compiler stack.
+This runbook creates a private, reproducible PyTorch and vLLM stack without changing the repository `.venv`. The
+shared `.venv` remains the certified runtime for all non-vLLM PyTorch and DeepSpeed waves. PyTorch and vLLM are both
+source-built because the site PyTorch 2.8.0/CUDA 12.4 module omits Gloo, while vLLM uses Gloo for CPU-side process
+coordination in addition to NCCL for GPU communication.
 
-The process has two gates:
+The process has three gates:
 
-1. Build pinned vLLM `0.10.2` in an external environment.
-2. Run E006 as a one-GPU acceptance job and require import, engine start, and one served request.
+1. Build a reusable private PyTorch `2.8.0`/CUDA `12.4` wheel with CUDA, NCCL, and Gloo enabled.
+2. Build pinned vLLM `0.10.2` against that exact private wheel.
+3. Run E006 as a one-GPU acceptance job and require import, engine start, and one served request.
 
-E006 and the remaining vLLM rows are currently deferred because the active Torch module lacks Gloo. The acceptance JSON
-is diagnostic only and is never imported into `results/raw/`; resume this runbook only after the cluster provides a
-Gloo-enabled compatible Torch module.
+E006 and the remaining vLLM rows remain deferred until all three gates pass. The acceptance JSON is diagnostic only and
+is never imported into `results/raw/`.
 
 ## One-Time Preparation
 
@@ -33,9 +34,59 @@ uv --version
 Ensure the repository source is committed and clean. The build itself is external, so it will not make the repository
 or later submission snapshots dirty.
 
-## Build on L40S
+The PyTorch source checkout, build environment, and wheel can require substantial home-directory space. Check both free
+space and your user quota before submitting:
 
-From the project root on the login node, submit the build:
+```bash
+df -h "$HOME/.local/share"
+quota -s 2>/dev/null || true
+```
+
+Do not activate `.venv` or the old `vllm-0.10.2` environment before these Make targets. Each Slurm job establishes its
+own module and Python environment.
+
+## Gate 1: Build Gloo-Enabled PyTorch
+
+From the project root on the login node:
+
+```bash
+make submit-pytorch-gloo-build
+squeue -u "$USER"
+```
+
+This submits [`slurm/smoke/pytorch_gloo_build_l40s.sbatch`](../slurm/smoke/pytorch_gloo_build_l40s.sbatch). The build
+uses one L40S so it can validate the finished wheel against a real CUDA device before publishing its manifest. It:
+
+- loads the verified Spack 217 compiler and CUDA 12.4.1 paths;
+- removes Spack's Python package paths before creating the private environment;
+- checks out the exact PyTorch `v2.8.0` source and its submodules outside the repository;
+- builds for both L40S (`sm_89`) and H100 (`sm_90`) with `USE_CUDA=1`, `USE_DISTRIBUTED=1`, `USE_GLOO=1`, and
+  `USE_NCCL=1`;
+- installs the wheel into a private validation environment and completes one-rank NCCL/GPU and Gloo/CPU all-reduces;
+- writes `BUILD_MANIFEST.json` containing the source commit, build options, wheel name, and SHA-256.
+
+Default external paths are:
+
+```text
+~/.local/share/hpc-ai-performance-engineering/pytorch-2.8.0-cu124-gloo-build
+~/.local/share/hpc-ai-performance-engineering/src/pytorch-v2.8.0
+~/.local/share/hpc-ai-performance-engineering/wheels/pytorch-2.8.0-cu124-gloo
+```
+
+Inspect completion and logs using the job ID printed by `sbatch`:
+
+```bash
+sacct -j JOB_ID --format=JobID,State,ExitCode,Elapsed
+tail -n 120 slurm/pytorch-gloo-build-JOB_ID.out
+tail -n 200 slurm/pytorch-gloo-build-JOB_ID.err
+```
+
+Do not proceed unless the job is `COMPLETED` and its output reports passing private import, CUDA, Gloo, and NCCL checks.
+The target is safe to resubmit after success: it verifies and reuses the existing wheel instead of recompiling it.
+
+## Gate 2: Build vLLM on L40S
+
+After Gate 1 passes, submit the vLLM build:
 
 ```bash
 make submit-vllm-build
@@ -46,28 +97,30 @@ The job runs [`slurm/setup_vllm_environment.sh`](../slurm/setup_vllm_environment
 following:
 
 - loads the verified Spack 217 Lovelace module stack;
-- checks `nvcc`, Clang, Torch 2.8.x, and CUDA 12.4;
-- creates `~/.local/share/hpc-ai-performance-engineering/vllm-0.10.2` with `--system-site-packages`;
+- checks `nvcc`, Clang, and CUDA 12.4;
+- verifies the private PyTorch wheel against its SHA-256 build manifest;
+- creates `~/.local/share/hpc-ai-performance-engineering/vllm-0.10.2-gloo` without `--system-site-packages`;
+- installs and validates the private PyTorch wheel before compiling vLLM;
 - clones the exact `v0.10.2` source tag outside the repository;
 - bootstraps private `setuptools` 77–80 and vLLM `0.10.2`'s undeclared editable-build metadata dependency
-  (`setuptools_scm`), placing the private site-packages ahead of Spack's `PYTHONPATH`, before building with
-  verbose `uv pip install --no-build-isolation -e .` output against the module Torch runtime; and
+  (`setuptools_scm`) before building with verbose `uv pip install --no-build-isolation -e .` output against the
+  private Torch runtime; and
 - passes `-fbracket-depth=1024` to the selected Clang host compiler through `nvcc`, which is required for vLLM's
   generated Marlin CUDA source on this stack; and
 - targets both L40S (`sm_89`) and H100 (`sm_90`) by default.
 
 The installed source build reports `vllm==0.10.2+cu124`: the `+cu124` suffix records the linked CUDA toolkit. The
-build gate verifies the pinned base version (`0.10.2`) and the module Torch/CUDA runtime, so this expected local version
+build gate verifies the pinned base version (`0.10.2`) and the private Torch/CUDA runtime, so this expected local version
 suffix is accepted.
 
 vLLM `0.10.2` allows Transformers `>=4.55.2`, but the current release line can otherwise resolve Transformers 5,
 which removed a GPT-2 tokenizer API used by these workloads. The isolated profile pins `transformers==4.57.6` after
 building vLLM, alongside its compatible `tokenizers==0.22.1` and the matching Transformers Python dependencies (such
-as `huggingface-hub`). These packages do not require Torch, so this does not replace the module Torch/CUDA runtime.
+as `huggingface-hub`). These packages do not require Torch, so this does not replace the private Torch/CUDA runtime.
 
 The current vLLM matrix consists only of text workloads (GPT-2, TinyLlama, and DistilBERT). The build therefore removes
-PyPI TorchAudio from the isolated environment by default: its available wheel is compiled for CUDA 12.8 and cannot load
-beside the cluster's CUDA 12.4 Torch. This permits Transformers and vLLM's text `LLM` entry point to import normally.
+PyPI TorchAudio and TorchVision from the isolated environment by default: their native wheels are not built against this
+private CUDA 12.4 Torch. This permits Transformers and vLLM's text `LLM` entry point to import normally.
 Do not add audio or multimodal-audio workloads to this profile. First provide a TorchAudio build compiled for the same
 Torch/CUDA runtime, then set `HPC_AI_VLLM_TEXT_ONLY=0` when building.
 
@@ -77,7 +130,7 @@ failed external environment or source checkout automatically. Read the log first
 an unexpected existing directory or source revision. Use a new `HPC_AI_VLLM_ENV` / `HPC_AI_VLLM_SOURCE` path if a clean
 retry is required.
 
-## Run the E006 Acceptance Gate
+## Gate 3: Run the E006 Acceptance Gate
 
 After the build job completes successfully:
 
@@ -93,10 +146,10 @@ check-runtime --require-vllm
 E006: vLLM import → engine start → pinned GPT-2 request served
 ```
 
-vLLM 0.10.2 creates a Gloo CPU process group even for its one-GPU engine. The acceptance preflight therefore requires
-the active PyTorch build to report `torch.distributed.is_gloo_available() == True`. If it fails, do not retry E006 or
-submit the canonical pilot: ask the cluster team for a Gloo-enabled PyTorch module built for the same CUDA runtime.
-This is also a prerequisite for the later multi-GPU vLLM experiments.
+vLLM 0.10.2 creates a Gloo CPU process group even for its one-GPU engine. Before running E006, the acceptance script
+verifies that `torch.__file__` is inside the private environment and requires CUDA, Gloo, and NCCL. This prevents the
+site PyTorch module from silently re-entering the environment through `PYTHONPATH`; it also repeats the one-rank NCCL
+and Gloo all-reduce smoke before starting vLLM.
 
 Its result is retained under `build/vllm_acceptance/l40s/`; review the JSON and job log. Success requires:
 
@@ -115,11 +168,10 @@ sbatch --partition=gpu_h100 \
 ```
 
 The H100 job uses the same multi-architecture private build. If the user chose a custom environment location, include
-`HPC_AI_VLLM_ENV=/absolute/path/to/vllm-0.10.2` in that `--export` list as well.
+`HPC_AI_VLLM_ENV=/absolute/path/to/vllm-0.10.2-gloo` in that `--export` list as well.
 
-## Re-enable Only After the Cluster Fix
+## Re-enable Only After Acceptance
 
-Do not manually import the acceptance record. After a Gloo-enabled Torch module is available, rebuild the isolated
-environment against that module, rerun the acceptance gate, and reintroduce E006 as a dedicated immutable pilot before
-re-enabling the remaining vLLM rows. `VENV_ACTIVATE` remains available for those later vLLM waves and should not be set
-for non-vLLM work.
+Do not manually import the acceptance record. After the private stack and acceptance gate pass, reintroduce E006 as a
+dedicated immutable pilot before re-enabling the remaining vLLM rows. Use the private environment path as
+`VENV_ACTIVATE` for those later vLLM waves; never set it for non-vLLM work.

@@ -37,10 +37,10 @@ Do not use `--upgrade-strategy eager` on Lovelace; it can mix PyPI Torch/Numpy w
 runtime and invalidate both DeepSpeed and vLLM checks.
 
 The current execution matrix deliberately defers E006 and all other vLLM-serving rows until their isolated environment
-is built. The verified Lovelace helper now provides a CUDA 12.4.1 compiler for the pinned source build, but vLLM is not
-part of the shared environment. Do not install a generic PyPI vLLM wheel into this environment. Follow the
-[vLLM environment runbook](vllm_environment_runbook.md) to build it privately and run the E006 serving acceptance gate.
-Re-enable these rows only after the vLLM build and dedicated preflight pass.
+is built. The verified Lovelace helper provides the CUDA 12.4.1 compiler, but its PyTorch module omits the Gloo backend
+required by vLLM's CPU coordination group. Do not install a generic PyPI vLLM wheel into the shared environment. Follow
+the [vLLM environment runbook](vllm_environment_runbook.md) to build private Gloo-enabled PyTorch, build vLLM against
+that wheel, and run the E006 serving acceptance gate. Re-enable these rows only after all gates pass.
 
 On an L40S allocation, capture the actual device and topology before accepting results:
 
