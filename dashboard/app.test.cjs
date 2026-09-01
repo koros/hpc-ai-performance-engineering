@@ -1,6 +1,15 @@
 const assert = require("assert").strict;
 
-const { buildPhaseBarEntries, summarizePhases } = require("./app.js");
+const {
+  buildCompletionEntries,
+  buildEnergyPowerEntries,
+  buildInferenceGroups,
+  buildMemorySeries,
+  buildPhaseBarEntries,
+  buildScalingSeries,
+  buildUncertaintyGroups,
+  summarizePhases,
+} = require("./app.js");
 
 const rows = [
   result("l40s", "exact", "gpt2_small", 100),
@@ -29,6 +38,68 @@ run("fallback phase summaries preserve all statistical grouping fields", () => {
   assert.equal(summaryFor(summaries, "l40s", "capacity_adjusted", "gpt2_small").avg_throughput_tokens_sec, 80);
 });
 
+run("progress counts retain platform and comparability boundaries", () => {
+  const entries = buildCompletionEntries([
+    { platform_id: "l40s", comparability: "exact", status: "completed" },
+    { platform_id: "h100", comparability: "exact", status: "completed" },
+    { platform_id: "l40s", comparability: "capacity_adjusted", status: "failed" },
+  ]);
+
+  assert.equal(entries.length, 3);
+  assert.equal(entries.find((entry) => entry.platform === "h100").counts.completed, 1);
+  assert.equal(entries.find((entry) => entry.comparability === "capacity_adjusted").counts.failed, 1);
+});
+
+run("uncertainty panels split platform, comparability, workload, and unit", () => {
+  const common = {
+    completed_trials: 3,
+    throughput_tokens_mean: 100,
+    throughput_tokens_ci95_low: 90,
+    throughput_tokens_ci95_high: 110,
+  };
+  const groups = buildUncertaintyGroups([
+    { ...common, experiment_id: "E001", platform_id: "l40s", comparability: "exact", workload: "gpt2", throughput_unit: "tokens/s" },
+    { ...common, experiment_id: "E002", platform_id: "h100", comparability: "exact", workload: "gpt2", throughput_unit: "tokens/s" },
+    { ...common, experiment_id: "E003", platform_id: "l40s", comparability: "capacity_adjusted", workload: "gpt2", throughput_unit: "tokens/s" },
+    { ...common, experiment_id: "E004", platform_id: "l40s", comparability: "exact", workload: "distilbert", throughput_unit: "tokens/s" },
+    { ...common, experiment_id: "E005", platform_id: "l40s", comparability: "exact", workload: "gpt2", throughput_unit: "samples/s" },
+  ]);
+
+  assert.equal(groups.length, 5);
+});
+
+run("memory and scaling series never cross platform or comparability boundaries", () => {
+  const memoryRows = [
+    memory("l40s", "exact", "gpt2", 16, 28),
+    memory("l40s", "capacity_adjusted", "gpt2", 25, 43),
+    memory("h100", "exact", "gpt2", 32, 51),
+  ];
+  const scalingRows = [
+    scaling("l40s", "exact", "gpt2", 1, 1),
+    scaling("l40s", "capacity_adjusted", "gpt2", 2, 1.7),
+    scaling("h100", "exact", "gpt2", 2, 1.9),
+  ];
+
+  assert.equal(buildMemorySeries(memoryRows).length, 3);
+  assert.equal(buildScalingSeries(scalingRows).length, 3);
+});
+
+run("energy and inference views retain evidence labels without pooling", () => {
+  const energy = buildEnergyPowerEntries([
+    energyResult("l40s", "exact", "E008", "gpt2", 1000),
+    energyResult("h100", "exact", "E008", "gpt2", 700),
+    energyResult("l40s", "capacity_adjusted", "E201", "gpt2", 1200),
+  ]);
+  const inference = buildInferenceGroups([
+    inferenceResult("l40s", "exact", "gpt2"),
+    inferenceResult("h100", "exact", "gpt2"),
+    inferenceResult("l40s", "exact", "distilbert"),
+  ]);
+
+  assert.equal(energy.length, 3);
+  assert.equal(inference.length, 3);
+});
+
 function result(platform_id, comparability, workload, throughput_tokens_sec) {
   return {
     platform_id,
@@ -42,6 +113,60 @@ function result(platform_id, comparability, workload, throughput_tokens_sec) {
     throughput_tokens_sec,
     runtime_seconds: 10,
     gpu_hours_estimate: 1,
+  };
+}
+
+function memory(platform_id, comparability, workload, micro_batch_size, max_memory_used_gb) {
+  return {
+    platform_id,
+    comparability,
+    workload,
+    throughput_unit: "tokens/s",
+    activation_checkpointing: "false",
+    gradient_accumulation_steps: 1,
+    micro_batch_size,
+    max_memory_used_gb,
+  };
+}
+
+function scaling(platform_id, comparability, workload, gpus, speedup) {
+  return {
+    platform_id,
+    comparability,
+    workload,
+    strategy: "ddp",
+    precision: "bf16",
+    scaling_type: "strong",
+    throughput_unit: "tokens/s",
+    gpus,
+    speedup,
+    scaling_efficiency: speedup / gpus,
+  };
+}
+
+function energyResult(platform_id, comparability, experiment_id, workload, energy_joules) {
+  return {
+    platform_id,
+    comparability,
+    experiment_id,
+    workload,
+    mode: "training",
+    energy_joules,
+    metric_nvidia_smi_power_draw_watts: 200,
+  };
+}
+
+function inferenceResult(platform_id, comparability, workload) {
+  return {
+    experiment_id: "E010",
+    platform_id,
+    comparability,
+    workload,
+    throughput_unit: "tokens/s",
+    avg_latency_p95_ms: 10,
+    avg_throughput_tokens_sec: 100,
+    precision: "bf16",
+    gpus: 1,
   };
 }
 
