@@ -12,6 +12,14 @@
     },
     {
       "platform": "l40s",
+      "wave": "vllm-pilot",
+      "name": "L40S canonical vLLM environment pilot",
+      "experiment_ids": ["E006"],
+      "required_trials": 1,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "l40s",
       "wave": "1",
       "name": "L40S core baselines and characterisation",
       "experiment_ids": ["E008-E015", "E018-E031"],
@@ -67,6 +75,46 @@
       "name": "L40S supported PyTorch inference",
       "experiment_ids": ["E129-E130", "E132-E153", "E156-E178", "E180-E198"],
       "exclude_ids": ["E130", "E132-E148", "E151-E152", "E172", "E175-E176", "E178", "E180-E196"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "vllm-framework",
+      "name": "L40S vLLM framework baselines",
+      "experiment_ids": ["E130", "E178"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "vllm-batching",
+      "name": "L40S vLLM batching studies",
+      "experiment_ids": ["E132-E137", "E180-E185"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "vllm-concurrency",
+      "name": "L40S vLLM concurrency studies",
+      "experiment_ids": ["E138-E142", "E186-E190"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "vllm-prompt",
+      "name": "L40S vLLM prompt-length studies",
+      "experiment_ids": ["E143-E146", "E191-E194"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "vllm-tp2",
+      "name": "L40S two-GPU vLLM tensor-parallel studies",
+      "experiment_ids": ["E147", "E195"],
       "required_trials": 3,
       "comparability": "exact"
     },
@@ -149,13 +197,6 @@
   ],
   "deferred": [
     {
-      "platforms": ["l40s"],
-      "name": "vLLM serving blocked by the PyTorch Gloo backend",
-      "experiment_ids": ["E006", "E130", "E132-E148", "E178", "E180-E196"],
-      "comparability": "platform_specific",
-      "reason": "The isolated vLLM 0.10.2 build imports, but the active Torch 2.8.0 CUDA 12.4 module lacks the Gloo backend required by vLLM engine startup. Do not schedule until a Gloo-enabled compatible Torch module is available and E006 passes its serving gate."
-    },
-    {
       "platforms": ["h100"],
       "name": "vLLM serving blocked pending H100 acceptance",
       "experiment_ids": ["E006", "E130", "E132-E148", "E178", "E180-E196"],
@@ -167,7 +208,7 @@
       "name": "CUDA-toolkit-dependent TensorRT-LLM validation",
       "experiment_ids": ["E007"],
       "comparability": "platform_specific",
-      "reason": "Requires a compatible TensorRT-LLM environment, a usable CUDA build toolchain, and a pinned model/engine contract. Do not schedule until those prerequisites are available."
+      "reason": "The CUDA 12.4.1 compiler toolchain is now validated, but no compatible TensorRT-LLM package, built engine artefact, or pinned model/engine load-and-request contract is available. Do not schedule until those remaining prerequisites pass E007."
     },
     {
       "platforms": ["l40s", "h100"],
@@ -207,7 +248,7 @@
     {
       "platforms": ["l40s"],
       "name": "L40S four-GPU conditions exceed the available node capacity",
-      "experiment_ids": ["E003", "E034", "E037", "E040", "E043", "E046", "E048", "E050", "E056", "E058", "E115-E116", "E119-E120", "E172"],
+      "experiment_ids": ["E003", "E034", "E037", "E040", "E043", "E046", "E048", "E050", "E056", "E058", "E115-E116", "E119-E120", "E148", "E172", "E196"],
       "comparability": "platform_specific",
       "reason": "The active L40S node exposes two GPUs. These four-GPU conditions must wait for a verified four-GPU L40S allocation; do not substitute two-GPU results."
     },

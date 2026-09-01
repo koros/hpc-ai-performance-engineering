@@ -261,7 +261,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in source_ids
     )
 
-    assert l40s_planned_source_count == 125
+    assert l40s_planned_source_count == 160
     assert (
         sum(condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in supplemental_ids)
         == 3
@@ -350,13 +350,16 @@ def test_retry_scope_includes_new_policy_conditions_missing_from_prior_attempt(m
     assert retry_ids == ["E205"]
 
 
-def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -> None:
-    shared_deferred_ids = {
-        "E007",
+def test_execution_matrix_defers_only_unaccepted_or_unsupported_backend_and_platform_rows() -> None:
+    h100_vllm_deferred_ids = {
+        "E006",
         "E130",
         *(f"E{index:03d}" for index in range(132, 149)),
         "E178",
         *(f"E{index:03d}" for index in range(180, 197)),
+    }
+    shared_deferred_ids = {
+        "E007",
     }
 
     for platform_id in ("l40s", "h100"):
@@ -365,7 +368,6 @@ def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -
             expected_ids.update(
                 {
                     "E003",
-                    "E006",
                     "E032",
                     "E033",
                     "E034",
@@ -387,11 +389,13 @@ def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -
                     "E116",
                     "E119",
                     "E120",
+                    "E148",
                     "E172",
+                    "E196",
                 }
             )
         else:
-            expected_ids.add("E006")
+            expected_ids.update(h100_vllm_deferred_ids)
         conditions = load_platform_conditions(
             "platforms/execution_matrix.json",
             platform_id,
@@ -403,10 +407,38 @@ def test_execution_matrix_defers_vllm_cuda_toolkit_and_unavailable_l40s_rows() -
         assert all(condition.wave == "deferred" for condition in conditions)
 
 
-def test_execution_matrix_has_no_runnable_l40s_vllm_pilot() -> None:
+def test_execution_matrix_schedules_accepted_l40s_vllm_scope_in_dedicated_waves() -> None:
     conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s", wave="vllm-pilot")
 
-    assert conditions == []
+    assert [(condition.matrix_id, condition.required_trials) for condition in conditions] == [("E006", 1)]
+
+    later_waves = {
+        "vllm-framework": {"E130", "E178"},
+        "vllm-batching": {
+            *(f"E{index:03d}" for index in range(132, 138)),
+            *(f"E{index:03d}" for index in range(180, 186)),
+        },
+        "vllm-concurrency": {
+            *(f"E{index:03d}" for index in range(138, 143)),
+            *(f"E{index:03d}" for index in range(186, 191)),
+        },
+        "vllm-prompt": {
+            *(f"E{index:03d}" for index in range(143, 147)),
+            *(f"E{index:03d}" for index in range(191, 195)),
+        },
+        "vllm-tp2": {"E147", "E195"},
+    }
+    for wave, expected_ids in later_waves.items():
+        wave_conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s", wave=wave)
+        assert {condition.matrix_id for condition in wave_conditions} == expected_ids
+        assert {condition.required_trials for condition in wave_conditions} == {3}
+        assert {condition.comparability for condition in wave_conditions} == {"exact"}
+
+    all_vllm_ids = {"E006"}
+    for expected_ids in later_waves.values():
+        all_vllm_ids.update(expected_ids)
+    assert len(all_vllm_ids) == 35
+    assert {"E148", "E196"}.isdisjoint(all_vllm_ids)
 
 
 def test_deferred_platform_conditions_are_tracked() -> None:
@@ -616,7 +648,9 @@ def test_private_gloo_torch_and_vllm_builds_preserve_the_shared_venv() -> None:
     assert "submit-pytorch-gloo-build:" in makefile
     assert "submit-vllm-build:" in makefile
     assert "submit-vllm-acceptance:" in makefile
-    assert "submit-vllm-pilot:" not in makefile
+    assert "submit-vllm-pilot:" in makefile
+    assert "submit-vllm-wave:" in makefile
+    assert 'VENV_ACTIVATE="$(VLLM_ENV)/bin/activate"' in makefile
     assert "HPC_AI_VLLM_SOURCE" in makefile
     assert "--venv-activate $(VENV_ACTIVATE)" in makefile
 
