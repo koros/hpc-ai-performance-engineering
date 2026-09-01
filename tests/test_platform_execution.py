@@ -550,6 +550,12 @@ def test_private_gloo_torch_and_vllm_builds_preserve_the_shared_venv() -> None:
     assert "export USE_DISTRIBUTED=1" in torch_builder
     assert "export USE_GLOO=1" in torch_builder
     assert "export USE_NCCL=1" in torch_builder
+    assert "export USE_OPENMP=0" in torch_builder
+    assert "export USE_FBGEMM=0" in torch_builder
+    assert "export USE_MKLDNN=0" in torch_builder
+    assert '"cmake>=3.27,<4"' in torch_builder
+    assert "build-openmp-incompatible-" in torch_builder
+    assert "Preserved incompatible OpenMP build cache" in torch_builder
     assert "export TORCH_CUDA_ARCH_LIST" in torch_builder
     assert 'setup.py bdist_wheel --dist-dir "$TORCH_WHEEL_DIR"' in torch_builder
     assert '"BUILD_MANIFEST.json"' in torch_builder

@@ -62,6 +62,10 @@ uses one L40S so it can validate the finished wheel against a real CUDA device b
 - checks out the exact PyTorch `v2.8.0` source and its submodules outside the repository;
 - builds for both L40S (`sm_89`) and H100 (`sm_90`) with `USE_CUDA=1`, `USE_DISTRIBUTED=1`, `USE_GLOO=1`, and
   `USE_NCCL=1`;
+- disables OpenMP, FBGEMM, and oneDNN/MKLDNN because the site LLVM `libomp` has unresolved hwloc symbols and these
+  CPU acceleration paths are not required by the CUDA-only vLLM profile or Gloo transport;
+- preserves a build directory configured with the incompatible OpenMP profile under a timestamped
+  `build-openmp-incompatible-*` name before starting the corrected configuration;
 - installs the wheel into a private validation environment and completes one-rank NCCL/GPU and Gloo/CPU all-reduces;
 - writes `BUILD_MANIFEST.json` containing the source commit, build options, wheel name, and SHA-256.
 

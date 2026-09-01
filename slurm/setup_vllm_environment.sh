@@ -179,6 +179,9 @@ if manifest.get("cuda_version") != "12.4":
 for backend in ("use_distributed", "use_gloo", "use_nccl"):
     if manifest.get(backend) is not True:
         issues.append(f"{backend} is not true")
+for disabled_feature in ("use_openmp", "use_fbgemm", "use_mkldnn"):
+    if manifest.get(disabled_feature) is not False:
+        issues.append(f"{disabled_feature} is not false")
 if manifest.get("wheel") != wheel.name:
     issues.append("manifest wheel name does not match the selected file")
 digest = hashlib.sha256(wheel.read_bytes()).hexdigest()

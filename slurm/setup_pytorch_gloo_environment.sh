@@ -158,7 +158,7 @@ else
   # hidden, preventing setuptools, NumPy, or Torch from leaking into the build.
   uv pip install --python "$TORCH_ENV/bin/python" -r "$TORCH_SOURCE/requirements.txt"
   uv pip install --python "$TORCH_ENV/bin/python" \
-    "setuptools>=77,<81" wheel ninja cmake
+    "setuptools>=77,<81" wheel ninja "cmake>=3.27,<4"
 
   export CC="${CC:-clang}"
   export CXX="${CXX:-clang++}"
@@ -172,7 +172,25 @@ else
   export USE_GLOO=1
   export USE_NCCL=1
   export USE_MPI=0
+  # The site LLVM libomp has unresolved hwloc symbols. This private runtime is
+  # exclusively for CUDA vLLM, so omit CPU OpenMP and the two CPU acceleration
+  # libraries that probe it. Gloo itself uses its own thread/socket transport.
+  export USE_OPENMP=0
+  export USE_FBGEMM=0
+  export USE_MKLDNN=0
   export BUILD_TEST=0
+
+  # A previous attempt may have configured this checkout with the site OpenMP
+  # runtime enabled. Reusing that CMake graph would keep the broken libomp/hwloc
+  # probe alive even though the corrected options are now exported. Preserve
+  # the partial build for diagnosis and force one clean reconfiguration.
+  TORCH_BUILD_DIR="$TORCH_SOURCE/build"
+  if [[ -f "$TORCH_BUILD_DIR/CMakeCache.txt" ]] && \
+    grep -Eq '^USE_(OPENMP|FBGEMM|MKLDNN):BOOL=(ON|1)$' "$TORCH_BUILD_DIR/CMakeCache.txt"; then
+    STALE_BUILD_DIR="${TORCH_SOURCE}/build-openmp-incompatible-$(date -u +%Y%m%dT%H%M%SZ)"
+    mv "$TORCH_BUILD_DIR" "$STALE_BUILD_DIR"
+    echo "Preserved incompatible OpenMP build cache at: $STALE_BUILD_DIR"
+  fi
 
   echo "Building private PyTorch $TORCH_TAG"
   echo "  environment:   $TORCH_ENV"
@@ -230,6 +248,9 @@ manifest = {
     "use_distributed": True,
     "use_gloo": True,
     "use_nccl": True,
+    "use_openmp": False,
+    "use_fbgemm": False,
+    "use_mkldnn": False,
     "wheel": wheel.name,
     "wheel_sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
 }
