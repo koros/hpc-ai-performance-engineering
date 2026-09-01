@@ -11,8 +11,9 @@ VLLM_VERSION="${HPC_AI_VLLM_VERSION:-0.10.2}"
 VLLM_TAG="v${VLLM_VERSION}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VLLM_BASE="${HPC_AI_VLLM_BASE:-${HOME}/.local/share/hpc-ai-performance-engineering}"
-VLLM_ENV="${HPC_AI_VLLM_ENV:-${VLLM_BASE}/vllm-${VLLM_VERSION}}"
-VLLM_SOURCE="${HPC_AI_VLLM_SOURCE:-${VLLM_BASE}/src/vllm-${VLLM_TAG}}"
+VLLM_ENV="${HPC_AI_VLLM_ENV:-${VLLM_BASE}/vllm-${VLLM_VERSION}-gloo}"
+VLLM_SOURCE="${HPC_AI_VLLM_SOURCE:-${VLLM_BASE}/src/vllm-${VLLM_TAG}-gloo}"
+TORCH_WHEEL_DIR="${HPC_AI_TORCH_WHEEL_DIR:-${VLLM_BASE}/wheels/pytorch-2.8.0-cu124-gloo}"
 VLLM_MAX_JOBS="${HPC_AI_VLLM_MAX_JOBS:-${SLURM_CPUS_PER_TASK:-4}}"
 VLLM_CLANG_BRACKET_DEPTH="${HPC_AI_VLLM_CLANG_BRACKET_DEPTH:-1024}"
 VLLM_TEXT_ONLY="${HPC_AI_VLLM_TEXT_ONLY:-1}"
@@ -29,11 +30,14 @@ Options:
   --project-root PATH  Repository containing slurm/modules_for_hpc_ai.
   --env-dir PATH       Destination virtual environment.
   --source-dir PATH    Destination vLLM source checkout.
+  --torch-wheel-dir PATH
+                       Private Gloo-enabled PyTorch wheel directory.
   --max-jobs COUNT     Parallel compiler jobs (default: SLURM_CPUS_PER_TASK or 4).
   --help               Show this message.
 
 Environment overrides: HPC_AI_VLLM_VERSION, HPC_AI_VLLM_BASE,
-HPC_AI_VLLM_ENV, HPC_AI_VLLM_SOURCE, HPC_AI_VLLM_MAX_JOBS, and
+HPC_AI_VLLM_ENV, HPC_AI_VLLM_SOURCE, HPC_AI_TORCH_WHEEL_DIR,
+HPC_AI_VLLM_MAX_JOBS, and
 HPC_AI_VLLM_TORCH_CUDA_ARCH_LIST. HPC_AI_VLLM_CLANG_BRACKET_DEPTH defaults
 to 1024 for vLLM's generated Marlin code. The default architecture list is
 8.9;9.0, so one isolated build can be used on the L40S and H100 nodes.
@@ -62,6 +66,10 @@ while [[ $# -gt 0 ]]; do
       VLLM_SOURCE="$2"
       shift 2
       ;;
+    --torch-wheel-dir)
+      TORCH_WHEEL_DIR="$2"
+      shift 2
+      ;;
     --max-jobs)
       VLLM_MAX_JOBS="$2"
       shift 2
@@ -81,6 +89,7 @@ done
 PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd)"
 VLLM_ENV="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$VLLM_ENV")"
 VLLM_SOURCE="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$VLLM_SOURCE")"
+TORCH_WHEEL_DIR="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$TORCH_WHEEL_DIR")"
 
 if [[ ! "$VLLM_MAX_JOBS" =~ ^[1-9][0-9]*$ ]]; then
   echo "ERROR: --max-jobs must be a positive integer; got $VLLM_MAX_JOBS" >&2
@@ -134,14 +143,50 @@ for command in nvcc clang clang++ git; do
 done
 
 BOOTSTRAP_PYTHON="$(command -v python3)"
-"$BOOTSTRAP_PYTHON" - <<'PY'
-import torch
 
-if not torch.__version__.startswith("2.8.") or torch.version.cuda != "12.4":
-    raise SystemExit(
-        f"Expected the Lovelace Torch 2.8/CUDA 12.4 stack; found torch {torch.__version__}, CUDA {torch.version.cuda}."
-    )
-print(f"Using module Torch {torch.__version__} with CUDA {torch.version.cuda}")
+# Keep the compiler and CUDA library paths loaded by the site modules, but hide
+# their Python packages. In particular, the Gloo-disabled py-torch module must
+# never satisfy an import inside this private environment.
+unset PYTHONPATH PYTHONHOME
+
+torch_wheels=("$TORCH_WHEEL_DIR"/torch-2.8.0-*.whl)
+if [[ ${#torch_wheels[@]} -ne 1 || ! -e "${torch_wheels[0]}" ]]; then
+  echo "ERROR: expected one private Torch 2.8.0 wheel in $TORCH_WHEEL_DIR" >&2
+  echo "Run make submit-pytorch-gloo-build and wait for it to succeed first." >&2
+  exit 3
+fi
+TORCH_WHEEL="${torch_wheels[0]}"
+if [[ ! -r "$TORCH_WHEEL_DIR/BUILD_MANIFEST.json" ]]; then
+  echo "ERROR: private Torch build manifest is missing: $TORCH_WHEEL_DIR/BUILD_MANIFEST.json" >&2
+  exit 3
+fi
+export HPC_AI_PRIVATE_TORCH_WHEEL="$TORCH_WHEEL"
+export HPC_AI_PRIVATE_TORCH_MANIFEST="$TORCH_WHEEL_DIR/BUILD_MANIFEST.json"
+"$BOOTSTRAP_PYTHON" - <<'PY'
+import hashlib
+import json
+import os
+from pathlib import Path
+
+wheel = Path(os.environ["HPC_AI_PRIVATE_TORCH_WHEEL"])
+manifest_path = Path(os.environ["HPC_AI_PRIVATE_TORCH_MANIFEST"])
+manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+issues = []
+if manifest.get("torch_version") != "2.8.0":
+    issues.append(f"expected Torch 2.8.0, found {manifest.get('torch_version')!r}")
+if manifest.get("cuda_version") != "12.4":
+    issues.append(f"expected CUDA 12.4, found {manifest.get('cuda_version')!r}")
+for backend in ("use_distributed", "use_gloo", "use_nccl"):
+    if manifest.get(backend) is not True:
+        issues.append(f"{backend} is not true")
+if manifest.get("wheel") != wheel.name:
+    issues.append("manifest wheel name does not match the selected file")
+digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+if manifest.get("wheel_sha256") != digest:
+    issues.append("private Torch wheel SHA-256 does not match the build manifest")
+if issues:
+    raise SystemExit("Invalid private Torch build:\n- " + "\n- ".join(issues))
+print(f"Private Torch build manifest verified: {manifest_path}")
 PY
 
 if [[ -e "$VLLM_ENV" && ! -x "$VLLM_ENV/bin/python" ]]; then
@@ -150,7 +195,7 @@ if [[ -e "$VLLM_ENV" && ! -x "$VLLM_ENV/bin/python" ]]; then
 fi
 if [[ ! -e "$VLLM_ENV" ]]; then
   mkdir -p "$(dirname "$VLLM_ENV")"
-  "$BOOTSTRAP_PYTHON" -m venv --system-site-packages "$VLLM_ENV"
+  "$BOOTSTRAP_PYTHON" -m venv "$VLLM_ENV"
 fi
 
 if [[ -e "$VLLM_SOURCE" ]]; then
@@ -182,24 +227,36 @@ if "$CXX" --version 2>&1 | grep -qi 'clang version'; then
   export CUDAFLAGS="${CUDAFLAGS:+${CUDAFLAGS} }-Xcompiler=-fbracket-depth=${VLLM_CLANG_BRACKET_DEPTH}"
 fi
 
-# The Spack modules expose their Python packages through PYTHONPATH. That path
-# otherwise wins over a --system-site-packages venv and makes the build import
-# the site's setuptools 76.1 instead of the private compatible version below.
-# Keep the module paths for Torch, but put this venv's site-packages first.
+# Put the private site-packages first for subprocesses spawned by CMake. The
+# module PYTHONPATH was removed above, so this contains only the private stack.
 VLLM_SITE_PACKAGES="$("$VLLM_ENV/bin/python" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
-export PYTHONPATH="${VLLM_SITE_PACKAGES}${PYTHONPATH:+:${PYTHONPATH}}"
+export PYTHONPATH="$VLLM_SITE_PACKAGES"
 
 echo "Building $VLLM_TAG"
 echo "  environment: $VLLM_ENV"
 echo "  source:      $VLLM_SOURCE"
+echo "  Torch wheel: $TORCH_WHEEL"
 echo "  compiler:    $CC / $CXX"
 echo "  CUDA_HOME:   $CUDA_HOME"
 echo "  architectures: $TORCH_CUDA_ARCH_LIST"
 echo "  CUDAFLAGS:   ${CUDAFLAGS:-unset}"
 
-# vLLM documents uv pip install -e . for a source build. The target environment
-# inherits the Spack Torch runtime read-only, while its vLLM/Python packages are
-# installed privately. No package is written into the project .venv.
+# Install and validate the private Torch wheel before invoking vLLM's build
+# backend. This makes the CUDA extension ABI deterministic and prevents uv from
+# resolving the site module or an official wheel for a different CUDA runtime.
+uv pip install --python "$VLLM_ENV/bin/python" "$TORCH_WHEEL"
+"$VLLM_ENV/bin/python" "$PROJECT_ROOT/scripts/check_private_torch.py" \
+  --expected-environment "$VLLM_ENV" \
+  --expected-version 2.8.0 \
+  --expected-cuda 12.4 \
+  --require-gloo \
+  --require-nccl \
+  --require-cuda \
+  --smoke-process-groups
+
+# vLLM documents uv pip install -e . for a source build. No package is written
+# into the project .venv and build isolation is disabled so the extension sees
+# the private Torch ABI.
 cd "$VLLM_SOURCE"
 # vLLM v0.10.2 imports setuptools_scm while preparing editable metadata but
 # does not declare it in its build-system requirements. Its SPDX license value
@@ -240,8 +297,8 @@ uv pip install --python "$VLLM_ENV/bin/python" \
 # remove this optional incompatible wheel. A future audio workload must use a
 # TorchAudio build that matches the cluster runtime and set TEXT_ONLY=0.
 if [[ "$VLLM_TEXT_ONLY" == "1" ]]; then
-  echo "Removing incompatible optional TorchAudio wheel for the text-only vLLM profile"
-  "$VLLM_ENV/bin/python" -m pip uninstall -y torchaudio
+  echo "Removing incompatible optional audio/vision wheels for the text-only vLLM profile"
+  "$VLLM_ENV/bin/python" -m pip uninstall -y torchaudio torchvision
 fi
 
 "$VLLM_ENV/bin/python" - <<PY
@@ -262,7 +319,11 @@ print("torch_cuda", torch.version.cuda)
 if Version(installed_vllm_version).base_version != "$VLLM_VERSION":
     raise SystemExit("vLLM base version does not match the pinned source tag")
 if not torch.__version__.startswith("2.8.") or torch.version.cuda != "12.4":
-    raise SystemExit("isolated environment no longer resolves the verified Torch 2.8/CUDA 12.4 runtime")
+    raise SystemExit("isolated environment no longer resolves private Torch 2.8/CUDA 12.4")
+if not torch.distributed.is_gloo_available() or not torch.distributed.is_nccl_available():
+    raise SystemExit("private Torch must provide both Gloo and NCCL")
+if not str(torch.__file__).startswith("$VLLM_ENV/"):
+    raise SystemExit(f"Torch resolved outside the private environment: {torch.__file__}")
 if installed_transformers_version != "$VLLM_TRANSFORMERS_VERSION":
     raise SystemExit("isolated environment no longer resolves the pinned Transformers runtime")
 if installed_tokenizers_version != "$VLLM_TOKENIZERS_VERSION":

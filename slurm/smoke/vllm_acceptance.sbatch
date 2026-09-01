@@ -15,7 +15,7 @@ set -euo pipefail
 PROJECT_ROOT="${SLURM_SUBMIT_DIR:?Submit this script from the project root}"
 EXPECTED_GPU_MODEL="${HPC_AI_EXPECTED_GPU_MODEL:-L40S}"
 VLLM_VERSION="${HPC_AI_VLLM_VERSION:-0.10.2}"
-HPC_AI_VLLM_ENV="${HPC_AI_VLLM_ENV:-${HOME}/.local/share/hpc-ai-performance-engineering/vllm-${VLLM_VERSION}}"
+HPC_AI_VLLM_ENV="${HPC_AI_VLLM_ENV:-${HOME}/.local/share/hpc-ai-performance-engineering/vllm-${VLLM_VERSION}-gloo}"
 
 cd "$PROJECT_ROOT"
 source slurm/modules_for_hpc_ai
@@ -25,9 +25,19 @@ if [[ ! -r "$HPC_AI_VLLM_ENV/bin/activate" ]]; then
   echo "Run sbatch slurm/smoke/vllm_build_l40s.sbatch first." >&2
   exit 3
 fi
+unset PYTHONPATH PYTHONHOME
 source "$HPC_AI_VLLM_ENV/bin/activate"
-export PYTHONPATH="$PROJECT_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$PROJECT_ROOT/src"
 export TOKENIZERS_PARALLELISM=false
+
+python scripts/check_private_torch.py \
+  --expected-environment "$HPC_AI_VLLM_ENV" \
+  --expected-version 2.8.0 \
+  --expected-cuda 12.4 \
+  --require-gloo \
+  --require-nccl \
+  --require-cuda \
+  --smoke-process-groups
 
 python -m hpc_ai_perf.cli check-runtime \
   --expected-gpu-model "$EXPECTED_GPU_MODEL" \

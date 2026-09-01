@@ -7,6 +7,7 @@ import venv
 from pathlib import Path
 
 import pytest
+from scripts.check_private_torch import is_import_below_environment
 
 from hpc_ai_perf.cli import (
     _incomplete_planned_wave_experiment_ids,
@@ -524,29 +525,69 @@ def test_lovelace_module_helper_uses_verified_cuda_build_stack() -> None:
     assert 'export CUDA_HOME="$(cd "$(dirname "$_hpc_ai_nvcc")/.." && pwd)"' in helper
 
 
-def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -> None:
+def test_private_torch_check_rejects_site_module_import(tmp_path: Path) -> None:
+    environment = tmp_path / "vllm-0.10.2-gloo"
+    private_torch = environment / "lib/python3.11/site-packages/torch/__init__.py"
+    site_torch = tmp_path / "spack/py-torch/lib/python3.11/site-packages/torch/__init__.py"
+
+    assert is_import_below_environment(private_torch, environment)
+    assert not is_import_below_environment(site_torch, environment)
+
+
+def test_private_gloo_torch_and_vllm_builds_preserve_the_shared_venv() -> None:
+    torch_builder = Path("slurm/setup_pytorch_gloo_environment.sh").read_text(encoding="utf-8")
+    torch_build_job = Path("slurm/smoke/pytorch_gloo_build_l40s.sbatch").read_text(encoding="utf-8")
     builder = Path("slurm/setup_vllm_environment.sh").read_text(encoding="utf-8")
     build_job = Path("slurm/smoke/vllm_build_l40s.sbatch").read_text(encoding="utf-8")
     acceptance = Path("slurm/smoke/vllm_acceptance.sbatch").read_text(encoding="utf-8")
+    checker = Path("scripts/check_private_torch.py").read_text(encoding="utf-8")
     makefile = Path("Makefile").read_text(encoding="utf-8")
+
+    assert 'TORCH_VERSION="${HPC_AI_TORCH_VERSION:-2.8.0}"' in torch_builder
+    assert "unset PYTHONPATH PYTHONHOME" in torch_builder
+    assert '"$BOOTSTRAP_PYTHON" -m venv "$TORCH_ENV"' in torch_builder
+    assert '-m venv --system-site-packages "$TORCH_ENV"' not in torch_builder
+    assert "export USE_DISTRIBUTED=1" in torch_builder
+    assert "export USE_GLOO=1" in torch_builder
+    assert "export USE_NCCL=1" in torch_builder
+    assert "export TORCH_CUDA_ARCH_LIST" in torch_builder
+    assert 'setup.py bdist_wheel --dist-dir "$TORCH_WHEEL_DIR"' in torch_builder
+    assert '"BUILD_MANIFEST.json"' in torch_builder
+    assert "check_private_torch.py" in torch_builder
+    assert "--require-gloo" in torch_builder
+    assert "--require-nccl" in torch_builder
+    assert "--require-cuda" in torch_builder
+    assert "torch.__file__" in checker
+    assert "dist.is_gloo_available()" in checker
+    assert "dist.is_nccl_available()" in checker
+    assert "process_group_smoke" in checker
+    assert "--smoke-process-groups" in torch_builder
+    assert "#SBATCH --partition=gpu_l40s" in torch_build_job
+    assert "setup_pytorch_gloo_environment.sh" in torch_build_job
 
     assert 'VLLM_VERSION="${HPC_AI_VLLM_VERSION:-0.10.2}"' in builder
     assert 'VLLM_CLANG_BRACKET_DEPTH="${HPC_AI_VLLM_CLANG_BRACKET_DEPTH:-1024}"' in builder
     assert 'VLLM_TEXT_ONLY="${HPC_AI_VLLM_TEXT_ONLY:-1}"' in builder
     assert 'VLLM_TRANSFORMERS_VERSION="${HPC_AI_VLLM_TRANSFORMERS_VERSION:-4.57.6}"' in builder
     assert 'VLLM_TOKENIZERS_VERSION="${HPC_AI_VLLM_TOKENIZERS_VERSION:-0.22.1}"' in builder
-    assert "python3 -m venv --system-site-packages" not in builder
-    assert '"$BOOTSTRAP_PYTHON" -m venv --system-site-packages "$VLLM_ENV"' in builder
+    assert '-m venv --system-site-packages "$VLLM_ENV"' not in builder
+    assert '"$BOOTSTRAP_PYTHON" -m venv "$VLLM_ENV"' in builder
+    assert "unset PYTHONPATH PYTHONHOME" in builder
+    assert 'TORCH_WHEEL_DIR="${HPC_AI_TORCH_WHEEL_DIR' in builder
+    assert "Private Torch build manifest verified" in builder
+    assert 'uv pip install --python "$VLLM_ENV/bin/python" "$TORCH_WHEEL"' in builder
+    assert "check_private_torch.py" in builder
+    assert "--smoke-process-groups" in builder
     assert '"setuptools>=77,<81"' in builder
     assert '"setuptools_scm[toml]>=8,<9"' in builder
-    assert 'export PYTHONPATH="${VLLM_SITE_PACKAGES}${PYTHONPATH:+:${PYTHONPATH}}"' in builder
+    assert 'export PYTHONPATH="$VLLM_SITE_PACKAGES"' in builder
     assert "Using private setuptools" in builder
     assert "uv --verbose pip install" in builder
     assert 'uv pip install --python "$VLLM_ENV/bin/python" \\' in builder
     assert '"transformers==${VLLM_TRANSFORMERS_VERSION}"' in builder
     assert '"tokenizers==${VLLM_TOKENIZERS_VERSION}"' in builder
     assert "Version(installed_vllm_version).base_version" in builder
-    assert "pip uninstall -y torchaudio" in builder
+    assert "pip uninstall -y torchaudio torchvision" in builder
     assert "from transformers import ProcessorMixin" in builder
     assert "from vllm import LLM, SamplingParams" in builder
     assert 'installed_transformers_version != "$VLLM_TRANSFORMERS_VERSION"' in builder
@@ -555,9 +596,14 @@ def test_isolated_vllm_build_and_acceptance_scripts_preserve_the_shared_venv() -
     assert "-Xcompiler=-fbracket-depth=${VLLM_CLANG_BRACKET_DEPTH}" in builder
     assert "#SBATCH --partition=gpu_l40s" in build_job
     assert "setup_vllm_environment.sh" in build_job
+    assert "unset PYTHONPATH PYTHONHOME" in acceptance
+    assert "check_private_torch.py" in acceptance
+    assert "--smoke-process-groups" in acceptance
     assert "--require-vllm" in acceptance
     assert "E006_vllm_1gpu.json" in acceptance
     assert "build/vllm_acceptance" in acceptance
+    assert "setup-pytorch-gloo-environment:" in makefile
+    assert "submit-pytorch-gloo-build:" in makefile
     assert "submit-vllm-build:" in makefile
     assert "submit-vllm-acceptance:" in makefile
     assert "submit-vllm-pilot:" not in makefile
