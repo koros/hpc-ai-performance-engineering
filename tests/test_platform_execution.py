@@ -757,6 +757,7 @@ def test_private_gloo_torch_and_vllm_builds_preserve_the_shared_venv() -> None:
     assert "submit-vllm-acceptance:" in makefile
     assert "submit-vllm-pilot:" in makefile
     assert "submit-vllm-wave:" in makefile
+    assert "retry-vllm-wave:" in makefile
     assert 'VENV_ACTIVATE="$(VLLM_ENV)/bin/activate"' in makefile
     assert "HPC_AI_VLLM_SOURCE" in makefile
     assert "--venv-activate $(VENV_ACTIVATE)" in makefile

@@ -1300,6 +1300,73 @@ def test_gpt2_inference_dispatches_to_causal_lm_helper(monkeypatch) -> None:
     assert output.metrics["throughput_tokens_sec"] == 1.0
 
 
+def test_vllm_inference_uses_eager_execution_for_the_certified_runtime(monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/inference/E130_gpt2_small_framework_vllm.json"))
+    config = replace(config, runtime=replace(config.runtime, max_steps=1))
+    llm_kwargs: dict[str, object] = {}
+
+    class FakeCuda:
+        @staticmethod
+        def is_available() -> bool:
+            return True
+
+    class FakeGenerator:
+        def manual_seed(self, seed: int):
+            assert seed == 1337
+            return self
+
+    class FakeTokenIds:
+        @staticmethod
+        def tolist() -> list[list[int]]:
+            return [[1] * 128]
+
+    class FakeTorch:
+        cuda = FakeCuda()
+        Generator = FakeGenerator
+
+        @staticmethod
+        def randint(*args, **kwargs) -> FakeTokenIds:
+            assert args == (0, 50257, (1, 128))
+            assert isinstance(kwargs["generator"], FakeGenerator)
+            return FakeTokenIds()
+
+    class FakeTokenizer:
+        vocab_size = 50257
+
+    class FakeCandidate:
+        token_ids = [1, 2]
+
+    class FakeOutput:
+        outputs = [FakeCandidate()]
+        metrics = None
+
+    class FakeLlm:
+        def __init__(self, **kwargs) -> None:
+            llm_kwargs.update(kwargs)
+
+        @staticmethod
+        def get_tokenizer() -> FakeTokenizer:
+            return FakeTokenizer()
+
+        @staticmethod
+        def generate(*args, **kwargs) -> list[FakeOutput]:
+            return [FakeOutput()]
+
+    fake_vllm = types.ModuleType("vllm")
+    fake_vllm.LLM = FakeLlm
+    fake_vllm.SamplingParams = lambda **kwargs: kwargs
+    monkeypatch.setitem(sys.modules, "torch", FakeTorch())
+    monkeypatch.setitem(sys.modules, "vllm", fake_vllm)
+    monkeypatch.setattr(transformer_module.importlib.util, "find_spec", lambda _: object())
+    monkeypatch.setattr(transformer_module, "_prepare_runtime", lambda *args, **kwargs: None)
+    monkeypatch.setattr(transformer_module, "_start_cuda_timer", lambda *args: None)
+
+    output = transformer_module._run_vllm_inference(config)
+
+    assert llm_kwargs["enforce_eager"] is True
+    assert output.metrics["vllm_execution_mode"] == "eager"
+
+
 def test_tinyllama_training_dispatches_to_causal_training(monkeypatch) -> None:
     config = load_experiment_config(Path("configs/local/tinyllama_inference_smoke.json"))
     training_config = config.__class__(

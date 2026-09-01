@@ -713,6 +713,13 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         revision=_selected_model_revision(config, model_name),
         dtype=dtype,
         tensor_parallel_size=tensor_parallel_size,
+        # The certified private L40S runtime couples vLLM 0.10.2 to a
+        # source-built PyTorch 2.8.0 wheel. Its installed Triton package is
+        # sufficient for vLLM kernels, but not for vLLM's optional
+        # torch.compile/Inductor path: that path expects Triton's removed
+        # ``triton_key`` API. Eager execution avoids that incompatible optional
+        # compiler while retaining CUDA, NCCL, and the vLLM engine itself.
+        enforce_eager=True,
     )
     sampling = SamplingParams(temperature=0.0, max_tokens=max_new_tokens)
     requests_per_round = batch_size * concurrency
@@ -776,6 +783,7 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "latency_p95_ms": _percentile(latencies, 95) * 1000,
         "framework_observed": "vllm",
         "tensor_parallel_size_observed": tensor_parallel_size,
+        "vllm_execution_mode": "eager",
         "precision_backend": f"vllm_{dtype}",
         "compute_dtype_observed": dtype,
         "parameter_dtype_observed": dtype,

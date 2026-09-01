@@ -23,6 +23,12 @@ sets `PYTHONPATH` only to the immutable bundle snapshot. This prevents the modul
 the accepted private Gloo/NCCL-enabled build. Ordinary project `.venv` waves retain the module Python path because
 they intentionally consume the cluster's site packages.
 
+The certified L40S vLLM runner uses `enforce_eager=True`. This is intentional: the private Torch 2.8.0/vLLM 0.10.2
+environment passes CUDA, NCCL, Gloo, engine-start, and request-serving gates, but its optional `torch.compile` path
+expects a Triton `triton_key` API that is not present in the compatible vLLM build. Eager mode avoids only that
+optional compilation path and is recorded in each result as `vllm_execution_mode=eager`. Do not compare these values
+with a compiled-vLLM run without explicitly separating the execution modes.
+
 ## One-Time Preparation
 
 Install `uv` in your user account if the command is unavailable:
@@ -218,3 +224,9 @@ make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-framework
 
 `submit-vllm-wave` always supplies the private environment to the immutable bundle. Never supply that environment to
 non-vLLM waves. L40S `E148` and `E196` remain deferred because they request four GPUs; the active node exposes two.
+
+If a completed scheduler job writes failed evidence, create a recovery bundle with the matching private environment:
+
+```bash
+make retry-vllm-wave PLATFORM=l40s PLATFORM_WAVE=vllm-framework
+```
