@@ -31,10 +31,10 @@ The companion [platform experiment matrix](platform_experiment_matrix.md) gives 
 | --- | ---: | --- |
 | Source matrix configs | 200 | `E001-E200` |
 | Supplemental L40S capacity conditions | 9 | `E201-E207` are GPT-2 micro-batch boundary probes; `E208-E209` are a matched checkpointed TinyLlama strong-scaling pair derived from the E044 L40S OOM. |
-| Planned L40S source conditions | 160 | Generated as `E###@l40s`; includes 35 platform-specific/exact vLLM conditions in dedicated waves. |
+| Planned L40S source conditions | 176 | Generated as `E###@l40s`; includes all 37 platform-specific/exact vLLM conditions in dedicated waves and 17 newly released four-GPU rows. |
 | Planned L40S supplemental conditions | 5 | Generated as capacity-adjusted `E201-E202@l40s`, `E205@l40s`, and `E208-E209@l40s`; do not pool with exact H100 evidence. |
 | Deferred L40S supplemental conditions | 4 | `E203-E204` and `E206-E207`; confirmed upper-bound OOM probes at micro-batch 26/27/28/30. |
-| Deferred L40S source conditions | 40 | TensorRT-LLM/backend/adapter gaps, H100-specific hardware rows, four-GPU rows including E148/E196, and exact-shape E032/E033/E067/E068 L40S OOMs. |
+| Deferred L40S source conditions | 24 | TensorRT-LLM/backend/adapter gaps, H100-specific hardware rows, and exact-shape E032/E033/E044/E067/E068 L40S OOMs. |
 | Planned H100 conditions | 144 | Generated as `E###@h100`; run the same supported scope when allocation is available. |
 | Deferred H100 conditions | 56 | Backend/adapter rows, 37 vLLM rows pending H100 E006, TensorRT-LLM `E007`, and four L40S-specific hardware rows. |
 | Mac M1 smoke configs | 4 | `configs/local/*`; minimal workflow checks. |
@@ -48,7 +48,7 @@ materializer now creates the required companion config deterministically and rec
 
 The Lovelace documentation describes one four-GPU H100 node and one eight-GPU L40S node. The `gpu_h100` queue provides 16 CPU cores per allocated GPU, while `gpu_l40s` provides 8; do not copy an H100 scheduler allocation unchanged to L40S. [Lovelace system specification](https://www.plymouth.ac.uk/facilities/high-performance-computing) and [GPU queue guidance](https://docs.lovelace.plymouth.ac.uk/user-guide/resources) should be checked again immediately before submission.
 
-The H100 SXM is the primary multi-GPU platform: it has 80 GB memory and NVLink. NVIDIA lists the L40S as a PCIe GPU with no NVLink. Consequently, an L40S distributed result is useful evidence about DDP/FSDP/ZeRO and NCCL over the installed PCIe topology, but it cannot support an H100 NVLink conclusion. [NVIDIA H100 specifications](https://www.nvidia.com/en-us/data-center/h100/) and [NVIDIA L40S specifications](https://www.nvidia.com/en-in/data-center/l40s/) provide the hardware distinction.
+The H100 SXM has 80 GB memory and NVLink, while the L40S node provides eight PCIe GPUs without NVLink. Consequently, both platforms support four-GPU experiments, but their communication evidence answers different topology questions: L40S measures the installed PCIe path and H100 measures NVLink where available. [NVIDIA H100 specifications](https://www.nvidia.com/en-us/data-center/h100/) and [NVIDIA L40S specifications](https://www.nvidia.com/en-in/data-center/l40s/) provide the hardware distinction.
 
 There is a memory-label discrepancy to resolve before the first L40S run: the repository and L40S config names expect `NVIDIA L40S 48GB`, while the University facility page currently says 40 GB per L40S card. Run `nvidia-smi --query-gpu=name,memory.total --format=csv,noheader` on the allocation and use the observed name and capacity in the companion profile/config. Do not assume an L40 and an L40S are interchangeable; the runtime currently matches the `l40s` model token.
 
@@ -81,7 +81,7 @@ companion:
 - use the `gpu_l40s` queue/profile and repeat the L40S environment-validation sequence before matrix collection; and
 - report communication as NCCL/PCIe behaviour, not NVLink behaviour.
 
-L40S is suitable for supported single- and two-GPU baselines, DistilBERT scaling, DDP/FSDP/ZeRO comparisons, memory optimisation, data-movement studies, power/energy analysis, PyTorch inference, and the accepted one-/two-GPU vLLM scope. The active node does not support its four-GPU rows, including vLLM E148/E196. The exact E032/E033 GPT-2 strong-scaling shapes and E067/E068 GPT-2 micro-batch 32/64 shapes are deferred after observed OOMs; E201/E202/E205 provide separately labelled L40S capacity-adjusted probes, while E203/E204/E206/E207 record the upper-bound OOMs at micro-batch 26/27/28/30. E205 establishes micro-batch 25 as the largest passing integer boundary observed so far. Exact E044 also OOMed in all three L40S trials after allocating 43.30 GiB and failing a further 1000 MiB request. The matched checkpointed E208/E209 pair preserves TinyLlama, BF16, sequence length 1024, and global batch 16 for a separate capacity-adjusted scaling analysis, while original E044/E045 remain intact for H100. These results answer L40S-specific questions and do not replace H100 evidence for H100-specific research questions.
+L40S is suitable for supported single-, two-, and four-GPU baselines, scaling, DDP/FSDP/ZeRO comparisons, communication analysis, memory optimisation, data-movement studies, power/energy analysis, PyTorch inference, and the accepted vLLM scope. Slurm job 1773321 verified four concurrent visible L40S GPUs on the eight-GPU node. The exact E032/E033 GPT-2 strong-scaling shapes and E067/E068 GPT-2 micro-batch 32/64 shapes remain deferred after observed OOMs; E201/E202/E205 provide separately labelled L40S capacity-adjusted probes, while E203/E204/E206/E207 record the upper-bound OOMs at micro-batch 26/27/28/30. E205 establishes micro-batch 25 as the largest passing integer boundary observed so far. Exact E044 also OOMed in all three L40S trials after allocating 43.30 GiB and failing a further 1000 MiB request. The matched checkpointed E208/E209 pair preserves TinyLlama, BF16, sequence length 1024, and global batch 16 for a separate capacity-adjusted scaling analysis, while original E044/E045 remain intact for H100. These results answer L40S-specific questions and do not replace H100 evidence for H100-specific research questions.
 
 ### H100: deferred collection path, already materializable
 
@@ -96,7 +96,6 @@ Use the H100 node for the core baseline trials, 1/2/4-GPU scaling, distributed-s
 | IDs | Reason | Required before release |
 | --- | --- | --- |
 | H100 `E006`, `E130`, `E132-E148`, `E178`, `E180-E196` | The private stack has passed on L40S, not H100. | Run E006 with the private stack on H100 and require import, engine-start, and served-request success before releasing H100 performance rows. |
-| L40S `E148`, `E196` | These tensor-parallel conditions request four GPUs while the active L40S node exposes two. | A verified four-GPU L40S allocation; do not substitute two-GPU results. |
 | `E007` | CUDA 12.4.1 is available, but TensorRT-LLM still lacks a compatible package, built engine, pinned model, and saved-engine contract. | A compatible pinned environment, immutable engine artefact, and successful build/load/request result on each target platform. |
 | `E131`, `E155`, `E179` | TensorRT-LLM performance integration is absent; `E155` is also not a valid generic DistilBERT classification adapter. | Reuse the validated E007 engine contract in causal-LM benchmarks; design a separate classification contract for E155. |
 | `E086`, `E089`, `E093`, `E096`, `E151`, `E175`, `E199` | FP8 backend/model implementation is not selected or validated. | A documented, tested backend and model path on the target GPU. |
@@ -108,11 +107,11 @@ Use the H100 node for the core baseline trials, 1/2/4-GPU scaling, distributed-s
 | Order | Mac M1 | L40/L40S | H100 | Why |
 | ---: | --- | --- | --- | --- |
 | 0 | Smoke and dev profile | Inspect GPU name, memory, CUDA, and topology | Inspect GPU name, memory, CUDA, and topology | Avoid model/profile mismatch before spending queue time. |
-| 1 | Baseline-shaped dev checks | Wave 0: `E001`, `E002`, `E004-E005` | Wave 0: `E001-E005` | The active L40S node has two GPUs, so its four-GPU E003 condition remains deferred. |
+| 1 | Baseline-shaped dev checks | Wave 0: `E001`, `E002`, `E004-E005`; then `4gpu-pilot` E003 | Wave 0: `E001-E005` | Keep E003 separate so the completed core-wave history remains immutable and four-rank NCCL is explicitly gated. |
 | 2 | GPT-2/DistilBERT adapter checks | Wave 1, then wave 2 direct hardware pairs | H100 wave 1, then wave 2 when available | Build repeatable reference measurements and matched platform anchors. |
-| 3 | No further publishable work | Supported one-/two-GPU wave 3 scaling and strategy pilots | H100 wave 3 later | The L40S four-GPU rows and exact E032/E033 OOM conditions remain deferred. |
+| 3 | No further publishable work | `4gpu-core`, then `4gpu-communication` after E003 | H100 wave 3 later | Four-GPU L40S capacity is verified; exact E032/E033 OOM conditions remain deferred independently. |
 | 4 | Optional local shape checks | Waves 4, 4c, 4b, and 5 | Matching H100 waves | Collect exact depth first, then labelled L40S capacity probes, communication, and PyTorch inference. |
-| 5 | No publishable vLLM evidence | `vllm-pilot`, then framework, batching, concurrency, prompt, and TP2 waves | Run H100 E006 first; release H100 vLLM waves only after it passes | Keep private-runtime evidence platform-specific and preserve the accepted environment contract in each immutable bundle. |
+| 5 | No publishable vLLM evidence | `vllm-pilot`, then framework, batching, concurrency, prompt, TP2, and canary-gated TP4 waves | Run H100 E006 first; release H100 vLLM waves only after it passes | Keep private-runtime evidence platform-specific and preserve the accepted environment contract in each immutable bundle. |
 
 ## Interpretation Rules
 

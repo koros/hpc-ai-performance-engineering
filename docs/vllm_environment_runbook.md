@@ -218,6 +218,7 @@ After the pilot reports one provenance-valid completed trial, run the performanc
 | `vllm-concurrency` | `E138-E142`, `E186-E190` | 3 | Concurrent-request sweeps. |
 | `vllm-prompt` | `E143-E146`, `E191-E194` | 3 | Prompt-length sweeps. |
 | `vllm-tp2` | `E147`, `E195` | 3 | Two-GPU tensor-parallel serving. |
+| `vllm-tp4` | `E148`, `E196` | 3 | Four-GPU tensor-parallel serving after E003 and a TP=4 canary pass. |
 
 For example:
 
@@ -229,7 +230,8 @@ make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-framework
 ```
 
 `submit-vllm-wave` always supplies the private environment to the immutable bundle. Never supply that environment to
-non-vLLM waves. L40S `E148` and `E196` remain deferred because they request four GPUs; the active node exposes two.
+non-vLLM waves. Slurm job 1773321 verified four visible L40S GPUs on the eight-GPU node, so E148/E196 are routed to
+`vllm-tp4`; run a TP=4 canary before submitting their canonical trials.
 
 If a completed scheduler job writes failed evidence, create a recovery bundle with the matching private environment:
 

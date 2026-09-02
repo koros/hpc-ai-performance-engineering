@@ -65,8 +65,9 @@ python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-to
 
 The helper must expose `nvcc` and set `CUDA_HOME` to the matching compiler root before running E005. Run
 `make check-cuda-toolchain PLATFORM=l40s EXPECTED_GPUS=2` in this allocation to verify the complete toolchain. The
-current wave 0 scope is E001, E002, E004, and E005; E003 requires four GPUs and is deferred on the active L40S node.
-Run E006 only through `make submit-vllm-pilot`; its separate serving environment has passed the L40S preflight.
+current wave 0 scope remains E001, E002, E004, and E005. Slurm job 1773321 separately verified four concurrent L40S
+GPUs on the eight-GPU node, so E003 now runs through `4gpu-pilot` without reopening completed wave 0 history. Run
+E006 only through `make submit-vllm-pilot`; its separate serving environment has passed the L40S preflight.
 
 ## 2. Preserve and Collect L40S Trials
 
@@ -100,7 +101,7 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `0` | `E001`, `E002`, `E004`, `E005` core environment validation | 1 | All four Complete; observed L40S/CUDA/distributed/DeepSpeed checks agree. |
 | `1` | `E008-E015`, `E018-E031` baselines and characterisation | 3 | Core rows Complete; variance and provenance reviewed. |
 | `2` | `E123`, `E124`, `E127`, `E128` direct L40S comparison anchors | 3 | All matched L40S anchors Complete. |
-| `3` | L40S 1/2-GPU scaling and strategy conditions, excluding E032/E033 | 3 | Supported 1/2-GPU rows are valid. E032 and E033 are deferred after exact-shape L40S OOMs; four-GPU conditions are also deferred. |
+| `3` | L40S one-/two-GPU scaling and strategy conditions, excluding E032/E033 | 3 | Supported one-/two-GPU rows are valid. E032 and E033 remain deferred after exact-shape L40S OOMs; four-GPU rows use `4gpu-core`. |
 | `4` | Supported exact memory, precision, and data movement rows, excluding E067/E068 | 3 | No silent OOM-driven shape changes; precision backend observed. E067/E068 remain H100-exact rows and L40S OOM deferrals. |
 | `4c` | `E201-E202`, `E205` capacity-adjusted GPT-2 L40S micro-batch probes | 3 | Interpret only as L40S capacity-boundary evidence; E203/E204/E206/E207 are confirmed OOM upper-bound probes and must not be pooled with exact E067/E068. |
 | `4b` | `E113`, `E114`, `E117`, `E118` communication | 3 | Interpret as two-GPU NCCL over installed PCIe topology; no NVLink claims. |
@@ -111,6 +112,10 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `vllm-concurrency` | `E138-E142`, `E186-E190` | 3 | Concurrency sweep completes with latency and throughput metrics. |
 | `vllm-prompt` | `E143-E146`, `E191-E194` | 3 | Prompt-length sweep completes with TTFT and generation metrics. |
 | `vllm-tp2` | `E147`, `E195` | 3 | Two-GPU tensor-parallel rows run on both visible L40S devices. |
+| `4gpu-pilot` | `E003` | 1 | Four-rank NCCL initialization and all-reduce pass before any four-GPU performance wave. |
+| `4gpu-core` | `E034`, `E037`, `E040`, `E043`, `E046`, `E048`, `E050`, `E056`, `E058`, `E172` | 3 | Exact four-GPU scaling, strategy, and PyTorch classification inference conditions complete after E003. |
+| `4gpu-communication` | `E115-E116`, `E119-E120` | 3 | Interpret as four-GPU NCCL over the installed L40S PCIe topology. |
+| `vllm-tp4` | `E148`, `E196` | 3 | Submit with `make submit-vllm-wave` only after a four-GPU TP=4 canary succeeds. |
 | `optional` | `E016-E017`, `E045` | 3 | E044 is excluded after three deterministic exact-shape L40S OOMs; retain its failed bundle for the report. |
 | `optional-capacity` | `E208-E209` checkpointed TinyLlama strong scaling | 3 | Both rows must complete under the same checkpointed protocol before calculating capacity-adjusted speedup. Do not pair E208 with non-checkpointed E045. |
 | `telemetry-revalidation` | `E210-E213` UUID-bound training, inference, and communication anchors | 3 | Run before final power/utilisation/energy interpretation. All records must identify the allocated GPU mapping and pass the telemetry audit. |
@@ -126,14 +131,14 @@ remain active. Set `HPC_AI_ENABLE_DEEPSPEED_NVTX=1` only after verifying a compa
 Nsight study. The DeepSpeed `bf16`/`fp16` configuration is the sole mixed-precision controller for ZeRO rows; the
 runner does not nest PyTorch native AMP around the DeepSpeed engine.
 
-E007, H100-unaccepted vLLM rows, E032/E033/E067/E068 exact L40S rows, four-GPU L40S rows, and backend/adapter rows
-listed as Deferred are not rendered by platform batch commands. L40S E006 and supported one-/two-GPU GPT-2/TinyLlama
-vLLM rows are now rendered only by their dedicated private-environment waves. E032 and E033 exhausted the exact GPT-2 strong-scaling
+E007, H100-unaccepted vLLM rows, E032/E033/E067/E068 exact L40S rows, and backend/adapter rows listed as Deferred are
+not rendered by platform batch commands. L40S E006 and supported GPT-2/TinyLlama vLLM rows are rendered only by their
+dedicated private-environment waves, including `vllm-tp4`. E032 and E033 exhausted the exact GPT-2 strong-scaling
 shapes on the observed L40S capacity. E067 and E068 exhausted the exact GPT-2 micro-batch 32/64 shapes. Reduced-batch
 L40S studies are registered separately as capacity-adjusted conditions. E201/E202 succeeded at micro-batch 20/24,
 E205 succeeded at micro-batch 25, and E206/E207/E203/E204 OOMed at 26/27/28/30. The current L40S boundary is therefore
-micro-batch 25 as the largest passing integer probe. The active L40S node exposes two GPUs,
-so the matrix preserves only supported one- and two-GPU conditions in runnable waves.
+micro-batch 25 as the largest passing integer probe. The L40S node exposes eight GPUs, and a four-GPU allocation has
+been verified; the dedicated four-GPU waves preserve those exact conditions without modifying prior wave history.
 
 The exact one-GPU TinyLlama strong-scaling row E044 also exceeded L40S memory in all three trials. Each run had
 43.30 GiB allocated by PyTorch with 592.25 MiB free before a further 1000 MiB allocation failed. E044 is therefore
