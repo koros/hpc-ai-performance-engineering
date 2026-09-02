@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import subprocess
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -92,7 +93,7 @@ class EnvironmentValidationWorkload(Workload):
         if observed != expected_value:
             raise RuntimeError(f"AllReduce produced {observed}, expected {expected_value}")
         algorithmic_bytes = 2 * (world_size - 1) / world_size * tensor_bytes * iterations
-        return {
+        metrics: dict[str, int | float | str | bool | None] = {
             "torchrun_launch": world_size > 1,
             "process_group_init": dist.is_initialized(),
             "allreduce": True,
@@ -104,6 +105,14 @@ class EnvironmentValidationWorkload(Workload):
             "rank": rank,
             "local_rank": local_rank,
         }
+        if bool(config.workload.parameters.get("capture_gpu_topology", False)):
+            if rank == 0:
+                metrics.update(_capture_gpu_topology())
+            else:
+                # Only rank zero writes the canonical result. Every rank still
+                # needs to satisfy the same environment-validation checks.
+                metrics["gpu_topology_capture"] = True
+        return metrics
 
     @staticmethod
     def _fsdp_smoke(config: ExperimentConfig) -> dict[str, int | float | str | bool | None]:
@@ -308,3 +317,27 @@ def _init_process_group(torch: Any, config: ExperimentConfig) -> tuple[Any, int,
     if world_size > 1 and not dist.is_initialized():
         dist.init_process_group(backend=config.distributed.backend, init_method="env://")
     return dist, rank, local_rank, world_size
+
+
+def _capture_gpu_topology() -> dict[str, int | float | str | bool | None]:
+    """Capture full-node GPU topology and active PCIe links for evidence."""
+    commands = {
+        "gpu_topology_matrix": ["nvidia-smi", "topo", "-m"],
+        "gpu_pcie_link_inventory": [
+            "nvidia-smi",
+            "--query-gpu=uuid,pci.bus_id,pcie.link.gen.current,pcie.link.gen.max,"
+            "pcie.link.width.current,pcie.link.width.max",
+            "--format=csv,noheader,nounits",
+        ],
+    }
+    captured: dict[str, int | float | str | bool | None] = {"gpu_topology_capture": True}
+    for metric_name, command in commands.items():
+        try:
+            completed = subprocess.run(command, check=True, capture_output=True, text=True, timeout=15)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise RuntimeError(f"Failed to capture {metric_name} with nvidia-smi: {exc}") from exc
+        output = completed.stdout.strip()
+        if not output:
+            raise RuntimeError(f"nvidia-smi returned no data for {metric_name}")
+        captured[metric_name] = output
+    return captured

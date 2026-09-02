@@ -654,6 +654,41 @@ def test_torch_profiler_uses_bundle_artifact_directory_when_provided(monkeypatch
     )
 
 
+def test_nonzero_distributed_ranks_skip_node_wide_nvidia_smi_sampling(monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/communication_analysis/E115_gpt2_small_nccl_ddp_4gpu.json"))
+    monkeypatch.setenv("RANK", "1")
+
+    profiler = build_profiler(config, repetition_number=1)
+
+    assert isinstance(profiler, CompositeProfiler)
+    assert [item.name for item in profiler._profilers] == ["nccl", "torch_profiler"]
+
+
+def test_topology_capture_records_matrix_and_pcie_inventory(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return types.SimpleNamespace(stdout="GPU-a, 00000000:01:00.0, 4, 4, 16, 16\n")
+
+    monkeypatch.setattr(environment_module.subprocess, "run", fake_run)
+
+    captured = environment_module._capture_gpu_topology()
+
+    assert captured["gpu_topology_capture"] is True
+    assert captured["gpu_topology_matrix"] == "GPU-a, 00000000:01:00.0, 4, 4, 16, 16"
+    assert captured["gpu_pcie_link_inventory"] == "GPU-a, 00000000:01:00.0, 4, 4, 16, 16"
+    assert calls == [
+        ["nvidia-smi", "topo", "-m"],
+        [
+            "nvidia-smi",
+            "--query-gpu=uuid,pci.bus_id,pcie.link.gen.current,pcie.link.gen.max,"
+            "pcie.link.width.current,pcie.link.width.max",
+            "--format=csv,noheader,nounits",
+        ],
+    ]
+
+
 def test_deepspeed_import_environment_unsets_stale_cuda_home(monkeypatch, tmp_path: Path) -> None:
     stale_cuda_home = tmp_path / "cuda_without_nvcc"
     stale_cuda_home.mkdir()

@@ -486,8 +486,16 @@ def build_profiler(config: ExperimentConfig, *, repetition_number: int | None = 
         raise ValueError(f"Unsupported profiler(s): {', '.join(unknown)}")
 
     profilers: list[Profiler] = []
+    rank = int(os.environ.get("RANK", "0"))
     for name in config.profiling.profilers:
         if name == "nvidia_smi":
+            # nvidia-smi observes every GPU allocated to the job. One sampler
+            # per distributed rank would duplicate node-wide queries and add
+            # avoidable measurement overhead on four-/eight-GPU workloads.
+            # Rank zero records the complete visible allocation for the
+            # canonical result.
+            if rank != 0:
+                continue
             interval = float(config.profiling.parameters.get("sample_interval_seconds", 0.2))
             profilers.append(NvidiaSmiProfiler(interval))
         elif name == "torch_memory":

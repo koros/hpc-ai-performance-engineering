@@ -18,6 +18,7 @@ TRANSFORMER_PARAMETER_KEYS = {
     "allreduce_iterations",
     "baseline_kind",
     "batch_size",
+    "capture_gpu_topology",
     "collect_gradient_synchronization",
     "collect_loss",
     "collect_sharded_communication",
@@ -78,6 +79,7 @@ WORKLOAD_PARAMETER_KEYS = {
     "tinyllama": TRANSFORMER_PARAMETER_KEYS,
     "environment_validation": {
         "allreduce_bytes",
+        "capture_gpu_topology",
         "engine_api_contract",
         "engine_manifest_path",
         "engine_mode",
