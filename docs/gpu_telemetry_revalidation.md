@@ -19,6 +19,12 @@ New records include:
 - metric scopes showing that memory is the maximum per GPU, power is summed across visible GPUs, and utilisation is
   averaged across visible GPUs.
 
+Telemetry schema version 3 additionally timestamps samples and separates `measured_region` energy from the broader
+collector window. The original E210-E213 L40S runs validated device attribution, but their unqualified average-power
+and energy estimates include warm-up and profiler finalization. Preserve those records unchanged. Their throughput,
+latency, NCCL, loss, Torch memory, and peak-power evidence remains usable; their energy values are
+`legacy_full_window` diagnostics and must not feed tokens/kWh or steady-state power conclusions.
+
 Processed output translates those methods into `uuid_verified` or `cgroup_verified`. Historical records with samples
 but no mapping metadata become `legacy_positional`; no raw record is rewritten.
 
@@ -46,6 +52,7 @@ comparability class and therefore cannot be pooled with the original experiment 
 | `E211` | GPT-2 BF16 DDP weak-scaling training | `E036` | 2 |
 | `E212` | GPT-2 BF16 PyTorch eager inference | `E129` | 1 |
 | `E213` | GPT-2 BF16 DDP/NCCL communication | `E113` | 2 |
+| `E214` | Measured-region GPT-2 BF16 DDP/NCCL energy | `E113`, `E213` | 2 |
 
 Run L40S before starting H100 collection:
 
@@ -70,3 +77,19 @@ energy measurements with the documented mapping limitation. If a material system
 only conclusions that depend on the affected external metric and rerun representative conditions in those families.
 Throughput, latency, loss, NCCL timings, and independently collected Torch peak-memory values are not invalidated merely
 because an old record is labelled `legacy_positional`.
+
+For energy revalidation, use the new immutable `E214` condition rather than rerunning E210-E213 with duplicate trial
+identities. E214 is the two-GPU communication protocol corresponding to E113/E213. It
+must produce three trials with `telemetry_schema_version=3`, `energy_scope=measured_region`, and
+`measurement_status=sufficient`. Compare its throughput and NCCL metrics against E113/E213 for protocol consistency,
+then use only the corrected condition for average power, joules, and tokens/kWh. Run the corrected collector before
+the first H100 energy campaign; do not copy L40S energy conclusions to H100.
+
+```bash
+make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=energy-revalidation
+make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=energy-revalidation
+make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=energy-revalidation
+make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=energy-revalidation
+```
+
+Repeat with `PLATFORM=h100` before making cross-platform communication-energy claims.

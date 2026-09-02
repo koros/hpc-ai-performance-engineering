@@ -114,6 +114,7 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `optional` | `E016-E017`, `E045` | 3 | E044 is excluded after three deterministic exact-shape L40S OOMs; retain its failed bundle for the report. |
 | `optional-capacity` | `E208-E209` checkpointed TinyLlama strong scaling | 3 | Both rows must complete under the same checkpointed protocol before calculating capacity-adjusted speedup. Do not pair E208 with non-checkpointed E045. |
 | `telemetry-revalidation` | `E210-E213` UUID-bound training, inference, and communication anchors | 3 | Run before final power/utilisation/energy interpretation. All records must identify the allocated GPU mapping and pass the telemetry audit. |
+| `energy-revalidation` | `E214` measured-region two-GPU communication anchor | 3 | Use for communication average power, joules, and tokens/kWh after schema-v3 boundary validation. |
 
 If the original optional bundle was submitted before E044 was deferred, pull the updated policy and rerun
 `status-platform-wave`. It will report 9/9 current-policy trials and identify E044 as a policy-deferred historical

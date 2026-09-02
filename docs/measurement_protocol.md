@@ -19,6 +19,22 @@ When `workload.parameters.warmup_steps` is absent, the default is zero for a one
 
 CUDA is synchronized at measured-region boundaries and after measured steps before wall-clock timings are read. Transformer adapters also record `cuda_event_seconds` across the measured device region. `measured_seconds` is the comparable steady-state end-to-end duration; `runtime_seconds` remains the full process duration and must not replace it in scaling calculations. A region-level CUDA event does not by itself provide kernel-by-kernel or communication/compute attribution.
 
+### Power and energy boundary
+
+Telemetry schema version 3 timestamps every `nvidia-smi` observation and opens its comparable measurement window only
+after workload warm-up. The window is frozen immediately after the final measured CUDA synchronization, before
+PyTorch trace export, result serialization, distributed cleanup, or other profiler finalization. Energy is integrated
+over actual sample intervals with the trapezoidal rule.
+
+Research-valid energy records expose `energy_scope=measured_region`, `energy_joules_measured_region`,
+`power_draw_watts_measured_region`, `measurement_duration_seconds`, and `measurement_status=sufficient`. At least two
+telemetry observations must support the interval. A shorter interval is labelled `insufficient_samples` and produces
+no measured-region energy value.
+
+The backward-compatible `energy_joules_estimate` and unqualified `nvidia_smi` power/utilisation fields describe the
+broader collector window. They are diagnostics only. Derived `energy_joules` and `tokens_per_kwh` values are populated
+solely from sufficient `measured_region` evidence; legacy or full-window values must never be substituted.
+
 Every result also records `throughput_unit`: `training_tokens_per_second` for optimizer work, `generated_tokens_per_second` for causal serving, `input_tokens_per_second` for classification inference, or `synthetic_tokens_per_second` for local smoke work. Rankings and charts must be filtered or grouped by this field; unlike units are not interchangeable.
 
 ## Reproducibility and Determinism
@@ -39,6 +55,8 @@ an execution failure. Derived outputs classify earlier samples without this iden
 Those raw records remain immutable and are reviewed through `make audit-telemetry`; the label does not automatically
 invalidate independently measured throughput, latency, loss, NCCL, or Torch peak-memory metrics. See the
 [GPU telemetry revalidation protocol](gpu_telemetry_revalidation.md).
+
+Schema version 3 retains that device-identity contract and adds the measured-region energy boundary described above.
 
 ## Statistics and Missing Evidence
 
