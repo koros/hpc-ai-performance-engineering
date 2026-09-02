@@ -144,6 +144,14 @@
       "comparability": "platform_specific"
     },
     {
+      "platform": "l40s",
+      "wave": "energy-revalidation",
+      "name": "L40S measured-region communication energy anchor",
+      "experiment_ids": ["E214"],
+      "required_trials": 3,
+      "comparability": "platform_specific"
+    },
+    {
       "platform": "h100",
       "wave": "0",
       "name": "H100 core environment gate",
@@ -215,6 +223,14 @@
       "wave": "telemetry-revalidation",
       "name": "H100 UUID-verified GPU telemetry anchors",
       "experiment_ids": ["E210-E213"],
+      "required_trials": 3,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "h100",
+      "wave": "energy-revalidation",
+      "name": "H100 measured-region communication energy anchor",
+      "experiment_ids": ["E214"],
       "required_trials": 3,
       "comparability": "platform_specific"
     }

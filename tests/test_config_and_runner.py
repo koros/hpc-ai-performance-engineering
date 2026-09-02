@@ -11,7 +11,12 @@ from pathlib import Path
 import pytest
 
 from hpc_ai_perf.analysis import analyze_results, build_analysis_tables
-from hpc_ai_perf.analysis.summaries import build_phase_summary, build_scaling_summary, build_trial_summary
+from hpc_ai_perf.analysis.summaries import (
+    build_experiment_rankings,
+    build_phase_summary,
+    build_scaling_summary,
+    build_trial_summary,
+)
 from hpc_ai_perf.cli import _check_slurm_profile, _load_slurm_profile, _refresh_outputs, _render_slurm_bulk
 from hpc_ai_perf.config import (
     ProfilingConfig,
@@ -19,10 +24,13 @@ from hpc_ai_perf.config import (
     filter_config_entries,
     load_experiment_config,
 )
+from hpc_ai_perf.profiling import CompositeProfiler
+from hpc_ai_perf.profiling.base import Profiler
 from hpc_ai_perf.profiling.system import (
     NvidiaSmiProfiler,
     TorchMemoryProfiler,
     TorchProfiler,
+    _NvidiaSmiSample,
     build_profiler,
     select_nvidia_smi_rows,
 )
@@ -86,9 +94,9 @@ def test_discover_matrix_configs() -> None:
     entries = discover_experiment_configs()
     experiment_ids = {entry.config.experiment_id for entry in entries}
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 214)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 215)}
 
-    assert len(entries) == 213
+    assert len(entries) == 214
     assert experiment_ids == source_ids | supplemental_ids
 
 
@@ -469,6 +477,30 @@ def test_local_runner_records_explicit_repetition_and_provenance() -> None:
     assert result.git_commit
     assert result.config_sha256
     assert result.command
+
+
+def test_local_runner_exposes_workload_measurement_boundaries() -> None:
+    config = load_experiment_config(Path("configs/local/synthetic_smoke.json"))
+    events: list[str] = []
+
+    class RecordingProfiler(Profiler):
+        def start(self, config) -> None:
+            events.append("start")
+
+        def begin_measurement(self) -> None:
+            events.append("begin_measurement")
+
+        def end_measurement(self) -> None:
+            events.append("end_measurement")
+
+        def stop(self) -> dict[str, int | float | str | bool | None]:
+            events.append("stop")
+            return {}
+
+    result = LocalBenchmarkRunner(profiler=RecordingProfiler()).run(config)
+
+    assert result.status == "completed"
+    assert events == ["start", "begin_measurement", "end_measurement", "stop"]
 
 
 def test_runner_fails_when_enabled_workload_profiler_metrics_are_missing() -> None:
@@ -961,6 +993,10 @@ def test_deepspeed_environment_validation_uses_explicit_cuda_device(monkeypatch)
             assert device == expected_device
             devices_seen.append(device)
 
+        @staticmethod
+        def synchronize(device) -> None:
+            assert device == expected_device
+
     class FakeTorch:
         cuda = FakeCuda()
         nn = types.SimpleNamespace(
@@ -1335,6 +1371,10 @@ def test_vllm_inference_uses_certified_eager_execution(
         def is_available() -> bool:
             return True
 
+        @staticmethod
+        def synchronize() -> None:
+            return None
+
     class FakeGenerator:
         def manual_seed(self, seed: int):
             assert seed == 1337
@@ -1529,8 +1569,80 @@ def test_nvidia_smi_profiler_records_uuid_mapping_and_metric_scopes(monkeypatch)
     assert metrics["power_draw_watts"] == 220.0
     assert metrics["profiled_gpu_uuids"] == "GPU-a,GPU-b"
     assert metrics["gpu_mapping_method"] == "cuda_uuid"
-    assert metrics["telemetry_schema_version"] == "2"
+    assert metrics["telemetry_schema_version"] == "3"
     assert metrics["memory_metric_scope"] == "max_per_gpu"
+
+
+def test_nvidia_smi_profiler_integrates_only_the_measured_region() -> None:
+    profiler = NvidiaSmiProfiler()
+    profiler._started_at = 0.0
+    profiler._collection_stopped_at = 4.0
+    profiler._measurement_started_at = 1.0
+    profiler._measurement_stopped_at = 3.0
+    profiler._samples = [
+        _NvidiaSmiSample(0.0, 0.0, 1024.0, 50.0, 30.0, 1000.0),
+        _NvidiaSmiSample(1.0, 50.0, 2048.0, 100.0, 40.0, 2000.0),
+        _NvidiaSmiSample(2.0, 90.0, 3072.0, 200.0, 50.0, 2500.0),
+        _NvidiaSmiSample(3.0, 50.0, 2048.0, 100.0, 40.0, 2000.0),
+        _NvidiaSmiSample(4.0, 0.0, 1024.0, 50.0, 30.0, 1000.0),
+    ]
+
+    metrics = profiler.stop()
+
+    assert metrics["energy_scope"] == "measured_region"
+    assert metrics["measurement_status"] == "sufficient"
+    assert metrics["measurement_duration_seconds"] == 2.0
+    assert metrics["energy_joules_measured_region"] == 300.0
+    assert metrics["power_draw_watts_measured_region"] == 150.0
+    assert metrics["energy_joules_full_window"] == 450.0
+
+
+def test_nvidia_smi_profiler_marks_short_measurement_as_insufficient() -> None:
+    profiler = NvidiaSmiProfiler()
+    profiler._started_at = 0.0
+    profiler._collection_stopped_at = 1.0
+    profiler._measurement_started_at = 0.25
+    profiler._measurement_stopped_at = 0.75
+    profiler._samples = [_NvidiaSmiSample(0.5, 50.0, 1024.0, 100.0, 40.0, 2000.0)]
+
+    metrics = profiler.stop()
+
+    assert metrics["energy_scope"] == "full_window"
+    assert metrics["measurement_status"] == "insufficient_samples"
+    assert "energy_joules_measured_region" not in metrics
+
+
+def test_composite_freezes_measurement_before_profiler_finalization() -> None:
+    events: list[str] = []
+
+    class RecordingProfiler(Profiler):
+        def __init__(self, name: str, priority: int) -> None:
+            self.name = name
+            self.measurement_stop_priority = priority
+
+        def begin_measurement(self) -> None:
+            events.append(f"begin:{self.name}")
+
+        def end_measurement(self) -> None:
+            events.append(f"end:{self.name}")
+
+        def stop(self) -> dict[str, int | float | str | bool | None]:
+            events.append(f"stop:{self.name}")
+            return {}
+
+    profiler = CompositeProfiler([RecordingProfiler("nvidia_smi", 100), RecordingProfiler("torch_profiler", 0)])
+    profiler.begin_measurement()
+    profiler.end_measurement()
+    profiler.stop()
+
+    assert events == [
+        "begin:nvidia_smi",
+        "begin:torch_profiler",
+        "end:nvidia_smi",
+        "end:torch_profiler",
+        "stop:torch_profiler",
+        "stop:nvidia_smi",
+    ]
 
 
 def test_aggregate_results_writes_processed_csv(tmp_path: Path) -> None:
@@ -1694,6 +1806,36 @@ def test_analyze_results_writes_summary_tables(tmp_path: Path) -> None:
     assert ranking_rows[0]["throughput_tokens_per_gpu"] == "600.0"
 
 
+def test_energy_efficiency_requires_measured_region_scope() -> None:
+    common = {
+        "status": "completed",
+        "condition_id": "E214@l40s",
+        "experiment_id": "E214",
+        "platform_id": "l40s",
+        "comparability": "platform_specific",
+        "gpus": "2",
+        "metric_total_tokens": "1000",
+        "throughput_tokens_sec": "100",
+    }
+    measured = {**common, "energy_scope": "measured_region", "energy_joules": "200"}
+    legacy = {
+        **common,
+        "condition_id": "E213@l40s",
+        "experiment_id": "E213",
+        "energy_scope": "legacy_full_window",
+        "energy_joules": "800",
+        "metric_energy_joules_estimate": "800",
+    }
+
+    rows = build_experiment_rankings([measured, legacy])
+
+    by_id = {row["experiment_id"]: row for row in rows}
+    assert by_id["E214"]["energy_joules"] == 200.0
+    assert by_id["E214"]["tokens_per_kwh"] == 18_000_000.0
+    assert by_id["E213"]["energy_joules"] is None
+    assert by_id["E213"]["tokens_per_kwh"] is None
+
+
 def test_dashboard_static_assets_exist() -> None:
     dashboard_files = [
         Path("dashboard/index.html"),
@@ -1733,7 +1875,7 @@ def test_current_status_snapshot_exists() -> None:
 
     assert "Source matrix configs | 200" in status
     assert "L40S supplemental capacity probes | 9" in status
-    assert "Cross-platform telemetry revalidation anchors | 4" in status
+    assert "Cross-platform telemetry revalidation anchors | 5" in status
     assert "Smoke-Ready Workloads" in status
     assert "python -m hpc_ai_perf.cli refresh" in status
 
@@ -1773,8 +1915,8 @@ def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
 
     assert "Source matrix configs discovered: 200" in report
     assert "Supplemental platform probes discovered: 9" in report
-    assert "Cross-platform telemetry anchors discovered: 4" in report
-    assert "Total E-number configs discovered: 213" in report
+    assert "Cross-platform telemetry anchors discovered: 5" in report
+    assert "Total E-number configs discovered: 214" in report
     assert "`gpt2_small`" in report
     assert "slurm/smoke/gpt2_small_smoke.sbatch" in report
     assert "Submission Gate" in report
@@ -1820,7 +1962,7 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
 
     assert csv_path == output_csv
     assert markdown_path == output_markdown
-    assert len(rows) == 213
+    assert len(rows) == 214
     assert e033["status"] == "Completed"
     assert e033["runtime_seconds"] == "600.0"
     assert e034["status"] == "Configured"
