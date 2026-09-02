@@ -19,9 +19,15 @@ from hpc_ai_perf.config import (
     filter_config_entries,
     load_experiment_config,
 )
-from hpc_ai_perf.profiling.system import TorchMemoryProfiler, TorchProfiler, build_profiler
+from hpc_ai_perf.profiling.system import (
+    NvidiaSmiProfiler,
+    TorchMemoryProfiler,
+    TorchProfiler,
+    build_profiler,
+    select_nvidia_smi_rows,
+)
 from hpc_ai_perf.readiness import write_readiness_report
-from hpc_ai_perf.results import ExperimentResult, aggregate_results
+from hpc_ai_perf.results import ExperimentResult, aggregate_results, audit_telemetry
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.runtime_checks import (
     disable_deepspeed_nvtx_annotations,
@@ -80,9 +86,9 @@ def test_discover_matrix_configs() -> None:
     entries = discover_experiment_configs()
     experiment_ids = {entry.config.experiment_id for entry in entries}
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 210)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 214)}
 
-    assert len(entries) == 209
+    assert len(entries) == 213
     assert experiment_ids == source_ids | supplemental_ids
 
 
@@ -1475,6 +1481,58 @@ def test_cuda_event_timer_reports_seconds() -> None:
     assert transformer_module._stop_cuda_timer(FakeTorch, timer) == 0.125
 
 
+def test_nvidia_smi_rows_follow_cuda_uuid_order() -> None:
+    rows = [
+        "GPU-b, 80, 2048, 120, 50, 2400",
+        "GPU-a, 40, 1024, 100, 45, 2200",
+        "GPU-c, 10, 512, 80, 40, 1800",
+    ]
+
+    selected, method = select_nvidia_smi_rows(
+        rows,
+        target_gpu_uuids=("GPU-a", "GPU-b"),
+        expected_gpu_count=2,
+    )
+
+    assert method == "cuda_uuid"
+    assert selected == [rows[1], rows[0]]
+
+
+def test_nvidia_smi_rows_reject_ambiguous_positional_mapping() -> None:
+    with pytest.raises(ValueError, match="cannot prove nvidia-smi device ownership"):
+        select_nvidia_smi_rows(
+            ["GPU-a, 40", "GPU-b, 50", "GPU-c, 60"],
+            target_gpu_uuids=(),
+            expected_gpu_count=2,
+        )
+
+
+def test_nvidia_smi_profiler_records_uuid_mapping_and_metric_scopes(monkeypatch) -> None:
+    profiler = NvidiaSmiProfiler()
+    profiler._gpu_count = 2
+    profiler._target_gpu_uuids = ("GPU-a", "GPU-b")
+    profiler._started_at = 1.0
+    monkeypatch.setattr(
+        "hpc_ai_perf.profiling.system.query_nvidia_smi_rows",
+        lambda query, timeout=5: [
+            "GPU-b, 80, 2048, 120, 50, 2400",
+            "GPU-a, 40, 1024, 100, 45, 2200",
+        ],
+    )
+    monkeypatch.setattr("hpc_ai_perf.profiling.system.time.perf_counter", lambda: 3.0)
+
+    profiler._sample_once()
+    metrics = profiler.stop()
+
+    assert metrics["gpu_utilization"] == 60.0
+    assert metrics["memory_used_gb"] == 2.0
+    assert metrics["power_draw_watts"] == 220.0
+    assert metrics["profiled_gpu_uuids"] == "GPU-a,GPU-b"
+    assert metrics["gpu_mapping_method"] == "cuda_uuid"
+    assert metrics["telemetry_schema_version"] == "2"
+    assert metrics["memory_metric_scope"] == "max_per_gpu"
+
+
 def test_aggregate_results_writes_processed_csv(tmp_path: Path) -> None:
     config = load_experiment_config(Path("configs/scaling_studies/E033_gpt2_small_strong_2gpu.json"))
     raw_dir = tmp_path / "raw"
@@ -1505,6 +1563,84 @@ def test_aggregate_results_writes_processed_csv(tmp_path: Path) -> None:
     assert rows[0]["strategy"] == "ddp"
     assert rows[0]["throughput_unit"] == "training_tokens_per_second"
     assert rows[0]["metric_throughput_tokens_sec"]
+    assert rows[0]["gpu_telemetry_mapping"] == "not_collected"
+
+
+def test_aggregate_results_labels_legacy_and_uuid_verified_telemetry(tmp_path: Path) -> None:
+    config = load_experiment_config(Path("configs/baseline_profiling/E008_gpt2_small_training_baseline.json"))
+    raw_dir = tmp_path / "raw"
+    output_path = tmp_path / "processed.csv"
+    legacy = ExperimentResult.from_config(
+        config,
+        status="completed",
+        started_at="2026-01-01T00:00:00Z",
+        completed_at="2026-01-01T00:00:01Z",
+        runtime_seconds=1.0,
+        repetition_number=1,
+        metrics={"nvidia_smi.samples": 5},
+    )
+    verified = ExperimentResult.from_config(
+        config,
+        status="completed",
+        started_at="2026-01-01T00:00:02Z",
+        completed_at="2026-01-01T00:00:03Z",
+        runtime_seconds=1.0,
+        repetition_number=2,
+        metrics={
+            "nvidia_smi.samples": 5,
+            "nvidia_smi.gpu_mapping_method": "cuda_uuid",
+            "nvidia_smi.telemetry_schema_version": "2",
+            "nvidia_smi.profiled_gpu_uuids": "GPU-a",
+        },
+    )
+    legacy.write_json(raw_dir, preserve_trial=True)
+    verified.write_json(raw_dir, preserve_trial=True)
+
+    aggregate_results(raw_dir, output_path)
+    with output_path.open(encoding="utf-8", newline="") as file_obj:
+        rows = list(csv.DictReader(file_obj))
+
+    assert [row["gpu_telemetry_mapping"] for row in rows] == ["legacy_positional", "uuid_verified"]
+    assert rows[1]["gpu_telemetry_schema_version"] == "2"
+    assert rows[1]["profiled_gpu_uuids"] == "GPU-a"
+
+
+def test_audit_telemetry_preserves_raw_results_and_flags_repeated_trial_outlier(tmp_path: Path) -> None:
+    config = load_experiment_config(Path("configs/baseline_profiling/E008_gpt2_small_training_baseline.json"))
+    raw_dir = tmp_path / "raw"
+    original_contents: dict[Path, str] = {}
+    for repetition, memory in enumerate((10.0, 10.5, 40.0), start=1):
+        result = ExperimentResult.from_config(
+            config,
+            status="completed",
+            started_at=f"2026-01-01T00:00:0{repetition}Z",
+            completed_at=f"2026-01-01T00:00:1{repetition}Z",
+            runtime_seconds=10.0,
+            repetition_number=repetition,
+            metrics={
+                "nvidia_smi.samples": 20,
+                "nvidia_smi.gpu_utilization": 80.0,
+                "nvidia_smi.memory_used_gb": memory,
+                "nvidia_smi.power_draw_watts": 200.0,
+            },
+        )
+        path = result.write_json(raw_dir, preserve_trial=True)
+        original_contents[path] = path.read_text(encoding="utf-8")
+
+    csv_path, markdown_path = audit_telemetry(
+        raw_dir,
+        tmp_path / "analysis" / "telemetry_audit.csv",
+        tmp_path / "analysis" / "telemetry_audit.md",
+    )
+
+    with csv_path.open(encoding="utf-8", newline="") as file_obj:
+        rows = list(csv.DictReader(file_obj))
+    assert len(rows) == 1
+    assert rows[0]["metric"] == "memory_used_gb"
+    assert rows[0]["repetition_number"] == "3"
+    assert rows[0]["issue"] == "repeated_trial_outlier"
+    assert "| legacy_positional | 3 |" in markdown_path.read_text(encoding="utf-8")
+    assert {path: path.read_text(encoding="utf-8") for path in original_contents} == original_contents
 
 
 def test_analyze_results_writes_summary_tables(tmp_path: Path) -> None:
@@ -1597,6 +1733,7 @@ def test_current_status_snapshot_exists() -> None:
 
     assert "Source matrix configs | 200" in status
     assert "L40S supplemental capacity probes | 9" in status
+    assert "Cross-platform telemetry revalidation anchors | 4" in status
     assert "Smoke-Ready Workloads" in status
     assert "python -m hpc_ai_perf.cli refresh" in status
 
@@ -1636,7 +1773,8 @@ def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
 
     assert "Source matrix configs discovered: 200" in report
     assert "Supplemental platform probes discovered: 9" in report
-    assert "Total E-number configs discovered: 209" in report
+    assert "Cross-platform telemetry anchors discovered: 4" in report
+    assert "Total E-number configs discovered: 213" in report
     assert "`gpt2_small`" in report
     assert "slurm/smoke/gpt2_small_smoke.sbatch" in report
     assert "Submission Gate" in report
@@ -1682,7 +1820,7 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
 
     assert csv_path == output_csv
     assert markdown_path == output_markdown
-    assert len(rows) == 209
+    assert len(rows) == 213
     assert e033["status"] == "Completed"
     assert e033["runtime_seconds"] == "600.0"
     assert e034["status"] == "Configured"

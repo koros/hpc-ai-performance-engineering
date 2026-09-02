@@ -10,7 +10,12 @@ from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 
 from hpc_ai_perf.config import ExperimentConfig, config_sha256
-from hpc_ai_perf.profiling import Profiler, build_profiler, missing_workload_profiler_metrics
+from hpc_ai_perf.profiling import (
+    Profiler,
+    build_profiler,
+    missing_workload_profiler_metrics,
+    nvidia_smi_device_metadata,
+)
 from hpc_ai_perf.results import ExperimentResult
 from hpc_ai_perf.workloads import WorkloadRegistry, default_registry
 
@@ -164,7 +169,7 @@ def _environment(
         "submission_bundle_wave": os.environ.get("HPC_AI_SUBMISSION_BUNDLE_WAVE"),
     }
     environment.update({key: value for key, value in bundle_environment.items() if value})
-    environment.update(_nvidia_smi_metadata())
+    environment.update(nvidia_smi_device_metadata())
     for package in ["datasets", "deepspeed", "transformers", "vllm"]:
         try:
             environment[f"{package}_version"] = version(package)
@@ -193,32 +198,6 @@ def _git_value(command: list[str]) -> str | None:
     except (OSError, subprocess.SubprocessError):
         return None
     return completed.stdout.strip() or None
-
-
-def _nvidia_smi_metadata() -> dict[str, str | None]:
-    """Capture immutable GPU identity and driver details when available."""
-    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-    try:
-        completed = subprocess.run(
-            [
-                "nvidia-smi",
-                "--query-gpu=uuid,driver_version",
-                "--format=csv,noheader,nounits",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        rows = [row.strip() for row in completed.stdout.splitlines() if row.strip()]
-        if not rows:
-            return {}
-        values = [value.strip() for value in rows[min(local_rank, len(rows) - 1)].split(",")]
-        if len(values) != 2:
-            return {}
-        return {"observed_gpu_uuid": values[0], "nvidia_driver_version": values[1]}
-    except (OSError, subprocess.SubprocessError):
-        return {}
 
 
 def _promote_standard_profiler_metrics(

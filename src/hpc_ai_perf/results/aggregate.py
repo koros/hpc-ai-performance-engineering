@@ -59,6 +59,9 @@ BASE_COLUMNS = [
     "actual_gpu_hours",
     "energy_joules",
     "observed_gpu_model",
+    "gpu_telemetry_mapping",
+    "gpu_telemetry_schema_version",
+    "profiled_gpu_uuids",
     "source_path",
     "error",
 ]
@@ -177,6 +180,9 @@ def flatten_result_record(record: dict[str, Any], source_path: str | Path | None
         "actual_gpu_hours": metrics.get("gpu_hours"),
         "energy_joules": metrics.get("energy_joules_estimate"),
         "observed_gpu_model": environment.get("observed_gpu_model"),
+        "gpu_telemetry_mapping": telemetry_mapping_class(metrics),
+        "gpu_telemetry_schema_version": metrics.get("nvidia_smi.telemetry_schema_version"),
+        "profiled_gpu_uuids": metrics.get("nvidia_smi.profiled_gpu_uuids"),
         "source_path": str(source_path) if source_path else None,
         "error": record.get("error"),
     }
@@ -191,6 +197,18 @@ def flatten_result_record(record: dict[str, Any], source_path: str | Path | None
         row[f"environment_{_slugify(key)}"] = value
 
     return row
+
+
+def telemetry_mapping_class(metrics: dict[str, Any]) -> str:
+    """Classify external GPU telemetry provenance without changing raw evidence."""
+    mapping_method = str(metrics.get("nvidia_smi.gpu_mapping_method") or "").strip()
+    if mapping_method == "cuda_uuid":
+        return "uuid_verified"
+    if mapping_method == "cgroup_visible_rows":
+        return "cgroup_verified"
+    if metrics.get("nvidia_smi.samples") is not None:
+        return "legacy_positional"
+    return "not_collected"
 
 
 def write_results_csv(rows: list[dict[str, Any]], output_path: str | Path) -> Path:

@@ -18,6 +18,7 @@ Primary planning documents:
 - [Enhanced platform experiment matrix](docs/platform_experiment_matrix.md): resolved, direct, local-dev, and deferred experiment routes across the three platforms.
 - [L40S-first execution runbook](docs/platform_execution_runbook.md): gated waves, Slurm commands, evidence import, and H100 recovery workflow.
 - [Measurement and trial protocol](docs/measurement_protocol.md): repetition, warm-up, timing, provenance, uncertainty, and outlier rules for research evidence.
+- [GPU telemetry revalidation](docs/gpu_telemetry_revalidation.md): UUID-bound device attribution, legacy evidence treatment, telemetry audit, and cross-platform anchor waves.
 - [Comprehensive experiment matrix](docs/experiment_matrix.md): full source-of-truth matrix with `E001` to `E200`, priority levels, metrics, and GPU-hour estimates.
 - [Local dev runbook](docs/local_dev_runbook.md): Mac/local baseline-style runs for development while HPC access is unavailable.
 - [Dev experiment matrix](docs/dev_experiment_matrix.md): rationale, parameters, and local-dev versus HPC-only experiment boundaries.

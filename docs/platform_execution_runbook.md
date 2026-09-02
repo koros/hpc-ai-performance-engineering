@@ -113,6 +113,7 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `vllm-tp2` | `E147`, `E195` | 3 | Two-GPU tensor-parallel rows run on both visible L40S devices. |
 | `optional` | `E016-E017`, `E045` | 3 | E044 is excluded after three deterministic exact-shape L40S OOMs; retain its failed bundle for the report. |
 | `optional-capacity` | `E208-E209` checkpointed TinyLlama strong scaling | 3 | Both rows must complete under the same checkpointed protocol before calculating capacity-adjusted speedup. Do not pair E208 with non-checkpointed E045. |
+| `telemetry-revalidation` | `E210-E213` UUID-bound training, inference, and communication anchors | 3 | Run before final power/utilisation/energy interpretation. All records must identify the allocated GPU mapping and pass the telemetry audit. |
 
 If the original optional bundle was submitted before E044 was deferred, pull the updated policy and rerun
 `status-platform-wave`. It will report 9/9 current-policy trials and identify E044 as a policy-deferred historical
@@ -196,6 +197,9 @@ Use the same `status-platform-wave`, `collect-platform-wave`, and `stage-platfor
 under its own evidence root, never changing L40S status. Only compare rows whose workload, revisions, seed,
 useful-work definition, and `comparability` contract match. The hardware-comparison anchors are `E121/E123`,
 `E122/E124`, `E125/E127`, and `E126/E128`.
+
+Before using H100 power, utilisation, external-memory, or energy values in conclusions, run the independent H100
+`telemetry-revalidation` wave and follow [the GPU telemetry revalidation protocol](gpu_telemetry_revalidation.md).
 
 ## 6. Recovery Rules
 

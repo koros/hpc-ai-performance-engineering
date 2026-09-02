@@ -1,0 +1,61 @@
+{
+  "experiment_id": "E213",
+  "experiment": "telemetry_revalidation_two_gpu_communication",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "communication_study_type": "nccl_ddp",
+      "batch_size": 16,
+      "sequence_length": 1024,
+      "collect_gradient_synchronization": true,
+      "collect_sharded_communication": false
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 2,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "torch_memory", "nccl", "torch_profiler"],
+    "parameters": {
+      "sample_interval_seconds": 0.2,
+      "collect_allreduce_time": true,
+      "collect_nccl_bandwidth": true,
+      "collect_comm_compute_ratio": true,
+      "collect_gpu_idle_time": true,
+      "collect_nvlink_utilisation": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E213",
+    "template": "telemetry_revalidation",
+    "phase": "Telemetry revalidation",
+    "priority": "Supplemental",
+    "gpu_hours_estimate": 0.8,
+    "objective": "Revalidate external GPU telemetry alongside a representative two-GPU NCCL communication protocol",
+    "source_experiment_ids": ["E113"],
+    "telemetry_anchor_type": "two_gpu_communication",
+    "research_questions": ["RQ4", "RQ5", "RQ7"],
+    "analysis_tasks": ["A03", "A04", "A05", "A06"],
+    "key_metrics": ["allreduce_time", "bandwidth", "throughput", "memory", "gpu_util", "power", "energy"]
+  }
+}

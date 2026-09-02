@@ -1,0 +1,61 @@
+{
+  "experiment_id": "E212",
+  "experiment": "telemetry_revalidation_single_gpu_inference",
+  "mode": "inference",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "dataset": "synthetic_token_prompts_v1",
+    "parameters": {
+      "inference_study_type": "framework",
+      "framework": "pytorch_eager",
+      "framework_label": "PyTorch eager",
+      "batch_size": 1,
+      "prompt_length": 128,
+      "max_new_tokens": 128,
+      "concurrent_requests": 1
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "torch_memory", "serving_latency"],
+    "parameters": {
+      "sample_interval_seconds": 0.2,
+      "collect_latency_distribution": true,
+      "collect_time_to_first_token": true,
+      "collect_memory_trace": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E212",
+    "template": "telemetry_revalidation",
+    "phase": "Telemetry revalidation",
+    "priority": "Supplemental",
+    "gpu_hours_estimate": 0.6,
+    "objective": "Revalidate external GPU telemetry for a representative single-GPU inference protocol",
+    "source_experiment_ids": ["E129"],
+    "telemetry_anchor_type": "single_gpu_inference",
+    "research_questions": ["RQ5", "RQ7"],
+    "analysis_tasks": ["A02", "A04", "A05", "A06"],
+    "key_metrics": ["throughput", "latency", "memory", "gpu_util", "power", "energy"]
+  }
+}

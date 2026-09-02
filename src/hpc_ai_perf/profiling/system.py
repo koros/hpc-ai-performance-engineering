@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import threading
 import time
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -79,7 +80,7 @@ class NvidiaSmiProfiler(Profiler):
     """Sample utilization, memory, and power through the nvidia-smi CLI."""
 
     name = "nvidia_smi"
-    _QUERY = "utilization.gpu,memory.used,power.draw,temperature.gpu,clocks.sm"
+    _QUERY = "uuid,utilization.gpu,memory.used,power.draw,temperature.gpu,clocks.sm"
 
     def __init__(self, interval_seconds: float = 0.2) -> None:
         self._interval_seconds = interval_seconds
@@ -88,6 +89,9 @@ class NvidiaSmiProfiler(Profiler):
         self._thread: threading.Thread | None = None
         self._started_at = 0.0
         self._gpu_count = 1
+        self._target_gpu_uuids: tuple[str, ...] = ()
+        self._profiled_gpu_uuids: tuple[str, ...] = ()
+        self._mapping_method = ""
 
     def start(self, config: ExperimentConfig) -> None:
         if shutil.which("nvidia-smi") is None:
@@ -96,6 +100,13 @@ class NvidiaSmiProfiler(Profiler):
         self._stop_event.clear()
         self._started_at = time.perf_counter()
         self._gpu_count = max(1, config.hardware.gpus)
+        self._target_gpu_uuids = visible_cuda_device_uuids(self._gpu_count)
+        self._profiled_gpu_uuids = ()
+        self._mapping_method = ""
+        # Resolve and sample the devices synchronously so an ambiguous mapping
+        # fails before the benchmark starts instead of silently profiling an
+        # unrelated GPU on a shared node.
+        self._sample_once()
         self._thread = threading.Thread(target=self._sample_loop, name="nvidia-smi-profiler", daemon=True)
         self._thread.start()
 
@@ -122,41 +133,161 @@ class NvidiaSmiProfiler(Profiler):
             "temperature_max_c": max(temperatures),
             "sm_clock_mean_mhz": sum(clocks_mhz) / len(clocks_mhz),
             "profiled_gpu_count": self._gpu_count,
+            "profiled_gpu_uuids": ",".join(self._profiled_gpu_uuids),
+            "gpu_mapping_method": self._mapping_method,
+            "telemetry_schema_version": "2",
+            "memory_metric_scope": "max_per_gpu",
+            "power_metric_scope": "sum_visible_gpus",
+            "utilization_metric_scope": "mean_visible_gpus",
             "samples": len(self._samples),
         }
 
     def _sample_loop(self) -> None:
         while not self._stop_event.is_set():
-            try:
-                completed = subprocess.run(
-                    [
-                        "nvidia-smi",
-                        f"--query-gpu={self._QUERY}",
-                        "--format=csv,noheader,nounits",
-                    ],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
-                rows = [row.strip() for row in completed.stdout.splitlines() if row.strip()]
-                if len(rows) >= self._gpu_count:
-                    selected_rows = rows[: self._gpu_count]
-                    parsed = [[float(value.strip()) for value in row.split(",")] for row in selected_rows]
-                    if parsed and all(len(values) == 5 for values in parsed):
-                        self._samples.append(
-                            (
-                                sum(values[0] for values in parsed) / len(parsed),
-                                max(values[1] for values in parsed),
-                                sum(values[2] for values in parsed),
-                                max(values[3] for values in parsed),
-                                sum(values[4] for values in parsed) / len(parsed),
-                            )
-                        )
-            except (OSError, subprocess.SubprocessError, ValueError):
-                # A transient sample failure should not discard otherwise valid samples.
-                pass
+            # A transient sample failure should not discard otherwise valid samples.
+            with suppress(OSError, subprocess.SubprocessError, ValueError):
+                self._sample_once()
             self._stop_event.wait(self._interval_seconds)
+
+    def _sample_once(self) -> None:
+        rows = query_nvidia_smi_rows(self._QUERY, timeout=10)
+        selected_rows, mapping_method = select_nvidia_smi_rows(
+            rows,
+            target_gpu_uuids=self._target_gpu_uuids,
+            expected_gpu_count=self._gpu_count,
+        )
+        parsed: list[tuple[str, list[float]]] = []
+        for row in selected_rows:
+            values = [value.strip() for value in row.split(",")]
+            if len(values) != 6:
+                raise ValueError(f"nvidia-smi returned an unexpected telemetry row: {row}")
+            parsed.append((values[0], [float(value) for value in values[1:]]))
+        if not parsed:
+            raise ValueError("nvidia-smi returned no telemetry rows for the allocated CUDA devices")
+        if self._mapping_method and self._mapping_method != mapping_method:
+            raise ValueError("nvidia-smi GPU mapping method changed during profiling")
+        self._mapping_method = mapping_method
+        self._profiled_gpu_uuids = tuple(uuid for uuid, _ in parsed)
+        samples = [values for _, values in parsed]
+        self._samples.append(
+            (
+                sum(values[0] for values in samples) / len(samples),
+                max(values[1] for values in samples),
+                sum(values[2] for values in samples),
+                max(values[3] for values in samples),
+                sum(values[4] for values in samples) / len(samples),
+            )
+        )
+
+
+def visible_cuda_device_uuids(expected_gpu_count: int | None = None) -> tuple[str, ...]:
+    """Return UUIDs for CUDA-visible devices in CUDA runtime order when exposed by Torch."""
+    try:
+        import torch
+    except ImportError:
+        return ()
+    if not torch.cuda.is_available():
+        return ()
+    visible_count = int(torch.cuda.device_count())
+    requested_count = visible_count if expected_gpu_count is None else expected_gpu_count
+    if visible_count < requested_count:
+        raise RuntimeError(
+            f"CUDA exposes {visible_count} device(s), but telemetry requires {requested_count} allocated device(s)"
+        )
+    uuids: list[str] = []
+    for index in range(requested_count):
+        value = getattr(torch.cuda.get_device_properties(index), "uuid", None)
+        normalized = _format_cuda_uuid(value)
+        if normalized is None:
+            return _uuid_tokens_from_cuda_visible_devices(requested_count)
+        uuids.append(normalized)
+    return tuple(uuids)
+
+
+def query_nvidia_smi_rows(query: str, *, timeout: int = 5) -> list[str]:
+    """Query nvidia-smi and return non-empty CSV rows."""
+    completed = subprocess.run(
+        ["nvidia-smi", f"--query-gpu={query}", "--format=csv,noheader,nounits"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+    return [row.strip() for row in completed.stdout.splitlines() if row.strip()]
+
+
+def select_nvidia_smi_rows(
+    rows: list[str], *, target_gpu_uuids: tuple[str, ...], expected_gpu_count: int
+) -> tuple[list[str], str]:
+    """Select only allocated GPU rows, preferring an explicit CUDA-to-NVML UUID match."""
+    if target_gpu_uuids:
+        by_uuid = {_normalize_gpu_uuid(row.split(",", 1)[0]): row for row in rows}
+        missing = [uuid for uuid in target_gpu_uuids if _normalize_gpu_uuid(uuid) not in by_uuid]
+        if missing:
+            raise ValueError(f"nvidia-smi did not return allocated CUDA GPU UUID(s): {', '.join(missing)}")
+        selected = [by_uuid[_normalize_gpu_uuid(uuid)] for uuid in target_gpu_uuids]
+        return selected, "cuda_uuid"
+    if len(rows) == expected_gpu_count:
+        # Some Slurm/cgroup deployments filter nvidia-smi to exactly the job's
+        # devices but do not expose UUIDs through Torch. Exact row-count equality
+        # is the only safe fallback; never take the first N rows from a larger set.
+        return rows, "cgroup_visible_rows"
+    raise ValueError(
+        "cannot prove nvidia-smi device ownership: Torch exposed no CUDA UUIDs "
+        f"and nvidia-smi returned {len(rows)} row(s) for {expected_gpu_count} requested GPU(s)"
+    )
+
+
+def nvidia_smi_device_metadata() -> dict[str, str | None]:
+    """Capture the current CUDA rank's immutable UUID and driver using verified mapping."""
+    try:
+        import torch
+
+        visible_count = int(torch.cuda.device_count()) if torch.cuda.is_available() else 0
+        if visible_count < 1:
+            return {}
+        target_uuids = visible_cuda_device_uuids(visible_count)
+        rows = query_nvidia_smi_rows("uuid,driver_version")
+        selected, mapping_method = select_nvidia_smi_rows(
+            rows,
+            target_gpu_uuids=target_uuids,
+            expected_gpu_count=visible_count,
+        )
+        local_rank = min(int(os.environ.get("LOCAL_RANK", "0")), len(selected) - 1)
+        values = [value.strip() for value in selected[local_rank].split(",")]
+        if len(values) != 2:
+            return {}
+        return {
+            "observed_gpu_uuid": values[0],
+            "nvidia_driver_version": values[1],
+            "observed_gpu_uuid_mapping_method": mapping_method,
+        }
+    except (ImportError, OSError, RuntimeError, subprocess.SubprocessError, ValueError):
+        return {}
+
+
+def _uuid_tokens_from_cuda_visible_devices(expected_gpu_count: int) -> tuple[str, ...]:
+    tokens = [token.strip() for token in os.environ.get("CUDA_VISIBLE_DEVICES", "").split(",") if token.strip()]
+    if len(tokens) < expected_gpu_count:
+        return ()
+    selected = tokens[:expected_gpu_count]
+    if all(token.upper().startswith(("GPU-", "MIG-")) for token in selected):
+        return tuple(selected)
+    return ()
+
+
+def _format_cuda_uuid(value: object) -> str | None:
+    if isinstance(value, bytes) and len(value) == 16:
+        hex_value = value.hex()
+        return f"GPU-{hex_value[:8]}-{hex_value[8:12]}-{hex_value[12:16]}-{hex_value[16:20]}-{hex_value[20:]}"
+    text = str(value or "").strip()
+    if text.upper().startswith(("GPU-", "MIG-")):
+        return text
+    return None
+
+
+def _normalize_gpu_uuid(value: str) -> str:
+    return value.strip().casefold()
 
 
 class TorchProfiler(Profiler):

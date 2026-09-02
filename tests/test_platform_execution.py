@@ -313,18 +313,20 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
 
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 210)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 214)}
+    l40s_only_supplemental_ids = {f"E{index:03d}" for index in range(201, 210)}
+    shared_telemetry_ids = {f"E{index:03d}" for index in range(210, 214)}
 
     l40s_conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s")
     h100_conditions = load_platform_conditions("platforms/execution_matrix.json", "h100")
 
     assert len([condition for condition in l40s_conditions if condition.matrix_id in source_ids]) == 200
     assert {condition.matrix_id for condition in l40s_conditions if condition.matrix_id in source_ids} == source_ids
-    assert {condition.matrix_id for condition in l40s_conditions if condition.matrix_id not in source_ids} == (
-        supplemental_ids
-    )
-    assert len(h100_conditions) == 200
-    assert {condition.matrix_id for condition in h100_conditions} == source_ids
+    assert {
+        condition.matrix_id for condition in l40s_conditions if condition.matrix_id not in source_ids
+    } == supplemental_ids
+    assert len(h100_conditions) == 204
+    assert {condition.matrix_id for condition in h100_conditions} == source_ids | shared_telemetry_ids
     l40s_planned_source_count = sum(
         condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in source_ids
     )
@@ -332,9 +334,31 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     assert l40s_planned_source_count == 159
     assert (
         sum(condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in supplemental_ids)
+        == 9
+    )
+    assert (
+        sum(
+            condition.status == "planned"
+            for condition in l40s_conditions
+            if condition.matrix_id in l40s_only_supplemental_ids
+        )
         == 5
     )
-    assert sum(condition.status == "planned" for condition in h100_conditions) == 144
+    assert sum(condition.status == "planned" for condition in h100_conditions) == 148
+
+
+def test_telemetry_revalidation_wave_is_shared_but_platform_separated() -> None:
+    l40s = load_platform_conditions(
+        "platforms/execution_matrix.json", "l40s", wave="telemetry-revalidation", include_deferred=False
+    )
+    h100 = load_platform_conditions(
+        "platforms/execution_matrix.json", "h100", wave="telemetry-revalidation", include_deferred=False
+    )
+
+    assert [condition.matrix_id for condition in l40s] == ["E210", "E211", "E212", "E213"]
+    assert [condition.condition_id for condition in l40s] == [f"E{index:03d}@l40s" for index in range(210, 214)]
+    assert [condition.condition_id for condition in h100] == [f"E{index:03d}@h100" for index in range(210, 214)]
+    assert all(condition.comparability == "platform_specific" for condition in [*l40s, *h100])
 
 
 def test_runnable_l40s_conditions_fit_the_verified_two_gpu_node() -> None:

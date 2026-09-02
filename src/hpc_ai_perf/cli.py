@@ -20,7 +20,7 @@ from hpc_ai_perf.config import (
     materialize_platform_configs,
 )
 from hpc_ai_perf.readiness import write_readiness_report
-from hpc_ai_perf.results import aggregate_results, import_result_evidence, verify_result_evidence
+from hpc_ai_perf.results import aggregate_results, audit_telemetry, import_result_evidence, verify_result_evidence
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.runtime_checks import format_runtime_checks, run_cluster_runtime_checks, runtime_checks_to_json
 from hpc_ai_perf.slurm import (
@@ -329,6 +329,12 @@ def main() -> None:
     if args.command == "aggregate-results":
         result_path = aggregate_results(args.input_dir, args.output)
         LOGGER.info("Wrote aggregated results to %s", result_path)
+        return
+
+    if args.command == "audit-telemetry":
+        csv_path, markdown_path = audit_telemetry(args.result_root, args.csv_output, args.markdown_output)
+        LOGGER.info("Wrote telemetry audit CSV to %s", csv_path)
+        LOGGER.info("Wrote telemetry audit Markdown to %s", markdown_path)
         return
 
     if args.command == "import-result-evidence":
@@ -665,6 +671,14 @@ def _build_parser() -> argparse.ArgumentParser:
         default="results/processed/experiments.csv",
         help="Path for the processed experiment CSV.",
     )
+
+    telemetry_parser = subparsers.add_parser(
+        "audit-telemetry",
+        help="Label GPU telemetry provenance and flag repeated-trial outliers without changing raw evidence.",
+    )
+    telemetry_parser.add_argument("--result-root", default="results/raw")
+    telemetry_parser.add_argument("--csv-output", default="results/analysis/telemetry_audit.csv")
+    telemetry_parser.add_argument("--markdown-output", default="results/analysis/telemetry_audit.md")
 
     import_evidence_parser = subparsers.add_parser(
         "import-result-evidence",
@@ -1470,6 +1484,13 @@ def _refresh_outputs(
 
     analysis_paths = analyze_results(result_path, analysis_dir)
     LOGGER.info("Wrote %d analysis tables to %s", len(analysis_paths), analysis_dir)
+
+    telemetry_csv, telemetry_markdown = audit_telemetry(
+        result_dir,
+        Path(analysis_dir) / "telemetry_audit.csv",
+        Path(analysis_dir) / "telemetry_audit.md",
+    )
+    LOGGER.info("Wrote telemetry audit to %s and %s", telemetry_csv, telemetry_markdown)
 
     # Keep refresh focused on the real E-number matrix tracker; dev has its own Make target.
     tracker_csv_path, tracker_markdown_path = track_experiment_progress(

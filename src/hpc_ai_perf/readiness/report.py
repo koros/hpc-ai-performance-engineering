@@ -57,7 +57,14 @@ def build_readiness_report(
     """
     entries = discover_experiment_configs(config_root)
     source_entries = [entry for entry in entries if _matrix_number(entry.config.experiment_id) <= 200]
-    supplemental_entries = [entry for entry in entries if _matrix_number(entry.config.experiment_id) > 200]
+    telemetry_entries = [
+        entry for entry in entries if entry.config.metadata.get("template") == "telemetry_revalidation"
+    ]
+    supplemental_entries = [
+        entry
+        for entry in entries
+        if _matrix_number(entry.config.experiment_id) > 200 and entry not in telemetry_entries
+    ]
     validation_issues = validate_project(config_root, result_dir)
     research_issues = validate_project(config_root, result_dir, include_results=False, research_ready=True)
     deferred_entries = [
@@ -90,6 +97,7 @@ def build_readiness_report(
         "",
         f"- Source matrix configs discovered: {len(source_entries)}",
         f"- Supplemental platform probes discovered: {len(supplemental_entries)}",
+        f"- Cross-platform telemetry anchors discovered: {len(telemetry_entries)}",
         f"- Total E-number configs discovered: {len(entries)}",
         f"- Validation issues: {len(validation_issues)}",
         f"- Research-readiness blockers: {len(research_issues)}",

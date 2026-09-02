@@ -31,6 +31,15 @@ Platform-resolved evidence additionally records the logical source-config SHA-25
 wave, required-trial count, result root, and comparability class. L40S and H100 trials are stored and aggregated as
 separate conditions even when they originate from the same logical E-number.
 
+### External GPU telemetry identity
+
+Telemetry schema version 2 binds every `nvidia-smi` row to the CUDA-visible allocation by GPU UUID. A scheduler-filtered
+fallback is accepted only when `nvidia-smi` exposes exactly the requested GPU count; ambiguous positional selection is
+an execution failure. Derived outputs classify earlier samples without this identity metadata as `legacy_positional`.
+Those raw records remain immutable and are reviewed through `make audit-telemetry`; the label does not automatically
+invalidate independently measured throughput, latency, loss, NCCL, or Torch peak-memory metrics. See the
+[GPU telemetry revalidation protocol](gpu_telemetry_revalidation.md).
+
 ## Statistics and Missing Evidence
 
 The trial summary reports completed and failed counts, mean, median, sample standard deviation, coefficient of variation, and a two-sided 95% Student's t confidence interval. Fewer than three completed trials are labelled `insufficient_data`.

@@ -1,0 +1,54 @@
+{
+  "experiment_id": "E210",
+  "experiment": "telemetry_revalidation_single_gpu_training",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "quality_sanity_check": true,
+      "baseline_kind": "training",
+      "batch_size": 16,
+      "sequence_length": 1024,
+      "stack": "pytorch_single_gpu"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "torch_memory"],
+    "parameters": {"sample_interval_seconds": 0.2}
+  },
+  "metadata": {
+    "matrix_id": "E210",
+    "template": "telemetry_revalidation",
+    "phase": "Telemetry revalidation",
+    "priority": "Supplemental",
+    "gpu_hours_estimate": 1.0,
+    "objective": "Revalidate external GPU telemetry for a representative single-GPU training protocol",
+    "source_experiment_ids": ["E008"],
+    "telemetry_anchor_type": "single_gpu_training",
+    "research_questions": ["RQ5", "RQ7"],
+    "analysis_tasks": ["A04", "A05", "A06"],
+    "key_metrics": ["throughput", "runtime", "memory", "gpu_util", "power", "energy"]
+  }
+}

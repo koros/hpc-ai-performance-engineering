@@ -6,15 +6,15 @@ This snapshot summarises the repository state before full HPC submission. It sho
 
 | Area | Status |
 | --- | --- |
-| Experiment matrix | 200 source matrix configs plus 9 L40S capacity-adjusted supplemental conditions are present and load successfully. |
+| Experiment matrix | 200 source matrix configs, 9 L40S capacity-adjusted supplemental conditions, and 4 cross-platform telemetry revalidation anchors are present and load successfully. |
 | Validation | `python -m hpc_ai_perf.cli validate --skip-results` passes with 0 config issues. |
 | Local smoke runner | CPU-only synthetic workload is ready and covered by tests. |
 | Semantic launch gate | `validate --research-ready` blocks unsupported precision/backend/framework combinations before Slurm rendering or execution. |
-| Result pipeline | Immutable, repetition-aware matrix trials, verified config/provenance fields, aggregation, 11 objective-specific analysis tables, progress tracking, and readiness reporting are wired into `python -m hpc_ai_perf.cli refresh`. |
+| Result pipeline | Immutable, repetition-aware matrix trials, verified config/provenance fields, aggregation, 11 objective-specific analysis tables, GPU telemetry provenance/outlier auditing, progress tracking, and readiness reporting are wired into `python -m hpc_ai_perf.cli refresh`. |
 | Distributed execution | One-process-per-GPU `python -m torch.distributed.run`, DDP, FSDP, DeepSpeed ZeRO, rank binding, global work accounting, and rank-safe result writing are implemented. |
-| Profiling | nvidia-smi power/utilisation/memory/clock/temperature sampling, PyTorch traces, workload timing, and NCCL microbenchmark metrics are implemented. |
+| Profiling | UUID-bound nvidia-smi power/utilisation/memory/clock/temperature sampling, PyTorch traces, workload timing, and NCCL microbenchmark metrics are implemented. Historical samples are retained and labelled `legacy_positional` in derived outputs. |
 | Slurm support | Semantic-gated single/bulk rendering, H100/L40S profile matching, CPU allocation checks, and three transformer smoke presets are available. |
-| Platform execution | All 200 source rows route exactly once per platform. There are 159 planned L40S source conditions, 5 planned L40S capacity-adjusted conditions, and 144 planned H100 conditions. The private PyTorch 2.8.0/CUDA 12.4 stack has passed the L40S E006 vLLM gate, so 35 supported L40S vLLM conditions now have dedicated waves. H100 vLLM, four-GPU L40S rows, known L40S OOM shapes, TensorRT-LLM, and other backend-blocked rows remain deferred. |
+| Platform execution | All 200 source rows route exactly once per platform. There are 159 planned L40S source conditions, 5 planned L40S capacity-adjusted conditions, 4 planned L40S telemetry anchors, 144 planned H100 source conditions, and 4 planned H100 telemetry anchors. The private PyTorch 2.8.0/CUDA 12.4 stack has passed the L40S E006 vLLM gate, so 35 supported L40S vLLM conditions now have dedicated waves. H100 vLLM, four-GPU L40S rows, known L40S OOM shapes, TensorRT-LLM, and other backend-blocked rows remain deferred. |
 | Evidence retention | L40S/H100 JSON is imported non-destructively into separate roots, scanned for sensitive keys, validated, and covered by tracked SHA-256 manifests. |
 | Dashboard | Static dashboard reads processed results, analysis summaries, and readiness report output. |
 | Quality gates | `pytest`, `ruff`, and `pre-commit` are configured and passing. |
@@ -34,6 +34,7 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | --- | ---: |
 | Source matrix configs | 200 |
 | L40S supplemental capacity probes | 9 |
+| Cross-platform telemetry revalidation anchors | 4 |
 | Must Have | 116 |
 | Should Have | 71 |
 | Optional | 13 |

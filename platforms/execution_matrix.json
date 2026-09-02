@@ -136,6 +136,14 @@
       "comparability": "capacity_adjusted"
     },
     {
+      "platform": "l40s",
+      "wave": "telemetry-revalidation",
+      "name": "L40S UUID-verified GPU telemetry anchors",
+      "experiment_ids": ["E210-E213"],
+      "required_trials": 3,
+      "comparability": "platform_specific"
+    },
+    {
       "platform": "h100",
       "wave": "0",
       "name": "H100 core environment gate",
@@ -201,6 +209,14 @@
       "experiment_ids": ["E016-E017", "E044-E046"],
       "required_trials": 3,
       "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "telemetry-revalidation",
+      "name": "H100 UUID-verified GPU telemetry anchors",
+      "experiment_ids": ["E210-E213"],
+      "required_trials": 3,
+      "comparability": "platform_specific"
     }
   ],
   "deferred": [
