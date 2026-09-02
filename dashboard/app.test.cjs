@@ -100,6 +100,19 @@ run("energy and inference views retain evidence labels without pooling", () => {
   assert.equal(inference.length, 3);
 });
 
+run("energy views exclude legacy full-window estimates", () => {
+  const measured = energyResult("l40s", "exact", "E214", "gpt2", 1000);
+  const legacy = {
+    ...energyResult("l40s", "exact", "E113", "gpt2", 4000),
+    energy_scope: "legacy_full_window",
+  };
+
+  const energy = buildEnergyPowerEntries([measured, legacy]);
+
+  assert.equal(energy.length, 1);
+  assert.match(energy[0].label, /E214/);
+});
+
 function result(platform_id, comparability, workload, throughput_tokens_sec) {
   return {
     platform_id,
@@ -152,7 +165,8 @@ function energyResult(platform_id, comparability, experiment_id, workload, energ
     workload,
     mode: "training",
     energy_joules,
-    metric_nvidia_smi_power_draw_watts: 200,
+    energy_scope: "measured_region",
+    metric_nvidia_smi_power_draw_watts_measured_region: 200,
   };
 }
 

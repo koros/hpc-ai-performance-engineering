@@ -57,6 +57,7 @@ ANALYSIS_TABLES = {
         "tokens_per_actual_gpu_hour",
         "samples_per_actual_gpu_hour",
         "energy_joules",
+        "energy_scope",
         "tokens_per_kwh",
     ],
     "scaling_summary": [
@@ -363,7 +364,8 @@ def build_experiment_rankings(rows: list[dict[str, str]]) -> list[dict[str, Any]
         actual_gpu_hours = _first_float(row, "actual_gpu_hours", "metric_gpu_hours")
         total_tokens = _first_float(row, "metric_total_tokens")
         total_samples = _first_float(row, "metric_total_samples", "metric_samples")
-        energy_joules = _first_float(row, "energy_joules", "metric_energy_joules_estimate")
+        energy_scope = _value(row, "energy_scope")
+        energy_joules = _first_float(row, "energy_joules") if energy_scope == "measured_region" else None
         throughput_tokens = _first_float(row, "throughput_tokens_sec", "metric_throughput_tokens_sec")
         throughput_samples = _first_float(row, "throughput_samples_sec", "metric_throughput_samples_sec")
 
@@ -395,6 +397,7 @@ def build_experiment_rankings(rows: list[dict[str, str]]) -> list[dict[str, Any]
                 "tokens_per_actual_gpu_hour": _divide(total_tokens, actual_gpu_hours),
                 "samples_per_actual_gpu_hour": _divide(total_samples, actual_gpu_hours),
                 "energy_joules": energy_joules,
+                "energy_scope": energy_scope,
                 "tokens_per_kwh": _divide(total_tokens, _divide(energy_joules, 3_600_000)),
             }
         )

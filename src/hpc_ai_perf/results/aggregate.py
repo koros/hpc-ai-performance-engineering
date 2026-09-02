@@ -58,6 +58,9 @@ BASE_COLUMNS = [
     "gpu_hours_estimate",
     "actual_gpu_hours",
     "energy_joules",
+    "energy_scope",
+    "energy_measurement_status",
+    "measurement_duration_seconds",
     "observed_gpu_model",
     "gpu_telemetry_mapping",
     "gpu_telemetry_schema_version",
@@ -178,7 +181,14 @@ def flatten_result_record(record: dict[str, Any], source_path: str | Path | None
         "latency_p95_ms": record.get("latency_p95_ms"),
         "gpu_hours_estimate": metadata.get("gpu_hours_estimate"),
         "actual_gpu_hours": metrics.get("gpu_hours"),
-        "energy_joules": metrics.get("energy_joules_estimate"),
+        "energy_joules": (
+            metrics.get("energy_joules_measured_region") if metrics.get("energy_scope") == "measured_region" else None
+        ),
+        "energy_scope": metrics.get(
+            "energy_scope", "legacy_full_window" if metrics.get("energy_joules_estimate") else None
+        ),
+        "energy_measurement_status": metrics.get("energy_measurement_status"),
+        "measurement_duration_seconds": metrics.get("measurement_duration_seconds"),
         "observed_gpu_model": environment.get("observed_gpu_model"),
         "gpu_telemetry_mapping": telemetry_mapping_class(metrics),
         "gpu_telemetry_schema_version": metrics.get("nvidia_smi.telemetry_schema_version"),

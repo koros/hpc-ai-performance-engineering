@@ -372,7 +372,7 @@ function buildPhaseBarEntries(rows) {
 function renderEnergy(rows) {
   const entries = buildEnergyPowerEntries(rows);
   renderSeparatedBars("energyBars", entries, {
-    empty: "No energy or sampled power values are available.",
+    empty: "No measured-region energy evidence is available. Legacy full-window estimates are excluded.",
     barClass: "energy",
     value: (entry) => formatDecimal(entry.value, 0) + " J · " + formatDecimal(entry.power, 1) + " W",
   });
@@ -381,15 +381,15 @@ function renderEnergy(rows) {
 }
 
 function buildEnergyPowerEntries(rows) {
-  const groups = groupRows(rows.filter((row) => number(row.energy_joules || row.metric_energy_joules_estimate) > 0), (row) => [row.platform_id || "unlabelled", row.comparability || "unspecified", row.experiment_id || "unknown", row.workload || "unassigned", row.mode || "unassigned"]);
+  const groups = groupRows(rows.filter((row) => row.energy_scope === "measured_region" && number(row.energy_joules) > 0), (row) => [row.platform_id || "unlabelled", row.comparability || "unspecified", row.experiment_id || "unknown", row.workload || "unassigned", row.mode || "unassigned"]);
   return Object.entries(groups).map(([key, group]) => {
     const [platform, comparability, experiment, workload, mode] = key.split("\u0000");
     return {
       label: platform + " · " + comparability + " · " + experiment + " · " + workload,
       detail: mode,
       unit: "joules",
-      value: average(group.map((row) => number(row.energy_joules || row.metric_energy_joules_estimate))),
-      power: average(group.map((row) => number(row.metric_nvidia_smi_power_draw_watts || row.metric_power_draw_watts))),
+      value: average(group.map((row) => number(row.energy_joules))),
+      power: average(group.map((row) => number(row.metric_nvidia_smi_power_draw_watts_measured_region || row.metric_power_draw_watts))),
     };
   }).sort((left, right) => right.value - left.value).slice(0, 12);
 }
