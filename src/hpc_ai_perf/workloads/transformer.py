@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from hpc_ai_perf.config import ExperimentConfig
+from hpc_ai_perf.profiling import measured_region
 from hpc_ai_perf.runtime_checks import disable_deepspeed_nvtx_annotations, prepare_deepspeed_import_environment
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
 
@@ -267,16 +268,17 @@ def _run_training_loop(
     _sync(torch, device)
 
     step_times: list[float] = []
-    cuda_timer = _start_cuda_timer(torch)
-    measured_start = time.perf_counter()
-    for _ in range(steps):
-        step_start = time.perf_counter()
-        final_loss = one_optimizer_step(True)
+    with measured_region():
+        cuda_timer = _start_cuda_timer(torch)
+        measured_start = time.perf_counter()
+        for _ in range(steps):
+            step_start = time.perf_counter()
+            final_loss = one_optimizer_step(True)
+            _sync(torch, device)
+            step_times.append(time.perf_counter() - step_start)
+        cuda_event_seconds = _stop_cuda_timer(torch, cuda_timer)
         _sync(torch, device)
-        step_times.append(time.perf_counter() - step_start)
-    cuda_event_seconds = _stop_cuda_timer(torch, cuda_timer)
-    _sync(torch, device)
-    measured_seconds = max(time.perf_counter() - measured_start, 1e-12)
+        measured_seconds = max(time.perf_counter() - measured_start, 1e-12)
     measured_seconds = _distributed_max(torch, measured_seconds, device, runtime)
 
     total_samples = steps * accumulation_steps * batch_size * runtime.world_size
@@ -419,17 +421,19 @@ def _run_causal_inference(config: ExperimentConfig) -> WorkloadRunOutput:
 
     latencies: list[float] = []
     generated_tokens = 0
-    cuda_timer = _start_cuda_timer(torch)
-    measured_start = time.perf_counter()
-    for _ in range(measured_batches):
-        start = time.perf_counter()
-        with torch.inference_mode():
-            outputs = model.generate(**generate_kwargs)
+    with measured_region():
+        cuda_timer = _start_cuda_timer(torch)
+        measured_start = time.perf_counter()
+        for _ in range(measured_batches):
+            start = time.perf_counter()
+            with torch.inference_mode():
+                outputs = model.generate(**generate_kwargs)
+            _sync(torch, device)
+            latencies.append(time.perf_counter() - start)
+            generated_tokens += int(outputs.shape[-1] - prompt_length) * batch_size
+        cuda_event_seconds = _stop_cuda_timer(torch, cuda_timer)
         _sync(torch, device)
-        latencies.append(time.perf_counter() - start)
-        generated_tokens += int(outputs.shape[-1] - prompt_length) * batch_size
-    cuda_event_seconds = _stop_cuda_timer(torch, cuda_timer)
-    measured_seconds = max(time.perf_counter() - measured_start, 1e-12)
+        measured_seconds = max(time.perf_counter() - measured_start, 1e-12)
 
     ttft_samples: list[float] = []
     for _ in range(min(measured_batches, 20)):
@@ -534,22 +538,24 @@ def _run_classification_inference(config: ExperimentConfig) -> WorkloadRunOutput
         _classification_round(torch, model, inputs, attention_mask, device, concurrency)
     _sync(torch, device)
     latencies: list[float] = []
-    cuda_timer = _start_cuda_timer(torch)
-    start_all = time.perf_counter()
     logits = None
-    for _ in range(measured_batches):
-        round_logits, round_latencies = _classification_round(
-            torch,
-            model,
-            inputs,
-            attention_mask,
-            device,
-            concurrency,
-        )
-        logits = round_logits[-1]
-        latencies.extend(round_latencies)
-    cuda_event_seconds = _stop_cuda_timer(torch, cuda_timer)
-    measured_seconds = max(time.perf_counter() - start_all, 1e-12)
+    with measured_region():
+        cuda_timer = _start_cuda_timer(torch)
+        start_all = time.perf_counter()
+        for _ in range(measured_batches):
+            round_logits, round_latencies = _classification_round(
+                torch,
+                model,
+                inputs,
+                attention_mask,
+                device,
+                concurrency,
+            )
+            logits = round_logits[-1]
+            latencies.extend(round_latencies)
+        cuda_event_seconds = _stop_cuda_timer(torch, cuda_timer)
+        _sync(torch, device)
+        measured_seconds = max(time.perf_counter() - start_all, 1e-12)
     total_samples = measured_batches * batch_size * concurrency
     total_tokens = total_samples * sequence_length
     metrics: dict[str, int | float | str | bool | None] = {
@@ -754,34 +760,37 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     warmup_rounds = _warmup_steps(parameters, measured_rounds)
     for _ in range(warmup_rounds):
         llm.generate(prompts, sampling_params=sampling, use_tqdm=False)
+    torch.cuda.synchronize()
 
     latencies: list[float] = []
     ttft_samples: list[float] = []
     queueing_samples: list[float] = []
     generated_tokens = 0
-    cuda_timer = _start_cuda_timer(torch)
-    start_all = time.perf_counter()
-    for _ in range(measured_rounds):
-        start = time.perf_counter()
-        outputs = llm.generate(prompts, sampling_params=sampling, use_tqdm=False)
-        elapsed = time.perf_counter() - start
-        for output in outputs:
-            generated_tokens += sum(len(candidate.token_ids) for candidate in output.outputs)
-            request_metrics = getattr(output, "metrics", None)
-            arrival = getattr(request_metrics, "arrival_time", None)
-            first = getattr(request_metrics, "first_token_time", None)
-            finished = getattr(request_metrics, "finished_time", None)
-            scheduled = getattr(request_metrics, "first_scheduled_time", None)
-            if arrival is not None and first is not None:
-                ttft_samples.append(float(first - arrival))
-            if arrival is not None and finished is not None:
-                latencies.append(float(finished - arrival))
-            else:
-                latencies.append(elapsed)
-            if arrival is not None and scheduled is not None:
-                queueing_samples.append(float(scheduled - arrival))
-    cuda_event_seconds = _stop_cuda_timer(torch, cuda_timer)
-    measured_seconds = max(time.perf_counter() - start_all, 1e-12)
+    with measured_region():
+        cuda_timer = _start_cuda_timer(torch)
+        start_all = time.perf_counter()
+        for _ in range(measured_rounds):
+            start = time.perf_counter()
+            outputs = llm.generate(prompts, sampling_params=sampling, use_tqdm=False)
+            elapsed = time.perf_counter() - start
+            for output in outputs:
+                generated_tokens += sum(len(candidate.token_ids) for candidate in output.outputs)
+                request_metrics = getattr(output, "metrics", None)
+                arrival = getattr(request_metrics, "arrival_time", None)
+                first = getattr(request_metrics, "first_token_time", None)
+                finished = getattr(request_metrics, "finished_time", None)
+                scheduled = getattr(request_metrics, "first_scheduled_time", None)
+                if arrival is not None and first is not None:
+                    ttft_samples.append(float(first - arrival))
+                if arrival is not None and finished is not None:
+                    latencies.append(float(finished - arrival))
+                else:
+                    latencies.append(elapsed)
+                if arrival is not None and scheduled is not None:
+                    queueing_samples.append(float(scheduled - arrival))
+        cuda_event_seconds = _stop_cuda_timer(torch, cuda_timer)
+        torch.cuda.synchronize()
+        measured_seconds = max(time.perf_counter() - start_all, 1e-12)
     request_count = measured_rounds * requests_per_round
     metrics: dict[str, int | float | str | bool | None] = {
         "requests": request_count,

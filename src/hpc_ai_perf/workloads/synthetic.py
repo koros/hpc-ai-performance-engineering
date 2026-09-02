@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 
 from hpc_ai_perf.config import ExperimentConfig
+from hpc_ai_perf.profiling import measured_region
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
 
 
@@ -32,10 +33,11 @@ class SyntheticWorkload(Workload):
 
         # Use a monotonic high-resolution timer so very short local smoke runs
         # produce stable elapsed-time measurements independent of wall-clock time.
-        start = time.perf_counter()
-        for _ in range(steps):
-            time.sleep(sleep_seconds)
-        elapsed = max(time.perf_counter() - start, 1e-9)
+        with measured_region():
+            start = time.perf_counter()
+            for _ in range(steps):
+                time.sleep(sleep_seconds)
+            elapsed = max(time.perf_counter() - start, 1e-9)
 
         # Report the same token-throughput shape used by transformer workloads
         # so aggregation and dashboard paths can be tested with no ML dependency.
@@ -44,6 +46,7 @@ class SyntheticWorkload(Workload):
             metrics={
                 "steps": steps,
                 "total_tokens": total_tokens,
+                "measured_seconds": elapsed,
                 "throughput_unit": "synthetic_tokens_per_second",
                 "throughput_tokens_sec": total_tokens / elapsed,
             }

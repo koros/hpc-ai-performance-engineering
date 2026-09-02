@@ -12,9 +12,11 @@ from importlib.metadata import PackageNotFoundError, version
 from hpc_ai_perf.config import ExperimentConfig, config_sha256
 from hpc_ai_perf.profiling import (
     Profiler,
+    bind_measurement_profiler,
     build_profiler,
     missing_workload_profiler_metrics,
     nvidia_smi_device_metadata,
+    reset_measurement_profiler,
 )
 from hpc_ai_perf.results import ExperimentResult
 from hpc_ai_perf.workloads import WorkloadRegistry, default_registry
@@ -56,6 +58,7 @@ class LocalBenchmarkRunner:
         error: str | None = None
         status = "completed"
         profiler = self._profiler
+        measurement_token = None
 
         try:
             workload = self._registry.get(config.workload.name)
@@ -64,7 +67,12 @@ class LocalBenchmarkRunner:
             # setup before the measured workload starts.
             workload.prepare(config)
             profiler.start(config)
-            output = workload.run(config)
+            measurement_token = bind_measurement_profiler(profiler)
+            try:
+                output = workload.run(config)
+            finally:
+                reset_measurement_profiler(measurement_token)
+                measurement_token = None
             metrics.update(output.metrics)
             missing_profiler_metrics = missing_workload_profiler_metrics(config, metrics)
             if missing_profiler_metrics:
@@ -73,6 +81,8 @@ class LocalBenchmarkRunner:
             status = "failed"
             error = f"{type(exc).__name__}: {exc}"
         finally:
+            if measurement_token is not None:
+                reset_measurement_profiler(measurement_token)
             # Stop profilers even after workload failure so partial diagnostic
             # metrics can still be written to the raw result record.
             if profiler is not None:
@@ -216,3 +226,16 @@ def _promote_standard_profiler_metrics(
         suffix = key.rsplit(".", 1)[-1]
         if suffix in standard_names:
             metrics[suffix] = value
+    measured_promotions = {
+        "nvidia_smi.energy_joules_measured_region": "energy_joules_measured_region",
+        "nvidia_smi.gpu_utilization_measured_region": "gpu_utilization",
+        "nvidia_smi.memory_used_gb_measured_region": "memory_used_gb",
+        "nvidia_smi.power_draw_watts_measured_region": "power_draw_watts",
+        "nvidia_smi.power_draw_max_watts_measured_region": "power_draw_max_watts",
+        "nvidia_smi.measurement_duration_seconds": "measurement_duration_seconds",
+        "nvidia_smi.energy_scope": "energy_scope",
+        "nvidia_smi.measurement_status": "energy_measurement_status",
+    }
+    for source, destination in measured_promotions.items():
+        if source in profiler_metrics:
+            metrics[destination] = profiler_metrics[source]

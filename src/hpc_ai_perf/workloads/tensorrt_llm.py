@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from hpc_ai_perf.config import ExperimentConfig
+from hpc_ai_perf.profiling import measured_region
 
 ENGINE_MANIFEST_FILENAME = "hpc_ai_perf_engine_manifest.json"
 ENGINE_MANIFEST_SCHEMA_VERSION = 1
@@ -190,14 +191,15 @@ def _serve_requests(
     latencies: list[float] = []
     generated_tokens = 0
     served_requests = 0
-    for _ in range(measured_requests):
-        started = time.perf_counter()
-        outputs = _generate(engine, prompt, sampling)
-        torch.cuda.synchronize()
-        latencies.append(max(time.perf_counter() - started, 1e-12))
-        output_count, token_count = _count_outputs(outputs)
-        served_requests += output_count
-        generated_tokens += token_count
+    with measured_region():
+        for _ in range(measured_requests):
+            started = time.perf_counter()
+            outputs = _generate(engine, prompt, sampling)
+            torch.cuda.synchronize()
+            latencies.append(max(time.perf_counter() - started, 1e-12))
+            output_count, token_count = _count_outputs(outputs)
+            served_requests += output_count
+            generated_tokens += token_count
 
     if served_requests < measured_requests:
         raise RuntimeError(f"TensorRT-LLM served {served_requests} outputs for {measured_requests} measured requests")

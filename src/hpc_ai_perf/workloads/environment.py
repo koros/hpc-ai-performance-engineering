@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from hpc_ai_perf.config import ExperimentConfig
+from hpc_ai_perf.profiling import measured_region
 from hpc_ai_perf.runtime_checks import disable_deepspeed_nvtx_annotations, prepare_deepspeed_import_environment
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
 from hpc_ai_perf.workloads.tensorrt_llm import validate_tensorrt_llm_environment
@@ -48,10 +49,12 @@ class EnvironmentValidationWorkload(Workload):
         visible = torch.cuda.device_count()
         if visible != expected:
             raise RuntimeError(f"Expected {expected} visible CUDA GPUs, observed {visible}")
-        start = time.perf_counter()
-        left = torch.ones(1024, device="cuda")
-        right = left * 2
-        torch.cuda.synchronize()
+        with measured_region():
+            start = time.perf_counter()
+            left = torch.ones(1024, device="cuda")
+            right = left * 2
+            torch.cuda.synchronize()
+            elapsed = time.perf_counter() - start
         return {
             "cuda_visible": True,
             "torch_import": True,
@@ -60,7 +63,8 @@ class EnvironmentValidationWorkload(Workload):
             "visible_gpu_count": visible,
             "cuda_version": str(torch.version.cuda),
             "pytorch_version": str(torch.__version__),
-            "smoke_test_runtime_seconds": time.perf_counter() - start,
+            "smoke_test_runtime_seconds": elapsed,
+            "measured_seconds": elapsed,
             "tensor_check": float(right.sum().item()),
         }
 
@@ -76,12 +80,13 @@ class EnvironmentValidationWorkload(Workload):
         for _ in range(3):
             dist.all_reduce(values)
         torch.cuda.synchronize(local_rank)
-        start = time.perf_counter()
-        iterations = 10
-        for _ in range(iterations):
-            dist.all_reduce(values)
-        torch.cuda.synchronize(local_rank)
-        elapsed = time.perf_counter() - start
+        with measured_region():
+            start = time.perf_counter()
+            iterations = 10
+            for _ in range(iterations):
+                dist.all_reduce(values)
+            torch.cuda.synchronize(local_rank)
+            elapsed = time.perf_counter() - start
         expected_value = float(world_size ** (iterations + 3))
         observed = float(values[0].item())
         if observed != expected_value:
@@ -94,6 +99,7 @@ class EnvironmentValidationWorkload(Workload):
             "allreduce_success": True,
             "allreduce_time_seconds": elapsed / iterations,
             "nccl_bandwidth_gbps": algorithmic_bytes / max(elapsed, 1e-12) / 1e9,
+            "measured_seconds": elapsed,
             "world_size": world_size,
             "rank": rank,
             "local_rank": local_rank,
@@ -112,17 +118,21 @@ class EnvironmentValidationWorkload(Workload):
         inputs = torch.randn(8, 128, device=device)
         labels = torch.randint(0, 2, (8,), device=device)
         torch.cuda.reset_peak_memory_stats(device)
-        optimizer.zero_grad(set_to_none=True)
-        loss = torch.nn.functional.cross_entropy(model(inputs), labels)
-        loss.backward()
-        optimizer.step()
-        torch.cuda.synchronize(device)
+        with measured_region():
+            started = time.perf_counter()
+            optimizer.zero_grad(set_to_none=True)
+            loss = torch.nn.functional.cross_entropy(model(inputs), labels)
+            loss.backward()
+            optimizer.step()
+            torch.cuda.synchronize(device)
+            elapsed = time.perf_counter() - started
         return {
             "torchrun_launch": world_size > 1,
             "fsdp_init": True,
             "single_train_step": True,
             "loss": float(loss.detach().cpu()),
             "memory_used_gb": torch.cuda.max_memory_allocated(device) / (1024**3),
+            "measured_seconds": elapsed,
             "world_size": world_size,
             "rank": rank,
         }
@@ -174,9 +184,13 @@ class EnvironmentValidationWorkload(Workload):
         parameter_dtype = next(engine.parameters()).dtype
         inputs = torch.randn(8, 128, device=device, dtype=parameter_dtype)
         labels = torch.randint(0, 2, (8,), device=device)
-        loss = torch.nn.functional.cross_entropy(engine(inputs), labels)
-        engine.backward(loss)
-        engine.step()
+        with measured_region():
+            started = time.perf_counter()
+            loss = torch.nn.functional.cross_entropy(engine(inputs), labels)
+            engine.backward(loss)
+            engine.step()
+            torch.cuda.synchronize(device)
+            elapsed = time.perf_counter() - started
         return {
             "deepspeed_launch": True,
             "zero_init": True,
@@ -191,6 +205,7 @@ class EnvironmentValidationWorkload(Workload):
             "deepspeed_nvtx_annotations_disabled": deepspeed_nvtx_annotations_disabled,
             "cuda_home": str(deepspeed_runtime["cuda_home_after"] or ""),
             "nvcc_path": str(deepspeed_runtime["cuda_home_nvcc_after"] or deepspeed_runtime["nvcc_path_after"] or ""),
+            "measured_seconds": elapsed,
         }
 
     @staticmethod
@@ -227,10 +242,11 @@ class EnvironmentValidationWorkload(Workload):
         prompts = [{"prompt_token_ids": [prompt_token_id]}]
         engine.generate(prompts, sampling_params=sampling, use_tqdm=False)
         torch.cuda.synchronize()
-        started = time.perf_counter()
-        outputs = engine.generate(prompts, sampling_params=sampling, use_tqdm=False)
-        torch.cuda.synchronize()
-        elapsed = max(time.perf_counter() - started, 1e-12)
+        with measured_region():
+            started = time.perf_counter()
+            outputs = engine.generate(prompts, sampling_params=sampling, use_tqdm=False)
+            torch.cuda.synchronize()
+            elapsed = max(time.perf_counter() - started, 1e-12)
         generated_tokens = sum(len(candidate.token_ids) for output in outputs for candidate in output.outputs)
         if generated_tokens < 1:
             raise RuntimeError("vLLM engine returned no generated tokens")

@@ -6,6 +6,7 @@ import subprocess
 import threading
 import time
 from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -76,18 +77,33 @@ class TorchMemoryProfiler(Profiler):
         }
 
 
+@dataclass(frozen=True)
+class _NvidiaSmiSample:
+    timestamp: float
+    utilization: float
+    memory_mib: float
+    power_watts: float
+    temperature_c: float
+    sm_clock_mhz: float
+
+
 class NvidiaSmiProfiler(Profiler):
     """Sample utilization, memory, and power through the nvidia-smi CLI."""
 
     name = "nvidia_smi"
+    measurement_stop_priority = 100
     _QUERY = "uuid,utilization.gpu,memory.used,power.draw,temperature.gpu,clocks.sm"
 
     def __init__(self, interval_seconds: float = 0.2) -> None:
         self._interval_seconds = interval_seconds
-        self._samples: list[tuple[float, float, float, float, float]] = []
+        self._samples: list[_NvidiaSmiSample] = []
+        self._samples_lock = threading.Lock()
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._started_at = 0.0
+        self._collection_stopped_at: float | None = None
+        self._measurement_started_at: float | None = None
+        self._measurement_stopped_at: float | None = None
         self._gpu_count = 1
         self._target_gpu_uuids: tuple[str, ...] = ()
         self._profiled_gpu_uuids: tuple[str, ...] = ()
@@ -99,6 +115,9 @@ class NvidiaSmiProfiler(Profiler):
         self._samples.clear()
         self._stop_event.clear()
         self._started_at = time.perf_counter()
+        self._collection_stopped_at = None
+        self._measurement_started_at = None
+        self._measurement_stopped_at = None
         self._gpu_count = max(1, config.hardware.gpus)
         self._target_gpu_uuids = visible_cuda_device_uuids(self._gpu_count)
         self._profiled_gpu_uuids = ()
@@ -110,37 +129,95 @@ class NvidiaSmiProfiler(Profiler):
         self._thread = threading.Thread(target=self._sample_loop, name="nvidia-smi-profiler", daemon=True)
         self._thread.start()
 
+    def begin_measurement(self) -> None:
+        if self._measurement_started_at is not None:
+            raise RuntimeError("nvidia-smi measured region was opened more than once")
+        self._measurement_started_at = time.perf_counter()
+
+    def end_measurement(self) -> None:
+        if self._measurement_started_at is None or self._measurement_stopped_at is not None:
+            return
+        # Freeze the boundary before stopping the sampling thread. Any query
+        # already in flight may finish later, but timestamp filtering excludes
+        # it from measured-region metrics.
+        self._measurement_stopped_at = time.perf_counter()
+        self._halt_sampling()
+
     def stop(self) -> dict[str, int | float | str | bool | None]:
-        self._stop_event.set()
-        if self._thread is not None:
-            self._thread.join(timeout=max(1.0, self._interval_seconds * 3))
-        duration = max(time.perf_counter() - self._started_at, 0.0)
-        if not self._samples:
+        self._halt_sampling()
+        stopped_at = self._collection_stopped_at or time.perf_counter()
+        with self._samples_lock:
+            samples = list(self._samples)
+        if not samples:
             raise RuntimeError("nvidia-smi returned no valid samples")
-        utilizations = [sample[0] for sample in self._samples]
-        memory_mib = [sample[1] for sample in self._samples]
-        power_watts = [sample[2] for sample in self._samples]
-        temperatures = [sample[3] for sample in self._samples]
-        clocks_mhz = [sample[4] for sample in self._samples]
-        average_power = sum(power_watts) / len(power_watts)
-        return {
-            "gpu_utilization": sum(utilizations) / len(utilizations),
-            "gpu_utilization_max": max(utilizations),
-            "memory_used_gb": max(memory_mib) / 1024,
-            "power_draw_watts": average_power,
-            "power_draw_max_watts": max(power_watts),
-            "energy_joules_estimate": average_power * duration,
-            "temperature_max_c": max(temperatures),
-            "sm_clock_mean_mhz": sum(clocks_mhz) / len(clocks_mhz),
+
+        full_window = _summarize_nvidia_smi_window(samples, self._started_at, stopped_at)
+        metrics: dict[str, int | float | str | bool | None] = {
+            # Backward-compatible aliases retain their historical full-window
+            # meaning. Derived energy analysis uses only the explicitly scoped
+            # measured-region fields added below.
+            "gpu_utilization": full_window["gpu_utilization"],
+            "gpu_utilization_max": full_window["gpu_utilization_max"],
+            "memory_used_gb": full_window["memory_used_gb"],
+            "power_draw_watts": full_window["power_draw_watts"],
+            "power_draw_max_watts": full_window["power_draw_max_watts"],
+            "energy_joules_estimate": full_window["energy_joules"],
+            "temperature_max_c": full_window["temperature_max_c"],
+            "sm_clock_mean_mhz": full_window["sm_clock_mean_mhz"],
+            "gpu_utilization_full_window": full_window["gpu_utilization"],
+            "memory_used_gb_full_window": full_window["memory_used_gb"],
+            "power_draw_watts_full_window": full_window["power_draw_watts"],
+            "power_draw_max_watts_full_window": full_window["power_draw_max_watts"],
+            "energy_joules_full_window": full_window["energy_joules"],
+            "full_window_duration_seconds": full_window["duration_seconds"],
             "profiled_gpu_count": self._gpu_count,
             "profiled_gpu_uuids": ",".join(self._profiled_gpu_uuids),
             "gpu_mapping_method": self._mapping_method,
-            "telemetry_schema_version": "2",
+            "telemetry_schema_version": "3",
             "memory_metric_scope": "max_per_gpu",
             "power_metric_scope": "sum_visible_gpus",
             "utilization_metric_scope": "mean_visible_gpus",
-            "samples": len(self._samples),
+            "samples": len(samples),
+            "measurement_status": "not_recorded",
+            "energy_scope": "full_window",
         }
+
+        if self._measurement_started_at is not None and self._measurement_stopped_at is not None:
+            measured = _summarize_nvidia_smi_window(
+                samples,
+                self._measurement_started_at,
+                self._measurement_stopped_at,
+                require_two_observations=True,
+            )
+            metrics["measurement_duration_seconds"] = max(
+                self._measurement_stopped_at - self._measurement_started_at, 0.0
+            )
+            metrics["measurement_samples"] = measured["source_samples"]
+            if measured["sufficient"]:
+                metrics.update(
+                    {
+                        "gpu_utilization_measured_region": measured["gpu_utilization"],
+                        "gpu_utilization_max_measured_region": measured["gpu_utilization_max"],
+                        "memory_used_gb_measured_region": measured["memory_used_gb"],
+                        "power_draw_watts_measured_region": measured["power_draw_watts"],
+                        "power_draw_max_watts_measured_region": measured["power_draw_max_watts"],
+                        "energy_joules_measured_region": measured["energy_joules"],
+                        "temperature_max_c_measured_region": measured["temperature_max_c"],
+                        "sm_clock_mean_mhz_measured_region": measured["sm_clock_mean_mhz"],
+                        "measurement_status": "sufficient",
+                        "energy_scope": "measured_region",
+                    }
+                )
+            else:
+                metrics["measurement_status"] = "insufficient_samples"
+        return metrics
+
+    def _halt_sampling(self) -> None:
+        if self._collection_stopped_at is None:
+            self._collection_stopped_at = time.perf_counter()
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=max(1.0, self._interval_seconds * 3))
 
     def _sample_loop(self) -> None:
         while not self._stop_event.is_set():
@@ -169,15 +246,78 @@ class NvidiaSmiProfiler(Profiler):
         self._mapping_method = mapping_method
         self._profiled_gpu_uuids = tuple(uuid for uuid, _ in parsed)
         samples = [values for _, values in parsed]
-        self._samples.append(
-            (
-                sum(values[0] for values in samples) / len(samples),
-                max(values[1] for values in samples),
-                sum(values[2] for values in samples),
-                max(values[3] for values in samples),
-                sum(values[4] for values in samples) / len(samples),
-            )
+        sample = _NvidiaSmiSample(
+            timestamp=time.perf_counter(),
+            utilization=sum(values[0] for values in samples) / len(samples),
+            memory_mib=max(values[1] for values in samples),
+            power_watts=sum(values[2] for values in samples),
+            temperature_c=max(values[3] for values in samples),
+            sm_clock_mhz=sum(values[4] for values in samples) / len(samples),
         )
+        with self._samples_lock:
+            self._samples.append(sample)
+
+
+def _summarize_nvidia_smi_window(
+    samples: list[_NvidiaSmiSample],
+    started_at: float,
+    stopped_at: float,
+    *,
+    require_two_observations: bool = False,
+) -> dict[str, float | int | bool]:
+    """Summarize timestamped samples and integrate power over an exact interval."""
+    duration = max(stopped_at - started_at, 0.0)
+    ordered = sorted(samples, key=lambda sample: sample.timestamp)
+    source = [sample for sample in ordered if started_at <= sample.timestamp <= stopped_at]
+    previous = [sample for sample in ordered if sample.timestamp < started_at]
+    following = [sample for sample in ordered if sample.timestamp > stopped_at]
+    anchors = list(source)
+    if previous:
+        anchors.insert(0, previous[-1])
+    if following:
+        anchors.append(following[0])
+    if not anchors:
+        anchors = ordered[:1]
+
+    # A boundary projection uses the nearest sampled value while integration
+    # between real observations uses the trapezoidal rule.
+    projected: list[tuple[float, _NvidiaSmiSample]] = []
+    if anchors:
+        start_value = max(
+            (sample for sample in ordered if sample.timestamp <= started_at),
+            default=anchors[0],
+            key=lambda item: item.timestamp,
+        )
+        end_value = max(
+            (sample for sample in ordered if sample.timestamp <= stopped_at),
+            default=anchors[-1],
+            key=lambda item: item.timestamp,
+        )
+        projected.append((started_at, start_value))
+        projected.extend((sample.timestamp, sample) for sample in source if started_at < sample.timestamp < stopped_at)
+        projected.append((stopped_at, end_value))
+
+    observation_count = len({sample.timestamp for sample in anchors})
+    sufficient = bool(projected) and duration > 0 and (not require_two_observations or observation_count >= 2)
+    relevant = source or anchors
+    if not relevant:
+        raise RuntimeError("nvidia-smi returned no samples in the profiling window")
+    energy_joules = 0.0
+    for (left_time, left), (right_time, right) in zip(projected, projected[1:], strict=False):
+        energy_joules += (left.power_watts + right.power_watts) * 0.5 * max(right_time - left_time, 0.0)
+    return {
+        "sufficient": sufficient,
+        "source_samples": observation_count,
+        "duration_seconds": duration,
+        "gpu_utilization": sum(sample.utilization for sample in relevant) / len(relevant),
+        "gpu_utilization_max": max(sample.utilization for sample in relevant),
+        "memory_used_gb": max(sample.memory_mib for sample in relevant) / 1024,
+        "power_draw_watts": energy_joules / duration if duration > 0 else 0.0,
+        "power_draw_max_watts": max(sample.power_watts for sample in relevant),
+        "energy_joules": energy_joules,
+        "temperature_max_c": max(sample.temperature_c for sample in relevant),
+        "sm_clock_mean_mhz": sum(sample.sm_clock_mhz for sample in relevant) / len(relevant),
+    }
 
 
 def visible_cuda_device_uuids(expected_gpu_count: int | None = None) -> tuple[str, ...]:

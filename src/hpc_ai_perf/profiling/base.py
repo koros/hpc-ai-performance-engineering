@@ -16,9 +16,16 @@ class Profiler(ABC):
     """
 
     name = "profiler"
+    measurement_stop_priority = 0
 
     def start(self, config: ExperimentConfig) -> None:
         """Start collecting metrics for a configured run."""
+
+    def begin_measurement(self) -> None:
+        """Mark the beginning of the workload's comparable measured region."""
+
+    def end_measurement(self) -> None:
+        """Freeze the end of the workload's comparable measured region."""
 
     def stop(self) -> dict[str, int | float | str | bool | None]:
         """Stop collecting metrics and return machine-readable scalar values."""
@@ -59,6 +66,30 @@ class CompositeProfiler(Profiler):
                     profiler.stop()
             self._profilers = []
             raise
+
+    def begin_measurement(self) -> None:
+        """Open the measured region on every profiler adapter."""
+        begun: list[Profiler] = []
+        try:
+            for profiler in self._profilers:
+                profiler.begin_measurement()
+                begun.append(profiler)
+        except Exception:
+            for profiler in sorted(begun, key=lambda item: item.measurement_stop_priority, reverse=True):
+                with suppress(Exception):
+                    profiler.end_measurement()
+            raise
+
+    def end_measurement(self) -> None:
+        """Freeze measurement collectors before expensive profiler finalization."""
+        failures: list[str] = []
+        for profiler in sorted(self._profilers, key=lambda item: item.measurement_stop_priority, reverse=True):
+            try:
+                profiler.end_measurement()
+            except Exception as exc:
+                failures.append(f"{profiler.name}: {type(exc).__name__}: {exc}")
+        if failures:
+            raise RuntimeError("; ".join(failures))
 
     def stop(self) -> dict[str, int | float | str | bool | None]:
         """Stop every profiler and merge their scalar metrics with name prefixes."""
