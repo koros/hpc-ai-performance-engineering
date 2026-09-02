@@ -1,0 +1,42 @@
+{
+  "experiment_id": "E217",
+  "experiment": "weak_scaling_gpt2_small_8gpu_l40s",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "scaling_type": "weak",
+      "per_gpu_batch_size": 16,
+      "global_batch_size": 128,
+      "sequence_length": 1024,
+      "fixed_workload": false,
+      "stack": "ddp"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpus": 8,
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe"
+  },
+  "distributed": {"strategy": "ddp", "nodes": 1, "gpus_per_node": 8, "backend": "nccl"},
+  "runtime": {"precision": "bf16", "max_steps": 100, "seed": 1337, "output_dir": "results/raw"},
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "nccl"],
+    "parameters": {"collect_scaling_metrics": true, "collect_gpu_utilisation": true}
+  },
+  "metadata": {
+    "matrix_id": "E217",
+    "template": "scaling_ddp",
+    "phase": "Weak scaling",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 4.0,
+    "strategy_detail": "ddp",
+    "objective": "Extend the fixed-per-GPU-work GPT-2 weak-scaling curve to the L40S full node",
+    "key_metrics": ["throughput_per_gpu", "efficiency", "memory", "loss"]
+  }
+}

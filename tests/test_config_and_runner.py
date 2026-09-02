@@ -94,9 +94,9 @@ def test_discover_matrix_configs() -> None:
     entries = discover_experiment_configs()
     experiment_ids = {entry.config.experiment_id for entry in entries}
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 215)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 231)}
 
-    assert len(entries) == 214
+    assert len(entries) == 230
     assert experiment_ids == source_ids | supplemental_ids
 
 
@@ -338,7 +338,15 @@ def test_render_slurm_bulk(tmp_path: Path) -> None:
 
     generated = sorted(path.name for path in tmp_path.glob("*.sbatch"))
 
-    assert generated == ["E001.sbatch", "E002.sbatch", "E003.sbatch", "E004.sbatch", "E006.sbatch"]
+    assert generated == [
+        "E001.sbatch",
+        "E002.sbatch",
+        "E003.sbatch",
+        "E004.sbatch",
+        "E006.sbatch",
+        "E215.sbatch",
+        "E230.sbatch",
+    ]
 
 
 def test_render_slurm_bulk_with_profile(tmp_path: Path) -> None:
@@ -1087,6 +1095,10 @@ def test_vllm_environment_validation_serves_a_real_request(monkeypatch) -> None:
 
     class FakeCuda:
         @staticmethod
+        def device_count() -> int:
+            return 1
+
+        @staticmethod
         def synchronize() -> None:
             return None
 
@@ -1123,6 +1135,52 @@ def test_vllm_environment_validation_serves_a_real_request(monkeypatch) -> None:
     assert output.metrics["request_served"] is True
     assert output.metrics["generated_tokens"] == 2
     assert output.metrics["throughput_tokens_sec"] > 0
+
+
+def test_vllm_environment_validation_supports_eight_gpu_tensor_parallel_canary(monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/environment_validation/E230_l40s_vllm_tinyllama_tp8_canary.json"))
+    assert capability_issues(config) == []
+    llm_kwargs: dict[str, object] = {}
+
+    class FakeCuda:
+        @staticmethod
+        def device_count() -> int:
+            return 8
+
+        @staticmethod
+        def synchronize() -> None:
+            return None
+
+    class FakeTorch:
+        cuda = FakeCuda()
+
+    class FakeCandidate:
+        token_ids = [1, 2]
+
+    class FakeOutput:
+        outputs = [FakeCandidate()]
+
+    class FakeLlm:
+        def __init__(self, **kwargs) -> None:
+            llm_kwargs.update(kwargs)
+
+        def generate(self, prompts, **kwargs):
+            assert prompts == [{"prompt_token_ids": [1]}]
+            return [FakeOutput()]
+
+    fake_vllm = types.ModuleType("vllm")
+    fake_vllm.__version__ = "test"
+    fake_vllm.LLM = FakeLlm
+    fake_vllm.SamplingParams = lambda **kwargs: kwargs
+    monkeypatch.setitem(sys.modules, "vllm", fake_vllm)
+    monkeypatch.setattr(environment_module, "_torch_with_cuda", lambda _: FakeTorch())
+    monkeypatch.setattr(environment_module.importlib.util, "find_spec", lambda _: object())
+
+    output = EnvironmentValidationWorkload().run(config)
+
+    assert llm_kwargs["tensor_parallel_size"] == 8
+    assert llm_kwargs["compilation_config"] == {"level": 0, "use_inductor": False}
+    assert output.metrics["tensor_parallel_size_observed"] == 8
 
 
 def test_vllm_environment_validation_reports_cuda_wheel_mismatch(monkeypatch) -> None:
@@ -1949,9 +2007,9 @@ def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
     report = report_path.read_text(encoding="utf-8")
 
     assert "Source matrix configs discovered: 200" in report
-    assert "Supplemental platform probes discovered: 9" in report
+    assert "Supplemental platform probes discovered: 25" in report
     assert "Cross-platform telemetry anchors discovered: 5" in report
-    assert "Total E-number configs discovered: 214" in report
+    assert "Total E-number configs discovered: 230" in report
     assert "`gpt2_small`" in report
     assert "slurm/smoke/gpt2_small_smoke.sbatch" in report
     assert "Submission Gate" in report
@@ -1997,7 +2055,7 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
 
     assert csv_path == output_csv
     assert markdown_path == output_markdown
-    assert len(rows) == 214
+    assert len(rows) == 230
     assert e033["status"] == "Completed"
     assert e033["runtime_seconds"] == "600.0"
     assert e034["status"] == "Configured"

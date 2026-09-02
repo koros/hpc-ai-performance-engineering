@@ -238,15 +238,29 @@ class EnvironmentValidationWorkload(Workload):
         model_revision = str(parameters["hf_model_revision"])
         max_new_tokens = int(parameters.get("max_new_tokens", 2))
         prompt_token_id = int(parameters.get("prompt_token_id", 15496))
+        expected_gpus = int(parameters.get("expected_gpus", config.hardware.gpus))
+        visible_gpus = int(torch.cuda.device_count())
+        if visible_gpus != expected_gpus:
+            raise RuntimeError(f"Expected {expected_gpus} visible CUDA GPUs, observed {visible_gpus}")
+        tensor_parallel_size = int(parameters.get("tensor_parallel_size", 1))
+        if tensor_parallel_size != expected_gpus:
+            raise RuntimeError(
+                f"tensor_parallel_size={tensor_parallel_size} does not match expected_gpus={expected_gpus}"
+            )
         dtype = "bfloat16" if config.runtime.precision == "bf16" else "float16"
-        engine = LLM(
-            model=model_name,
-            revision=model_revision,
-            dtype=dtype,
-            tensor_parallel_size=1,
-            max_model_len=64,
-            enforce_eager=True,
-        )
+        if tensor_parallel_size > 1:
+            os.environ["TORCHDYNAMO_DISABLE"] = "1"
+        engine_kwargs: dict[str, Any] = {
+            "model": model_name,
+            "revision": model_revision,
+            "dtype": dtype,
+            "tensor_parallel_size": tensor_parallel_size,
+            "max_model_len": 64,
+            "enforce_eager": True,
+        }
+        if tensor_parallel_size > 1:
+            engine_kwargs["compilation_config"] = {"level": 0, "use_inductor": False}
+        engine = LLM(**engine_kwargs)
         sampling = SamplingParams(temperature=0.0, max_tokens=max_new_tokens)
         prompts = [{"prompt_token_ids": [prompt_token_id]}]
         engine.generate(prompts, sampling_params=sampling, use_tqdm=False)
@@ -270,8 +284,8 @@ class EnvironmentValidationWorkload(Workload):
             "total_tokens": generated_tokens,
             "throughput_unit": "generated_tokens_per_second",
             "measured_seconds": elapsed,
-            "gpu_seconds": elapsed,
-            "gpu_hours": elapsed / 3600,
+            "gpu_seconds": elapsed * tensor_parallel_size,
+            "gpu_hours": elapsed * tensor_parallel_size / 3600,
             "throughput_tokens_sec": generated_tokens / elapsed,
             "latency_p50_ms": elapsed * 1000,
             "latency_p95_ms": elapsed * 1000,
@@ -279,6 +293,7 @@ class EnvironmentValidationWorkload(Workload):
             "framework_observed": "vllm",
             "hf_model_name": model_name,
             "hf_model_revision": model_revision,
+            "tensor_parallel_size_observed": tensor_parallel_size,
         }
 
     @staticmethod

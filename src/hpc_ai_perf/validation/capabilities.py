@@ -222,12 +222,21 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
             tensor_parallel = int(parameters.get("tensor_parallel_size", 0))
             data_parallel = int(parameters.get("data_parallel_size", 0))
             valid_tensor_parallel = selected_framework == "vllm" and tensor_parallel == config.hardware.gpus
+            valid_environment_vllm_tensor_parallel = (
+                workload == "environment_validation"
+                and str(parameters.get("validation_target", "")) == "vllm_serving"
+                and tensor_parallel == config.hardware.gpus
+            )
             valid_classification_data_parallel = (
                 workload == "distilbert"
                 and selected_framework == "pytorch_eager"
                 and data_parallel == config.hardware.gpus
             )
-            if not valid_tensor_parallel and not valid_classification_data_parallel:
+            if (
+                not valid_tensor_parallel
+                and not valid_environment_vllm_tensor_parallel
+                and not valid_classification_data_parallel
+            ):
                 issues.append(
                     "multi-GPU inference requires either vLLM tensor parallelism or DistilBERT PyTorch "
                     "data parallelism matching hardware.gpus"

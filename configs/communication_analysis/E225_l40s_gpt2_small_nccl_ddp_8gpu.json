@@ -1,0 +1,43 @@
+{
+  "experiment_id": "E225",
+  "experiment": "communication_analysis_gpt2_small_nccl_ddp_8gpu_l40s",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "communication_study_type": "nccl_ddp",
+      "batch_size": 16,
+      "sequence_length": 1024,
+      "collect_gradient_synchronization": true,
+      "collect_sharded_communication": false
+    }
+  },
+  "hardware": {"platform": "lovelace_l40s", "gpus": 8, "gpu_model": "NVIDIA L40S 48GB", "interconnect": "PCIe"},
+  "distributed": {"strategy": "ddp", "nodes": 1, "gpus_per_node": 8, "backend": "nccl"},
+  "runtime": {"precision": "bf16", "max_steps": 100, "seed": 1337, "output_dir": "results/raw"},
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "nccl", "torch_profiler"],
+    "parameters": {
+      "collect_allreduce_time": true,
+      "collect_nccl_bandwidth": true,
+      "collect_comm_compute_ratio": true,
+      "collect_gpu_idle_time": true,
+      "collect_pcie_topology": true,
+      "collect_fsdp_exchange_time": false
+    }
+  },
+  "metadata": {
+    "matrix_id": "E225",
+    "template": "communication_analysis",
+    "phase": "Communication analysis",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 3.2,
+    "strategy_detail": "NCCL/DDP",
+    "objective": "Profile full-node GPT-2 gradient synchronization across the installed L40S PCIe topology",
+    "key_metrics": ["allreduce_time", "bandwidth", "comm_compute_ratio", "gpu_topology_matrix"]
+  }
+}

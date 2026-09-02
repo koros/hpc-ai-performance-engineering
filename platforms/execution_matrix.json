@@ -184,6 +184,54 @@
       "comparability": "platform_specific"
     },
     {
+      "platform": "l40s",
+      "wave": "8gpu-pilot",
+      "name": "L40S full-node NCCL and PCIe topology gate",
+      "experiment_ids": ["E215"],
+      "required_trials": 1,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "l40s",
+      "wave": "8gpu-scaling",
+      "name": "L40S full-node training scaling",
+      "experiment_ids": ["E216-E220"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "8gpu-strategy",
+      "name": "L40S full-node DDP and FSDP strategies",
+      "experiment_ids": ["E221-E224"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "8gpu-communication",
+      "name": "L40S full-node PCIe communication",
+      "experiment_ids": ["E225-E228"],
+      "required_trials": 3,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "l40s",
+      "wave": "vllm-tp8",
+      "name": "L40S eight-GPU vLLM tensor parallel",
+      "experiment_ids": ["E229"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "vllm-tp8-canary",
+      "name": "L40S eight-GPU TinyLlama vLLM canary",
+      "experiment_ids": ["E230"],
+      "required_trials": 1,
+      "comparability": "platform_specific"
+    },
+    {
       "platform": "h100",
       "wave": "0",
       "name": "H100 core environment gate",

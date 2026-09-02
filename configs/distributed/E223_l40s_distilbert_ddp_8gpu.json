@@ -1,0 +1,30 @@
+{
+  "experiment_id": "E223",
+  "experiment": "distributed_strategy_distilbert_ddp_8gpu_l40s",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+    "dataset": "synthetic_classification_v1",
+    "parameters": {"batch_size": 32, "sequence_length": 512, "distributed_strategy": "DDP"}
+  },
+  "hardware": {"platform": "lovelace_l40s", "gpus": 8, "gpu_model": "NVIDIA L40S 48GB", "interconnect": "PCIe"},
+  "distributed": {"strategy": "ddp", "nodes": 1, "gpus_per_node": 8, "backend": "nccl"},
+  "runtime": {"precision": "bf16", "max_steps": 100, "seed": 1337, "output_dir": "results/raw"},
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "nccl"],
+    "parameters": {"collect_communication_overhead": true, "collect_memory_trace": false}
+  },
+  "metadata": {
+    "matrix_id": "E223",
+    "template": "distributed_strategy",
+    "phase": "Distributed training strategy",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 4.8,
+    "strategy_detail": "DDP",
+    "objective": "Measure DistilBERT DDP throughput and communication overhead across all eight L40S GPUs",
+    "key_metrics": ["throughput", "memory", "communication_overhead", "gpu_hours"]
+  }
+}

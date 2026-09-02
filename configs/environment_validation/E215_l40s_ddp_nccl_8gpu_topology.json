@@ -1,0 +1,49 @@
+{
+  "experiment_id": "E215",
+  "experiment": "environment_validation_ddp_nccl_8gpu_topology",
+  "mode": "training",
+  "workload": {
+    "name": "environment_validation",
+    "model": "all",
+    "dataset": null,
+    "parameters": {
+      "validation_target": "ddp_nccl_allreduce",
+      "expected_checks": ["torchrun_launch", "process_group_init", "allreduce", "gpu_topology_capture"],
+      "expected_gpus": 8,
+      "allreduce_bytes": 268435456,
+      "capture_gpu_topology": true
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpus": 8,
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 8,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 1,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "nccl"],
+    "parameters": {}
+  },
+  "metadata": {
+    "matrix_id": "E215",
+    "template": "environment_validation",
+    "phase": "Environment validation",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.5,
+    "objective": "Confirm full-node eight-rank NCCL communication and capture the installed PCIe topology",
+    "key_metrics": ["allreduce_success", "bandwidth", "gpu_topology_matrix", "gpu_pcie_link_inventory"]
+  }
+}

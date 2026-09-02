@@ -1,0 +1,36 @@
+{
+  "experiment_id": "E222",
+  "experiment": "distributed_strategy_gpt2_small_fsdp_full_shard_8gpu_l40s",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "batch_size": 16,
+      "sequence_length": 1024,
+      "distributed_strategy": "FSDP full shard",
+      "strategy_detail": "full_shard",
+      "fsdp_config": {"sharding_strategy": "full_shard", "mixed_precision": "bf16"}
+    }
+  },
+  "hardware": {"platform": "lovelace_l40s", "gpus": 8, "gpu_model": "NVIDIA L40S 48GB", "interconnect": "PCIe"},
+  "distributed": {"strategy": "fsdp", "nodes": 1, "gpus_per_node": 8, "backend": "nccl"},
+  "runtime": {"precision": "bf16", "max_steps": 100, "seed": 1337, "output_dir": "results/raw"},
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "nccl"],
+    "parameters": {"collect_communication_overhead": true, "collect_memory_trace": true}
+  },
+  "metadata": {
+    "matrix_id": "E222",
+    "template": "distributed_strategy",
+    "phase": "Distributed training strategy",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 4.8,
+    "strategy_detail": "full_shard",
+    "objective": "Measure GPT-2 FSDP full-shard trade-offs across all eight L40S GPUs",
+    "key_metrics": ["throughput", "memory", "communication_overhead", "gpu_hours"]
+  }
+}

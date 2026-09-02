@@ -1,0 +1,42 @@
+{
+  "experiment_id": "E218",
+  "experiment": "strong_scaling_distilbert_8gpu_l40s",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+    "dataset": "synthetic_classification_v1",
+    "parameters": {
+      "scaling_type": "strong",
+      "per_gpu_batch_size": 16,
+      "global_batch_size": 128,
+      "sequence_length": 512,
+      "fixed_workload": true,
+      "stack": "ddp"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpus": 8,
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe"
+  },
+  "distributed": {"strategy": "ddp", "nodes": 1, "gpus_per_node": 8, "backend": "nccl"},
+  "runtime": {"precision": "bf16", "max_steps": 100, "seed": 1337, "output_dir": "results/raw"},
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "nccl"],
+    "parameters": {"collect_scaling_metrics": true, "collect_gpu_utilisation": true}
+  },
+  "metadata": {
+    "matrix_id": "E218",
+    "template": "scaling_ddp",
+    "phase": "Strong scaling",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 4.0,
+    "strategy_detail": "ddp",
+    "objective": "Extend the fixed-global-work DistilBERT strong-scaling curve to the L40S full node",
+    "key_metrics": ["runtime", "speedup", "parallel_efficiency", "throughput"]
+  }
+}

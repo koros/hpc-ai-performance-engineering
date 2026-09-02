@@ -313,8 +313,10 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
 
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 215)}
-    l40s_only_supplemental_ids = {f"E{index:03d}" for index in range(201, 210)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 231)}
+    l40s_only_supplemental_ids = {f"E{index:03d}" for index in range(201, 210)} | {
+        f"E{index:03d}" for index in range(215, 231)
+    }
     shared_telemetry_ids = {f"E{index:03d}" for index in range(210, 215)}
 
     l40s_conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s")
@@ -334,7 +336,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     assert l40s_planned_source_count == 176
     assert (
         sum(condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in supplemental_ids)
-        == 10
+        == 26
     )
     assert (
         sum(
@@ -342,7 +344,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
             for condition in l40s_conditions
             if condition.matrix_id in l40s_only_supplemental_ids
         )
-        == 5
+        == 21
     )
     assert sum(condition.status == "planned" for condition in h100_conditions) == 149
 
@@ -412,6 +414,34 @@ def test_l40s_four_gpu_conditions_use_dedicated_release_waves() -> None:
         assert {condition.required_trials for condition in conditions} == {required_trials}
         assert {condition.comparability for condition in conditions} == {comparability}
         assert all(entries[condition.matrix_id].config.hardware.gpus == 4 for condition in conditions)
+
+
+def test_l40s_eight_gpu_conditions_use_architecture_aware_release_waves() -> None:
+    entries = {entry.config.experiment_id: entry for entry in discover_experiment_configs()}
+    expected = {
+        "8gpu-pilot": ({"E215"}, 1, "platform_specific"),
+        "8gpu-scaling": ({"E216", "E217", "E218", "E219", "E220"}, 3, "exact"),
+        "8gpu-strategy": ({"E221", "E222", "E223", "E224"}, 3, "exact"),
+        "8gpu-communication": ({"E225", "E226", "E227", "E228"}, 3, "platform_specific"),
+        "vllm-tp8": ({"E229"}, 3, "exact"),
+        "vllm-tp8-canary": ({"E230"}, 1, "platform_specific"),
+    }
+
+    for wave, (expected_ids, required_trials, comparability) in expected.items():
+        conditions = load_platform_conditions(
+            "platforms/execution_matrix.json",
+            "l40s",
+            wave=wave,
+            include_deferred=False,
+        )
+        assert {condition.matrix_id for condition in conditions} == expected_ids
+        assert {condition.required_trials for condition in conditions} == {required_trials}
+        assert {condition.comparability for condition in conditions} == {comparability}
+        assert all(entries[condition.matrix_id].config.hardware.gpus == 8 for condition in conditions)
+
+    assert entries["E215"].config.workload.parameters["capture_gpu_topology"] is True
+    assert entries["E229"].config.workload.parameters["tensor_parallel_size"] == 8
+    assert entries["E230"].config.workload.parameters["tensor_parallel_size"] == 8
 
 
 def test_l40s_wave_three_collection_scope_excludes_gpt2_strong_scaling_oom_deferrals() -> None:
@@ -796,6 +826,36 @@ def test_render_l40s_four_gpu_pilot_requests_four_gpus_and_thirty_two_cpus(tmp_p
     assert "#SBATCH --partition=gpu_l40s" in script
     assert "#SBATCH --gres=gpu:4" in script
     assert "#SBATCH --cpus-per-task=32" in script
+    assert "#SBATCH --array" not in script
+
+
+def test_render_l40s_eight_gpu_pilot_requests_full_node_capacity(tmp_path: Path) -> None:
+    config_dir = tmp_path / "configs"
+    slurm_dir = tmp_path / "slurm"
+
+    _, script_paths = _render_platform_slurm(
+        platform_profile="platforms/l40s.json",
+        execution_matrix="platforms/execution_matrix.json",
+        config_root="configs",
+        config_output_dir=str(config_dir),
+        output_dir=str(slurm_dir),
+        run_output_dir=None,
+        log_dir=None,
+        wave="8gpu-pilot",
+        experiment_ids={"E215"},
+        profile_path=None,
+        partition=None,
+        account=None,
+        time_limit=None,
+        cpus_per_task=None,
+        modules=[],
+        env_values=[],
+    )
+
+    script = script_paths[0].read_text(encoding="utf-8")
+    assert "#SBATCH --partition=gpu_l40s" in script
+    assert "#SBATCH --gres=gpu:8" in script
+    assert "#SBATCH --cpus-per-task=64" in script
     assert "#SBATCH --array" not in script
 
 
