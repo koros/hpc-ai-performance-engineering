@@ -20,6 +20,14 @@
     },
     {
       "platform": "l40s",
+      "wave": "4gpu-pilot",
+      "name": "L40S four-GPU NCCL environment gate",
+      "experiment_ids": ["E003"],
+      "required_trials": 1,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "l40s",
       "wave": "1",
       "name": "L40S core baselines and characterisation",
       "experiment_ids": ["E008-E015", "E018-E031"],
@@ -115,6 +123,30 @@
       "wave": "vllm-tp2",
       "name": "L40S two-GPU vLLM tensor-parallel studies",
       "experiment_ids": ["E147", "E195"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "4gpu-core",
+      "name": "L40S four-GPU scaling strategy and PyTorch inference",
+      "experiment_ids": ["E034", "E037", "E040", "E043", "E046", "E048", "E050", "E056", "E058", "E172"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "4gpu-communication",
+      "name": "L40S four-GPU PCIe communication",
+      "experiment_ids": ["E115-E116", "E119-E120"],
+      "required_trials": 3,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "l40s",
+      "wave": "vllm-tp4",
+      "name": "L40S four-GPU vLLM tensor-parallel studies",
+      "experiment_ids": ["E148", "E196"],
       "required_trials": 3,
       "comparability": "exact"
     },
@@ -291,13 +323,6 @@
       "experiment_ids": ["E203-E204", "E206-E207"],
       "comparability": "capacity_adjusted",
       "reason": "The capacity-adjusted GPT-2 micro-batch 26/27/28/30 probes exceeded the observed 44.52 GiB L40S capacity in all three trials. E206 failed before a further 4.99 GiB allocation after 34.87 GiB was allocated by PyTorch, E207 failed before a further 5.18 GiB allocation after 36.13 GiB was allocated, E203 failed before a further 5.37 GiB allocation after 37.40 GiB was allocated, and E204 failed before a further 5.75 GiB allocation after 39.04 GiB was allocated. Keep E201/E202/E205 as successful lower-bound probes; E205 at micro-batch 25 is the largest passing integer boundary observed on the 44.52 GiB L40S."
-    },
-    {
-      "platforms": ["l40s"],
-      "name": "L40S four-GPU conditions exceed the available node capacity",
-      "experiment_ids": ["E003", "E034", "E037", "E040", "E043", "E046", "E048", "E050", "E056", "E058", "E115-E116", "E119-E120", "E148", "E172", "E196"],
-      "comparability": "platform_specific",
-      "reason": "The active L40S node exposes two GPUs. These four-GPU conditions must wait for a verified four-GPU L40S allocation; do not substitute two-GPU results."
     },
     {
       "platforms": ["h100"],

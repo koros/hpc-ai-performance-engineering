@@ -60,7 +60,7 @@ def test_platform_profiles_load() -> None:
     assert l40s.platform_id == "l40s"
     assert l40s.partition == "gpu_l40s"
     assert l40s.output_root == "results/raw/l40s"
-    assert l40s.max_gpus == 2
+    assert l40s.max_gpus == 8
     assert h100.platform_id == "h100"
     assert h100.max_gpus == 4
 
@@ -331,7 +331,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in source_ids
     )
 
-    assert l40s_planned_source_count == 159
+    assert l40s_planned_source_count == 176
     assert (
         sum(condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in supplemental_ids)
         == 10
@@ -375,7 +375,7 @@ def test_energy_revalidation_wave_uses_new_immutable_condition() -> None:
     assert all(condition.comparability == "platform_specific" for condition in [*l40s, *h100])
 
 
-def test_runnable_l40s_conditions_fit_the_verified_two_gpu_node() -> None:
+def test_runnable_l40s_conditions_fit_the_verified_eight_gpu_node() -> None:
     profile = load_platform_profile("platforms/l40s.json")
     entries = {entry.config.experiment_id: entry for entry in discover_experiment_configs()}
     conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s")
@@ -386,6 +386,32 @@ def test_runnable_l40s_conditions_fit_the_verified_two_gpu_node() -> None:
     assert all(entries[condition.matrix_id].config.hardware.gpus <= profile.max_gpus for condition in planned)
     wave_two = [condition.matrix_id for condition in planned if condition.wave == "2"]
     assert wave_two == ["E123", "E124", "E127", "E128"]
+
+
+def test_l40s_four_gpu_conditions_use_dedicated_release_waves() -> None:
+    entries = {entry.config.experiment_id: entry for entry in discover_experiment_configs()}
+    expected = {
+        "4gpu-pilot": ({"E003"}, 1, "platform_specific"),
+        "4gpu-core": (
+            {"E034", "E037", "E040", "E043", "E046", "E048", "E050", "E056", "E058", "E172"},
+            3,
+            "exact",
+        ),
+        "4gpu-communication": ({"E115", "E116", "E119", "E120"}, 3, "platform_specific"),
+        "vllm-tp4": ({"E148", "E196"}, 3, "exact"),
+    }
+
+    for wave, (expected_ids, required_trials, comparability) in expected.items():
+        conditions = load_platform_conditions(
+            "platforms/execution_matrix.json",
+            "l40s",
+            wave=wave,
+            include_deferred=False,
+        )
+        assert {condition.matrix_id for condition in conditions} == expected_ids
+        assert {condition.required_trials for condition in conditions} == {required_trials}
+        assert {condition.comparability for condition in conditions} == {comparability}
+        assert all(entries[condition.matrix_id].config.hardware.gpus == 4 for condition in conditions)
 
 
 def test_l40s_wave_three_collection_scope_excludes_gpt2_strong_scaling_oom_deferrals() -> None:
@@ -578,31 +604,14 @@ def test_execution_matrix_defers_only_unaccepted_or_unsupported_backend_and_plat
         if platform_id == "l40s":
             expected_ids.update(
                 {
-                    "E003",
                     "E032",
                     "E033",
-                    "E034",
-                    "E037",
-                    "E040",
-                    "E043",
-                    "E046",
                     "E067",
                     "E068",
                     "E203",
                     "E204",
                     "E206",
                     "E207",
-                    "E048",
-                    "E050",
-                    "E056",
-                    "E058",
-                    "E115",
-                    "E116",
-                    "E119",
-                    "E120",
-                    "E148",
-                    "E172",
-                    "E196",
                 }
             )
         else:
@@ -638,6 +647,7 @@ def test_execution_matrix_schedules_accepted_l40s_vllm_scope_in_dedicated_waves(
             *(f"E{index:03d}" for index in range(191, 195)),
         },
         "vllm-tp2": {"E147", "E195"},
+        "vllm-tp4": {"E148", "E196"},
     }
     for wave, expected_ids in later_waves.items():
         wave_conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s", wave=wave)
@@ -648,8 +658,8 @@ def test_execution_matrix_schedules_accepted_l40s_vllm_scope_in_dedicated_waves(
     all_vllm_ids = {"E006"}
     for expected_ids in later_waves.values():
         all_vllm_ids.update(expected_ids)
-    assert len(all_vllm_ids) == 35
-    assert {"E148", "E196"}.isdisjoint(all_vllm_ids)
+    assert len(all_vllm_ids) == 37
+    assert {"E148", "E196"} <= all_vllm_ids
 
 
 def test_deferred_platform_conditions_are_tracked() -> None:
@@ -757,6 +767,36 @@ def test_render_platform_slurm_uses_profile_partition_and_matrix_trials(tmp_path
     assert "DS_IGNORE_CUDA_DETECTION" not in script
     assert "export PYTORCH_NVML_BASED_CUDA_CHECK=1" in script
     assert f"--config {config_dir / 'E008.json'}" in script
+
+
+def test_render_l40s_four_gpu_pilot_requests_four_gpus_and_thirty_two_cpus(tmp_path: Path) -> None:
+    config_dir = tmp_path / "configs"
+    slurm_dir = tmp_path / "slurm"
+
+    _, script_paths = _render_platform_slurm(
+        platform_profile="platforms/l40s.json",
+        execution_matrix="platforms/execution_matrix.json",
+        config_root="configs",
+        config_output_dir=str(config_dir),
+        output_dir=str(slurm_dir),
+        run_output_dir=None,
+        log_dir=None,
+        wave="4gpu-pilot",
+        experiment_ids={"E003"},
+        profile_path=None,
+        partition=None,
+        account=None,
+        time_limit=None,
+        cpus_per_task=None,
+        modules=[],
+        env_values=[],
+    )
+
+    script = script_paths[0].read_text(encoding="utf-8")
+    assert "#SBATCH --partition=gpu_l40s" in script
+    assert "#SBATCH --gres=gpu:4" in script
+    assert "#SBATCH --cpus-per-task=32" in script
+    assert "#SBATCH --array" not in script
 
 
 def test_lovelace_module_helper_uses_verified_cuda_build_stack() -> None:
