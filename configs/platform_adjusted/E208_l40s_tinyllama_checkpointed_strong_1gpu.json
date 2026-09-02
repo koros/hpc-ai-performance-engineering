@@ -1,0 +1,75 @@
+{
+  "experiment_id": "E208",
+  "experiment": "capacity_adjusted_l40s_tinyllama_checkpointed_strong_1gpu",
+  "mode": "training",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "scaling_type": "strong",
+      "per_gpu_batch_size": 16,
+      "global_batch_size": 16,
+      "effective_batch_size": 16,
+      "gradient_accumulation_steps": 1,
+      "sequence_length": 1024,
+      "activation_checkpointing": true,
+      "fixed_workload": true,
+      "stack": "ddp"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpus": 1,
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw/l40s"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory",
+      "nccl"
+    ],
+    "parameters": {
+      "collect_scaling_metrics": true,
+      "collect_gpu_utilisation": true,
+      "collect_memory_trace": true,
+      "collect_oom_risk": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E208",
+    "template": "l40s_capacity_adjusted_checkpointed_strong_scaling",
+    "phase": "Strong scaling",
+    "priority": "Supplemental",
+    "gpu_hours_estimate": 1.5,
+    "objective": "Measure one-GPU TinyLlama strong-scaling performance with activation checkpointing while preserving the original global batch and sequence length",
+    "source_experiment_ids": [
+      "E044",
+      "E045"
+    ],
+    "capacity_adjusted_reason": "E044 OOMed in all three exact L40S trials at batch 16 and sequence length 1024. Activation checkpointing preserves the mathematical workload while reducing activation memory; the matched E209 row applies the same execution mode on two GPUs.",
+    "key_metrics": [
+      "runtime",
+      "throughput",
+      "speedup",
+      "memory",
+      "gpu_util",
+      "gpu_hours"
+    ]
+  }
+}

@@ -6,7 +6,7 @@ This snapshot summarises the repository state before full HPC submission. It sho
 
 | Area | Status |
 | --- | --- |
-| Experiment matrix | 200 source matrix configs plus 7 L40S capacity-adjusted supplemental probes are present and load successfully. |
+| Experiment matrix | 200 source matrix configs plus 9 L40S capacity-adjusted supplemental conditions are present and load successfully. |
 | Validation | `python -m hpc_ai_perf.cli validate --skip-results` passes with 0 config issues. |
 | Local smoke runner | CPU-only synthetic workload is ready and covered by tests. |
 | Semantic launch gate | `validate --research-ready` blocks unsupported precision/backend/framework combinations before Slurm rendering or execution. |
@@ -14,7 +14,7 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | Distributed execution | One-process-per-GPU `python -m torch.distributed.run`, DDP, FSDP, DeepSpeed ZeRO, rank binding, global work accounting, and rank-safe result writing are implemented. |
 | Profiling | nvidia-smi power/utilisation/memory/clock/temperature sampling, PyTorch traces, workload timing, and NCCL microbenchmark metrics are implemented. |
 | Slurm support | Semantic-gated single/bulk rendering, H100/L40S profile matching, CPU allocation checks, and three transformer smoke presets are available. |
-| Platform execution | All 200 source rows route exactly once per platform. There are 160 planned L40S source conditions, 3 planned L40S capacity-adjusted probes, and 144 planned H100 conditions. The private PyTorch 2.8.0/CUDA 12.4 stack has passed the L40S E006 vLLM gate, so 35 supported L40S vLLM conditions now have dedicated waves. H100 vLLM, four-GPU L40S rows, known L40S OOM shapes, TensorRT-LLM, and other backend-blocked rows remain deferred. |
+| Platform execution | All 200 source rows route exactly once per platform. There are 159 planned L40S source conditions, 5 planned L40S capacity-adjusted conditions, and 144 planned H100 conditions. The private PyTorch 2.8.0/CUDA 12.4 stack has passed the L40S E006 vLLM gate, so 35 supported L40S vLLM conditions now have dedicated waves. H100 vLLM, four-GPU L40S rows, known L40S OOM shapes, TensorRT-LLM, and other backend-blocked rows remain deferred. |
 | Evidence retention | L40S/H100 JSON is imported non-destructively into separate roots, scanned for sensitive keys, validated, and covered by tracked SHA-256 manifests. |
 | Dashboard | Static dashboard reads processed results, analysis summaries, and readiness report output. |
 | Quality gates | `pytest`, `ruff`, and `pre-commit` are configured and passing. |
@@ -33,7 +33,7 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | Category | Count |
 | --- | ---: |
 | Source matrix configs | 200 |
-| L40S supplemental capacity probes | 7 |
+| L40S supplemental capacity probes | 9 |
 | Must Have | 116 |
 | Should Have | 71 |
 | Optional | 13 |
@@ -113,4 +113,4 @@ commits in the primary checkout.
 
 ## Deferred Research Scope
 
-Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative gate; it must pass with zero blockers. The platform tracker lists deferred rows that are intentionally excluded from generated deployment waves. The L40S E006 gate has passed, and supported one-/two-GPU L40S vLLM studies are now planned in dedicated waves. H100 vLLM remains deferred until E006 passes there. The active L40S node has two GPUs, so all four-GPU conditions—including E148/E196—remain deferred. E032/E033/E067/E068 remain exact-shape L40S OOM deferrals; E203/E204/E206/E207 are also deferred after confirming the upper capacity-adjusted probes do not fit. Use the separately labelled E201-E202/E205 capacity-adjusted probes for the L40S GPT-2 micro-batch boundary; E205 at micro-batch 25 is the largest passing integer probe observed so far. E007 remains deferred because a compatible TensorRT-LLM package, built engine, and pinned load/request contract are missing. Other deferred rows still require their documented FP8, quantization, or adapter prerequisites. See [the deferred experiment audit](deferred_experiment_audit.md) for the complete platform-specific list.
+Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` for the authoritative gate; it must pass with zero blockers. The platform tracker lists deferred rows that are intentionally excluded from generated deployment waves. The L40S E006 gate has passed, and supported one-/two-GPU L40S vLLM studies are now planned in dedicated waves. H100 vLLM remains deferred until E006 passes there. The active L40S node has two GPUs, so all four-GPU conditions—including E148/E196—remain deferred. E032/E033/E044/E067/E068 remain exact-shape L40S OOM deferrals; E203/E204/E206/E207 are also deferred after confirming the upper capacity-adjusted probes do not fit. Use E201-E202/E205 for the L40S GPT-2 micro-batch boundary and the matched checkpointed E208/E209 pair for L40S TinyLlama strong scaling. Original E044/E045 remain unchanged for exact H100 execution. E007 remains deferred because a compatible TensorRT-LLM package, built engine, and pinned load/request contract are missing. Other deferred rows still require their documented FP8, quantization, or adapter prerequisites. See [the deferred experiment audit](deferred_experiment_audit.md) for the complete platform-specific list.

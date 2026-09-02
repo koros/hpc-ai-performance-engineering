@@ -10,6 +10,7 @@ import pytest
 from scripts.check_private_torch import is_import_below_environment
 
 from hpc_ai_perf.cli import (
+    _apply_current_wave_policy,
     _bundle_setup_commands,
     _completed_planned_wave_evidence_ids,
     _incomplete_planned_wave_experiment_ids,
@@ -312,7 +313,7 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
 
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 208)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 210)}
 
     l40s_conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s")
     h100_conditions = load_platform_conditions("platforms/execution_matrix.json", "h100")
@@ -328,10 +329,10 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in source_ids
     )
 
-    assert l40s_planned_source_count == 160
+    assert l40s_planned_source_count == 159
     assert (
         sum(condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in supplemental_ids)
-        == 3
+        == 5
     )
     assert sum(condition.status == "planned" for condition in h100_conditions) == 144
 
@@ -386,6 +387,71 @@ def test_l40s_capacity_adjusted_wave_materializes_boundary_probes(tmp_path: Path
     assert config.metadata["condition_id"] == "E205@l40s"
     assert config.metadata["comparability"] == "capacity_adjusted"
     assert config.runtime.output_dir == "results/raw/l40s"
+
+
+def test_l40s_checkpointed_scaling_wave_preserves_original_h100_protocol(tmp_path: Path) -> None:
+    l40s_profile = load_platform_profile("platforms/l40s.json")
+    l40s_conditions = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "l40s",
+        wave="optional-capacity",
+        include_deferred=False,
+    )
+
+    adjusted_paths = materialize_platform_configs(l40s_profile, l40s_conditions, tmp_path / "l40s")
+
+    assert [path.name for path in adjusted_paths] == ["E208.json", "E209.json"]
+    adjusted_configs = [load_experiment_config(path) for path in adjusted_paths]
+    assert [config.hardware.gpus for config in adjusted_configs] == [1, 2]
+    assert [config.workload.parameters["per_gpu_batch_size"] for config in adjusted_configs] == [16, 8]
+    assert all(config.workload.parameters["activation_checkpointing"] is True for config in adjusted_configs)
+    assert all(config.workload.parameters["global_batch_size"] == 16 for config in adjusted_configs)
+    assert all(config.metadata["comparability"] == "capacity_adjusted" for config in adjusted_configs)
+
+    l40s_e044 = next(
+        condition
+        for condition in load_platform_conditions("platforms/execution_matrix.json", "l40s")
+        if condition.matrix_id == "E044"
+    )
+    assert l40s_e044.status == "deferred"
+
+    h100_profile = load_platform_profile("platforms/h100.json")
+    h100_e044 = next(
+        condition
+        for condition in load_platform_conditions(
+            "platforms/execution_matrix.json",
+            "h100",
+            wave="optional",
+            include_deferred=False,
+        )
+        if condition.matrix_id == "E044"
+    )
+    h100_path = materialize_platform_configs(h100_profile, [h100_e044], tmp_path / "h100")[0]
+    h100_config = load_experiment_config(h100_path)
+
+    assert h100_config.metadata["comparability"] == "exact"
+    assert h100_config.hardware.gpu_model == "NVIDIA H100 SXM 80GB"
+    assert h100_config.workload.parameters.get("activation_checkpointing", False) is False
+    assert h100_config.workload.parameters["per_gpu_batch_size"] == 16
+
+
+def test_wave_status_stops_retrying_conditions_deferred_after_submission() -> None:
+    historical = BundleResultStatus(
+        Path("bundle"),
+        (
+            ExperimentResultStatus("E016", 3, (1, 2, 3), (), 0),
+            ExperimentResultStatus("E017", 3, (1, 2, 3), (), 0),
+            ExperimentResultStatus("E044", 3, (), (1, 2, 3), 0),
+            ExperimentResultStatus("E045", 3, (1, 2, 3), (), 0),
+        ),
+    )
+
+    current = _apply_current_wave_policy(historical, "l40s", "optional")
+
+    assert current.complete
+    assert current.completed_trials == 9
+    assert current.expected_trials == 9
+    assert [experiment.experiment_id for experiment in current.experiments] == ["E016", "E017", "E045"]
 
 
 def test_retry_scope_includes_new_policy_conditions_missing_from_prior_attempt(monkeypatch, tmp_path: Path) -> None:

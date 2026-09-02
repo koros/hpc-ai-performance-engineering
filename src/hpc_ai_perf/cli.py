@@ -24,6 +24,8 @@ from hpc_ai_perf.results import aggregate_results, import_result_evidence, verif
 from hpc_ai_perf.runners import LocalBenchmarkRunner
 from hpc_ai_perf.runtime_checks import format_runtime_checks, run_cluster_runtime_checks, runtime_checks_to_json
 from hpc_ai_perf.slurm import (
+    BundleResultStatus,
+    ExperimentResultStatus,
     append_wave_attempt,
     capture_environment_contract,
     current_wave_attempt,
@@ -156,6 +158,10 @@ def main() -> None:
         scheduler_rows = refresh_job_status_csv(attempt["status_path"])
         scheduler_summary = _summarize_scheduler_rows(scheduler_rows)
         print(format_bundle_result_status(status))
+        current_ids = {experiment.experiment_id for experiment in status.experiments}
+        historical_ids = {str(experiment_id) for experiment_id in attempt.get("experiment_ids", [])} - current_ids
+        if historical_ids:
+            print("Policy-deferred historical conditions: " + ", ".join(sorted(historical_ids)))
         print(f"Slurm scheduler states: {scheduler_summary}")
         print(f"Slurm submission record: {attempt['status_path']}")
         return
@@ -1175,8 +1181,41 @@ def _current_platform_wave_status(args: argparse.Namespace):
     profile = load_platform_profile(args.platform_profile)
     state_path = _wave_state_path_for_args(args, profile.platform_id)
     attempt = current_wave_attempt(state_path)
-    status = summarize_bundle_results(attempt["bundle_dir"])
+    status = _apply_current_wave_policy(
+        summarize_bundle_results(attempt["bundle_dir"]),
+        profile.platform_id,
+        str(args.wave),
+    )
     return state_path, attempt, status
+
+
+def _apply_current_wave_policy(
+    status: BundleResultStatus,
+    platform_id: str,
+    wave: str,
+) -> BundleResultStatus:
+    """Show current planned scope while retaining coverage from an older bundle.
+
+    A measured failure can move a condition from a runnable wave into deferred
+    policy after its bundle was submitted. Status must stop recommending that
+    historical condition for recovery, while still showing newly added policy
+    conditions as missing until they receive their own submission.
+    """
+    conditions = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        platform_id,
+        wave=wave,
+        include_deferred=False,
+    )
+    expected = {condition.matrix_id: condition.required_trials for condition in conditions}
+    observed = {experiment.experiment_id: experiment for experiment in status.experiments}
+    experiments: list[ExperimentResultStatus] = []
+    for experiment_id, required_trials in sorted(expected.items()):
+        experiment = observed.get(experiment_id)
+        if experiment is None:
+            experiment = ExperimentResultStatus(experiment_id, required_trials, (), (), 0)
+        experiments.append(experiment)
+    return BundleResultStatus(status.bundle_dir, tuple(experiments))
 
 
 def _collect_platform_wave(args: argparse.Namespace) -> list[str]:
