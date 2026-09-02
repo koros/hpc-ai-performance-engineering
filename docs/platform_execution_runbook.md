@@ -120,6 +120,12 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `optional-capacity` | `E208-E209` checkpointed TinyLlama strong scaling | 3 | Both rows must complete under the same checkpointed protocol before calculating capacity-adjusted speedup. Do not pair E208 with non-checkpointed E045. |
 | `telemetry-revalidation` | `E210-E213` UUID-bound training, inference, and communication anchors | 3 | Run before final power/utilisation/energy interpretation. All records must identify the allocated GPU mapping and pass the telemetry audit. |
 | `energy-revalidation` | `E214` measured-region two-GPU communication anchor | 3 | Use for communication average power, joules, and tokens/kWh after schema-v3 boundary validation. |
+| `8gpu-pilot` | `E215` eight-rank NCCL and PCIe topology gate | 1 | Verify all eight allocated L40S GPUs, the rank mapping, NCCL all-reduce, and the captured PCIe topology before full-node performance work. |
+| `8gpu-scaling` | `E216-E220` GPT-2, DistilBERT, and TinyLlama scaling | 3 | L40S-only full-node extension. Preserve the stated strong/weak scaling protocol; do not pool it with a differently sized H100 run. |
+| `8gpu-strategy` | `E221-E224` GPT-2 and DistilBERT DDP/FSDP | 3 | Compare strategies only within the same eight-GPU L40S allocation class. |
+| `8gpu-communication` | `E225-E228` GPT-2 and DistilBERT DDP/FSDP communication | 3 | Interpret as eight-GPU PCIe/NCCL behaviour using E215's topology capture, never as NVLink evidence. |
+| `vllm-tp8-canary` | `E230` TinyLlama TP=8 engine-start/request gate | 1 | Use the private vLLM environment; it must pass before E229. |
+| `vllm-tp8` | `E229` TinyLlama TP=8 serving | 3 | L40S-only extension. TinyLlama has 32 attention heads and is divisible by TP=8; GPT-2 is not. |
 
 If the original optional bundle was submitted before E044 was deferred, pull the updated policy and rerun
 `status-platform-wave`. It will report 9/9 current-policy trials and identify E044 as a policy-deferred historical
@@ -138,13 +144,36 @@ shapes on the observed L40S capacity. E067 and E068 exhausted the exact GPT-2 mi
 L40S studies are registered separately as capacity-adjusted conditions. E201/E202 succeeded at micro-batch 20/24,
 E205 succeeded at micro-batch 25, and E206/E207/E203/E204 OOMed at 26/27/28/30. The current L40S boundary is therefore
 micro-batch 25 as the largest passing integer probe. The L40S node exposes eight GPUs, and a four-GPU allocation has
-been verified; the dedicated four-GPU waves preserve those exact conditions without modifying prior wave history.
+been verified. `8gpu-pilot` is the canonical full-node allocation and topology gate; only its accepted evidence releases
+the eight-GPU supplemental waves. Those L40S-only rows do not alter the original H100 source configurations.
 
 The exact one-GPU TinyLlama strong-scaling row E044 also exceeded L40S memory in all three trials. Each run had
 43.30 GiB allocated by PyTorch with 592.25 MiB free before a further 1000 MiB allocation failed. E044 is therefore
 preserved unchanged as an exact H100 condition and deferred only on L40S. The supplemental E208/E209 pair applies
 activation checkpointing consistently to the original one-/two-GPU workload shapes and is labelled
 `capacity_adjusted`; it must not be pooled with exact E044/E045 evidence.
+
+### Full-node L40S release sequence
+
+Run the full-node waves in this order. Each status command must report all expected trials as provenance-valid before
+collection and staging. The first four waves use the project `.venv`; the last two use the isolated vLLM environment.
+
+```bash
+make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=8gpu-pilot
+make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=8gpu-pilot
+make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=8gpu-pilot
+make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=8gpu-pilot
+
+make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=8gpu-scaling
+make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=8gpu-strategy
+make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=8gpu-communication
+
+make submit-vllm-wave PLATFORM=l40s PLATFORM_WAVE=vllm-tp8-canary
+make submit-vllm-wave PLATFORM=l40s PLATFORM_WAVE=vllm-tp8
+```
+
+For every performance wave, substitute its wave name in the same `status-platform-wave`, `collect-platform-wave`, and
+`stage-platform-wave` sequence shown for `8gpu-pilot`. Submit `vllm-tp8` only after the E230 canary is collected.
 
 ## 4. Submit, Monitor, and Recover an Immutable Wave
 

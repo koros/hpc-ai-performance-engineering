@@ -219,6 +219,8 @@ After the pilot reports one provenance-valid completed trial, run the performanc
 | `vllm-prompt` | `E143-E146`, `E191-E194` | 3 | Prompt-length sweeps. |
 | `vllm-tp2` | `E147`, `E195` | 3 | Two-GPU tensor-parallel serving. |
 | `vllm-tp4` | `E148`, `E196` | 3 | Four-GPU tensor-parallel serving after E003 and a TP=4 canary pass. |
+| `vllm-tp8-canary` | `E230` | 1 | L40S-only TinyLlama engine-start and served-request gate with eight visible GPUs. |
+| `vllm-tp8` | `E229` | 3 | L40S-only TinyLlama TP=8 performance after E230 has been collected. |
 
 For example:
 
@@ -231,7 +233,9 @@ make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-framework
 
 `submit-vllm-wave` always supplies the private environment to the immutable bundle. Never supply that environment to
 non-vLLM waves. Slurm job 1773321 verified four visible L40S GPUs on the eight-GPU node, so E148/E196 are routed to
-`vllm-tp4`; run a TP=4 canary before submitting their canonical trials.
+`vllm-tp4`; run a TP=4 canary before submitting their canonical trials. E215 is the canonical eight-rank allocation
+and PCIe-topology gate. Run E230 after E215 and collect it before submitting E229. TP=8 is intentionally limited to
+TinyLlama because its 32 attention heads divide evenly by eight; GPT-2's 12 heads do not.
 
 If a completed scheduler job writes failed evidence, create a recovery bundle with the matching private environment:
 

@@ -50,8 +50,10 @@ make check-cuda-toolchain PLATFORM=l40s EXPECTED_GPUS=1
 ```
 
 E003 is not part of core wave 0 because it needs four GPUs. A four-GPU L40S allocation was verified with Slurm job
-1773321, so run E003 separately through `4gpu-pilot`. E006 is a separate one-trial `vllm-pilot` condition and must run
-through the private serving environment; it remains outside the shared `.venv` core preflight.
+1773321, so run E003 separately through `4gpu-pilot`. E215 is the equivalent eight-rank L40S gate: it verifies all
+eight visible GPUs, NCCL all-reduce, rank mapping, and PCIe topology before any supplemental full-node performance
+wave is submitted. E006 is a separate one-trial `vllm-pilot` condition and must run through the private serving
+environment; it remains outside the shared `.venv` core preflight.
 
 If pip has already upgraded Torch, Numpy, or vLLM inside `.venv`, move that environment aside and rebuild it:
 

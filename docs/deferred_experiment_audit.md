@@ -28,6 +28,15 @@ canary-gated until it has started an engine and served a request with four visib
 be submitted with `make submit-vllm-wave`, which binds the immutable bundle to the private vLLM environment. The
 shared project `.venv` remains the runtime for non-vLLM waves.
 
+## L40S Full-node Extension
+
+`E215-E230` are new L40S-only supplemental conditions, not rows released from the `E001-E200` deferred source matrix.
+They preserve all original H100 configurations, including the exact rows that will later use the four-GPU H100 node.
+The required order is E215 (eight-rank NCCL and PCIe topology), E216-E220 scaling, E221-E224 DDP/FSDP strategy,
+E225-E228 communication, E230 TinyLlama TP=8 vLLM canary, then E229 TP=8 performance. E229 is intentionally
+TinyLlama-only: its 32 attention heads are divisible by eight, whereas GPT-2's 12 heads are not. These 16 conditions
+produce 44 canonical L40S trials and are always analysed as L40S-only evidence.
+
 ## Deferred After Audit
 
 | Platform | Count | IDs | Blocking condition | Release requirement |
