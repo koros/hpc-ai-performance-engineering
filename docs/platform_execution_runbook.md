@@ -111,7 +111,12 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `vllm-concurrency` | `E138-E142`, `E186-E190` | 3 | Concurrency sweep completes with latency and throughput metrics. |
 | `vllm-prompt` | `E143-E146`, `E191-E194` | 3 | Prompt-length sweep completes with TTFT and generation metrics. |
 | `vllm-tp2` | `E147`, `E195` | 3 | Two-GPU tensor-parallel rows run on both visible L40S devices. |
-| `optional` | `E016-E017`, `E044-E045` | 3 | Run only if memory and queue budget remain. |
+| `optional` | `E016-E017`, `E045` | 3 | E044 is excluded after three deterministic exact-shape L40S OOMs; retain its failed bundle for the report. |
+| `optional-capacity` | `E208-E209` checkpointed TinyLlama strong scaling | 3 | Both rows must complete under the same checkpointed protocol before calculating capacity-adjusted speedup. Do not pair E208 with non-checkpointed E045. |
+
+If the original optional bundle was submitted before E044 was deferred, pull the updated policy and rerun
+`status-platform-wave`. It will report 9/9 current-policy trials and identify E044 as a policy-deferred historical
+condition. Collect that bundle normally; do not submit another exact E044 retry.
 
 DeepSpeed's own optional NVTX annotations are disabled by default for ZeRO rows. The installed Lovelace NVTX binding
 does not accept the keyword arguments used by DeepSpeed 0.19.6, while the project NCCL and `nvidia-smi` collectors
@@ -127,6 +132,12 @@ L40S studies are registered separately as capacity-adjusted conditions. E201/E20
 E205 succeeded at micro-batch 25, and E206/E207/E203/E204 OOMed at 26/27/28/30. The current L40S boundary is therefore
 micro-batch 25 as the largest passing integer probe. The active L40S node exposes two GPUs,
 so the matrix preserves only supported one- and two-GPU conditions in runnable waves.
+
+The exact one-GPU TinyLlama strong-scaling row E044 also exceeded L40S memory in all three trials. Each run had
+43.30 GiB allocated by PyTorch with 592.25 MiB free before a further 1000 MiB allocation failed. E044 is therefore
+preserved unchanged as an exact H100 condition and deferred only on L40S. The supplemental E208/E209 pair applies
+activation checkpointing consistently to the original one-/two-GPU workload shapes and is labelled
+`capacity_adjusted`; it must not be pooled with exact E044/E045 evidence.
 
 ## 4. Submit, Monitor, and Recover an Immutable Wave
 

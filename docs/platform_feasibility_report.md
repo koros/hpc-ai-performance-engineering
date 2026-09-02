@@ -30,9 +30,9 @@ The companion [platform experiment matrix](platform_experiment_matrix.md) gives 
 | Scope | Count | Interpretation |
 | --- | ---: | --- |
 | Source matrix configs | 200 | `E001-E200` |
-| Supplemental L40S capacity probes | 7 | `E201-E207`; capacity-adjusted GPT-2 micro-batch rows derived from the E067/E068 L40S OOM boundary. |
+| Supplemental L40S capacity conditions | 9 | `E201-E207` are GPT-2 micro-batch boundary probes; `E208-E209` are a matched checkpointed TinyLlama strong-scaling pair derived from the E044 L40S OOM. |
 | Planned L40S source conditions | 160 | Generated as `E###@l40s`; includes 35 platform-specific/exact vLLM conditions in dedicated waves. |
-| Planned L40S supplemental conditions | 3 | Generated as capacity-adjusted `E201-E202@l40s` and `E205@l40s`; do not pool with exact H100 evidence. |
+| Planned L40S supplemental conditions | 5 | Generated as capacity-adjusted `E201-E202@l40s`, `E205@l40s`, and `E208-E209@l40s`; do not pool with exact H100 evidence. |
 | Deferred L40S supplemental conditions | 4 | `E203-E204` and `E206-E207`; confirmed upper-bound OOM probes at micro-batch 26/27/28/30. |
 | Deferred L40S source conditions | 40 | TensorRT-LLM/backend/adapter gaps, H100-specific hardware rows, four-GPU rows including E148/E196, and exact-shape E032/E033/E067/E068 L40S OOMs. |
 | Planned H100 conditions | 144 | Generated as `E###@h100`; run the same supported scope when allocation is available. |
@@ -81,7 +81,7 @@ companion:
 - use the `gpu_l40s` queue/profile and repeat the L40S environment-validation sequence before matrix collection; and
 - report communication as NCCL/PCIe behaviour, not NVLink behaviour.
 
-L40S is suitable for supported single- and two-GPU baselines, DistilBERT scaling, DDP/FSDP/ZeRO comparisons, memory optimisation, data-movement studies, power/energy analysis, PyTorch inference, and the accepted one-/two-GPU vLLM scope. The active node does not support its four-GPU rows, including vLLM E148/E196. The exact E032/E033 GPT-2 strong-scaling shapes and E067/E068 GPT-2 micro-batch 32/64 shapes are deferred after observed OOMs; E201/E202/E205 provide separately labelled L40S capacity-adjusted probes, while E203/E204/E206/E207 record the upper-bound OOMs at micro-batch 26/27/28/30. E205 establishes micro-batch 25 as the largest passing integer boundary observed so far. Its results answer L40S-specific questions and do not replace H100 evidence for H100-specific research questions.
+L40S is suitable for supported single- and two-GPU baselines, DistilBERT scaling, DDP/FSDP/ZeRO comparisons, memory optimisation, data-movement studies, power/energy analysis, PyTorch inference, and the accepted one-/two-GPU vLLM scope. The active node does not support its four-GPU rows, including vLLM E148/E196. The exact E032/E033 GPT-2 strong-scaling shapes and E067/E068 GPT-2 micro-batch 32/64 shapes are deferred after observed OOMs; E201/E202/E205 provide separately labelled L40S capacity-adjusted probes, while E203/E204/E206/E207 record the upper-bound OOMs at micro-batch 26/27/28/30. E205 establishes micro-batch 25 as the largest passing integer boundary observed so far. Exact E044 also OOMed in all three L40S trials after allocating 43.30 GiB and failing a further 1000 MiB request. The matched checkpointed E208/E209 pair preserves TinyLlama, BF16, sequence length 1024, and global batch 16 for a separate capacity-adjusted scaling analysis, while original E044/E045 remain intact for H100. These results answer L40S-specific questions and do not replace H100 evidence for H100-specific research questions.
 
 ### H100: deferred collection path, already materializable
 
