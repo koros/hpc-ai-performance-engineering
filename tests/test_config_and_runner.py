@@ -1319,6 +1319,7 @@ def test_vllm_inference_uses_certified_eager_execution(
     expected_compilation_config: dict[str, object] | None,
     expected_execution_mode: str,
 ) -> None:
+    monkeypatch.delenv("TORCHDYNAMO_DISABLE", raising=False)
     config = load_experiment_config(Path(config_path))
     config = replace(config, runtime=replace(config.runtime, max_steps=1))
     llm_kwargs: dict[str, object] = {}
@@ -1360,6 +1361,10 @@ def test_vllm_inference_uses_certified_eager_execution(
 
     class FakeLlm:
         def __init__(self, **kwargs) -> None:
+            if expected_tensor_parallel_size > 1:
+                assert os.environ["TORCHDYNAMO_DISABLE"] == "1"
+            else:
+                assert "TORCHDYNAMO_DISABLE" not in os.environ
             llm_kwargs.update(kwargs)
 
         @staticmethod
@@ -1386,6 +1391,7 @@ def test_vllm_inference_uses_certified_eager_execution(
     assert llm_kwargs.get("compilation_config") == expected_compilation_config
     assert output.metrics["vllm_execution_mode"] == expected_execution_mode
     assert output.metrics["vllm_inductor_disabled"] == (expected_compilation_config is not None)
+    assert output.metrics["vllm_torchdynamo_disabled"] == (expected_tensor_parallel_size > 1)
 
 
 def test_tinyllama_training_dispatches_to_causal_training(monkeypatch) -> None:

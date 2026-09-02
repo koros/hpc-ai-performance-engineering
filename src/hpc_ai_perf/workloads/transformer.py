@@ -693,7 +693,6 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         raise RuntimeError("vLLM matrix experiments require CUDA")
     if config.runtime.precision not in {"fp16", "bf16"}:
         raise RuntimeError(f"Generic vLLM adapter does not support precision: {config.runtime.precision}")
-    from vllm import LLM, SamplingParams
 
     parameters = config.workload.parameters
     batch_size = int(parameters.get("batch_size", 1))
@@ -706,6 +705,16 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         raise RuntimeError(
             f"tensor_parallel_size={tensor_parallel_size} does not match requested GPUs={config.hardware.gpus}"
         )
+    torchdynamo_disabled = tensor_parallel_size > 1
+    if torchdynamo_disabled:
+        # vLLM 0.10.2 decorates its tensor-parallel vocabulary embedding
+        # helper with ``torch.compile`` at module-import time. That direct
+        # decorator bypasses vLLM's compilation_config, so TorchDynamo must be
+        # disabled before importing vLLM in the certified TP runtime.
+        os.environ["TORCHDYNAMO_DISABLE"] = "1"
+
+    from vllm import LLM, SamplingParams
+
     model_name = str(parameters.get("hf_model_name", config.workload.model))
     dtype = "bfloat16" if config.runtime.precision == "bf16" else "float16"
     llm_kwargs: dict[str, Any] = {
@@ -795,6 +804,7 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "tensor_parallel_size_observed": tensor_parallel_size,
         "vllm_execution_mode": "eager_no_inductor" if inductor_disabled else "eager",
         "vllm_inductor_disabled": inductor_disabled,
+        "vllm_torchdynamo_disabled": torchdynamo_disabled,
         "precision_backend": f"vllm_{dtype}",
         "compute_dtype_observed": dtype,
         "parameter_dtype_observed": dtype,

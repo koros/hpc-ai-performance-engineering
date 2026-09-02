@@ -28,9 +28,12 @@ environment passes CUDA, NCCL, Gloo, engine-start, and request-serving gates, bu
 expects a Triton `triton_key` API that is not present in the compatible vLLM build. For one-GPU workloads, eager mode
 is recorded as `vllm_execution_mode=eager`. vLLM 0.10.2 leaves its `use_inductor` setting enabled at compilation level
 zero, and the tensor-parallel embedding path can still invoke TorchInductor. Therefore every tensor-parallel workload
-also passes `compilation_config={"level": 0, "use_inductor": false}` and records
-`vllm_execution_mode=eager_no_inductor` plus `vllm_inductor_disabled=true`. Do not compare either execution mode with
-a compiled-vLLM run without explicitly separating the modes.
+also sets `TORCHDYNAMO_DISABLE=1` before importing vLLM and passes
+`compilation_config={"level": 0, "use_inductor": false}`. The environment gate is required because vLLM 0.10.2's
+vocabulary-parallel embedding helper has a direct import-time `torch.compile` decorator that bypasses
+`compilation_config`. Results record `vllm_execution_mode=eager_no_inductor`, `vllm_inductor_disabled=true`, and
+`vllm_torchdynamo_disabled=true`. Do not compare either execution mode with a compiled-vLLM run without explicitly
+separating the modes.
 
 ## One-Time Preparation
 
