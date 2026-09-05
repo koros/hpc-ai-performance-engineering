@@ -2423,6 +2423,27 @@ def test_research_question_tables_report_coverage_and_matched_strategy_tradeoffs
     assert zero["source_condition_ids"] == "E052@l40s"
 
 
+def test_research_question_summary_marks_incomplete_energy_as_partial() -> None:
+    row = {
+        "condition_id": "E008@l40s",
+        "experiment_id": "E008",
+        "platform_id": "l40s",
+        "comparability": "exact",
+        "phase": "Baseline profiling",
+        "status": "completed",
+        "required_trials": "1",
+    }
+
+    summary = next(
+        entry
+        for entry in build_analysis_tables([row])["research_question_summary"]
+        if entry["research_question"] == "RQ5" and entry["platform_id"] == "l40s"
+    )
+
+    assert summary["energy_trials"] == 0
+    assert summary["evidence_status"] == "partial_energy_evidence"
+
+
 def test_analysis_rejects_ambiguous_processed_matrix_rows() -> None:
     row = {
         "experiment_id": "E008",

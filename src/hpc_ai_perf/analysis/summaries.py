@@ -1256,6 +1256,16 @@ def _research_evidence_status(
 ) -> str:
     if not group_rows:
         return "awaiting_evidence"
+    if research_question == "RQ5":
+        completed_trials = sum(row.get("status") == "completed" for row in group_rows)
+        energy_trials = sum(
+            row.get("status") == "completed"
+            and _value(row, "energy_scope") == "measured_region"
+            and _value(row, "energy_measurement_status") == "sufficient"
+            for row in group_rows
+        )
+        if energy_trials < completed_trials:
+            return "partial_energy_evidence"
     if research_question == "RQ6":
         own_ids = {row.get("experiment_id") for row in group_rows}
         other_ids = {

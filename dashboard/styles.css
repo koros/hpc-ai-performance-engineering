@@ -321,7 +321,8 @@ select {
 
 .evidence-awaiting_evidence,
 .evidence-awaiting_matched_platform,
-.evidence-insufficient_data {
+.evidence-insufficient_data,
+.evidence-partial_energy_evidence {
   background: #fef3c7;
   color: #92400e;
 }
