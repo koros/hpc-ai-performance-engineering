@@ -259,6 +259,119 @@ select {
   padding: 16px;
 }
 
+.research-question-grid,
+.research-finding-list {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.research-question-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.research-question-card,
+.research-finding {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: linear-gradient(145deg, #ffffff, var(--surface-strong));
+}
+
+.research-question-card.is-pending {
+  border-style: dashed;
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.research-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.research-card-heading strong {
+  color: #0f3f3b;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.evidence-badge {
+  flex: 0 0 auto;
+  max-width: 47%;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 0.69rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.evidence-sufficient,
+.evidence-supporting_platform_evidence {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.evidence-awaiting_evidence,
+.evidence-awaiting_matched_platform,
+.evidence-insufficient_data {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.research-question-text,
+.research-finding > p {
+  margin: 0;
+  color: #344054;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.research-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.research-metrics div {
+  min-width: 0;
+  padding: 8px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.research-metrics dt {
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.research-metrics dd {
+  margin: 0;
+  color: #344054;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.research-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
 .readiness-item {
   display: grid;
   gap: 8px;

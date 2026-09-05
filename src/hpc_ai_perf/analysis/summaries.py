@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import csv
+import json
 import statistics
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from hpc_ai_perf.config.traceability import PHASE_TRACEABILITY, RESEARCH_QUESTIONS
 from hpc_ai_perf.result_identity import COMPARABILITY_VALUES, MATRIX_PLATFORMS, is_matrix_experiment_id
 
 ANALYSIS_TABLES = {
@@ -240,6 +242,104 @@ ANALYSIS_TABLES = {
         "avg_memory_used_gb",
         "avg_energy_joules",
     ],
+    "research_question_summary": [
+        "research_question",
+        "objective",
+        "question",
+        "platform_id",
+        "comparability",
+        "direct_conditions",
+        "completed_trials",
+        "required_trials",
+        "sufficient_conditions",
+        "energy_trials",
+        "evidence_status",
+        "source_condition_ids",
+        "scope_note",
+        "limitation",
+    ],
+    "research_finding_summary": [
+        "research_question",
+        "finding_type",
+        "finding_status",
+        "platform_id",
+        "comparability",
+        "workload",
+        "model",
+        "precision",
+        "strategy",
+        "throughput_unit",
+        "gpus",
+        "baseline_gpus",
+        "speedup",
+        "scaling_efficiency",
+        "throughput_tokens_sec",
+        "max_memory_used_gb",
+        "completed_trials",
+        "required_trials",
+        "source_condition_ids",
+        "finding",
+        "limitation",
+    ],
+}
+
+
+RESEARCH_QUESTION_DETAILS = {
+    "RQ1": {
+        "objective": "Scaling efficiency",
+        "question": "How efficiently do transformer workloads scale from one to four H100 GPUs?",
+        "phases": {"Strong scaling", "Weak scaling", "Inference multi-GPU"},
+        "limitation": (
+            "The primary question requires H100 scaling evidence; "
+            "L40S scaling is supporting platform-specific evidence."
+        ),
+    },
+    "RQ2": {
+        "objective": "Throughput-to-memory trade-off",
+        "question": "Which distributed training strategy provides the best throughput-to-memory trade-off?",
+        "phases": {"Distributed training strategy", "Memory optimisation"},
+        "limitation": "Only conditions with matching workload, precision, batch semantics, and GPU count are compared.",
+    },
+    "RQ3": {
+        "objective": "Precision and quality",
+        "question": "What impact do precision and selected quantized formats have on performance and quality?",
+        "phases": {"Precision study", "Inference precision/quantization"},
+        "limitation": "Performance-format evidence alone does not establish application-level quality.",
+    },
+    "RQ4": {
+        "objective": "Bottlenecks",
+        "question": "How significant are communication, synchronisation, and data movement bottlenecks?",
+        "phases": {"Workload characterisation", "Data movement", "Communication analysis"},
+        "limitation": (
+            "Standalone communication and loader measurements do not by themselves prove in-loop causal attribution."
+        ),
+    },
+    "RQ5": {
+        "objective": "Useful work efficiency",
+        "question": "Which configurations produce the best useful work per GPU-hour and per Watt?",
+        "phases": None,
+        "limitation": (
+            "Only measured-region energy records with sufficient samples are eligible "
+            "for energy-efficiency conclusions."
+        ),
+    },
+    "RQ6": {
+        "objective": "Hardware comparison",
+        "question": "How do H100 and L40S platforms compare for selected AI workloads?",
+        "phases": {"Hardware comparison"},
+        "limitation": (
+            "A hardware conclusion requires matched exact L40S and H100 conditions; raw trials are never pooled."
+        ),
+    },
+    "RQ7": {
+        "objective": "Evidence-driven recommendations",
+        "question": (
+            "Can results be integrated into a dashboard that identifies bottlenecks "
+            "and supports practical recommendations?"
+        ),
+        "phases": None,
+        "limitation": "Recommendations remain conditional on the available platform coverage and trial evidence.",
+    },
 }
 
 
@@ -291,7 +391,253 @@ def build_analysis_tables(rows: list[dict[str, str]]) -> dict[str, list[dict[str
         "memory_summary": build_memory_summary(rows),
         "inference_summary": build_inference_summary(rows),
         "hardware_summary": build_hardware_summary(rows),
+        "research_question_summary": build_research_question_summary(rows),
+        "research_finding_summary": build_research_finding_summary(rows),
     }
+
+
+def build_research_question_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
+    """Report direct evidence coverage and constraints for every research question.
+
+    This is a coverage table, rather than a pooled performance aggregate. Each
+    row is constrained to one platform and comparability class so that the
+    dashboard can show what evidence is available without making unsupported
+    cross-platform conclusions.
+    """
+    direct_rows = [row for row in rows if _is_direct_research_evidence(row)]
+    grouped: dict[tuple[str, str, str], list[dict[str, str]]] = defaultdict(list)
+    for row in direct_rows:
+        platform_id = _value(row, "platform_id")
+        if platform_id not in MATRIX_PLATFORMS:
+            continue
+        comparability = _value(row, "comparability")
+        for research_question in _research_questions_for_row(row):
+            if research_question in RESEARCH_QUESTION_DETAILS and _row_addresses_research_question(
+                row, research_question
+            ):
+                grouped[(research_question, platform_id, comparability)].append(row)
+
+    summaries: list[dict[str, Any]] = []
+    for research_question in sorted(RESEARCH_QUESTIONS):
+        details = RESEARCH_QUESTION_DETAILS[research_question]
+        for platform_id in sorted(MATRIX_PLATFORMS):
+            comparabilities = sorted(
+                comparability
+                for question, grouped_platform, comparability in grouped
+                if question == research_question and grouped_platform == platform_id
+            )
+            if not comparabilities:
+                comparabilities = [""]
+            for comparability in comparabilities:
+                group_rows = grouped.get((research_question, platform_id, comparability), [])
+                condition_rows = _condition_groups(group_rows)
+                required_trials = sum(_required_trials(condition) for condition in condition_rows.values())
+                completed_trials = sum(
+                    sum(row.get("status") == "completed" for row in condition) for condition in condition_rows.values()
+                )
+                sufficient_conditions = sum(
+                    _condition_is_sufficient(condition) for condition in condition_rows.values()
+                )
+                energy_trials = sum(
+                    row.get("status") == "completed"
+                    and _value(row, "energy_scope") == "measured_region"
+                    and _value(row, "energy_measurement_status") == "sufficient"
+                    for row in group_rows
+                )
+                source_condition_ids = sorted(condition_rows)
+                evidence_status = _research_evidence_status(
+                    research_question,
+                    platform_id,
+                    group_rows,
+                    condition_rows,
+                    direct_rows,
+                )
+                summaries.append(
+                    {
+                        "research_question": research_question,
+                        "objective": details["objective"],
+                        "question": details["question"],
+                        "platform_id": platform_id,
+                        "comparability": comparability,
+                        "direct_conditions": len(condition_rows),
+                        "completed_trials": completed_trials,
+                        "required_trials": required_trials,
+                        "sufficient_conditions": sufficient_conditions,
+                        "energy_trials": energy_trials,
+                        "evidence_status": evidence_status,
+                        "source_condition_ids": "; ".join(source_condition_ids),
+                        "scope_note": _research_scope_note(
+                            research_question,
+                            platform_id,
+                            group_rows,
+                            energy_trials,
+                        ),
+                        "limitation": details["limitation"],
+                    }
+                )
+    return summaries
+
+
+def build_research_finding_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
+    """Build conservative, condition-traceable findings for RQ1 and RQ2.
+
+    RQ1 uses the existing within-platform scaling calculation. RQ2 uses only
+    strategy conditions with an identical workload/model/precision/GPU/batch
+    signature and labels the observed Pareto frontier instead of declaring one
+    universal winner.
+    """
+    return build_rq1_scaling_findings(rows) + build_rq2_strategy_findings(rows)
+
+
+def build_rq1_scaling_findings(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
+    """Convert within-platform scaling summaries into traceable RQ1 findings."""
+    findings: list[dict[str, Any]] = []
+    for summary in build_scaling_summary(rows):
+        gpus = _float(summary.get("gpus"))
+        baseline_gpus = _float(summary.get("baseline_gpus"))
+        speedup = _float(summary.get("speedup"))
+        efficiency = _float(summary.get("scaling_efficiency"))
+        if gpus is None or baseline_gpus is None or gpus <= baseline_gpus or speedup is None:
+            continue
+        source_rows = _matching_scaling_rows(rows, summary)
+        conditions = _condition_groups(source_rows)
+        completed_trials = sum(sum(row.get("status") == "completed" for row in group) for group in conditions.values())
+        required_trials = sum(_required_trials(group) for group in conditions.values())
+        finding_status = (
+            "sufficient"
+            if conditions and all(_condition_is_sufficient(group) for group in conditions.values())
+            else "insufficient_data"
+        )
+        platform_id = _value(summary, "platform_id")
+        findings.append(
+            {
+                "research_question": "RQ1",
+                "finding_type": "scaling",
+                "finding_status": finding_status,
+                "platform_id": platform_id,
+                "comparability": _value(summary, "comparability"),
+                "workload": _value(summary, "workload"),
+                "model": _value(summary, "model"),
+                "precision": _value(summary, "precision"),
+                "strategy": _value(summary, "strategy"),
+                "throughput_unit": _value(summary, "throughput_unit"),
+                "gpus": gpus,
+                "baseline_gpus": baseline_gpus,
+                "speedup": speedup,
+                "scaling_efficiency": efficiency,
+                "throughput_tokens_sec": _float(summary.get("throughput_tokens_sec")),
+                "max_memory_used_gb": None,
+                "completed_trials": completed_trials,
+                "required_trials": required_trials,
+                "source_condition_ids": "; ".join(sorted(conditions)),
+                "finding": (
+                    f"{int(gpus)} GPUs delivered {_format_number(speedup, 2)}× speedup "
+                    f"({_format_number((efficiency or 0) * 100, 1)}% parallel efficiency) "
+                    f"against the {int(baseline_gpus)}-GPU baseline."
+                ),
+                "limitation": (
+                    "Supporting L40S result; the primary RQ1 conclusion requires H100 1–4 GPU evidence."
+                    if platform_id == "l40s"
+                    else (
+                        "Speedup is calculated within this platform, comparability class, "
+                        "workload, precision, and strategy."
+                    )
+                ),
+            }
+        )
+    return findings
+
+
+def build_rq2_strategy_findings(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
+    """Describe the observed throughput-memory Pareto frontier for RQ2."""
+    selected = _completed_phase(rows, "Distributed training strategy")
+    grouped = _group_rows(
+        selected,
+        "platform_id",
+        "comparability",
+        "workload",
+        "model",
+        "precision",
+        "gpus",
+        "throughput_unit",
+        "global_batch_size",
+        "per_gpu_batch_size",
+        "parameter_sequence_length",
+        "parameter_gradient_accumulation_steps",
+    )
+    findings: list[dict[str, Any]] = []
+    for key, group_rows in sorted(grouped.items()):
+        by_strategy = _group_rows(group_rows, "strategy")
+        candidates = []
+        for strategy, strategy_rows in sorted(by_strategy.items()):
+            throughput = _mean(_metric_values(strategy_rows, "throughput_tokens_sec"))
+            memory = _max(_metric_values(strategy_rows, "memory_used_gb"))
+            if throughput is None or memory is None:
+                continue
+            conditions = _condition_groups(strategy_rows)
+            candidates.append(
+                {
+                    "strategy": strategy[0] or "unspecified",
+                    "throughput": throughput,
+                    "memory": memory,
+                    "conditions": conditions,
+                }
+            )
+        if len(candidates) < 2:
+            continue
+        for candidate in candidates:
+            dominated = any(
+                other is not candidate
+                and other["throughput"] >= candidate["throughput"]
+                and other["memory"] <= candidate["memory"]
+                and (other["throughput"] > candidate["throughput"] or other["memory"] < candidate["memory"])
+                for other in candidates
+            )
+            conditions = candidate["conditions"]
+            completed_trials = sum(
+                sum(row.get("status") == "completed" for row in group) for group in conditions.values()
+            )
+            required_trials = sum(_required_trials(group) for group in conditions.values())
+            finding_status = (
+                "sufficient"
+                if conditions and all(_condition_is_sufficient(group) for group in conditions.values())
+                else "insufficient_data"
+            )
+            platform_id, comparability, workload, model, precision, gpus, throughput_unit, *_ = key
+            frontier_status = "Pareto frontier" if not dominated else "Dominated"
+            findings.append(
+                {
+                    "research_question": "RQ2",
+                    "finding_type": "strategy_tradeoff",
+                    "finding_status": finding_status,
+                    "platform_id": platform_id,
+                    "comparability": comparability,
+                    "workload": workload,
+                    "model": model,
+                    "precision": precision,
+                    "strategy": candidate["strategy"],
+                    "throughput_unit": throughput_unit,
+                    "gpus": gpus,
+                    "baseline_gpus": None,
+                    "speedup": None,
+                    "scaling_efficiency": None,
+                    "throughput_tokens_sec": candidate["throughput"],
+                    "max_memory_used_gb": candidate["memory"],
+                    "completed_trials": completed_trials,
+                    "required_trials": required_trials,
+                    "source_condition_ids": "; ".join(sorted(conditions)),
+                    "finding": (
+                        f"{frontier_status}: {candidate['strategy']} observed "
+                        f"{_format_number(candidate['throughput'], 0)} {throughput_unit} "
+                        f"with {_format_number(candidate['memory'], 2)} GB maximum GPU memory."
+                    ),
+                    "limitation": (
+                        "This is an observed throughput-memory trade-off for matched conditions, "
+                        "not a universal strategy ranking."
+                    ),
+                }
+            )
+    return findings
 
 
 def build_phase_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
@@ -861,6 +1207,121 @@ def build_hardware_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
             }
         )
     return summaries
+
+
+def _is_direct_research_evidence(row: dict[str, str]) -> bool:
+    """Exclude environment checks from research finding coverage."""
+    return row.get("phase") != "Environment validation"
+
+
+def _research_questions_for_row(row: dict[str, str]) -> set[str]:
+    """Read traceability from processed CSV, falling back to the phase mapping."""
+    encoded = _value(row, "research_questions")
+    if encoded:
+        try:
+            decoded = json.loads(encoded)
+        except json.JSONDecodeError:
+            decoded = []
+        if isinstance(decoded, list):
+            questions = {str(value) for value in decoded if str(value) in RESEARCH_QUESTIONS}
+            if questions:
+                return questions
+    phase_traceability = PHASE_TRACEABILITY.get(_value(row, "phase"))
+    return set(phase_traceability[0]) if phase_traceability else set()
+
+
+def _row_addresses_research_question(row: dict[str, str], research_question: str) -> bool:
+    phases = RESEARCH_QUESTION_DETAILS[research_question]["phases"]
+    return phases is None or _value(row, "phase") in phases
+
+
+def _condition_groups(rows: list[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
+    return {key[0]: group_rows for key, group_rows in _group_rows(rows, "condition_id").items()}
+
+
+def _required_trials(rows: list[dict[str, str]]) -> int:
+    return int(max((_float(row.get("required_trials")) or 1 for row in rows), default=1))
+
+
+def _condition_is_sufficient(rows: list[dict[str, str]]) -> bool:
+    return sum(row.get("status") == "completed" for row in rows) >= _required_trials(rows)
+
+
+def _research_evidence_status(
+    research_question: str,
+    platform_id: str,
+    group_rows: list[dict[str, str]],
+    condition_rows: dict[str, list[dict[str, str]]],
+    all_direct_rows: list[dict[str, str]],
+) -> str:
+    if not group_rows:
+        return "awaiting_evidence"
+    if research_question == "RQ6":
+        own_ids = {row.get("experiment_id") for row in group_rows}
+        other_ids = {
+            row.get("experiment_id")
+            for row in all_direct_rows
+            if row.get("platform_id") != platform_id
+            and _value(row, "comparability") == _value(group_rows[0], "comparability")
+            and research_question in _research_questions_for_row(row)
+            and _row_addresses_research_question(row, research_question)
+        }
+        if not own_ids.intersection(other_ids):
+            return "awaiting_matched_platform"
+    if not all(_condition_is_sufficient(rows) for rows in condition_rows.values()):
+        return "insufficient_data"
+    if research_question == "RQ1" and platform_id != "h100":
+        return "supporting_platform_evidence"
+    return "sufficient"
+
+
+def _research_scope_note(
+    research_question: str,
+    platform_id: str,
+    group_rows: list[dict[str, str]],
+    energy_trials: int,
+) -> str:
+    if not group_rows:
+        return f"No direct {research_question} evidence has been collected for {platform_id}."
+    if research_question == "RQ1" and platform_id != "h100":
+        return "Collected on L40S as supporting evidence; retain it separately from the H100 research target."
+    if research_question == "RQ5":
+        return (
+            f"{energy_trials} completed measured-region energy trial(s) are eligible for energy analysis; "
+            "legacy full-window estimates are excluded."
+        )
+    if research_question == "RQ6":
+        return "Use only matched condition IDs and exact comparability classes for a hardware comparison."
+    return "Completed evidence is grouped within this platform and comparability class."
+
+
+def _matching_scaling_rows(rows: list[dict[str, str]], summary: dict[str, Any]) -> list[dict[str, str]]:
+    """Recover all condition records behind one scaling series for traceability."""
+    scaling_type = _value(summary, "scaling_type")
+    target_phase = _value(summary, "phase")
+    target_values = {
+        "platform_id": _value(summary, "platform_id"),
+        "comparability": _value(summary, "comparability"),
+        "phase": target_phase,
+        "workload": _value(summary, "workload"),
+        "model": _value(summary, "model"),
+        "precision": _value(summary, "precision"),
+        "strategy": _value(summary, "strategy"),
+        "throughput_unit": _value(summary, "throughput_unit"),
+    }
+    return [
+        row
+        for row in rows
+        if all(_value(row, field) == value for field, value in target_values.items())
+        and (
+            _value(row, "scaling_type") == scaling_type
+            or (not _value(row, "scaling_type") and target_phase in {"Strong scaling", "Weak scaling"})
+        )
+    ]
+
+
+def _format_number(value: float, digits: int) -> str:
+    return f"{value:.{digits}f}"
 
 
 def _write_table(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]) -> None:

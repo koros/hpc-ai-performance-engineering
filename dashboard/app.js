@@ -11,6 +11,8 @@ const state = {
   memorySummary: [],
   inferenceSummary: [],
   hardwareSummary: [],
+  researchQuestionSummary: [],
+  researchFindingSummary: [],
   readinessReport: "",
   loading: true,
   sort: { table: "rankingTable", key: "throughput_tokens_sec", direction: -1 },
@@ -29,6 +31,8 @@ const paths = {
   memorySummary: "../results/analysis/memory_summary.csv",
   inferenceSummary: "../results/analysis/inference_summary.csv",
   hardwareSummary: "../results/analysis/hardware_summary.csv",
+  researchQuestionSummary: "../results/analysis/research_question_summary.csv",
+  researchFindingSummary: "../results/analysis/research_finding_summary.csv",
   readinessReport: "../results/processed/readiness_report.md",
 };
 
@@ -44,6 +48,8 @@ const analysisFileKeys = {
   "memory_summary.csv": "memorySummary",
   "inference_summary.csv": "inferenceSummary",
   "hardware_summary.csv": "hardwareSummary",
+  "research_question_summary.csv": "researchQuestionSummary",
+  "research_finding_summary.csv": "researchFindingSummary",
 };
 
 const filterDefinitions = [
@@ -59,6 +65,7 @@ const filterDefinitions = [
   ["strategyFilter", "strategy"],
   ["precisionFilter", "precision"],
   ["gpuFilter", "gpus"],
+  ["researchQuestionFilter", "research_question"],
 ];
 
 const rankingColumns = ["experiment_id", "platform_id", "comparability", "workload", "mode", "strategy", "status", "throughput_unit", "throughput_tokens_sec", "runtime_seconds"];
@@ -175,6 +182,7 @@ function parseCsv(text) {
 
 function rebuildFilters() {
   filterDefinitions.forEach(([id, key]) => setFilterOptions(id, uniqueValues(state.results, key), key === "gpus"));
+  setFilterOptions("researchQuestionFilter", uniqueValues(state.researchQuestionSummary, "research_question"));
   setFilterOptions("evidenceFilter", uniqueValues(state.trialSummary, "evidence_status"));
 }
 
@@ -205,11 +213,26 @@ function selectedFilters() {
 }
 
 function rowValue(row, key) {
+  if (key === "research_question") return row.research_question || "";
   return key === "wave" ? row.submission_bundle_wave || row.environment_submission_bundle_wave || "" : row[key] || "";
 }
 
 function matchesFilters(row, filters, supported) {
-  return supported.every((key) => !filters[key] || String(rowValue(row, key)) === String(filters[key]));
+  return supported.every((key) => {
+    if (!filters[key]) return true;
+    if (key === "research_question") return researchQuestionsForRow(row).includes(filters[key]);
+    return String(rowValue(row, key)) === String(filters[key]);
+  });
+}
+
+function researchQuestionsForRow(row) {
+  if (row.research_question) return [row.research_question];
+  try {
+    const value = JSON.parse(row.research_questions || "[]");
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return String(row.research_questions || "").match(/RQ[1-7]/g) || [];
+  }
 }
 
 function filteredResults() {
@@ -228,6 +251,7 @@ function filteredAnalysisRows(rows, supported) {
 
 function render() {
   const rows = filteredResults();
+  renderResearchQuestions();
   renderKpis(rows);
   renderReadiness();
   renderProgress(rows);
@@ -246,6 +270,148 @@ function render() {
   renderTrialTable();
   organizeSections();
   document.getElementById("dataStatus").textContent = state.results.length ? rows.length + " of " + state.results.length + " trial rows" : "No data loaded";
+}
+
+function renderResearchQuestions() {
+  const coverage = filteredAnalysisRows(state.researchQuestionSummary, ["platform_id", "comparability", "research_question"]);
+  renderResearchCoverage(coverage.rows, coverage.message);
+  document.getElementById("researchCoverageStatus").textContent = coverage.message || researchCoverageLabel(coverage.rows);
+  markPanel("researchQuestionCards", coverage.rows.length > 0, state.researchQuestionSummary.length > 0, "Research-question coverage", "research_question_summary.csv");
+
+  const findings = filteredAnalysisRows(state.researchFindingSummary, ["platform_id", "comparability", "workload", "precision", "strategy", "gpus", "research_question"]);
+  const rq1 = findings.rows.filter((row) => row.research_question === "RQ1");
+  const rq2 = findings.rows.filter((row) => row.research_question === "RQ2");
+  const rq1Series = buildRq1ScalingSeries(rq1);
+  const rq2Groups = buildRq2StrategyGroups(rq2);
+  renderLineCharts("rq1ScalingCharts", rq1Series, {
+    empty: findings.message || "No completed RQ1 scaling finding is available for the active filters.",
+    xLabel: "GPU count",
+    yLabel: "speedup",
+  });
+  renderStrategyTradeoffCharts("rq2StrategyCharts", rq2Groups, findings.message || "No matched RQ2 strategy findings are available for the active filters.");
+  document.getElementById("rq1Status").textContent = findings.message || (rq1Series.length ? rq1Series.length + " isolated scaling series" : "No scaling findings");
+  document.getElementById("rq2Status").textContent = findings.message || (rq2Groups.length ? rq2Groups.length + " matched strategy groups" : "No matched strategy findings");
+  markPanel("rq1ScalingCharts", rq1Series.length > 0, state.researchFindingSummary.some((row) => row.research_question === "RQ1"), "RQ1 scaling efficiency", "research_finding_summary.csv", true);
+  markPanel("rq2StrategyCharts", rq2Groups.length > 0, state.researchFindingSummary.some((row) => row.research_question === "RQ2"), "RQ2 strategy trade-off", "research_finding_summary.csv", true);
+  renderResearchFindingList(findings.rows, findings.message);
+  document.getElementById("researchFindingStatus").textContent = findings.message || (findings.rows.length ? findings.rows.length + " traceable finding" + (findings.rows.length === 1 ? "" : "s") : "No findings");
+  markPanel("researchFindingList", findings.rows.length > 0, state.researchFindingSummary.length > 0, "Traceable research findings", "research_finding_summary.csv", true);
+}
+
+function renderResearchCoverage(rows, message) {
+  const container = document.getElementById("researchQuestionCards");
+  container.replaceChildren();
+  if (!rows.length) {
+    container.append(emptyState(message || "No research-question coverage is available. Run the refresh pipeline after collecting accepted evidence."));
+    return;
+  }
+  rows.sort((left, right) => (left.research_question + left.platform_id + left.comparability).localeCompare(right.research_question + right.platform_id + right.comparability)).forEach((row) => {
+    const card = document.createElement("article");
+    const awaiting = row.evidence_status.startsWith("awaiting") || row.evidence_status === "insufficient_data";
+    card.className = "research-question-card" + (awaiting ? " is-pending" : "");
+    const conditionLabel = number(row.direct_conditions) === 1 ? "condition" : "conditions";
+    card.innerHTML = '<div class="research-card-heading"><strong>' + escapeHtml(row.research_question) + " · " + escapeHtml(row.objective) + '</strong><span class="evidence-badge evidence-' + escapeHtml(row.evidence_status) + '">' + escapeHtml(displayEvidenceStatus(row.evidence_status)) + "</span></div>" +
+      '<p class="research-question-text">' + escapeHtml(row.question) + "</p>" +
+      '<dl class="research-metrics"><div><dt>Scope</dt><dd>' + escapeHtml((row.platform_id || "not recorded") + (row.comparability ? " · " + row.comparability : "")) + '</dd></div><div><dt>Direct evidence</dt><dd>' + formatInteger(number(row.direct_conditions)) + " " + conditionLabel + " · " + formatInteger(number(row.completed_trials)) + "/" + formatInteger(number(row.required_trials)) + " trials</dd></div></dl>" +
+      '<p class="research-note">' + escapeHtml(row.scope_note || row.limitation) + "</p>";
+    container.append(card);
+  });
+}
+
+function researchCoverageLabel(rows) {
+  const sufficient = rows.filter((row) => row.evidence_status === "sufficient" || row.evidence_status === "supporting_platform_evidence").length;
+  return sufficient + " coverage entries with completed evidence";
+}
+
+function buildRq1ScalingSeries(rows) {
+  const grouped = groupRows(rows.filter((row) => number(row.speedup) > 0 && number(row.gpus) > 0), (row) => [row.platform_id || "unlabelled", row.comparability || "unspecified", row.workload || "unassigned", row.precision || "unspecified", row.strategy || "unspecified", row.throughput_unit || "unit_not_recorded"]);
+  return Object.entries(grouped).map(([key, group]) => {
+    const [platform, comparability, workload, precision, strategy, unit] = key.split("\u0000");
+    return {
+      title: platform + " · " + comparability + " · " + workload,
+      subtitle: precision + "; " + strategy + "; " + unit,
+      platform, comparability, workload, unit,
+      points: group.map((row) => ({
+        x: number(row.gpus),
+        y: number(row.speedup),
+        label: row.gpus + " GPUs: " + formatDecimal(number(row.speedup), 2) + "× speedup; " + formatDecimal(number(row.scaling_efficiency) * 100, 1) + "% efficiency; " + row.source_condition_ids,
+      })).sort((left, right) => left.x - right.x),
+    };
+  }).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function buildRq2StrategyGroups(rows) {
+  const grouped = groupRows(rows.filter((row) => number(row.throughput_tokens_sec) > 0 && number(row.max_memory_used_gb) > 0), (row) => [row.platform_id || "unlabelled", row.comparability || "unspecified", row.workload || "unassigned", row.model || "unassigned", row.precision || "unspecified", row.gpus || "unspecified", row.throughput_unit || "unit_not_recorded"]);
+  return Object.entries(grouped).map(([key, group]) => {
+    const [platform, comparability, workload, model, precision, gpus, unit] = key.split("\u0000");
+    return {
+      title: platform + " · " + comparability + " · " + workload,
+      subtitle: model + "; " + precision + "; " + gpus + " GPUs; " + unit,
+      platform, comparability, workload, unit,
+      points: group.map((row) => ({
+        x: number(row.max_memory_used_gb),
+        y: number(row.throughput_tokens_sec),
+        label: row.strategy + " · " + row.finding,
+        status: row.finding.includes("Pareto frontier") ? "Pareto frontier" : "Dominated",
+      })).sort((left, right) => right.y - left.y),
+    };
+  }).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function renderStrategyTradeoffCharts(containerId, groups, emptyMessage) {
+  const container = document.getElementById(containerId);
+  container.replaceChildren();
+  if (!groups.length) {
+    container.append(emptyState(emptyMessage));
+    return;
+  }
+  groups.forEach((group) => container.append(strategyTradeoffChartCard(group)));
+}
+
+function strategyTradeoffChartCard(group) {
+  const card = chartCard(group.title, group.subtitle);
+  const width = 500;
+  const height = 220;
+  const left = 48;
+  const right = 18;
+  const top = 16;
+  const bottom = 33;
+  const xDomain = paddedDomain(group.points.map((point) => point.x), false);
+  const yDomain = paddedDomain(group.points.map((point) => point.y), true);
+  const x = linearScale(xDomain[0], xDomain[1], left, width - right);
+  const y = linearScale(yDomain[0], yDomain[1], height - bottom, top);
+  const xTicks = [xDomain[0], (xDomain[0] + xDomain[1]) / 2, xDomain[1]];
+  const yTicks = [yDomain[0], (yDomain[0] + yDomain[1]) / 2, yDomain[1]];
+  const grids = xTicks.map((value) => '<line class="svg-grid" x1="' + x(value) + '" y1="' + top + '" x2="' + x(value) + '" y2="' + (height - bottom) + '"/><text class="svg-label" x="' + x(value) + '" y="' + (height - 18) + '" text-anchor="middle">' + formatCompact(value) + "</text>").join("") + yTicks.map((value) => '<line class="svg-grid" x1="' + left + '" y1="' + y(value) + '" x2="' + (width - right) + '" y2="' + y(value) + '"/><text class="svg-label" x="' + (left - 5) + '" y="' + (y(value) + 3) + '" text-anchor="end">' + formatCompact(value) + "</text>").join("");
+  const points = group.points.map((point) => {
+    const color = point.status === "Pareto frontier" ? "#0f766e" : "#94a3b8";
+    return '<circle class="svg-point" fill="' + color + '" cx="' + x(point.x) + '" cy="' + y(point.y) + '" r="5"><title>' + escapeSvg(point.label + "; " + formatCompact(point.x) + " GB; " + formatCompact(point.y) + " " + group.unit) + "</title></circle>";
+  }).join("");
+  const labels = '<text class="svg-label" x="' + width / 2 + '" y="' + (height - 3) + '" text-anchor="middle">maximum GPU memory (GB)</text><text class="svg-label" transform="translate(11 ' + height / 2 + ') rotate(-90)" text-anchor="middle">throughput</text>';
+  card.append(svgElement(width, height, grids + points + labels));
+  return card;
+}
+
+function renderResearchFindingList(rows, message) {
+  const container = document.getElementById("researchFindingList");
+  container.replaceChildren();
+  if (!rows.length) {
+    container.append(emptyState(message || "No traceable RQ1 or RQ2 finding is available for the active filters."));
+    return;
+  }
+  rows.sort((left, right) => (left.research_question + left.platform_id + left.workload + left.strategy).localeCompare(right.research_question + right.platform_id + right.workload + right.strategy)).forEach((row) => {
+    const item = document.createElement("article");
+    item.className = "research-finding";
+    item.innerHTML = '<div class="research-card-heading"><strong>' + escapeHtml(row.research_question + " · " + row.finding_type.replaceAll("_", " ")) + '</strong><span class="evidence-badge evidence-' + escapeHtml(row.finding_status) + '">' + escapeHtml(displayEvidenceStatus(row.finding_status)) + "</span></div>" +
+      '<p>' + escapeHtml(row.finding) + "</p>" +
+      '<dl class="research-metrics"><div><dt>Scope</dt><dd>' + escapeHtml([row.platform_id, row.comparability, row.workload, row.precision, row.strategy].filter(Boolean).join(" · ")) + '</dd></div><div><dt>Trial evidence</dt><dd>' + formatInteger(number(row.completed_trials)) + "/" + formatInteger(number(row.required_trials)) + " trials</dd></div><div><dt>Source conditions</dt><dd>" + escapeHtml(row.source_condition_ids) + "</dd></div></dl>" +
+      '<p class="research-note">' + escapeHtml(row.limitation) + "</p>";
+    container.append(item);
+  });
+}
+
+function displayEvidenceStatus(value) {
+  return String(value || "not available").replaceAll("_", " ");
 }
 
 function renderKpis(rows) {
@@ -705,7 +871,7 @@ function markPanel(containerId, visible, sourceAvailable, label, source, include
 
 function organizeSections() {
   const metricFocus = document.getElementById("metricFilter").value;
-  const studySections = ["overview", "performance", "memory", "scaling", "inference", "evidence"];
+  const studySections = ["research", "overview", "performance", "memory", "scaling", "inference", "evidence"];
 
   document.querySelectorAll(".dashboard-section:not(#pendingStudies) .panel").forEach((panel) => {
     if (!("hasVisibleData" in panel.dataset)) return;
@@ -931,6 +1097,8 @@ if (typeof module !== "undefined" && module.exports) {
     buildInferenceGroups,
     buildMemorySeries,
     buildPhaseBarEntries,
+    buildRq1ScalingSeries,
+    buildRq2StrategyGroups,
     buildScalingSeries,
     buildUncertaintyGroups,
     summarizePhases,

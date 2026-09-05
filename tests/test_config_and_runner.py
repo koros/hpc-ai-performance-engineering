@@ -1881,6 +1881,8 @@ def test_analyze_results_writes_summary_tables(tmp_path: Path) -> None:
         "memory_summary.csv",
         "phase_summary.csv",
         "precision_summary.csv",
+        "research_finding_summary.csv",
+        "research_question_summary.csv",
         "scaling_summary.csv",
         "strategy_summary.csv",
         "trial_summary.csv",
@@ -2353,11 +2355,14 @@ def test_every_analysis_table_keeps_platform_groups_separate() -> None:
         "memory_summary",
         "inference_summary",
         "hardware_summary",
+        "research_question_summary",
+        "research_finding_summary",
     }
-    for table_rows in tables.values():
+    for table_name, table_rows in tables.items():
         assert table_rows
         assert {row["platform_id"] for row in table_rows} == {"l40s", "h100"}
-        assert {row["comparability"] for row in table_rows} == {"exact"}
+        if table_name != "research_question_summary":
+            assert {row["comparability"] for row in table_rows} == {"exact"}
 
     assert len(tables["phase_summary"]) == 16
     assert len(tables["scaling_summary"]) == 4
@@ -2369,6 +2374,53 @@ def test_every_analysis_table_keeps_platform_groups_separate() -> None:
     assert len(tables["inference_summary"]) == 2
     assert len(tables["hardware_summary"]) == 2
     assert len(tables["trial_summary"]) == len(rows)
+
+
+def test_research_question_tables_report_coverage_and_matched_strategy_tradeoffs() -> None:
+    def row(experiment_id: str, strategy: str, throughput: str, memory: str) -> dict[str, str]:
+        return {
+            "condition_id": f"{experiment_id}@l40s",
+            "experiment_id": experiment_id,
+            "platform_id": "l40s",
+            "comparability": "exact",
+            "phase": "Distributed training strategy",
+            "workload": "gpt2_small",
+            "model": "gpt2",
+            "mode": "training",
+            "precision": "bf16",
+            "strategy": strategy,
+            "gpus": "2",
+            "status": "completed",
+            "required_trials": "1",
+            "throughput_unit": "training_tokens_per_second",
+            "global_batch_size": "32",
+            "per_gpu_batch_size": "16",
+            "parameter_sequence_length": "1024",
+            "parameter_gradient_accumulation_steps": "1",
+            "throughput_tokens_sec": throughput,
+            "memory_used_gb": memory,
+        }
+
+    tables = build_analysis_tables(
+        [
+            row("E047", "ddp", "100", "30"),
+            row("E052", "zero_stage_1", "120", "24"),
+        ]
+    )
+
+    coverage = next(
+        entry
+        for entry in tables["research_question_summary"]
+        if entry["research_question"] == "RQ2" and entry["platform_id"] == "l40s"
+    )
+    assert coverage["evidence_status"] == "sufficient"
+    assert coverage["direct_conditions"] == 2
+    findings = tables["research_finding_summary"]
+    zero = next(entry for entry in findings if entry["strategy"] == "zero_stage_1")
+    ddp = next(entry for entry in findings if entry["strategy"] == "ddp")
+    assert "Pareto frontier" in zero["finding"]
+    assert "Dominated" in ddp["finding"]
+    assert zero["source_condition_ids"] == "E052@l40s"
 
 
 def test_analysis_rejects_ambiguous_processed_matrix_rows() -> None:

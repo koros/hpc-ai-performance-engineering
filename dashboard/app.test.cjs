@@ -6,6 +6,8 @@ const {
   buildInferenceGroups,
   buildMemorySeries,
   buildPhaseBarEntries,
+  buildRq1ScalingSeries,
+  buildRq2StrategyGroups,
   buildScalingSeries,
   buildUncertaintyGroups,
   summarizePhases,
@@ -84,6 +86,22 @@ run("memory and scaling series never cross platform or comparability boundaries"
   assert.equal(buildScalingSeries(scalingRows).length, 3);
 });
 
+run("research-question charts retain platform and comparability boundaries", () => {
+  const scalingGroups = buildRq1ScalingSeries([
+    rq1Finding("l40s", "exact", "gpt2", 2, 1.8),
+    rq1Finding("h100", "exact", "gpt2", 2, 1.9),
+    rq1Finding("l40s", "capacity_adjusted", "gpt2", 2, 1.7),
+  ]);
+  const strategyGroups = buildRq2StrategyGroups([
+    rq2Finding("l40s", "exact", "gpt2", "ddp", 100, 30),
+    rq2Finding("h100", "exact", "gpt2", "ddp", 200, 40),
+    rq2Finding("l40s", "capacity_adjusted", "gpt2", "ddp", 80, 42),
+  ]);
+
+  assert.equal(scalingGroups.length, 3);
+  assert.equal(strategyGroups.length, 3);
+});
+
 run("energy and inference views retain evidence labels without pooling", () => {
   const energy = buildEnergyPowerEntries([
     energyResult("l40s", "exact", "E008", "gpt2", 1000),
@@ -154,6 +172,36 @@ function scaling(platform_id, comparability, workload, gpus, speedup) {
     gpus,
     speedup,
     scaling_efficiency: speedup / gpus,
+  };
+}
+
+function rq1Finding(platform_id, comparability, workload, gpus, speedup) {
+  return {
+    platform_id,
+    comparability,
+    workload,
+    precision: "bf16",
+    strategy: "ddp",
+    throughput_unit: "tokens/s",
+    gpus,
+    speedup,
+    scaling_efficiency: speedup / gpus,
+  };
+}
+
+function rq2Finding(platform_id, comparability, workload, strategy, throughput_tokens_sec, max_memory_used_gb) {
+  return {
+    platform_id,
+    comparability,
+    workload,
+    model: "gpt2",
+    precision: "bf16",
+    strategy,
+    throughput_unit: "tokens/s",
+    gpus: 2,
+    throughput_tokens_sec,
+    max_memory_used_gb,
+    finding: "Pareto frontier",
   };
 }
 

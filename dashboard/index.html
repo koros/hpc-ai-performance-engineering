@@ -33,6 +33,7 @@
         <label>Strategy<select id="strategyFilter"></select></label>
         <label>Precision<select id="precisionFilter"></select></label>
         <label>GPUs<select id="gpuFilter"></select></label>
+        <label>Research question<select id="researchQuestionFilter"></select></label>
         <label>Evidence<select id="evidenceFilter"></select></label>
         <label>Metric focus
           <select id="metricFilter">
@@ -47,6 +48,7 @@
       </section>
 
       <nav class="section-nav" aria-label="Dashboard sections">
+        <a href="#research">Research evidence</a>
         <a href="#overview">Overview</a>
         <a href="#performance">Training performance</a>
         <a href="#memory">Memory and capacity</a>
@@ -65,6 +67,34 @@
       <section class="panel">
         <div class="panel-heading"><h2>Submission Readiness</h2><span id="readinessStatus">No report loaded</span></div>
         <div id="readinessSummary" class="readiness-grid"></div>
+      </section>
+
+      <section id="research" class="dashboard-section">
+        <div class="section-heading">
+          <div><p class="eyebrow">Research evidence</p><h2>Findings organised around the research questions</h2></div>
+          <p>Claims remain within one platform and comparability class. Coverage gaps are shown explicitly rather than filled with assumptions.</p>
+        </div>
+        <article class="panel" data-metrics="throughput runtime memory energy latency">
+          <div class="panel-heading"><h2>Research-question coverage</h2><span id="researchCoverageStatus">No research evidence</span></div>
+          <div id="researchQuestionCards" class="research-question-grid"></div>
+          <p class="chart-note">A coverage card records direct completed evidence, not a pooled performance average. H100 conclusions and exact hardware comparisons remain pending until their own evidence is collected.</p>
+        </article>
+        <div class="content-grid">
+          <article class="panel chart-panel" data-metrics="throughput runtime">
+            <div class="panel-heading"><h2>RQ1: Scaling efficiency</h2><span id="rq1Status">No scaling findings</span></div>
+            <div id="rq1ScalingCharts" class="svg-chart-grid"></div>
+            <p class="chart-note">Speedup is measured against the smallest GPU-count baseline in the same platform, comparability class, workload, precision, and strategy.</p>
+          </article>
+          <article class="panel chart-panel" data-metrics="throughput memory">
+            <div class="panel-heading"><h2>RQ2: Throughput–memory trade-off</h2><span id="rq2Status">No matched strategy findings</span></div>
+            <div id="rq2StrategyCharts" class="svg-chart-grid"></div>
+            <p class="chart-note">Points use matching workload, precision, GPU count, sequence length, global batch, and accumulation settings. Pareto-frontier points are observed trade-offs, not universal winners.</p>
+          </article>
+        </div>
+        <article class="panel" data-metrics="throughput runtime memory">
+          <div class="panel-heading"><h2>Traceable research findings</h2><span id="researchFindingStatus">No findings</span></div>
+          <div id="researchFindingList" class="research-finding-list"></div>
+        </article>
       </section>
 
       <section id="overview" class="dashboard-section">
