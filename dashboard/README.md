@@ -16,6 +16,8 @@ Expected inputs:
 - `results/analysis/memory_summary.csv`
 - `results/analysis/inference_summary.csv`
 - `results/analysis/hardware_summary.csv`
+- `results/analysis/research_question_summary.csv`
+- `results/analysis/research_finding_summary.csv`
 - `results/processed/readiness_report.md`
 
 The dashboard loads these files automatically when served from the repository root. The `Analysis CSVs` file picker
@@ -29,6 +31,29 @@ also accepts several analysis files at once for an offline/manual review.
 - Empty study panels are removed from the main flow and listed under **Awaiting evidence** at the bottom.
 - Narrow screens render result tables as labelled cards, avoiding page-wide horizontal scrolling.
 - The metric-focus filter can reduce the page to throughput, runtime, memory, energy/power, or latency views.
+
+## Research-question views
+
+The first dashboard section turns refreshed evidence into an explicit research
+argument rather than a generic results explorer:
+
+- **RQ1–RQ7 coverage cards** show direct condition/trial coverage, platform and
+  comparability scope, and the limitation that applies to each question.
+- **RQ1 scaling** plots only within-platform speedup and parallel efficiency.
+  L40S scaling is labelled supporting evidence because the primary question is
+  framed around H100 one-to-four-GPU scaling.
+- **RQ2 strategy trade-offs** plot maximum observed GPU memory against mean
+  throughput only where workload, model, precision, GPU count, sequence length,
+  global batch, and accumulation settings match. The observed Pareto frontier is
+  shown instead of claiming a universal best strategy.
+- **Traceable findings** link every displayed RQ1/RQ2 statement to its source
+  condition IDs and trial sufficiency. RQ3–RQ7 remain visible as coverage cards
+  until their dedicated conclusion views are added.
+
+The Research question filter applies to raw trial rows and the research-specific
+tables. Other summary tables intentionally ask the user to clear that filter,
+because they do not contain an RQ-level grouping and must not be reinterpreted
+as such.
 
 Run the pipeline and serve the dashboard locally:
 

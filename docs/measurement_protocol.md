@@ -66,7 +66,7 @@ The trial summary reports completed and failed counts, mean, median, sample stan
 
 - Every matrix row entering analysis must have a valid `E###@l40s` or `E###@h100` condition, platform, and
   comparability class. Ambiguous processed rows are rejected rather than assigned to an unlabelled group.
-- All 11 generated analysis tables include `platform_id` and `comparability` in their statistical grouping keys.
+- All performance-analysis tables include `platform_id` and `comparability` in their statistical grouping keys. The two research-question tables preserve those fields as evidence scope rather than pooling measurements across platforms.
   Trial-level tables also group by `condition_id`.
 - Means, confidence intervals, trial sufficiency, rankings, precision summaries, and scaling baselines are calculated
   within one platform. Three L40S and three H100 trials therefore remain two samples of three, never one sample of six.
