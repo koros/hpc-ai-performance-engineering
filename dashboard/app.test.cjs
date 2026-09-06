@@ -10,6 +10,7 @@ const {
   buildRq2StrategyGroups,
   buildScalingSeries,
   buildUncertaintyGroups,
+  comparisonContext,
   summarizePhases,
 } = require("./app.js");
 
@@ -129,6 +130,19 @@ run("energy views exclude legacy full-window estimates", () => {
 
   assert.equal(energy.length, 1);
   assert.match(energy[0].label, /E214/);
+});
+
+run("comparison context reports only genuinely constant controls", () => {
+  const context = comparisonContext([
+    { platform_id: "l40s", workload: "gpt2", precision: "bf16", gpus: 1 },
+    { platform_id: "l40s", workload: "gpt2", precision: "fp16", gpus: 2 },
+  ], ["Precision", "GPU count"], ["platform_id", "workload", "precision", "gpus", "missing"]);
+
+  assert.deepEqual(context.changing, ["Precision", "GPU count"]);
+  assert.deepEqual(context.constants, [
+    { label: "platform id", value: "l40s" },
+    { label: "workload", value: "gpt2" },
+  ]);
 });
 
 function result(platform_id, comparability, workload, throughput_tokens_sec) {

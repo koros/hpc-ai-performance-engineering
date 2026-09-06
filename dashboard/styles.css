@@ -20,6 +20,7 @@
 
 body {
   margin: 0;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 8% 0%, rgba(15, 118, 110, 0.08), transparent 24rem),
     linear-gradient(180deg, #fafbfc 0, var(--bg) 22rem);
@@ -399,6 +400,67 @@ select {
   gap: 6px;
 }
 
+.comparison-contract {
+  display: grid;
+  gap: 7px;
+  margin: 2px 0 10px;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.bar-list > .comparison-contract {
+  margin: 0;
+}
+
+.comparison-changing,
+.comparison-constants {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.comparison-changing > span,
+.comparison-constants > span:first-child {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.comparison-changing strong {
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+}
+
+.comparison-chip {
+  max-width: 100%;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #e8edf3;
+  color: #475467;
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
+}
+
+.experiment-target {
+  cursor: pointer;
+}
+
+.experiment-target:hover .bar-meta strong,
+.experiment-target:focus-visible .bar-meta strong {
+  color: var(--accent-strong);
+}
+
+.experiment-target:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.28);
+  outline-offset: 3px;
+}
+
 .bar-meta {
   display: flex;
   justify-content: space-between;
@@ -573,6 +635,19 @@ select {
 .svg-point {
   stroke: #fff;
   stroke-width: 1.5;
+}
+
+.svg-point[data-condition-ids] {
+  cursor: pointer;
+  transition: r 120ms ease, stroke-width 120ms ease;
+}
+
+.svg-point[data-condition-ids]:hover,
+.svg-point[data-condition-ids]:focus {
+  r: 7px;
+  stroke: #172554;
+  stroke-width: 2px;
+  outline: none;
 }
 
 .table-wrap {

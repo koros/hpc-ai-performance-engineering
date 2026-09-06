@@ -331,10 +331,12 @@ function buildRq1ScalingSeries(rows) {
       title: platform + " · " + comparability + " · " + workload,
       subtitle: precision + "; " + strategy + "; " + unit,
       platform, comparability, workload, unit,
+      comparison: comparisonContext(group, ["GPU count"], ["platform_id", "comparability", "workload", "precision", "strategy", "throughput_unit"]),
       points: group.map((row) => ({
         x: number(row.gpus),
         y: number(row.speedup),
         label: row.gpus + " GPUs: " + formatDecimal(number(row.speedup), 2) + "× speedup; " + formatDecimal(number(row.scaling_efficiency) * 100, 1) + "% efficiency; " + row.source_condition_ids,
+        conditionIds: parseConditionIds(row.source_condition_ids),
       })).sort((left, right) => left.x - right.x),
     };
   }).sort((left, right) => left.title.localeCompare(right.title));
@@ -348,11 +350,13 @@ function buildRq2StrategyGroups(rows) {
       title: platform + " · " + comparability + " · " + workload,
       subtitle: model + "; " + precision + "; " + gpus + " GPUs; " + unit,
       platform, comparability, workload, unit,
+      comparison: comparisonContext(group, ["Distributed strategy"], ["platform_id", "comparability", "workload", "model", "precision", "gpus", "throughput_unit"]),
       points: group.map((row) => ({
         x: number(row.max_memory_used_gb),
         y: number(row.throughput_tokens_sec),
         label: row.strategy + " · " + row.finding,
         status: row.finding.includes("Pareto frontier") ? "Pareto frontier" : "Dominated",
+        conditionIds: parseConditionIds(row.source_condition_ids),
       })).sort((left, right) => right.y - left.y),
     };
   }).sort((left, right) => left.title.localeCompare(right.title));
@@ -369,7 +373,7 @@ function renderStrategyTradeoffCharts(containerId, groups, emptyMessage) {
 }
 
 function strategyTradeoffChartCard(group) {
-  const card = chartCard(group.title, group.subtitle);
+  const card = chartCard(group.title, group.subtitle, group.comparison);
   const width = 500;
   const height = 220;
   const left = 48;
@@ -385,7 +389,7 @@ function strategyTradeoffChartCard(group) {
   const grids = xTicks.map((value) => '<line class="svg-grid" x1="' + x(value) + '" y1="' + top + '" x2="' + x(value) + '" y2="' + (height - bottom) + '"/><text class="svg-label" x="' + x(value) + '" y="' + (height - 18) + '" text-anchor="middle">' + formatCompact(value) + "</text>").join("") + yTicks.map((value) => '<line class="svg-grid" x1="' + left + '" y1="' + y(value) + '" x2="' + (width - right) + '" y2="' + y(value) + '"/><text class="svg-label" x="' + (left - 5) + '" y="' + (y(value) + 3) + '" text-anchor="end">' + formatCompact(value) + "</text>").join("");
   const points = group.points.map((point) => {
     const color = point.status === "Pareto frontier" ? "#0f766e" : "#94a3b8";
-    return '<circle class="svg-point" fill="' + color + '" cx="' + x(point.x) + '" cy="' + y(point.y) + '" r="5"><title>' + escapeSvg(point.label + "; " + formatCompact(point.x) + " GB; " + formatCompact(point.y) + " " + group.unit) + "</title></circle>";
+    return '<circle class="svg-point" ' + conditionTargetAttributes(point) + ' fill="' + color + '" cx="' + x(point.x) + '" cy="' + y(point.y) + '" r="5"><title>' + escapeSvg(point.label + "; " + formatCompact(point.x) + " GB; " + formatCompact(point.y) + " " + group.unit) + "</title></circle>";
   }).join("");
   const labels = '<text class="svg-label" x="' + width / 2 + '" y="' + (height - 3) + '" text-anchor="middle">maximum GPU memory (GB)</text><text class="svg-label" transform="translate(11 ' + height / 2 + ') rotate(-90)" text-anchor="middle">throughput</text>';
   card.append(svgElement(width, height, grids + points + labels));
@@ -519,6 +523,8 @@ function renderPhaseBars(rows) {
   renderSeparatedBars("phaseBars", entries, {
     empty: "No throughput values available.",
     value: (entry) => formatInteger(entry.value) + " " + entry.unit,
+    changing: ["Platform, phase, workload, or experiment condition"],
+    constants: ["comparability", "unit"],
   });
   markPanel("phaseBars", entries.length > 0, buildPhaseBarEntries(state.results).length > 0, "Phase throughput", "experiments.csv");
 }
@@ -530,6 +536,7 @@ function buildPhaseBarEntries(rows) {
     return {
       label: platform + " · " + comparability + " · " + phase + " · " + workload,
       platform, comparability, phase, workload, unit,
+      conditionIds: uniqueConditionIds(group),
       value: average(group.map(throughput).filter((value) => value > 0)),
     };
   }).filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 16);
@@ -541,6 +548,8 @@ function renderEnergy(rows) {
     empty: "No measured-region energy evidence is available. Legacy full-window estimates are excluded.",
     barClass: "energy",
     value: (entry) => formatDecimal(entry.value, 0) + " J · " + formatDecimal(entry.power, 1) + " W",
+    changing: ["Experiment condition"],
+    constants: ["platform", "comparability", "workload", "mode"],
   });
   document.getElementById("energyStatus").textContent = entries.length ? entries.length + " recorded conditions" : "No energy evidence";
   markPanel("energyBars", entries.length > 0, buildEnergyPowerEntries(state.results).length > 0, "Energy and power", "experiments.csv");
@@ -553,6 +562,8 @@ function buildEnergyPowerEntries(rows) {
     return {
       label: platform + " · " + comparability + " · " + experiment + " · " + workload,
       detail: mode,
+      platform, comparability, experiment, workload, mode,
+      conditionId: conditionId(group[0]),
       unit: "joules",
       value: average(group.map((row) => number(row.energy_joules))),
       power: average(group.map((row) => number(row.metric_nvidia_smi_power_draw_watts_measured_region || row.metric_power_draw_watts))),
@@ -575,10 +586,14 @@ function renderSeparatedBars(containerId, entries, options) {
       heading.textContent = unit;
       container.append(heading);
     }
+    if (options.changing) {
+      container.append(comparisonContract(comparisonContext(group, options.changing, options.constants || [])));
+    }
     const top = max(group.map((entry) => entry.value));
     group.forEach((entry) => {
       const row = document.createElement("div");
       row.className = "bar-row";
+      setConditionTarget(row, entry.conditionId, entry.conditionIds);
       row.innerHTML = '<div class="bar-meta"><strong>' + escapeHtml(entry.label) + "</strong><span>" + escapeHtml(options.value(entry)) + "</span></div>" + (entry.detail ? '<div class="bar-detail">' + escapeHtml(entry.detail) + "</div>" : "") + '<div class="bar-track"><div class="bar-fill ' + (options.barClass || "") + '" style="width: ' + Math.max(3, (entry.value / top) * 100) + '%"></div></div>';
       container.append(row);
     });
@@ -608,11 +623,13 @@ function buildUncertaintyGroups(rows) {
       title: platform + " · " + comparability + " · " + workload,
       subtitle: unit,
       platform, comparability, workload, unit,
+      comparison: comparisonContext(group, ["Experiment condition"], ["platform_id", "comparability", "workload", "throughput_unit"]),
       points: group.map((row) => ({
         label: row.experiment_id + " · " + row.workload,
         value: number(row.throughput_tokens_mean),
         low: number(row.throughput_tokens_ci95_low) || number(row.throughput_tokens_mean),
         high: number(row.throughput_tokens_ci95_high) || number(row.throughput_tokens_mean),
+        conditionId: conditionId(row),
       })).sort((left, right) => right.value - left.value).slice(0, 10),
     };
   }).sort((left, right) => left.title.localeCompare(right.title));
@@ -629,7 +646,7 @@ function renderErrorBarCharts(containerId, groups, emptyMessage) {
 }
 
 function errorBarChartCard(group) {
-  const card = chartCard(group.title, group.subtitle);
+  const card = chartCard(group.title, group.subtitle, group.comparison);
   const width = 500;
   const height = Math.max(110, group.points.length * 28 + 44);
   const left = 145;
@@ -641,7 +658,7 @@ function errorBarChartCard(group) {
   const y = (index) => top + index * 28 + 8;
   const ticks = [domain[0], (domain[0] + domain[1]) / 2, domain[1]];
   const grids = ticks.map((value) => '<line class="svg-grid" x1="' + scale(value) + '" y1="' + (top - 8) + '" x2="' + scale(value) + '" y2="' + (height - bottom) + '"/><text class="svg-label" x="' + scale(value) + '" y="' + (height - 5) + '" text-anchor="middle">' + formatCompact(value) + "</text>").join("");
-  const marks = group.points.map((point, index) => '<text class="svg-label" x="' + (left - 7) + '" y="' + (y(index) + 3) + '" text-anchor="end">' + escapeSvg(point.label) + '</text><line class="svg-line" stroke="' + colors[index % colors.length] + '" x1="' + scale(point.low) + '" y1="' + y(index) + '" x2="' + scale(point.high) + '" y2="' + y(index) + '"/><circle class="svg-point" fill="' + colors[index % colors.length] + '" cx="' + scale(point.value) + '" cy="' + y(index) + '" r="4"><title>' + escapeSvg(point.label + ": " + formatCompact(point.value) + " (" + formatCompact(point.low) + "–" + formatCompact(point.high) + ")") + "</title></circle>").join("");
+  const marks = group.points.map((point, index) => '<text class="svg-label" x="' + (left - 7) + '" y="' + (y(index) + 3) + '" text-anchor="end">' + escapeSvg(point.label) + '</text><line class="svg-line" stroke="' + colors[index % colors.length] + '" x1="' + scale(point.low) + '" y1="' + y(index) + '" x2="' + scale(point.high) + '" y2="' + y(index) + '"/><circle class="svg-point" ' + conditionTargetAttributes(point) + ' fill="' + colors[index % colors.length] + '" cx="' + scale(point.value) + '" cy="' + y(index) + '" r="4"><title>' + escapeSvg(point.label + ": " + formatCompact(point.value) + " (" + formatCompact(point.low) + "–" + formatCompact(point.high) + ")") + "</title></circle>").join("");
   card.append(svgElement(width, height, grids + marks));
   return card;
 }
@@ -649,7 +666,7 @@ function errorBarChartCard(group) {
 function renderStrategy() {
   const result = filteredAnalysisRows(state.strategySummary, ["platform_id", "comparability", "workload", "throughput_unit", "strategy", "precision", "gpus"]);
   const entries = buildStrategyEntries(result.rows);
-  renderSeparatedBars("strategyBars", entries, { empty: result.message || "No completed distributed-strategy evidence.", value: (entry) => formatInteger(entry.value) + " " + entry.unit });
+  renderSeparatedBars("strategyBars", entries, { empty: result.message || "No completed distributed-strategy evidence.", value: (entry) => formatInteger(entry.value) + " " + entry.unit, changing: ["Distributed strategy"], constants: ["platform", "comparability", "workload", "precision", "gpus"] });
   document.getElementById("strategyStatus").textContent = result.message || entries.length + " conditions";
   markPanel("strategyBars", entries.length > 0, buildStrategyEntries(state.strategySummary).length > 0, "Distributed strategy", "strategy_summary.csv", true);
 }
@@ -658,6 +675,12 @@ function buildStrategyEntries(rows) {
   return rows.map((row) => ({
     label: row.platform_id + " · " + row.comparability + " · " + row.workload + " · " + row.strategy,
     detail: row.precision + " · " + row.gpus + " GPU" + (number(row.gpus) === 1 ? "" : "s"),
+    platform: row.platform_id,
+    comparability: row.comparability,
+    workload: row.workload,
+    strategy: row.strategy,
+    precision: row.precision,
+    gpus: row.gpus,
     unit: row.throughput_unit || "unit_not_recorded",
     value: number(row.avg_throughput_tokens_sec),
   })).filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value);
@@ -666,7 +689,7 @@ function buildStrategyEntries(rows) {
 function renderPrecision() {
   const result = filteredAnalysisRows(state.precisionSummary, ["platform_id", "comparability", "workload", "throughput_unit", "mode", "precision"]);
   const entries = buildPrecisionEntries(result.rows);
-  renderSeparatedBars("precisionBars", entries, { empty: result.message || "No completed precision-study evidence.", value: (entry) => formatInteger(entry.value) + " " + entry.unit });
+  renderSeparatedBars("precisionBars", entries, { empty: result.message || "No completed precision-study evidence.", value: (entry) => formatInteger(entry.value) + " " + entry.unit, changing: ["Precision"], constants: ["platform", "comparability", "workload", "mode"] });
   document.getElementById("precisionStatus").textContent = result.message || entries.length + " conditions";
   markPanel("precisionBars", entries.length > 0, buildPrecisionEntries(state.precisionSummary).length > 0, "Precision trade-off", "precision_summary.csv", true);
 }
@@ -675,6 +698,11 @@ function buildPrecisionEntries(rows) {
   return rows.map((row) => ({
     label: row.platform_id + " · " + row.comparability + " · " + row.workload + " · " + row.precision,
     detail: row.mode + " · " + formatDecimal(number(row.avg_memory_used_gb), 2) + " GB",
+    platform: row.platform_id,
+    comparability: row.comparability,
+    workload: row.workload,
+    precision: row.precision,
+    mode: row.mode,
     unit: row.throughput_unit || "unit_not_recorded",
     value: number(row.avg_throughput_tokens_sec),
   })).filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value);
@@ -701,7 +729,8 @@ function buildMemorySeries(rows) {
       title: platform + " · " + comparability + " · " + workload,
       subtitle: "checkpointing: " + checkpointing + "; accumulation: " + accumulation + "; " + unit,
       platform, comparability, unit,
-      points: group.map((row) => ({ x: number(row.micro_batch_size), y: number(row.max_memory_used_gb), label: "batch " + row.micro_batch_size + ": " + formatDecimal(number(row.max_memory_used_gb), 2) + " GB" })).sort((left, right) => left.x - right.x),
+      comparison: comparisonContext(group, ["Micro-batch size"], ["platform_id", "comparability", "workload", "activation_checkpointing", "gradient_accumulation_steps", "throughput_unit"]),
+      points: group.map((row) => ({ x: number(row.micro_batch_size), y: number(row.max_memory_used_gb), label: "batch " + row.micro_batch_size + ": " + formatDecimal(number(row.max_memory_used_gb), 2) + " GB", conditionId: conditionId(row) })).sort((left, right) => left.x - right.x),
     };
   }).sort((left, right) => left.title.localeCompare(right.title));
 }
@@ -722,7 +751,8 @@ function buildScalingSeries(rows) {
       title: platform + " · " + comparability + " · " + workload,
       subtitle: strategy + "; " + precision + "; " + scalingType + "; " + unit,
       platform, comparability, unit,
-      points: group.map((row) => ({ x: number(row.gpus), y: number(row.speedup), label: row.gpus + " GPU: " + formatDecimal(number(row.speedup), 2) + "× speedup; " + formatDecimal(number(row.scaling_efficiency) * 100, 1) + "% efficiency" })).sort((left, right) => left.x - right.x),
+      comparison: comparisonContext(group, ["GPU count"], ["platform_id", "comparability", "workload", "strategy", "precision", "throughput_unit", "scaling_type"]),
+      points: group.map((row) => ({ x: number(row.gpus), y: number(row.speedup), label: row.gpus + " GPU: " + formatDecimal(number(row.speedup), 2) + "× speedup; " + formatDecimal(number(row.scaling_efficiency) * 100, 1) + "% efficiency", conditionId: conditionId(row) })).sort((left, right) => left.x - right.x),
     };
   }).sort((left, right) => left.title.localeCompare(right.title));
 }
@@ -738,7 +768,7 @@ function renderLineCharts(containerId, series, options) {
 }
 
 function lineChartCard(series, options, color) {
-  const card = chartCard(series.title, series.subtitle);
+  const card = chartCard(series.title, series.subtitle, series.comparison);
   const width = 500;
   const height = 220;
   const left = 46;
@@ -753,7 +783,7 @@ function lineChartCard(series, options, color) {
   const xTicks = [xDomain[0], (xDomain[0] + xDomain[1]) / 2, xDomain[1]];
   const yTicks = [yDomain[0], (yDomain[0] + yDomain[1]) / 2, yDomain[1]];
   const grid = xTicks.map((value) => '<line class="svg-grid" x1="' + x(value) + '" y1="' + top + '" x2="' + x(value) + '" y2="' + (height - bottom) + '"/><text class="svg-label" x="' + x(value) + '" y="' + (height - 18) + '" text-anchor="middle">' + formatCompact(value) + "</text>").join("") + yTicks.map((value) => '<line class="svg-grid" x1="' + left + '" y1="' + y(value) + '" x2="' + (width - right) + '" y2="' + y(value) + '"/><text class="svg-label" x="' + (left - 5) + '" y="' + (y(value) + 3) + '" text-anchor="end">' + formatCompact(value) + "</text>").join("");
-  const points = series.points.map((point) => '<circle class="svg-point" fill="' + color + '" cx="' + x(point.x) + '" cy="' + y(point.y) + '" r="4"><title>' + escapeSvg(point.label) + "</title></circle>").join("");
+  const points = series.points.map((point) => '<circle class="svg-point" ' + conditionTargetAttributes(point) + ' fill="' + color + '" cx="' + x(point.x) + '" cy="' + y(point.y) + '" r="4"><title>' + escapeSvg(point.label) + "</title></circle>").join("");
   const labels = '<text class="svg-label" x="' + width / 2 + '" y="' + (height - 3) + '" text-anchor="middle">' + escapeSvg(options.xLabel) + '</text><text class="svg-label" transform="translate(11 ' + height / 2 + ') rotate(-90)" text-anchor="middle">' + escapeSvg(options.yLabel) + "</text>";
   card.append(svgElement(width, height, grid + '<path class="svg-line" stroke="' + color + '" d="' + line + '"/>' + points + labels));
   return card;
@@ -762,7 +792,7 @@ function lineChartCard(series, options, color) {
 function renderCommunication() {
   const result = filteredAnalysisRows(state.communicationSummary, ["platform_id", "comparability", "workload", "throughput_unit", "strategy", "gpus"]);
   const entries = buildCommunicationEntries(result.rows);
-  renderSeparatedBars("communicationBars", entries, { empty: result.message || "No completed NCCL communication evidence.", barClass: "communication", value: (entry) => formatDecimal(entry.value, 2) + " GB/s" });
+  renderSeparatedBars("communicationBars", entries, { empty: result.message || "No completed NCCL communication evidence.", barClass: "communication", value: (entry) => formatDecimal(entry.value, 2) + " GB/s", changing: ["Communication condition"], constants: ["platform", "comparability", "workload", "gpus"] });
   document.getElementById("communicationStatus").textContent = result.message || entries.length + " conditions";
   markPanel("communicationBars", entries.length > 0, buildCommunicationEntries(state.communicationSummary).length > 0, "NCCL communication", "communication_summary.csv", true);
 }
@@ -771,6 +801,12 @@ function buildCommunicationEntries(rows) {
   return rows.map((row) => ({
     label: row.platform_id + " · " + row.comparability + " · " + row.experiment_id + " · " + row.strategy,
     detail: row.workload + " · " + row.gpus + " GPUs · communication/compute " + formatDecimal(number(row.communication_to_compute_ratio), 2),
+    conditionId: conditionId(row),
+    platform: row.platform_id,
+    comparability: row.comparability,
+    workload: row.workload,
+    strategy: row.strategy,
+    gpus: row.gpus,
     unit: "GB/s",
     value: number(row.avg_nccl_bandwidth_gbps),
   })).filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value);
@@ -779,7 +815,7 @@ function buildCommunicationEntries(rows) {
 function renderDataMovement() {
   const result = filteredAnalysisRows(state.dataMovementSummary, ["platform_id", "comparability", "workload", "throughput_unit"]);
   const entries = buildDataMovementEntries(result.rows);
-  renderSeparatedBars("movementBars", entries, { empty: result.message || "No completed data-movement evidence.", value: (entry) => formatDecimal(entry.value, 3) + " s" });
+  renderSeparatedBars("movementBars", entries, { empty: result.message || "No completed data-movement evidence.", value: (entry) => formatDecimal(entry.value, 3) + " s", changing: ["Worker count", "Pinned memory", "Prefetch factor"], constants: ["platform", "comparability", "workload"] });
   document.getElementById("movementStatus").textContent = result.message || entries.length + " conditions";
   markPanel("movementBars", entries.length > 0, buildDataMovementEntries(state.dataMovementSummary).length > 0, "Data movement", "data_movement_summary.csv", true);
 }
@@ -788,6 +824,13 @@ function buildDataMovementEntries(rows) {
   return rows.map((row) => ({
     label: row.platform_id + " · " + row.comparability + " · " + row.experiment_id + " · " + row.workload,
     detail: "workers " + row.num_workers + "; pinned memory " + row.pinned_memory + "; prefetch " + row.prefetch_factor,
+    conditionId: conditionId(row),
+    platform: row.platform_id,
+    comparability: row.comparability,
+    workload: row.workload,
+    num_workers: row.num_workers,
+    pinned_memory: row.pinned_memory,
+    prefetch_factor: row.prefetch_factor,
     unit: "seconds",
     value: number(row.avg_data_loading_seconds),
   })).filter((entry) => entry.value >= 0).sort((left, right) => right.value - left.value);
@@ -809,7 +852,8 @@ function buildInferenceGroups(rows) {
       title: platform + " · " + comparability + " · " + workload,
       subtitle: unit,
       platform, comparability, workload, unit,
-      points: group.map((row) => ({ x: number(row.avg_latency_p95_ms), y: number(row.avg_throughput_tokens_sec), label: row.experiment_id + " · " + row.workload + " · " + row.precision + " · " + row.gpus + " GPU" })),
+      comparison: comparisonContext(group, varyingLabels(group, ["framework", "precision", "gpus", "batch_size", "concurrent_requests", "prompt_length"]), ["platform_id", "comparability", "workload", "throughput_unit"]),
+      points: group.map((row) => ({ x: number(row.avg_latency_p95_ms), y: number(row.avg_throughput_tokens_sec), label: row.experiment_id + " · " + row.workload + " · " + row.precision + " · " + row.gpus + " GPU", conditionId: conditionId(row) })),
     };
   }).sort((left, right) => left.title.localeCompare(right.title));
 }
@@ -825,7 +869,7 @@ function renderScatterCharts(containerId, groups, emptyMessage) {
 }
 
 function scatterChartCard(group) {
-  const card = chartCard(group.title, group.subtitle);
+  const card = chartCard(group.title, group.subtitle, group.comparison);
   const width = 500;
   const height = 220;
   const left = 48;
@@ -839,7 +883,7 @@ function scatterChartCard(group) {
   const xTicks = [xDomain[0], (xDomain[0] + xDomain[1]) / 2, xDomain[1]];
   const yTicks = [yDomain[0], (yDomain[0] + yDomain[1]) / 2, yDomain[1]];
   const grids = xTicks.map((value) => '<line class="svg-grid" x1="' + x(value) + '" y1="' + top + '" x2="' + x(value) + '" y2="' + (height - bottom) + '"/><text class="svg-label" x="' + x(value) + '" y="' + (height - 18) + '" text-anchor="middle">' + formatCompact(value) + "</text>").join("") + yTicks.map((value) => '<line class="svg-grid" x1="' + left + '" y1="' + y(value) + '" x2="' + (width - right) + '" y2="' + y(value) + '"/><text class="svg-label" x="' + (left - 5) + '" y="' + (y(value) + 3) + '" text-anchor="end">' + formatCompact(value) + "</text>").join("");
-  const points = group.points.map((point, index) => '<circle class="svg-point" fill="' + colors[index % colors.length] + '" cx="' + x(point.x) + '" cy="' + y(point.y) + '" r="5"><title>' + escapeSvg(point.label + ": p95 " + formatCompact(point.x) + " ms; " + formatCompact(point.y) + " " + group.unit) + "</title></circle>").join("");
+  const points = group.points.map((point, index) => '<circle class="svg-point" ' + conditionTargetAttributes(point) + ' fill="' + colors[index % colors.length] + '" cx="' + x(point.x) + '" cy="' + y(point.y) + '" r="5"><title>' + escapeSvg(point.label + ": p95 " + formatCompact(point.x) + " ms; " + formatCompact(point.y) + " " + group.unit) + "</title></circle>").join("");
   const labels = '<text class="svg-label" x="' + width / 2 + '" y="' + (height - 3) + '" text-anchor="middle">p95 latency (ms)</text><text class="svg-label" transform="translate(11 ' + height / 2 + ') rotate(-90)" text-anchor="middle">throughput</text>';
   card.append(svgElement(width, height, grids + points + labels));
   return card;
@@ -931,6 +975,7 @@ function renderTable(id, rows, columns, message = "") {
   }
   sorted.slice(0, 120).forEach((row) => {
     const tr = document.createElement("tr");
+    setConditionTarget(tr, conditionId(row));
     columns.forEach((column) => {
       const td = document.createElement("td");
       td.textContent = formatCell(row[column]);
@@ -984,7 +1029,7 @@ function groupRows(rows, keyFunction) {
   }, {});
 }
 
-function chartCard(title, subtitle) {
+function chartCard(title, subtitle, comparison) {
   const card = document.createElement("article");
   card.className = "svg-chart-card";
   const heading = document.createElement("h3");
@@ -995,7 +1040,73 @@ function chartCard(title, subtitle) {
     text.textContent = subtitle;
     card.append(text);
   }
+  if (comparison) card.append(comparisonContract(comparison));
   return card;
+}
+
+function comparisonContext(rows, changing, constantFields) {
+  const constants = constantFields.flatMap((key) => {
+    const values = [...new Set(rows.map((row) => String(row[key] || "").trim()).filter(Boolean))];
+    return values.length === 1 ? [{ label: displayName(key), value: values[0] }] : [];
+  });
+  return { changing: changing.length ? changing : ["Multiple recorded settings"], constants };
+}
+
+function comparisonContract(context) {
+  const element = document.createElement("div");
+  element.className = "comparison-contract";
+  const changing = document.createElement("div");
+  changing.className = "comparison-changing";
+  changing.innerHTML = "<span>Changing</span><strong>" + escapeHtml(context.changing.join(" · ")) + "</strong>";
+  element.append(changing);
+  if (context.constants.length) {
+    const constants = document.createElement("div");
+    constants.className = "comparison-constants";
+    const label = document.createElement("span");
+    label.textContent = "Held constant";
+    constants.append(label);
+    context.constants.forEach((item) => {
+      const chip = document.createElement("span");
+      chip.className = "comparison-chip";
+      chip.textContent = item.label + ": " + item.value;
+      constants.append(chip);
+    });
+    element.append(constants);
+  }
+  return element;
+}
+
+function varyingLabels(rows, fields) {
+  const labels = fields.filter((key) => new Set(rows.map((row) => String(row[key] || "").trim()).filter(Boolean)).size > 1).map(displayName);
+  return labels.length ? labels : ["Experiment condition"];
+}
+
+function conditionId(row) {
+  return row.condition_id || (row.experiment_id && row.platform_id ? row.experiment_id + "@" + row.platform_id : "");
+}
+
+function uniqueConditionIds(rows) {
+  return [...new Set(rows.map(conditionId).filter(Boolean))];
+}
+
+function parseConditionIds(value) {
+  return String(value || "").split(/[;,]/).map((item) => item.trim()).filter(Boolean);
+}
+
+function setConditionTarget(element, id, ids) {
+  const targets = id ? [id] : (ids || []);
+  if (!targets.length) return;
+  element.dataset.conditionIds = targets.join(",");
+  element.classList.add("experiment-target");
+  element.tabIndex = 0;
+  element.setAttribute("role", "button");
+  element.setAttribute("aria-label", "View experiment details");
+}
+
+function conditionTargetAttributes(point) {
+  const targets = point.conditionId ? [point.conditionId] : (point.conditionIds || []);
+  if (!targets.length) return "";
+  return 'tabindex="0" role="button" aria-label="View experiment details" data-condition-ids="' + escapeSvg(targets.join(",")) + '"';
 }
 
 function svgElement(width, height, contents) {
@@ -1101,6 +1212,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildRq2StrategyGroups,
     buildScalingSeries,
     buildUncertaintyGroups,
+    comparisonContext,
     summarizePhases,
   };
 }
