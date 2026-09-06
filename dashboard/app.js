@@ -73,6 +73,51 @@ const phaseColumns = ["platform_id", "comparability", "phase", "workload", "thro
 const trialColumns = ["experiment_id", "platform_id", "comparability", "workload", "throughput_unit", "completed_trials", "failed_trials", "evidence_status", "runtime_mean_seconds", "throughput_tokens_mean", "throughput_tokens_ci95_low", "throughput_tokens_ci95_high"];
 const colors = ["#0f766e", "#2563eb", "#7c3aed", "#b45309", "#be123c", "#0891b2", "#4d7c0f"];
 
+const detailMetricSections = [
+  ["Performance", [
+    ["Throughput", ["throughput_tokens_sec", "metric_throughput_tokens_sec"], "throughput_unit", 1],
+    ["Sample throughput", ["throughput_samples_sec", "metric_throughput_samples_sec"], "samples/s", 2],
+    ["Runtime", ["runtime_seconds"], "s", 2],
+    ["Mean step time", ["metric_step_time_mean_ms"], "ms", 2],
+    ["p95 step time", ["metric_step_time_p95_ms"], "ms", 2],
+  ]],
+  ["Memory", [
+    ["GPU memory used", ["metric_nvidia_smi_memory_used_gb_measured_region", "metric_memory_used_gb", "memory_used_gb"], "GB", 2],
+    ["Torch memory allocated", ["metric_torch_memory_memory_used_gb"], "GB", 2],
+    ["Torch memory reserved", ["metric_torch_memory_memory_reserved_gb", "metric_memory_reserved_gb"], "GB", 2],
+  ]],
+  ["GPU telemetry", [
+    ["Average GPU utilisation", ["metric_nvidia_smi_gpu_utilization_measured_region", "metric_gpu_utilization", "gpu_utilization"], "%", 1],
+    ["Peak GPU utilisation", ["metric_nvidia_smi_gpu_utilization_max_measured_region", "metric_nvidia_smi_gpu_utilization_max"], "%", 1],
+    ["Average SM clock", ["metric_nvidia_smi_sm_clock_mean_mhz_measured_region", "metric_nvidia_smi_sm_clock_mean_mhz"], "MHz", 0],
+    ["Peak temperature", ["metric_nvidia_smi_temperature_max_c_measured_region", "metric_nvidia_smi_temperature_max_c"], "°C", 1],
+  ]],
+  ["Power and energy", [
+    ["Measured-region energy", ["metric_nvidia_smi_energy_joules_measured_region", "energy_joules"], "J", 1],
+    ["Average power", ["metric_nvidia_smi_power_draw_watts_measured_region", "metric_power_draw_watts", "power_draw_watts"], "W", 1],
+    ["Peak power", ["metric_nvidia_smi_power_draw_max_watts_measured_region", "metric_power_draw_max_watts"], "W", 1],
+    ["Measurement duration", ["metric_nvidia_smi_measurement_duration_seconds", "measurement_duration_seconds"], "s", 2],
+  ]],
+  ["CPU and data movement", [
+    ["Torch profiler CPU time", ["metric_torch_profiler_self_cpu_time_ms"], "ms", 2],
+    ["Data loading", ["metric_data_loading_seconds"], "s", 3],
+    ["CPU-to-GPU transfer", ["metric_cpu_to_gpu_transfer_seconds"], "s", 3],
+  ]],
+  ["Inference", [
+    ["p50 latency", ["metric_latency_p50_ms", "latency_p50_ms"], "ms", 2],
+    ["p95 latency", ["metric_latency_p95_ms", "latency_p95_ms"], "ms", 2],
+    ["p50 time to first token", ["metric_time_to_first_token_p50_ms"], "ms", 2],
+    ["p95 time to first token", ["metric_time_to_first_token_p95_ms"], "ms", 2],
+    ["Generated tokens", ["metric_generated_tokens"], "tokens", 0],
+    ["Requests per second", ["metric_throughput_requests_sec"], "requests/s", 2],
+  ]],
+  ["Distributed communication", [
+    ["NCCL bandwidth", ["metric_nccl_bandwidth_gbps"], "GB/s", 2],
+    ["All-reduce time", ["metric_allreduce_time_seconds"], "s", 4],
+    ["CUDA event time", ["metric_cuda_event_seconds"], "s", 4],
+  ]],
+];
+
 if (typeof document !== "undefined") {
   document.addEventListener("DOMContentLoaded", () => {
     bindInputs();
@@ -109,6 +154,21 @@ function bindInputs() {
       state.readinessReport = text;
       render();
     });
+  });
+  document.getElementById("experimentDialogClose").addEventListener("click", closeExperimentDialog);
+  document.getElementById("experimentDialog").addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) closeExperimentDialog();
+  });
+  document.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-condition-ids]");
+    if (target) openExperimentDialog(target.dataset.conditionIds.split(","));
+  });
+  document.addEventListener("keydown", (event) => {
+    const target = event.target.closest("[data-condition-ids]");
+    if (target && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      openExperimentDialog(target.dataset.conditionIds.split(","));
+    }
   });
 }
 
@@ -988,6 +1048,199 @@ function renderTable(id, rows, columns, message = "") {
   });
 }
 
+function openExperimentDialog(requestedIds) {
+  const ids = [...new Set(requestedIds.map((value) => value.trim()).filter(Boolean))];
+  const available = ids.filter((id) => rowsForCondition(id).length);
+  if (!available.length) return;
+  renderExperimentDialog(available[0], available);
+  const dialog = document.getElementById("experimentDialog");
+  if (!dialog.open) dialog.showModal();
+}
+
+function closeExperimentDialog() {
+  const dialog = document.getElementById("experimentDialog");
+  if (dialog.open) dialog.close();
+}
+
+function rowsForCondition(id) {
+  return state.results.filter((row) => conditionId(row) === id || (!id.includes("@") && row.experiment_id === id));
+}
+
+function renderExperimentDialog(selectedId, availableIds) {
+  const detail = buildExperimentDetail(rowsForCondition(selectedId));
+  if (!detail) return;
+  document.getElementById("experimentDialogTitle").textContent = detail.experimentId + " · " + detail.experimentName;
+  document.getElementById("experimentDialogSubtitle").textContent = [detail.platform, detail.comparability, detail.workload, detail.mode].filter(Boolean).join(" · ");
+  const body = document.getElementById("experimentDialogBody");
+  body.replaceChildren();
+
+  if (availableIds.length > 1) {
+    const switcher = document.createElement("div");
+    switcher.className = "condition-switcher";
+    const label = document.createElement("span");
+    label.textContent = "Related evidence";
+    switcher.append(label);
+    availableIds.forEach((id) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = id;
+      button.className = id === selectedId ? "is-active" : "";
+      button.addEventListener("click", () => renderExperimentDialog(id, availableIds));
+      switcher.append(button);
+    });
+    body.append(switcher);
+  }
+
+  const summary = document.createElement("section");
+  summary.className = "detail-hero";
+  summary.innerHTML = '<div><span class="status-pill status-' + escapeHtml(detail.status) + '">' + escapeHtml(detail.status) + '</span><p>' + escapeHtml(detail.purpose) + '</p></div><dl>' +
+    detail.summary.map((item) => '<div><dt>' + escapeHtml(item.label) + '</dt><dd>' + escapeHtml(item.value) + "</dd></div>").join("") + "</dl>";
+  body.append(summary);
+
+  const protocol = document.createElement("section");
+  protocol.className = "detail-section";
+  protocol.innerHTML = '<div class="detail-section-heading"><div><p class="eyebrow">Protocol</p><h3>What this condition changes and controls</h3></div></div>' +
+    '<div class="detail-protocol"><div><span>Study variable</span><strong>' + escapeHtml(detail.studyVariable) + '</strong></div><div><span>Recorded controls</span><div class="detail-chip-list">' +
+    detail.controls.map((item) => '<span>' + escapeHtml(item.label + ": " + item.value) + "</span>").join("") + "</div></div></div>";
+  body.append(protocol);
+
+  const metricsGrid = document.createElement("div");
+  metricsGrid.className = "detail-section-grid";
+  detail.sections.forEach((section) => metricsGrid.append(detailMetricSection(section, detail)));
+  body.append(metricsGrid);
+
+  const trials = document.createElement("section");
+  trials.className = "detail-section detail-trials";
+  const trialMetric = selectTrialMetric(detail.rows);
+  trials.innerHTML = '<div class="detail-section-heading"><div><p class="eyebrow">Evidence</p><h3>Trial-level consistency</h3></div><span>' + detail.rows.length + " recorded trial" + (detail.rows.length === 1 ? "" : "s") + "</span></div>" + renderTrialBars(detail.rows, trialMetric);
+  body.append(trials);
+
+  const provenance = document.createElement("details");
+  provenance.className = "detail-provenance";
+  provenance.innerHTML = '<summary>Environment and provenance</summary><dl>' + detail.provenance.map((item) => '<div><dt>' + escapeHtml(item.label) + '</dt><dd>' + escapeHtml(item.value) + "</dd></div>").join("") + "</dl>";
+  body.append(provenance);
+}
+
+function buildExperimentDetail(rows) {
+  if (!rows.length) return null;
+  const first = rows[0];
+  const completed = rows.filter((row) => row.status === "completed");
+  const metricRows = completed.length ? completed : rows;
+  const status = completed.length === rows.length ? "completed" : completed.length ? "partial" : (first.status || "unknown");
+  const sections = detailMetricSections.map(([title, definitions]) => ({
+    title,
+    items: definitions.map(([label, keys, unit, digits]) => metricAggregate(metricRows, label, keys, unit === "throughput_unit" ? first.throughput_unit : unit, digits)).filter(Boolean),
+  })).filter((section) => section.items.length);
+  const controls = [
+    ["Platform", "platform_id"], ["Comparability", "comparability"], ["Workload", "workload"], ["Model", "model"], ["Mode", "mode"],
+    ["Precision", "precision"], ["Strategy", "strategy"], ["GPUs", "gpus"], ["Batch size", "batch_size"], ["Global batch", "global_batch_size"],
+    ["Per-GPU batch", "per_gpu_batch_size"], ["Sequence length", "parameter_sequence_length"], ["Checkpointing", "parameter_activation_checkpointing"],
+    ["Gradient accumulation", "parameter_gradient_accumulation_steps"], ["Framework", "framework"], ["Concurrency", "parameter_concurrent_requests"],
+  ].flatMap(([label, key]) => hasValue(first[key]) ? [{ label, value: String(first[key]) }] : []);
+  const summary = [
+    { label: "Condition", value: conditionId(first) },
+    { label: "Trials", value: completed.length + "/" + rows.length + " completed" },
+    { label: "Research questions", value: researchQuestionsForRow(first).join(", ") || "Not assigned" },
+    { label: "Wave", value: rowValue(first, "wave") || "Not recorded" },
+  ];
+  const provenance = [
+    ["Run IDs", rows.map((row) => row.run_id).filter(Boolean).join(", ")],
+    ["Git commit", first.git_commit || first.environment_git_commit],
+    ["GPU", first.observed_gpu_model || first.environment_observed_gpu_model || first.gpu_model],
+    ["GPU UUID mapping", first.gpu_telemetry_mapping || first.environment_observed_gpu_uuid_mapping_method],
+    ["Profiled GPU UUIDs", first.profiled_gpu_uuids || first.metric_nvidia_smi_profiled_gpu_uuids],
+    ["CUDA", first.environment_cuda_version], ["PyTorch", first.environment_torch_version], ["vLLM", first.environment_vllm_version],
+    ["NCCL", first.environment_nccl_version], ["Slurm job", first.environment_slurm_job_id], ["Source", first.source_path],
+  ].flatMap(([label, value]) => hasValue(value) ? [{ label, value: String(value) }] : []);
+  return {
+    rows,
+    status,
+    sections,
+    controls,
+    summary,
+    provenance,
+    experimentId: first.experiment_id || "Unknown experiment",
+    experimentName: String(first.experiment || first.phase || "Recorded condition").replaceAll("_", " "),
+    purpose: first.objective || "Recorded evidence for " + (first.phase || "the experiment matrix") + ". Open the metric groups below to inspect the measured condition.",
+    studyVariable: first.parameter_comparison_axis || first.parameter_scaling_dimension || first.parameter_memory_study_type || first.parameter_inference_study_type || "Defined by the experiment matrix; inspect the controls below when comparing with another condition.",
+    platform: first.platform_id,
+    comparability: first.comparability,
+    workload: first.workload,
+    mode: first.mode,
+  };
+}
+
+function metricAggregate(rows, label, keys, unit, digits) {
+  const values = rows.flatMap((row) => {
+    const value = firstRecorded(row, keys);
+    return hasValue(value) && Number.isFinite(Number.parseFloat(value)) ? [Number.parseFloat(value)] : [];
+  });
+  if (!values.length) return null;
+  return { label, value: average(values), min: Math.min(...values), max: Math.max(...values), unit: unit || "", digits, samples: values.length };
+}
+
+function firstRecorded(row, keys) {
+  const key = keys.find((candidate) => hasValue(row[candidate]));
+  return key ? row[key] : undefined;
+}
+
+function hasValue(value) {
+  return value !== "" && value !== undefined && value !== null;
+}
+
+function detailMetricSection(section, detail) {
+  const element = document.createElement("section");
+  element.className = "detail-section metric-section";
+  const gauge = detailGauge(section, detail);
+  element.innerHTML = '<div class="detail-section-heading"><h3>' + escapeHtml(section.title) + '</h3></div><div class="metric-card-grid">' + section.items.map((item) => {
+    const range = item.samples > 1 && item.min !== item.max ? '<small>range ' + formatMetric(item.min, item) + "–" + formatMetric(item.max, item) + "</small>" : '<small>' + item.samples + " sample" + (item.samples === 1 ? "" : "s") + "</small>";
+    return '<article><span>' + escapeHtml(item.label) + '</span><strong>' + escapeHtml(formatMetric(item.value, item)) + "</strong>" + range + "</article>";
+  }).join("") + "</div>" + gauge;
+  return element;
+}
+
+function detailGauge(section, detail) {
+  if (section.title === "Memory") {
+    const used = section.items.find((item) => item.label === "GPU memory used");
+    const total = average(detail.rows.map((row) => Number.parseFloat(row.environment_observed_gpu_memory_gb)).filter(Number.isFinite));
+    if (used && total > 0) return gaugeMarkup("Observed memory pressure", used.value, total, "GB");
+  }
+  if (section.title === "GPU telemetry") {
+    const utilization = section.items.find((item) => item.label === "Average GPU utilisation");
+    if (utilization) return gaugeMarkup("Average GPU utilisation", utilization.value, 100, "%");
+  }
+  return "";
+}
+
+function gaugeMarkup(label, value, maxValue, unit) {
+  const bounded = Math.max(0, Math.min(100, value / maxValue * 100));
+  return `<div class="detail-gauge"><div><span>${escapeHtml(label)}</span><strong>${escapeHtml(formatDecimal(value, 1) + " " + unit)}</strong></div><div class="detail-gauge-track"><span style="width:${bounded}%"></span></div><small>${formatDecimal(bounded, 1)}% of ${formatDecimal(maxValue, 1)} ${escapeHtml(unit)}</small></div>`;
+}
+
+function formatMetric(value, item) {
+  return formatDecimal(value, item.digits) + (item.unit ? " " + item.unit : "");
+}
+
+function selectTrialMetric(rows) {
+  const candidates = [
+    { label: "Throughput", keys: ["throughput_tokens_sec", "metric_throughput_tokens_sec"], unit: rows[0].throughput_unit || "" },
+    { label: "Runtime", keys: ["runtime_seconds"], unit: "s" },
+    { label: "GPU memory", keys: ["metric_nvidia_smi_memory_used_gb_measured_region", "memory_used_gb"], unit: "GB" },
+  ];
+  return candidates.find((candidate) => rows.some((row) => hasValue(firstRecorded(row, candidate.keys)))) || candidates[1];
+}
+
+function renderTrialBars(rows, metric) {
+  const values = rows.map((row) => Number.parseFloat(firstRecorded(row, metric.keys))).filter(Number.isFinite);
+  const top = values.length ? Math.max(...values) : 1;
+  return '<div class="trial-bars">' + rows.slice().sort((left, right) => number(left.repetition_number) - number(right.repetition_number)).map((row) => {
+    const raw = Number.parseFloat(firstRecorded(row, metric.keys));
+    const value = Number.isFinite(raw) ? raw : 0;
+    const error = row.error ? '<small title="' + escapeHtml(row.error) + '">' + escapeHtml(row.error) + "</small>" : "";
+    return '<article><div><strong>Trial ' + escapeHtml(row.repetition_number || "—") + '</strong><span class="status-' + escapeHtml(row.status || "unknown") + '">' + escapeHtml(row.status || "unknown") + '</span><b>' + escapeHtml(value ? formatDecimal(value, 2) + " " + metric.unit : "No " + metric.label.toLowerCase()) + '</b></div><div class="trial-bar-track"><span style="width:' + (top ? value / top * 100 : 0) + '%"></span></div>' + error + "</article>";
+  }).join("") + "</div>";
+}
+
 function setSort(table, key) {
   if (state.sort.table === table && state.sort.key === key) state.sort.direction *= -1;
   else state.sort = { table, key, direction: 1 };
@@ -1205,6 +1458,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     buildCompletionEntries,
     buildEnergyPowerEntries,
+    buildExperimentDetail,
     buildInferenceGroups,
     buildMemorySeries,
     buildPhaseBarEntries,

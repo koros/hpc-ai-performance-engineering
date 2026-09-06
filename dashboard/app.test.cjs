@@ -3,6 +3,7 @@ const assert = require("assert").strict;
 const {
   buildCompletionEntries,
   buildEnergyPowerEntries,
+  buildExperimentDetail,
   buildInferenceGroups,
   buildMemorySeries,
   buildPhaseBarEntries,
@@ -143,6 +144,28 @@ run("comparison context reports only genuinely constant controls", () => {
     { label: "platform id", value: "l40s" },
     { label: "workload", value: "gpt2" },
   ]);
+});
+
+run("experiment detail separates completed metrics and omits unavailable groups", () => {
+  const detail = buildExperimentDetail([
+    {
+      condition_id: "E010@l40s", experiment_id: "E010", experiment: "inference_test", platform_id: "l40s",
+      comparability: "exact", workload: "gpt2", mode: "inference", status: "completed", repetition_number: 1,
+      throughput_tokens_sec: "100", throughput_unit: "generated_tokens_per_second", runtime_seconds: "4",
+      metric_nvidia_smi_memory_used_gb_measured_region: "12", environment_observed_gpu_memory_gb: "44.5",
+      metric_nvidia_smi_power_draw_watts_measured_region: "180", environment_git_commit: "abc123",
+    },
+    {
+      condition_id: "E010@l40s", experiment_id: "E010", experiment: "inference_test", platform_id: "l40s",
+      comparability: "exact", workload: "gpt2", mode: "inference", status: "failed", repetition_number: 2,
+      throughput_tokens_sec: "999", runtime_seconds: "1", error: "failed trial",
+    },
+  ]);
+
+  assert.equal(detail.status, "partial");
+  assert.equal(detail.sections.find((section) => section.title === "Performance").items[0].value, 100);
+  assert.equal(detail.sections.find((section) => section.title === "Power and energy").items[0].label, "Average power");
+  assert.equal(detail.sections.some((section) => section.title === "Distributed communication"), false);
 });
 
 function result(platform_id, comparability, workload, throughput_tokens_sec) {

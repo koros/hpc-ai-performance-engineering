@@ -229,6 +229,20 @@
         <div id="pendingStudyGrid" class="pending-grid"></div>
       </section>
     </main>
+
+    <dialog id="experimentDialog" class="experiment-dialog" aria-labelledby="experimentDialogTitle">
+      <div class="dialog-shell">
+        <header class="dialog-header">
+          <div>
+            <p class="eyebrow">Experiment drill-down</p>
+            <h2 id="experimentDialogTitle">Experiment details</h2>
+            <p id="experimentDialogSubtitle" class="dialog-subtitle"></p>
+          </div>
+          <button id="experimentDialogClose" class="icon-button" type="button" aria-label="Close experiment details">&times;</button>
+        </header>
+        <div id="experimentDialogBody" class="dialog-body"></div>
+      </div>
+    </dialog>
     <script src="app.js"></script>
   </body>
 </html>
