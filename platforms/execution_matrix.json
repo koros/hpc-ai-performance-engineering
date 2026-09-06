@@ -261,6 +261,7 @@
       "wave": "3",
       "name": "H100 scaling and strategies",
       "experiment_ids": ["E032-E043", "E047-E062"],
+      "exclude_ids": ["E032"],
       "required_trials": 3,
       "comparability": "exact"
     },
@@ -350,6 +351,13 @@
       "experiment_ids": ["E032", "E033"],
       "comparability": "platform_specific",
       "reason": "The exact GPT-2 strong-scaling shapes exceed the observed 44.52 GiB L40S capacity: E032 exhausted the one-GPU allocation after 43.32 GiB was allocated, and E033 exhausted the two-GPU allocation with 42.03 GiB allocated on rank 0 before a further 6.14 GiB request failed. Define and validate separate capacity-adjusted L40S conditions before changing batch size or accumulation; do not pool them with the exact E032/E033 conditions."
+    },
+    {
+      "platforms": ["h100"],
+      "name": "H100 GPT-2 one-GPU strong-scaling exact shape exceeds available memory",
+      "experiment_ids": ["E032"],
+      "comparability": "platform_specific",
+      "reason": "All three exact H100 E032 trials OOMed at the preserved GPT-2 Small BF16, sequence-length 1024, global/per-GPU batch-64 shape. PyTorch had 70.34 GiB allocated with 7.65 GiB free on the observed 79.19 GiB H100 when a further 12.27 GiB request failed; only 544 MiB was reserved but unallocated. This is a capacity limit rather than remediable allocator fragmentation. Preserve E032 unchanged; register any reduced-batch investigation as an H100-only capacity-adjusted probe and do not pool it with the exact strong-scaling series."
     },
     {
       "platforms": ["l40s"],

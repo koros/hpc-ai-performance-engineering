@@ -346,7 +346,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         )
         == 21
     )
-    assert sum(condition.status == "planned" for condition in h100_conditions) == 149
+    assert sum(condition.status == "planned" for condition in h100_conditions) == 148
 
 
 def test_telemetry_revalidation_wave_is_shared_but_platform_separated() -> None:
@@ -451,6 +451,14 @@ def test_l40s_wave_three_collection_scope_excludes_gpt2_strong_scaling_oom_defer
     assert "E032" not in wave_three
     assert "E033" not in wave_three
     assert {"E036", "E049", "E062"} <= wave_three
+
+
+def test_h100_wave_three_collection_scope_excludes_measured_gpt2_oom_deferral() -> None:
+    wave_three = _planned_wave_experiment_ids("h100", "3")
+
+    assert len(wave_three) == 27
+    assert "E032" not in wave_three
+    assert {"E033", "E034", "E062"} <= wave_three
 
 
 def test_l40s_wave_four_collection_scope_excludes_exact_micro_batch_oom_deferrals() -> None:
@@ -645,7 +653,7 @@ def test_execution_matrix_defers_only_unaccepted_or_unsupported_backend_and_plat
                 }
             )
         else:
-            expected_ids.update(h100_vllm_deferred_ids)
+            expected_ids.update(h100_vllm_deferred_ids | {"E032"})
         conditions = load_platform_conditions(
             "platforms/execution_matrix.json",
             platform_id,
