@@ -12,7 +12,9 @@ This matrix routes every source `E001-E200` experiment family to Mac M1, L40/L40
 Current site policy: the PyTorch CUDA runtime is usable on both GPU partitions, so ordinary CUDA/NCCL/FSDP/DeepSpeed
 experiments remain scheduled. The private PyTorch 2.8.0/CUDA 12.4 and vLLM 0.10.2 stack has passed E006 on L40S,
 so supported L40S vLLM conditions use dedicated waves. H100 vLLM waits for the same target-platform gate, while
-TensorRT-LLM remains deferred until its package, engine artefact, and load/request contract exist.
+TensorRT-LLM remains deferred until its package, engine artefact, and load/request contract exist. The preserved
+one-GPU H100 E032 exact shape also exceeds available memory and is deferred independently; it is not silently
+replaced by a smaller batch.
 
 | Current IDs | Experiment family | Mac M1 | L40/L40S | H100 | Clear reason and constraint |
 | --- | --- | --- | --- | --- | --- |
@@ -23,7 +25,7 @@ TensorRT-LLM remains deferred until its package, engine artefact, and load/reque
 | `E008-E015`, `E018-E019` | GPT-2, DistilBERT, TinyLlama baseline trials | Dev proxy for `E008`, `E010`, `E012`, `E014`, `E018` | Resolved; wave 1, 3 trials | Resolved; wave 1, 3 trials | Mac validates adapters only. L40S/H100 establish separately tracked baseline evidence. |
 | `E016-E017` | TinyLlama training baseline/repeat | No; local tiny-random inference only | Resolved optional wave after memory pilot | Resolved optional wave after memory pilot | Full TinyLlama training is optional and memory/queue sensitive; do not substitute the tiny local model. |
 | `E020-E031` | Workload characterisation | Dev proxy only for DistilBERT shape checks | Resolved; wave 1 | Resolved; wave 1 | nvidia-smi, CUDA traces, memory, and data-loader timings need NVIDIA hardware. |
-| `E032-E033` | GPT-2 Strong scaling exact shapes | No | Deferred | Resolved when H100 returns | The exact L40S shapes OOMed on the observed 44.52 GiB devices: E032 after allocating 43.32 GiB, and E033 before an additional 6.14 GiB allocation. Smaller L40S variants must be separate capacity-adjusted conditions. |
+| `E032-E033` | GPT-2 Strong scaling exact shapes | No | Deferred | E032 deferred after measured OOM; E033 resolved; wave 3 | L40S E032/E033 exceed 44.52 GiB. H100 E032 also OOMed identically in all three trials after 70.34 GiB was allocated and a further 12.27 GiB was requested with 7.65 GiB free on the observed 79.19 GiB device. Preserve both original rows; any reduced-batch study is platform-specific `capacity_adjusted` evidence. |
 | `E034`, `E038-E040`, `E044-E046` | Strong scaling | No | Supported one-/two-GPU rows remain in waves 3/optional; four-GPU E034/E040/E046 use `4gpu-core`; E044 remains deferred after measured OOM | Resolved when H100 returns | E044's exact one-GPU TinyLlama batch-16 shape OOMed in all three L40S trials, while E045 completed on two GPUs. Four-GPU rows retain their exact source shapes. |
 | `E035-E037`, `E041-E043` | Weak scaling | No | One-/two-GPU rows use wave 3; four-GPU E037/E043 use `4gpu-core` | Resolved; wave 3 | Requires concurrent GPUs; keep work-per-GPU definitions unchanged. |
 | `E047-E062` | DDP, FSDP, and ZeRO strategy comparison | No | One-/two-GPU rows use wave 3; four-GPU E048/E050/E056/E058 use `4gpu-core` after E003 | Resolved after the H100 pilot | Multi-process CUDA/NCCL/DeepSpeed execution is HPC-only. Interconnect differences are part of the result. |
@@ -52,7 +54,7 @@ TensorRT-LLM remains deferred until its package, engine artefact, and load/reque
 | --- | --- | --- |
 | Mac M1 | `configs/local/*.json` (4 smoke configs) and `configs/dev/*.json` (15 dev configs) | Workflow validation only. Keep results out of the `E001-E200` evidence set. |
 | L40/L40S | 176 planned source `E###@l40s` conditions, 5 capacity-adjusted conditions, 5 telemetry anchors, and 16 full-node conditions | Generated configs use `gpu_l40s`, 8 CPUs/GPU, PCIe, an eight-GPU node limit, and accepted evidence root `results/raw/l40s`. E215 must first prove the complete allocation and topology. Twenty-four source rows remain deferred: TensorRT-LLM/backend gaps, platform-specific comparison rows, and exact-shape E032/E033/E044/E067/E068 OOMs. E203/E204/E206/E207 are supplemental upper-bound OOM deferrals. |
-| H100 | 144 planned source `E###@h100` conditions plus 5 telemetry anchors | Generated configs use `gpu_h100`, 16 CPUs/GPU, NVLink, and accepted evidence root `results/raw/h100`. Fifty-six source rows remain deferred, including 37 vLLM conditions pending H100 E006, TensorRT-LLM, backend/adapter gaps, and L40S-specific comparison rows. |
+| H100 | 143 planned source `E###@h100` conditions plus 5 telemetry anchors | Generated configs use `gpu_h100`, 16 CPUs/GPU, NVLink, and accepted evidence root `results/raw/h100`. Fifty-seven source rows remain deferred, including E032 after a three-trial exact-shape OOM, 37 vLLM conditions pending H100 E006, TensorRT-LLM, backend/adapter gaps, and L40S-specific comparison rows. |
 
 ## Generated Companion-Config Contract
 

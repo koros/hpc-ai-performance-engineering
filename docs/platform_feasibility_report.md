@@ -37,8 +37,8 @@ The companion [platform experiment matrix](platform_experiment_matrix.md) gives 
 | Planned L40S supplemental conditions | 26 | Five capacity-adjusted rows, five telemetry anchors, and sixteen full-node rows. Do not pool capacity-adjusted or L40S-only evidence with exact H100 evidence. |
 | Deferred L40S supplemental conditions | 4 | `E203-E204` and `E206-E207`; confirmed upper-bound OOM probes at micro-batch 26/27/28/30. |
 | Deferred L40S source conditions | 24 | TensorRT-LLM/backend/adapter gaps, H100-specific hardware rows, and exact-shape E032/E033/E044/E067/E068 L40S OOMs. |
-| Planned H100 conditions | 144 | Generated as `E###@h100`; run the same supported scope when allocation is available. |
-| Deferred H100 conditions | 56 | Backend/adapter rows, 37 vLLM rows pending H100 E006, TensorRT-LLM `E007`, and four L40S-specific hardware rows. |
+| Planned H100 conditions | 143 | Generated as `E###@h100`; run the supported scope when allocation is available. |
+| Deferred H100 conditions | 57 | E032 exact-shape capacity limit, backend/adapter rows, 37 vLLM rows pending H100 E006, TensorRT-LLM `E007`, and four L40S-specific hardware rows. |
 | Mac M1 smoke configs | 4 | `configs/local/*`; minimal workflow checks. |
 | Mac M1 dev configs | 15 | `configs/dev/*`; lightweight MPS/CPU development checks. |
 
@@ -87,7 +87,7 @@ L40S is suitable for supported single-, two-, four-, and—after E215—eight-GP
 
 ### H100: deferred collection path, already materializable
 
-Generate the 144 planned H100 conditions from the same matrix and begin with wave 0. This is
+Generate the 143 planned H100 conditions from the same matrix and begin with wave 0. This is
 the only target that supports the dissertation's current wording about one-to-four H100 scaling and H100 NVLink
 behaviour. No L40S result is promoted or relabelled; matched conditions are compared only after both exist.
 
@@ -97,6 +97,7 @@ Use the H100 node for the core baseline trials, 1/2/4-GPU scaling, distributed-s
 
 | IDs | Reason | Required before release |
 | --- | --- | --- |
+| H100 `E032` | The preserved GPT-2 Small BF16 one-GPU, batch-64 strong-scaling shape OOMed in all three trials: 70.34 GiB allocated and 7.65 GiB free before a further 12.27 GiB allocation failed on the observed 79.19 GiB device. | Keep the exact condition and failure evidence immutable. Register any reduced-batch investigation separately as H100-only `capacity_adjusted` evidence. |
 | H100 `E006`, `E130`, `E132-E148`, `E178`, `E180-E196` | The private stack has passed on L40S, not H100. | Run E006 with the private stack on H100 and require import, engine-start, and served-request success before releasing H100 performance rows. |
 | `E007` | CUDA 12.4.1 is available, but TensorRT-LLM still lacks a compatible package, built engine, pinned model, and saved-engine contract. | A compatible pinned environment, immutable engine artefact, and successful build/load/request result on each target platform. |
 | `E131`, `E155`, `E179` | TensorRT-LLM performance integration is absent; `E155` is also not a valid generic DistilBERT classification adapter. | Reuse the validated E007 engine contract in causal-LM benchmarks; design a separate classification contract for E155. |
