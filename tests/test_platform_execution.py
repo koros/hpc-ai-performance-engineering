@@ -1087,6 +1087,8 @@ def test_platform_result_writes_atomically_under_platform_root(tmp_path: Path) -
     flattened = flatten_result_record(result.to_dict(), result_path)
     assert flattened["condition_id"] == "E123@l40s"
     assert flattened["platform_id"] == "l40s"
+    assert flattened["objective"] == entry.config.metadata["objective"]
+    assert flattened["key_metrics"] == entry.config.metadata["key_metrics"]
 
 
 def test_platform_result_validation_rejects_wrong_platform_directory(tmp_path: Path) -> None:
