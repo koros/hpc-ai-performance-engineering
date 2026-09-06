@@ -773,6 +773,9 @@ function errorBarChartCard(group) {
 function renderStrategy() {
   const result = filteredAnalysisRows(state.strategySummary, ["platform_id", "comparability", "workload", "throughput_unit", "strategy", "precision", "gpus"]);
   const entries = buildStrategyEntries(result.rows);
+  entries.forEach((entry) => {
+    entry.conditionIds = matchingConditionIds({ platform_id: entry.platform, comparability: entry.comparability, workload: entry.workload, model: entry.model, precision: entry.precision, strategy: entry.strategy, gpus: entry.gpus, throughput_unit: entry.unit });
+  });
   renderSeparatedBars("strategyBars", entries, { empty: result.message || "No completed distributed-strategy evidence.", value: (entry) => formatInteger(entry.value) + " " + entry.unit, changing: (group) => varyingLabels(group, ["platform", "comparability", "workload", "strategy", "precision", "gpus"]), constants: ["platform", "comparability", "workload", "precision", "gpus"] });
   document.getElementById("strategyStatus").textContent = result.message || entries.length + " conditions";
   markPanel("strategyBars", entries.length > 0, buildStrategyEntries(state.strategySummary).length > 0, "Distributed strategy", "strategy_summary.csv", true);
@@ -785,6 +788,7 @@ function buildStrategyEntries(rows) {
     platform: row.platform_id,
     comparability: row.comparability,
     workload: row.workload,
+    model: row.model,
     strategy: row.strategy,
     precision: row.precision,
     gpus: row.gpus,
@@ -796,6 +800,9 @@ function buildStrategyEntries(rows) {
 function renderPrecision() {
   const result = filteredAnalysisRows(state.precisionSummary, ["platform_id", "comparability", "workload", "throughput_unit", "mode", "precision"]);
   const entries = buildPrecisionEntries(result.rows);
+  entries.forEach((entry) => {
+    entry.conditionIds = matchingConditionIds({ platform_id: entry.platform, comparability: entry.comparability, workload: entry.workload, model: entry.model, mode: entry.mode, precision: entry.precision, throughput_unit: entry.unit });
+  });
   renderSeparatedBars("precisionBars", entries, { empty: result.message || "No completed precision-study evidence.", value: (entry) => formatInteger(entry.value) + " " + entry.unit, changing: (group) => varyingLabels(group, ["platform", "comparability", "workload", "precision", "mode"]), constants: ["platform", "comparability", "workload", "mode"] });
   document.getElementById("precisionStatus").textContent = result.message || entries.length + " conditions";
   markPanel("precisionBars", entries.length > 0, buildPrecisionEntries(state.precisionSummary).length > 0, "Precision trade-off", "precision_summary.csv", true);
@@ -808,6 +815,7 @@ function buildPrecisionEntries(rows) {
     platform: row.platform_id,
     comparability: row.comparability,
     workload: row.workload,
+    model: row.model,
     precision: row.precision,
     mode: row.mode,
     unit: row.throughput_unit || "unit_not_recorded",
@@ -845,6 +853,9 @@ function buildMemorySeries(rows) {
 function renderScaling() {
   const result = filteredAnalysisRows(state.scalingSummary, ["platform_id", "comparability", "phase", "workload", "throughput_unit", "strategy", "precision", "gpus"]);
   const series = buildScalingSeries(result.rows);
+  series.forEach((item) => item.points.forEach((point) => {
+    point.conditionIds = matchingConditionIds({ platform_id: item.platform, comparability: item.comparability, workload: item.workload, strategy: item.strategy, precision: item.precision, scaling_type: item.scalingType, gpus: point.x, throughput_unit: item.unit });
+  }));
   renderLineCharts("scalingCharts", series, { empty: result.message || "No completed scaling-study evidence.", xLabel: "GPU count", yLabel: "speedup" });
   document.getElementById("scalingStatus").textContent = result.message || series.length + " isolated series";
   markPanel("scalingCharts", series.length > 0, buildScalingSeries(state.scalingSummary).length > 0, "Scaling speedup", "scaling_summary.csv", true);
@@ -857,7 +868,7 @@ function buildScalingSeries(rows) {
     return {
       title: platform + " · " + comparability + " · " + workload,
       subtitle: strategy + "; " + precision + "; " + scalingType + "; " + unit,
-      platform, comparability, unit,
+      platform, comparability, workload, strategy, precision, unit, scalingType,
       comparison: comparisonContext(group, ["GPU count"], ["platform_id", "comparability", "workload", "strategy", "precision", "throughput_unit", "scaling_type"]),
       points: group.map((row) => ({ x: number(row.gpus), y: number(row.speedup), label: row.gpus + " GPU: " + formatDecimal(number(row.speedup), 2) + "× speedup; " + formatDecimal(number(row.scaling_efficiency) * 100, 1) + "% efficiency", conditionId: conditionId(row) })).sort((left, right) => left.x - right.x),
     };
@@ -1399,6 +1410,11 @@ function conditionId(row) {
 
 function uniqueConditionIds(rows) {
   return [...new Set(rows.map(conditionId).filter(Boolean))];
+}
+
+function matchingConditionIds(criteria) {
+  const entries = Object.entries(criteria).filter(([, value]) => hasValue(value));
+  return uniqueConditionIds(state.results.filter((row) => row.status === "completed" && entries.every(([key, value]) => String(row[key] || "") === String(value))));
 }
 
 function parseConditionIds(value) {
