@@ -47,6 +47,11 @@
         </label>
       </section>
 
+      <section class="filter-summary" aria-live="polite">
+        <div><span>Active view</span><div id="activeFilters" class="active-filter-list"><span class="filter-empty">All recorded evidence</span></div></div>
+        <button id="resetFilters" type="button">Reset filters</button>
+      </section>
+
       <nav class="section-nav" aria-label="Dashboard sections">
         <a href="#research">Research evidence</a>
         <a href="#overview">Overview</a>
@@ -58,10 +63,10 @@
       </nav>
 
       <section class="kpi-grid" aria-label="Summary metrics">
-        <article><span>Experiments</span><strong id="kpiExperiments">0</strong></article>
-        <article><span>Completed</span><strong id="kpiCompleted">0</strong></article>
-        <article><span>GPU-hours</span><strong id="kpiGpuHours">0.0</strong></article>
-        <article><span>Best throughput</span><strong id="kpiBestThroughput">0</strong></article>
+        <article><span>Conditions in view</span><strong id="kpiExperiments">0</strong></article>
+        <article><span>Completed trials</span><strong id="kpiCompleted">0</strong></article>
+        <article><span>Measured GPU-hours</span><strong id="kpiGpuHours">0.0</strong></article>
+        <article><span>Peak throughput</span><strong id="kpiBestThroughput">0</strong></article>
       </section>
 
       <section class="panel">
@@ -118,10 +123,10 @@
           <article class="panel chart-panel" data-metrics="energy">
             <div class="panel-heading"><h2>Energy and Power</h2><span id="energyStatus">No energy evidence</span></div>
             <div id="energyBars" class="bar-list"></div>
-            <p class="chart-note">Estimated energy and sampled power are per recorded condition; they are not hardware-normalised comparisons.</p>
+            <p class="chart-note">Estimated energy and sampled power are per recorded condition; they are not hardware-normalised comparisons. Select a bar for its measurement details.</p>
           </article>
           <article class="panel" data-metrics="throughput runtime energy">
-            <div class="panel-heading"><h2>Top Experiments</h2><span id="rankingCount">0 rows</span></div>
+            <div class="panel-heading"><h2>Top Experiments</h2><span id="rankingCount">0 rows · select one for details</span></div>
             <div class="table-wrap"><table id="rankingTable"><thead></thead><tbody></tbody></table></div>
           </article>
         </div>

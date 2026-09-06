@@ -68,9 +68,9 @@ const filterDefinitions = [
   ["researchQuestionFilter", "research_question"],
 ];
 
-const rankingColumns = ["experiment_id", "platform_id", "comparability", "workload", "mode", "strategy", "status", "throughput_unit", "throughput_tokens_sec", "runtime_seconds"];
-const phaseColumns = ["platform_id", "comparability", "phase", "workload", "throughput_unit", "completed", "failed", "avg_throughput_tokens_sec", "max_memory_used_gb", "energy_joules"];
-const trialColumns = ["experiment_id", "platform_id", "comparability", "workload", "throughput_unit", "completed_trials", "failed_trials", "evidence_status", "runtime_mean_seconds", "throughput_tokens_mean", "throughput_tokens_ci95_low", "throughput_tokens_ci95_high"];
+const rankingColumns = ["experiment_id", "platform_id", "comparability", "workload", "status", "throughput_tokens_sec", "throughput_unit", "runtime_seconds"];
+const phaseColumns = ["platform_id", "comparability", "phase", "workload", "completed", "failed", "avg_throughput_tokens_sec", "max_memory_used_gb"];
+const trialColumns = ["experiment_id", "platform_id", "comparability", "workload", "completed_trials", "failed_trials", "evidence_status", "throughput_tokens_mean", "throughput_tokens_ci95_low", "throughput_tokens_ci95_high"];
 const colors = ["#0f766e", "#2563eb", "#7c3aed", "#b45309", "#be123c", "#0891b2", "#4d7c0f"];
 
 const detailMetricSections = [
@@ -130,6 +130,7 @@ function bindInputs() {
   filterDefinitions.forEach(([id]) => document.getElementById(id).addEventListener("change", render));
   document.getElementById("evidenceFilter").addEventListener("change", render);
   document.getElementById("metricFilter").addEventListener("change", render);
+  document.getElementById("resetFilters").addEventListener("click", resetFilters);
   document.getElementById("resultsFile").addEventListener("change", (event) => {
     readFile(event.target.files[0]).then((text) => {
       state.results = parseCsv(text);
@@ -311,6 +312,7 @@ function filteredAnalysisRows(rows, supported) {
 
 function render() {
   const rows = filteredResults();
+  renderActiveFilters();
   renderResearchQuestions();
   renderKpis(rows);
   renderReadiness();
@@ -480,13 +482,56 @@ function displayEvidenceStatus(value) {
 
 function renderKpis(rows) {
   const completed = rows.filter((row) => row.status === "completed").length;
+  const conditions = new Set(rows.map(conditionId).filter(Boolean)).size;
   const gpuHours = sum(rows.map((row) => number(row.actual_gpu_hours || row.gpu_hours_estimate)));
   const bestThroughput = max(rows.map(throughput));
   const units = uniqueValues(rows.filter((row) => throughput(row) > 0), "throughput_unit");
-  document.getElementById("kpiExperiments").textContent = formatInteger(rows.length);
+  document.getElementById("kpiExperiments").textContent = formatInteger(conditions);
   document.getElementById("kpiCompleted").textContent = formatInteger(completed);
   document.getElementById("kpiGpuHours").textContent = formatDecimal(gpuHours, 2);
   document.getElementById("kpiBestThroughput").textContent = units.length === 1 ? formatInteger(bestThroughput) : bestThroughput ? "Mixed units" : "—";
+}
+
+function renderActiveFilters() {
+  const container = document.getElementById("activeFilters");
+  const filters = selectedFilters();
+  const metric = document.getElementById("metricFilter").value;
+  const active = Object.entries(filters).filter(([, value]) => Boolean(value)).map(([key, value]) => ({ key, label: displayName(key), value }));
+  if (metric) active.push({ key: "metric", label: "metric focus", value: metric });
+  container.replaceChildren();
+  if (!active.length) {
+    const empty = document.createElement("span");
+    empty.className = "filter-empty";
+    empty.textContent = "All recorded evidence";
+    container.append(empty);
+    return;
+  }
+  active.forEach((item) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "active-filter";
+    chip.innerHTML = "<span>" + escapeHtml(item.label) + "</span>" + escapeHtml(item.value) + " <b aria-hidden=\"true\">×</b>";
+    chip.setAttribute("aria-label", "Clear " + item.label + " filter");
+    chip.addEventListener("click", () => clearFilter(item.key));
+    container.append(chip);
+  });
+}
+
+function clearFilter(key) {
+  if (key === "metric") document.getElementById("metricFilter").value = "";
+  else {
+    const definition = filterDefinitions.find(([, filterKey]) => filterKey === key);
+    if (definition) document.getElementById(definition[0]).value = "";
+    if (key === "evidence_status") document.getElementById("evidenceFilter").value = "";
+  }
+  render();
+}
+
+function resetFilters() {
+  filterDefinitions.forEach(([id]) => { document.getElementById(id).value = ""; });
+  document.getElementById("evidenceFilter").value = "";
+  document.getElementById("metricFilter").value = "";
+  render();
 }
 
 function renderReadiness() {
@@ -663,7 +708,7 @@ function renderSeparatedBars(containerId, entries, options) {
 function renderRankingTable() {
   const result = filteredAnalysisRows(state.rankingSummary, ["platform_id", "comparability", "phase", "workload", "throughput_unit", "priority", "status", "mode", "strategy", "precision", "gpus"]);
   renderTable("rankingTable", result.rows, rankingColumns, result.message);
-  document.getElementById("rankingCount").textContent = result.message || result.rows.length + " rows";
+  document.getElementById("rankingCount").textContent = result.message || result.rows.length + " rows · select one for details";
   markPanel("rankingTable", result.rows.length > 0, state.rankingSummary.length > 0, "Experiment rankings", "experiment_rankings.csv");
 }
 

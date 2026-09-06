@@ -140,6 +140,83 @@ main {
   box-shadow: 0 8px 22px rgba(24, 32, 42, 0.04);
 }
 
+.filter-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  margin-top: -12px;
+  padding: 0 4px;
+}
+
+.filter-summary > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.filter-summary > div > span {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.active-filter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.active-filter,
+.filter-summary > button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: #344054;
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.active-filter {
+  padding: 5px 8px;
+}
+
+.active-filter span {
+  margin-right: 4px;
+  color: var(--muted);
+}
+
+.active-filter b {
+  margin-left: 3px;
+  color: var(--bad);
+}
+
+.active-filter:hover,
+.active-filter:focus-visible,
+.filter-summary > button:hover,
+.filter-summary > button:focus-visible {
+  border-color: var(--accent);
+  outline: 3px solid rgba(15, 118, 110, 0.12);
+}
+
+.filter-summary > button {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  font-weight: 700;
+}
+
+.filter-empty {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
 .section-nav {
   position: sticky;
   top: 0;
@@ -651,6 +728,8 @@ select {
 }
 
 .table-wrap {
+  width: 100%;
+  max-width: 100%;
   overflow: auto;
   max-height: 460px;
   border-radius: 0 0 var(--radius) var(--radius);
@@ -658,19 +737,30 @@ select {
 
 table {
   width: 100%;
-  min-width: 720px;
+  min-width: 640px;
   border-collapse: collapse;
   font-size: 0.86rem;
 }
 
 th,
 td {
-  padding: 10px 12px;
+  padding: 9px 10px;
   border-bottom: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+tbody tr.experiment-target {
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+tbody tr.experiment-target:hover,
+tbody tr.experiment-target:focus-visible {
+  background: #f0fdfa;
+  box-shadow: inset 3px 0 var(--accent);
+  outline: none;
 }
 
 th {
@@ -1224,6 +1314,12 @@ td.numeric {
   .toolbar label,
   .file-button {
     width: 100%;
+  }
+
+  .filter-summary,
+  .filter-summary > div {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .section-nav {
