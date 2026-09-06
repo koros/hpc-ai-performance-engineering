@@ -1226,6 +1226,7 @@ function buildExperimentDetail(rows) {
     comparability: first.comparability,
     workload: first.workload,
     mode: first.mode,
+    energyScope: String(first.energy_scope || first.metric_energy_scope || "").replaceAll("_", " "),
   };
 }
 
@@ -1262,7 +1263,8 @@ function detailMetricSection(section, detail) {
   const element = document.createElement("section");
   element.className = "detail-section metric-section";
   const gauge = detailGauge(section, detail);
-  element.innerHTML = '<div class="detail-section-heading"><h3>' + escapeHtml(section.title) + '</h3></div><div class="metric-card-grid">' + section.items.map((item) => {
+  const scope = section.title === "Power and energy" ? '<span>' + escapeHtml(detail.energyScope || "Scope not recorded") + "</span>" : "";
+  element.innerHTML = '<div class="detail-section-heading"><h3>' + escapeHtml(section.title) + "</h3>" + scope + '</div><div class="metric-card-grid">' + section.items.map((item) => {
     const range = item.samples > 1 && item.min !== item.max ? '<small>range ' + formatMetric(item.min, item) + "–" + formatMetric(item.max, item) + "</small>" : '<small>' + item.samples + " sample" + (item.samples === 1 ? "" : "s") + "</small>";
     return '<article><span>' + escapeHtml(item.label) + '</span><strong>' + escapeHtml(formatMetric(item.value, item)) + "</strong>" + range + "</article>";
   }).join("") + "</div>" + gauge;
