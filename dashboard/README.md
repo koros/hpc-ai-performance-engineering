@@ -31,6 +31,21 @@ also accepts several analysis files at once for an offline/manual review.
 - Empty study panels are removed from the main flow and listed under **Awaiting evidence** at the bottom.
 - Narrow screens render result tables as labelled cards, avoiding page-wide horizontal scrolling.
 - The metric-focus filter can reduce the page to throughput, runtime, memory, energy/power, or latency views.
+- Every analytical chart states which field or fields vary and lists a control only when that value is identical across the plotted rows.
+- Active filters appear as removable chips; **Reset filters** restores the complete evidence view.
+
+## Experiment drill-down
+
+Select an experiment row, bar, or chart point to open its condition-level detail view. The dialog keeps trial evidence together while separating:
+
+- protocol and recorded controls;
+- performance and memory;
+- measured GPU utilisation, power, and energy;
+- Torch-profiler CPU time and data-movement timing;
+- inference latency and distributed-communication metrics;
+- trial consistency, environment details, and provenance.
+
+Metric groups with no recorded values are omitted. The trial mini-chart uses aggregate values from each trial; it does not imply that telemetry sample histories were captured. “Torch profiler CPU time” is not presented as host CPU utilisation because the current result schema does not record that metric.
 
 ## Research-question views
 

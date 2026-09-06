@@ -468,6 +468,7 @@ function renderResearchFindingList(rows, message) {
   rows.sort((left, right) => (left.research_question + left.platform_id + left.workload + left.strategy).localeCompare(right.research_question + right.platform_id + right.workload + right.strategy)).forEach((row) => {
     const item = document.createElement("article");
     item.className = "research-finding";
+    setConditionTarget(item, "", parseConditionIds(row.source_condition_ids));
     item.innerHTML = '<div class="research-card-heading"><strong>' + escapeHtml(row.research_question + " · " + row.finding_type.replaceAll("_", " ")) + '</strong><span class="evidence-badge evidence-' + escapeHtml(row.finding_status) + '">' + escapeHtml(displayEvidenceStatus(row.finding_status)) + "</span></div>" +
       '<p>' + escapeHtml(row.finding) + "</p>" +
       '<dl class="research-metrics"><div><dt>Scope</dt><dd>' + escapeHtml([row.platform_id, row.comparability, row.workload, row.precision, row.strategy].filter(Boolean).join(" · ")) + '</dd></div><div><dt>Trial evidence</dt><dd>' + formatInteger(number(row.completed_trials)) + "/" + formatInteger(number(row.required_trials)) + " trials</dd></div><div><dt>Source conditions</dt><dd>" + escapeHtml(row.source_condition_ids) + "</dd></div></dl>" +
@@ -653,7 +654,7 @@ function renderEnergy(rows) {
     empty: "No measured-region energy evidence is available. Legacy full-window estimates are excluded.",
     barClass: "energy",
     value: (entry) => formatDecimal(entry.value, 0) + " J · " + formatDecimal(entry.power, 1) + " W",
-    changing: ["Experiment condition"],
+    changing: (group) => varyingLabels(group, ["platform", "comparability", "experiment", "workload", "mode"]),
     constants: ["platform", "comparability", "workload", "mode"],
   });
   document.getElementById("energyStatus").textContent = entries.length ? entries.length + " recorded conditions" : "No energy evidence";
@@ -692,7 +693,8 @@ function renderSeparatedBars(containerId, entries, options) {
       container.append(heading);
     }
     if (options.changing) {
-      container.append(comparisonContract(comparisonContext(group, options.changing, options.constants || [])));
+      const changing = typeof options.changing === "function" ? options.changing(group) : options.changing;
+      container.append(comparisonContract(comparisonContext(group, changing, options.constants || [])));
     }
     const top = max(group.map((entry) => entry.value));
     group.forEach((entry) => {
@@ -771,7 +773,7 @@ function errorBarChartCard(group) {
 function renderStrategy() {
   const result = filteredAnalysisRows(state.strategySummary, ["platform_id", "comparability", "workload", "throughput_unit", "strategy", "precision", "gpus"]);
   const entries = buildStrategyEntries(result.rows);
-  renderSeparatedBars("strategyBars", entries, { empty: result.message || "No completed distributed-strategy evidence.", value: (entry) => formatInteger(entry.value) + " " + entry.unit, changing: ["Distributed strategy"], constants: ["platform", "comparability", "workload", "precision", "gpus"] });
+  renderSeparatedBars("strategyBars", entries, { empty: result.message || "No completed distributed-strategy evidence.", value: (entry) => formatInteger(entry.value) + " " + entry.unit, changing: (group) => varyingLabels(group, ["platform", "comparability", "workload", "strategy", "precision", "gpus"]), constants: ["platform", "comparability", "workload", "precision", "gpus"] });
   document.getElementById("strategyStatus").textContent = result.message || entries.length + " conditions";
   markPanel("strategyBars", entries.length > 0, buildStrategyEntries(state.strategySummary).length > 0, "Distributed strategy", "strategy_summary.csv", true);
 }
@@ -794,7 +796,7 @@ function buildStrategyEntries(rows) {
 function renderPrecision() {
   const result = filteredAnalysisRows(state.precisionSummary, ["platform_id", "comparability", "workload", "throughput_unit", "mode", "precision"]);
   const entries = buildPrecisionEntries(result.rows);
-  renderSeparatedBars("precisionBars", entries, { empty: result.message || "No completed precision-study evidence.", value: (entry) => formatInteger(entry.value) + " " + entry.unit, changing: ["Precision"], constants: ["platform", "comparability", "workload", "mode"] });
+  renderSeparatedBars("precisionBars", entries, { empty: result.message || "No completed precision-study evidence.", value: (entry) => formatInteger(entry.value) + " " + entry.unit, changing: (group) => varyingLabels(group, ["platform", "comparability", "workload", "precision", "mode"]), constants: ["platform", "comparability", "workload", "mode"] });
   document.getElementById("precisionStatus").textContent = result.message || entries.length + " conditions";
   markPanel("precisionBars", entries.length > 0, buildPrecisionEntries(state.precisionSummary).length > 0, "Precision trade-off", "precision_summary.csv", true);
 }
@@ -897,7 +899,7 @@ function lineChartCard(series, options, color) {
 function renderCommunication() {
   const result = filteredAnalysisRows(state.communicationSummary, ["platform_id", "comparability", "workload", "throughput_unit", "strategy", "gpus"]);
   const entries = buildCommunicationEntries(result.rows);
-  renderSeparatedBars("communicationBars", entries, { empty: result.message || "No completed NCCL communication evidence.", barClass: "communication", value: (entry) => formatDecimal(entry.value, 2) + " GB/s", changing: ["Communication condition"], constants: ["platform", "comparability", "workload", "gpus"] });
+  renderSeparatedBars("communicationBars", entries, { empty: result.message || "No completed NCCL communication evidence.", barClass: "communication", value: (entry) => formatDecimal(entry.value, 2) + " GB/s", changing: (group) => varyingLabels(group, ["platform", "comparability", "workload", "strategy", "gpus"]), constants: ["platform", "comparability", "workload", "gpus"] });
   document.getElementById("communicationStatus").textContent = result.message || entries.length + " conditions";
   markPanel("communicationBars", entries.length > 0, buildCommunicationEntries(state.communicationSummary).length > 0, "NCCL communication", "communication_summary.csv", true);
 }
@@ -920,7 +922,7 @@ function buildCommunicationEntries(rows) {
 function renderDataMovement() {
   const result = filteredAnalysisRows(state.dataMovementSummary, ["platform_id", "comparability", "workload", "throughput_unit"]);
   const entries = buildDataMovementEntries(result.rows);
-  renderSeparatedBars("movementBars", entries, { empty: result.message || "No completed data-movement evidence.", value: (entry) => formatDecimal(entry.value, 3) + " s", changing: ["Worker count", "Pinned memory", "Prefetch factor"], constants: ["platform", "comparability", "workload"] });
+  renderSeparatedBars("movementBars", entries, { empty: result.message || "No completed data-movement evidence.", value: (entry) => formatDecimal(entry.value, 3) + " s", changing: (group) => varyingLabels(group, ["platform", "comparability", "workload", "num_workers", "pinned_memory", "prefetch_factor"]), constants: ["platform", "comparability", "workload"] });
   document.getElementById("movementStatus").textContent = result.message || entries.length + " conditions";
   markPanel("movementBars", entries.length > 0, buildDataMovementEntries(state.dataMovementSummary).length > 0, "Data movement", "data_movement_summary.csv", true);
 }
@@ -1186,6 +1188,7 @@ function buildExperimentDetail(rows) {
     { label: "Condition", value: conditionId(first) },
     { label: "Trials", value: completed.length + "/" + rows.length + " completed" },
     { label: "Research questions", value: researchQuestionsForRow(first).join(", ") || "Not assigned" },
+    { label: "Key metrics", value: readableList(first.key_metrics) || "Recorded metrics below" },
     { label: "Wave", value: rowValue(first, "wave") || "Not recorded" },
   ];
   const provenance = [
@@ -1231,6 +1234,17 @@ function firstRecorded(row, keys) {
 
 function hasValue(value) {
   return value !== "" && value !== undefined && value !== null;
+}
+
+function readableList(value) {
+  if (!hasValue(value)) return "";
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.map((item) => String(item).replaceAll("_", " ")).join(", ");
+  } catch {
+    // Fall through to the plain string representation.
+  }
+  return String(value).replaceAll("_", " ");
 }
 
 function detailMetricSection(section, detail) {
