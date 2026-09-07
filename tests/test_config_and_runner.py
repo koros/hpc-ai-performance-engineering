@@ -1892,6 +1892,10 @@ def test_analyze_results_writes_summary_tables(tmp_path: Path) -> None:
         phase_rows = list(csv.DictReader(file_obj))
     with (analysis_dir / "experiment_rankings.csv").open(encoding="utf-8", newline="") as file_obj:
         ranking_rows = list(csv.DictReader(file_obj))
+    with (analysis_dir / "research_finding_summary.csv").open(encoding="utf-8", newline="") as file_obj:
+        finding_fields = csv.DictReader(file_obj).fieldnames
+    with (analysis_dir / "strategy_summary.csv").open(encoding="utf-8", newline="") as file_obj:
+        strategy_fields = csv.DictReader(file_obj).fieldnames
 
     assert phase_rows[0]["phase"] == "Strong scaling"
     assert phase_rows[0]["completed"] == "1"
@@ -1899,6 +1903,8 @@ def test_analyze_results_writes_summary_tables(tmp_path: Path) -> None:
     assert phase_rows[0]["avg_throughput_tokens_sec"] == "1200.0"
     assert ranking_rows[0]["experiment_id"] == "E033"
     assert ranking_rows[0]["throughput_tokens_per_gpu"] == "600.0"
+    assert "scaling_type" in finding_fields
+    assert "scaling_type" not in strategy_fields
 
 
 def test_energy_efficiency_requires_measured_region_scope() -> None:
