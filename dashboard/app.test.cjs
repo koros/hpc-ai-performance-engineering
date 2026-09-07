@@ -137,6 +137,26 @@ run("research-question charts retain platform and comparability boundaries", () 
   assert.equal(strategyGroups.length, 3);
 });
 
+run("RQ1 charts separate scaling types and add their baseline reference", () => {
+  const common = {
+    platform_id: "h100",
+    comparability: "exact",
+    workload: "distilbert",
+    precision: "bf16",
+    strategy: "ddp",
+    throughput_unit: "tokens/s",
+    baseline_gpus: 1,
+  };
+  const series = buildRq1ScalingSeries([
+    { ...common, scaling_type: "strong", gpus: 2, speedup: 1.7, scaling_efficiency: 0.85, source_condition_ids: "E038@h100; E039@h100" },
+    { ...common, scaling_type: "weak", gpus: 2, speedup: 1.9, scaling_efficiency: 0.95, source_condition_ids: "E041@h100; E042@h100" },
+  ]);
+
+  assert.equal(series.length, 2);
+  assert.deepEqual(series.map((item) => item.scalingType).sort(), ["strong", "weak"]);
+  series.forEach((item) => assert.deepEqual(item.points.map((point) => point.x), [1, 2]));
+});
+
 run("energy and inference views retain evidence labels without pooling", () => {
   const energy = buildEnergyPowerEntries([
     energyResult("l40s", "exact", "E008", "gpt2", 1000),

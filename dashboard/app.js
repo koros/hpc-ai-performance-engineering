@@ -386,20 +386,30 @@ function researchCoverageLabel(rows) {
 }
 
 function buildRq1ScalingSeries(rows) {
-  const grouped = groupRows(rows.filter((row) => number(row.speedup) > 0 && number(row.gpus) > 0), (row) => [row.platform_id || "unlabelled", row.comparability || "unspecified", row.workload || "unassigned", row.precision || "unspecified", row.strategy || "unspecified", row.throughput_unit || "unit_not_recorded"]);
+  const grouped = groupRows(rows.filter((row) => number(row.speedup) > 0 && number(row.gpus) > 0), (row) => [row.platform_id || "unlabelled", row.comparability || "unspecified", row.workload || "unassigned", row.precision || "unspecified", row.strategy || "unspecified", row.scaling_type || "unspecified", row.throughput_unit || "unit_not_recorded"]);
   return Object.entries(grouped).map(([key, group]) => {
-    const [platform, comparability, workload, precision, strategy, unit] = key.split("\u0000");
+    const [platform, comparability, workload, precision, strategy, scalingType, unit] = key.split("\u0000");
+    const points = group.map((row) => ({
+      x: number(row.gpus),
+      y: number(row.speedup),
+      label: row.gpus + " GPUs: " + formatDecimal(number(row.speedup), 2) + "× speedup; " + formatDecimal(number(row.scaling_efficiency) * 100, 1) + "% efficiency; " + row.source_condition_ids,
+      conditionIds: parseConditionIds(row.source_condition_ids),
+    }));
+    const baselineGpus = number(group[0].baseline_gpus);
+    if (baselineGpus > 0 && !points.some((point) => point.x === baselineGpus)) {
+      points.push({
+        x: baselineGpus,
+        y: 1,
+        label: baselineGpus + " GPU baseline: 1.00× speedup; 100.0% reference efficiency",
+        conditionIds: parseConditionIds(group[0].source_condition_ids).slice(0, 1),
+      });
+    }
     return {
       title: platform + " · " + comparability + " · " + workload,
-      subtitle: precision + "; " + strategy + "; " + unit,
-      platform, comparability, workload, unit,
-      comparison: comparisonContext(group, ["GPU count"], ["platform_id", "comparability", "workload", "precision", "strategy", "throughput_unit"]),
-      points: group.map((row) => ({
-        x: number(row.gpus),
-        y: number(row.speedup),
-        label: row.gpus + " GPUs: " + formatDecimal(number(row.speedup), 2) + "× speedup; " + formatDecimal(number(row.scaling_efficiency) * 100, 1) + "% efficiency; " + row.source_condition_ids,
-        conditionIds: parseConditionIds(row.source_condition_ids),
-      })).sort((left, right) => left.x - right.x),
+      subtitle: scalingType + " scaling; " + precision + "; " + strategy + "; " + unit,
+      platform, comparability, workload, scalingType, unit,
+      comparison: comparisonContext(group, ["GPU count"], ["platform_id", "comparability", "workload", "precision", "strategy", "scaling_type", "throughput_unit"]),
+      points: points.sort((left, right) => left.x - right.x),
     };
   }).sort((left, right) => left.title.localeCompare(right.title));
 }
