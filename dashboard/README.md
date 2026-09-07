@@ -32,6 +32,7 @@ also accepts several analysis files at once for an offline/manual review.
 - Narrow screens render result tables as labelled cards, avoiding page-wide horizontal scrolling.
 - The metric-focus filter can reduce the page to throughput, runtime, memory, energy/power, or latency views.
 - Every analytical chart states which field or fields vary and lists a control only when that value is identical across the plotted rows.
+- Memory evidence is routed by `study_type`: micro-batch and gradient-accumulation sweeps use their respective numeric setting on the x-axis, while activation checkpointing uses a controlled off/on comparison. These studies are not combined into one apparent micro-batch curve.
 - Active filters appear as removable chips; **Reset filters** restores the complete evidence view.
 
 ## Experiment drill-down
