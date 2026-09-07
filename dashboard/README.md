@@ -83,12 +83,14 @@ Open `http://localhost:8000/dashboard/`.
 ## GitHub Pages
 
 The `Deploy research dashboard` workflow rebuilds all derived summaries from committed raw evidence, runs the project
-and dashboard checks, and publishes a static artifact whenever `main` changes. The artifact contains only the dashboard,
+and dashboard checks, and publishes a static artifact when manually dispatched. The artifact contains only the dashboard,
 analysis CSVs, the processed experiment table, and the readiness report; raw evidence and local build files are excluded.
 
-For the first deployment, set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**. Subsequent
-pushes to `main` deploy automatically. The repository Pages URL opens the dashboard through a root redirect; the direct
-route is `/hpc-ai-performance-engineering/dashboard/`.
+For the first deployment, set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**, then run the
+workflow from the repository's **Actions** tab. GitHub Free requires the Pages source repository to be public. If the
+research repository must remain private, publish the generated artifact from a separate public dashboard repository
+instead of changing this repository's visibility. The repository Pages URL opens the dashboard through a root redirect;
+the direct route is `/hpc-ai-performance-engineering/dashboard/`.
 
 To reproduce the publication artifact locally:
 
