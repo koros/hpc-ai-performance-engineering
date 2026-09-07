@@ -159,18 +159,28 @@
       <section id="memory" class="dashboard-section">
         <div class="section-heading">
           <div><p class="eyebrow">Memory and capacity</p><h2>Memory limits and optimisation choices</h2></div>
-          <p>Capacity-adjusted L40S rows are evidence about L40S limits, not substitutes for exact H100 rows.</p>
+          <p>Each panel isolates one changing variable. Capacity-adjusted L40S rows describe L40S limits, not substitutes for exact H100 rows.</p>
         </div>
         <div class="content-grid">
           <article class="panel chart-panel" data-metrics="memory throughput">
-            <div class="panel-heading"><h2>Memory vs Micro-batch</h2><span id="memoryStatus">No memory evidence</span></div>
+            <div class="panel-heading"><h2>Micro-batch Capacity Curve</h2><span id="memoryStatus">No micro-batch evidence</span></div>
             <div id="memoryCharts" class="svg-chart-grid"></div>
-            <p class="chart-note">Lines retain activation-checkpointing and gradient-accumulation settings in their labels.</p>
+            <p class="chart-note">Changing: micro-batch size. Held constant within each curve: platform, workload, checkpointing, accumulation, and throughput unit. Select a point for its full evidence record.</p>
+          </article>
+          <article class="panel chart-panel" data-metrics="memory throughput">
+            <div class="panel-heading"><h2>Activation Checkpointing</h2><span id="checkpointingStatus">No checkpointing evidence</span></div>
+            <div id="checkpointingCharts" class="svg-chart-grid"></div>
+            <p class="chart-note">Changing: checkpointing off/on. Held constant: platform, workload, micro-batch size, accumulation, and throughput unit.</p>
+          </article>
+          <article class="panel chart-panel" data-metrics="memory throughput">
+            <div class="panel-heading"><h2>Gradient Accumulation</h2><span id="accumulationStatus">No accumulation evidence</span></div>
+            <div id="accumulationCharts" class="svg-chart-grid"></div>
+            <p class="chart-note">Changing: gradient-accumulation steps. Held constant within each curve: platform, workload, micro-batch size, checkpointing, and throughput unit.</p>
           </article>
           <article class="panel chart-panel" data-metrics="memory throughput">
             <div class="panel-heading"><h2>L40S Capacity Boundary</h2><span id="capacityStatus">No capacity evidence</span></div>
             <div id="capacityCharts" class="svg-chart-grid"></div>
-            <p class="chart-note">Only capacity-adjusted rows appear here; exact cross-hardware comparisons remain separate.</p>
+            <p class="chart-note">Changing: micro-batch size. Only capacity-adjusted rows appear here; exact cross-hardware comparisons remain separate.</p>
           </article>
         </div>
       </section>

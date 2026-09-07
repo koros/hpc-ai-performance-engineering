@@ -477,6 +477,26 @@ select {
   gap: 6px;
 }
 
+.checkpointing-bars {
+  display: grid;
+  gap: 16px;
+  padding-top: 4px;
+}
+
+.checkpointing-row {
+  padding: 8px;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.bar-fill.checkpointing-off {
+  background: linear-gradient(90deg, #94a3b8, #64748b);
+}
+
+.bar-fill.checkpointing-on {
+  background: linear-gradient(90deg, #14b8a6, #0f766e);
+}
+
 .comparison-contract {
   display: grid;
   gap: 7px;

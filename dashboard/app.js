@@ -825,14 +825,24 @@ function buildPrecisionEntries(rows) {
 
 function renderMemory() {
   const result = filteredAnalysisRows(state.memorySummary, ["platform_id", "comparability", "workload", "throughput_unit"]);
-  const series = buildMemorySeries(result.rows);
-  renderLineCharts("memoryCharts", series, { empty: result.message || "No completed memory-study evidence. This panel populates after the memory study is collected and analysed.", xLabel: "micro-batch size", yLabel: "max memory (GB)" });
-  const capacity = series.filter((item) => item.comparability === "capacity_adjusted");
+  const microBatch = buildMemorySeries(result.rows);
+  const checkpointing = buildCheckpointingGroups(result.rows);
+  const accumulation = buildGradientAccumulationSeries(result.rows);
+  renderLineCharts("memoryCharts", microBatch, { empty: result.message || "No completed micro-batch evidence.", xLabel: "micro-batch size", yLabel: "max memory (GB)" });
+  renderCheckpointingCharts("checkpointingCharts", checkpointing, result.message || "No completed activation-checkpointing evidence.");
+  renderLineCharts("accumulationCharts", accumulation, { empty: result.message || "No completed gradient-accumulation evidence.", xLabel: "gradient accumulation steps", yLabel: "max memory (GB)" });
+  const capacity = microBatch.filter((item) => item.comparability === "capacity_adjusted");
   renderLineCharts("capacityCharts", capacity, { empty: result.message || "No completed capacity-adjusted L40S evidence.", xLabel: "micro-batch size", yLabel: "max memory (GB)" });
-  document.getElementById("memoryStatus").textContent = result.message || series.length + " isolated series";
+  document.getElementById("memoryStatus").textContent = result.message || microBatch.length + " micro-batch curves";
+  document.getElementById("checkpointingStatus").textContent = result.message || checkpointing.length + " controlled comparisons";
+  document.getElementById("accumulationStatus").textContent = result.message || accumulation.length + " accumulation curves";
   document.getElementById("capacityStatus").textContent = result.message || capacity.length + " L40S-only series";
   const allMemorySeries = buildMemorySeries(state.memorySummary);
-  markPanel("memoryCharts", series.length > 0, allMemorySeries.length > 0, "Memory optimisation", "memory_summary.csv", true);
+  const allCheckpointing = buildCheckpointingGroups(state.memorySummary);
+  const allAccumulation = buildGradientAccumulationSeries(state.memorySummary);
+  markPanel("memoryCharts", microBatch.length > 0, allMemorySeries.length > 0, "Micro-batch study", "memory_summary.csv", true);
+  markPanel("checkpointingCharts", checkpointing.length > 0, allCheckpointing.length > 0, "Activation checkpointing", "memory_summary.csv", true);
+  markPanel("accumulationCharts", accumulation.length > 0, allAccumulation.length > 0, "Gradient accumulation", "memory_summary.csv", true);
   markPanel("capacityCharts", capacity.length > 0, allMemorySeries.some((item) => item.comparability === "capacity_adjusted"), "L40S capacity boundary", "memory_summary.csv", true);
 }
 
@@ -897,6 +907,35 @@ function buildGradientAccumulationSeries(rows) {
 
 function booleanLabel(value, trueLabel, falseLabel) {
   return String(value).toLowerCase() === "true" ? trueLabel : falseLabel;
+}
+
+function renderCheckpointingCharts(containerId, groups, emptyMessage) {
+  const container = document.getElementById(containerId);
+  container.replaceChildren();
+  if (!groups.length) {
+    container.append(emptyState(emptyMessage));
+    return;
+  }
+  groups.forEach((group) => container.append(checkpointingChartCard(group)));
+}
+
+function checkpointingChartCard(group) {
+  const card = chartCard(group.title, group.subtitle, group.comparison);
+  const bars = document.createElement("div");
+  bars.className = "checkpointing-bars";
+  const top = max(group.entries.map((entry) => entry.value));
+  group.entries.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "bar-row checkpointing-row";
+    setConditionTarget(row, entry.conditionId);
+    const stateClass = entry.label.endsWith("on") ? "checkpointing-on" : "checkpointing-off";
+    row.innerHTML = '<div class="bar-meta"><strong>' + escapeHtml(entry.label) + '</strong><span>' + formatDecimal(entry.value, 2) + ' GB</span></div>' +
+      '<div class="bar-detail">' + formatInteger(entry.throughput) + " " + escapeHtml(entry.unit) + " · " + formatInteger(entry.trials) + ' trials</div>' +
+      '<div class="bar-track"><div class="bar-fill ' + stateClass + '" style="width: ' + Math.max(3, (entry.value / top) * 100) + '%"></div></div>';
+    bars.append(row);
+  });
+  card.append(bars);
+  return card;
 }
 
 function renderScaling() {
