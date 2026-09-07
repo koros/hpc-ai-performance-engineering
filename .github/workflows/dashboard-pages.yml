@@ -1,19 +1,19 @@
 name: Deploy research dashboard
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: github-pages
+  group: public-dashboard
   cancel-in-progress: true
 
 jobs:
-  build:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -34,21 +34,27 @@ jobs:
       - name: Build publication artifact
         run: make build-dashboard-site PYTHON=python
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+      - name: Configure dashboard deployment key
+        env:
+          DASHBOARD_DEPLOY_KEY: ${{ secrets.DASHBOARD_DEPLOY_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DASHBOARD_DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > ~/.ssh/known_hosts
 
-      - name: Upload publication artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: build/pages
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish sanitized dashboard repository
+        env:
+          GIT_SSH_COMMAND: ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes
+        run: |
+          git clone git@github.com:koros/hpc-ai-performance-engineering-dashboard.git build/public-dashboard
+          rsync -a --delete --exclude=.git build/pages/ build/public-dashboard/
+          git -C build/public-dashboard config user.name github-actions[bot]
+          git -C build/public-dashboard config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C build/public-dashboard add --all
+          if git -C build/public-dashboard diff --cached --quiet; then
+            echo "Published dashboard is already current."
+            exit 0
+          fi
+          git -C build/public-dashboard commit -m "Deploy research dashboard from ${GITHUB_SHA}"
+          git -C build/public-dashboard push origin main
