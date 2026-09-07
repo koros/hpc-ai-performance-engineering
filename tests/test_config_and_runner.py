@@ -2423,6 +2423,47 @@ def test_research_question_tables_report_coverage_and_matched_strategy_tradeoffs
     assert zero["source_condition_ids"] == "E052@l40s"
 
 
+def test_rq1_findings_preserve_strong_and_weak_scaling_series() -> None:
+    def row(experiment_id: str, phase: str, scaling_type: str, gpus: str, runtime: str) -> dict[str, str]:
+        return {
+            "condition_id": f"{experiment_id}@h100",
+            "experiment_id": experiment_id,
+            "platform_id": "h100",
+            "comparability": "exact",
+            "phase": phase,
+            "workload": "distilbert",
+            "model": "distilbert",
+            "mode": "training",
+            "precision": "bf16",
+            "strategy": "ddp",
+            "scaling_type": scaling_type,
+            "gpus": gpus,
+            "status": "completed",
+            "required_trials": "1",
+            "throughput_unit": "training_tokens_per_second",
+            "runtime_seconds": runtime,
+            "throughput_tokens_sec": str(float(gpus) * 100),
+        }
+
+    rows = [
+        row("E038", "Strong scaling", "strong", "1", "10"),
+        row("E039", "Strong scaling", "strong", "2", "6"),
+        row("E041", "Weak scaling", "weak", "1", "10"),
+        row("E042", "Weak scaling", "weak", "2", "10"),
+    ]
+
+    findings = build_analysis_tables(rows)["research_finding_summary"]
+    rq1 = [finding for finding in findings if finding["research_question"] == "RQ1"]
+
+    assert {finding["scaling_type"] for finding in rq1} == {"strong", "weak"}
+    assert next(finding for finding in rq1 if finding["scaling_type"] == "strong")["source_condition_ids"] == (
+        "E038@h100; E039@h100"
+    )
+    assert next(finding for finding in rq1 if finding["scaling_type"] == "weak")["source_condition_ids"] == (
+        "E041@h100; E042@h100"
+    )
+
+
 def test_research_question_summary_marks_incomplete_energy_as_partial() -> None:
     row = {
         "condition_id": "E008@l40s",
