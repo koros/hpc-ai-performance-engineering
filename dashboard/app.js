@@ -837,17 +837,66 @@ function renderMemory() {
 }
 
 function buildMemorySeries(rows) {
-  const grouped = groupRows(rows.filter((row) => number(row.micro_batch_size) > 0 && number(row.max_memory_used_gb) > 0), (row) => [row.platform_id || "unlabelled", row.comparability || "unspecified", row.workload || "unassigned", row.throughput_unit || "unit_not_recorded", row.activation_checkpointing || "unspecified", row.gradient_accumulation_steps || "unspecified"]);
+  const grouped = groupRows(rows.filter((row) => row.study_type === "micro_batch" && number(row.micro_batch_size) > 0 && number(row.max_memory_used_gb) > 0), (row) => [row.platform_id || "unlabelled", row.comparability || "unspecified", row.workload || "unassigned", row.throughput_unit || "unit_not_recorded", row.activation_checkpointing || "unspecified", row.gradient_accumulation_steps || "unspecified"]);
   return Object.entries(grouped).map(([key, group]) => {
     const [platform, comparability, workload, unit, checkpointing, accumulation] = key.split("\u0000");
     return {
       title: platform + " · " + comparability + " · " + workload,
       subtitle: "checkpointing: " + checkpointing + "; accumulation: " + accumulation + "; " + unit,
-      platform, comparability, unit,
+      platform, comparability, workload, unit,
       comparison: comparisonContext(group, ["Micro-batch size"], ["platform_id", "comparability", "workload", "activation_checkpointing", "gradient_accumulation_steps", "throughput_unit"]),
-      points: group.map((row) => ({ x: number(row.micro_batch_size), y: number(row.max_memory_used_gb), label: "batch " + row.micro_batch_size + ": " + formatDecimal(number(row.max_memory_used_gb), 2) + " GB", conditionId: conditionId(row) })).sort((left, right) => left.x - right.x),
+      points: group.map((row) => ({
+        x: number(row.micro_batch_size),
+        y: number(row.max_memory_used_gb),
+        label: "batch " + row.micro_batch_size + ": " + formatDecimal(number(row.max_memory_used_gb), 2) + " GB; " + formatInteger(number(row.avg_throughput_tokens_sec)) + " " + unit + "; " + row.trials + " trials",
+        conditionId: conditionId(row),
+      })).sort((left, right) => left.x - right.x),
     };
   }).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function buildCheckpointingGroups(rows) {
+  const grouped = groupRows(rows.filter((row) => row.study_type === "checkpointing" && number(row.max_memory_used_gb) > 0), (row) => [row.platform_id || "unlabelled", row.comparability || "unspecified", row.workload || "unassigned", row.throughput_unit || "unit_not_recorded", row.micro_batch_size || "unspecified", row.gradient_accumulation_steps || "unspecified"]);
+  return Object.entries(grouped).map(([key, group]) => {
+    const [platform, comparability, workload, unit, microBatch, accumulation] = key.split("\u0000");
+    return {
+      title: platform + " · " + comparability + " · " + workload,
+      subtitle: "micro-batch: " + microBatch + "; accumulation: " + accumulation + "; " + unit,
+      platform, comparability, workload, unit,
+      comparison: comparisonContext(group, ["Activation checkpointing"], ["platform_id", "comparability", "workload", "micro_batch_size", "gradient_accumulation_steps", "throughput_unit"]),
+      entries: group.map((row) => ({
+        label: booleanLabel(row.activation_checkpointing, "Checkpointing on", "Checkpointing off"),
+        value: number(row.max_memory_used_gb),
+        throughput: number(row.avg_throughput_tokens_sec),
+        unit,
+        trials: number(row.trials),
+        conditionId: conditionId(row),
+      })).sort((left, right) => left.label.localeCompare(right.label)),
+    };
+  }).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function buildGradientAccumulationSeries(rows) {
+  const grouped = groupRows(rows.filter((row) => row.study_type === "gradient_accumulation" && number(row.gradient_accumulation_steps) > 0 && number(row.max_memory_used_gb) > 0), (row) => [row.platform_id || "unlabelled", row.comparability || "unspecified", row.workload || "unassigned", row.throughput_unit || "unit_not_recorded", row.activation_checkpointing || "unspecified", row.micro_batch_size || "unspecified"]);
+  return Object.entries(grouped).map(([key, group]) => {
+    const [platform, comparability, workload, unit, checkpointing, microBatch] = key.split("\u0000");
+    return {
+      title: platform + " · " + comparability + " · " + workload,
+      subtitle: "micro-batch: " + microBatch + "; checkpointing: " + checkpointing + "; " + unit,
+      platform, comparability, workload, unit,
+      comparison: comparisonContext(group, ["Gradient accumulation steps"], ["platform_id", "comparability", "workload", "micro_batch_size", "activation_checkpointing", "throughput_unit"]),
+      points: group.map((row) => ({
+        x: number(row.gradient_accumulation_steps),
+        y: number(row.max_memory_used_gb),
+        label: row.gradient_accumulation_steps + " accumulation steps: " + formatDecimal(number(row.max_memory_used_gb), 2) + " GB; " + formatInteger(number(row.avg_throughput_tokens_sec)) + " " + unit + "; " + row.trials + " trials",
+        conditionId: conditionId(row),
+      })).sort((left, right) => left.x - right.x),
+    };
+  }).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function booleanLabel(value, trueLabel, falseLabel) {
+  return String(value).toLowerCase() === "true" ? trueLabel : falseLabel;
 }
 
 function renderScaling() {
@@ -1533,9 +1582,11 @@ function escapeSvg(value) {
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
+    buildCheckpointingGroups,
     buildCompletionEntries,
     buildEnergyPowerEntries,
     buildExperimentDetail,
+    buildGradientAccumulationSeries,
     buildInferenceGroups,
     buildMemorySeries,
     buildPhaseBarEntries,

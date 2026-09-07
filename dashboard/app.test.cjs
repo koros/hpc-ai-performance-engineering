@@ -1,9 +1,11 @@
 const assert = require("assert").strict;
 
 const {
+  buildCheckpointingGroups,
   buildCompletionEntries,
   buildEnergyPowerEntries,
   buildExperimentDetail,
+  buildGradientAccumulationSeries,
   buildInferenceGroups,
   buildMemorySeries,
   buildPhaseBarEntries,
@@ -86,6 +88,37 @@ run("memory and scaling series never cross platform or comparability boundaries"
 
   assert.equal(buildMemorySeries(memoryRows).length, 3);
   assert.equal(buildScalingSeries(scalingRows).length, 3);
+});
+
+run("memory studies are routed to charts for their independent variable", () => {
+  const common = {
+    platform_id: "l40s",
+    comparability: "exact",
+    workload: "gpt2",
+    throughput_unit: "training_tokens_per_second",
+    max_memory_used_gb: 24,
+    avg_throughput_tokens_sec: 100,
+    trials: 3,
+  };
+  const rows = [
+    { ...common, experiment_id: "E065", study_type: "micro_batch", micro_batch_size: 4, activation_checkpointing: "false", gradient_accumulation_steps: 1 },
+    { ...common, experiment_id: "E066", study_type: "micro_batch", micro_batch_size: 8, activation_checkpointing: "false", gradient_accumulation_steps: 1 },
+    { ...common, experiment_id: "E063", study_type: "checkpointing", micro_batch_size: 8, activation_checkpointing: "false", gradient_accumulation_steps: 1 },
+    { ...common, experiment_id: "E064", study_type: "checkpointing", micro_batch_size: 8, activation_checkpointing: "true", gradient_accumulation_steps: 1, max_memory_used_gb: 18 },
+    { ...common, experiment_id: "E069", study_type: "gradient_accumulation", micro_batch_size: 4, activation_checkpointing: "false", gradient_accumulation_steps: 1 },
+    { ...common, experiment_id: "E070", study_type: "gradient_accumulation", micro_batch_size: 4, activation_checkpointing: "false", gradient_accumulation_steps: 2 },
+  ];
+
+  const microBatch = buildMemorySeries(rows);
+  const checkpointing = buildCheckpointingGroups(rows);
+  const accumulation = buildGradientAccumulationSeries(rows);
+
+  assert.equal(microBatch.length, 1);
+  assert.deepEqual(microBatch[0].points.map((point) => point.x), [4, 8]);
+  assert.equal(checkpointing.length, 1);
+  assert.deepEqual(checkpointing[0].entries.map((entry) => entry.label), ["Checkpointing off", "Checkpointing on"]);
+  assert.equal(accumulation.length, 1);
+  assert.deepEqual(accumulation[0].points.map((point) => point.x), [1, 2]);
 });
 
 run("research-question charts retain platform and comparability boundaries", () => {
@@ -190,6 +223,7 @@ function memory(platform_id, comparability, workload, micro_batch_size, max_memo
     comparability,
     workload,
     throughput_unit: "tokens/s",
+    study_type: "micro_batch",
     activation_checkpointing: "false",
     gradient_accumulation_steps: 1,
     micro_batch_size,
