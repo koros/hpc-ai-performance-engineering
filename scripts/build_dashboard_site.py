@@ -6,7 +6,7 @@ import argparse
 import shutil
 from pathlib import Path
 
-DASHBOARD_FILES = ("index.html", "app.js", "styles.css")
+DASHBOARD_FILES = ("index.html", "app.js", "styles.css", "logo.svg")
 ANALYSIS_FILES = (
     "communication_summary.csv",
     "data_movement_summary.csv",
@@ -29,6 +29,7 @@ ROOT_REDIRECT = """<!doctype html>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/svg+xml" href="dashboard/logo.svg">
     <meta http-equiv="refresh" content="0; url=dashboard/">
     <title>HPC AI Performance Engineering</title>
   </head>

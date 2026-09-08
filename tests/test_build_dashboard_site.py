@@ -22,6 +22,8 @@ def test_build_site_publishes_only_dashboard_and_derived_evidence(tmp_path: Path
     assert (output / "index.html").is_file()
     assert (output / ".nojekyll").is_file()
     assert (output / "dashboard" / "app.js").is_file()
+    assert (output / "dashboard" / "logo.svg").is_file()
+    assert 'href="dashboard/logo.svg"' in (output / "index.html").read_text(encoding="utf-8")
     assert (output / "results" / "analysis" / "memory_summary.csv").is_file()
     assert not (output / "results" / "raw").exists()
     assert not (output / "dashboard" / "app.test.cjs").exists()
