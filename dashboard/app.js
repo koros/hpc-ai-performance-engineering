@@ -658,6 +658,97 @@ function buildPhaseBarEntries(rows) {
   }).filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value).slice(0, 16);
 }
 
+function buildStudyCoverageEntries(rows) {
+  const eligible = rows.filter((row) => row.status === "completed" && throughput(row) > 0);
+  const groups = groupRows(eligible, (row) => {
+    const study = studyFamily(row.phase);
+    return [study.label, study.target, study.changing];
+  });
+  return Object.entries(groups).map(([key, group]) => {
+    const [label, target, changing] = key.split("\u0000");
+    return {
+      label,
+      target,
+      changing,
+      conditionIds: uniqueConditionIds(group),
+      trials: group.length,
+      platforms: [...new Set(group.map((row) => row.platform_id).filter(Boolean))].sort(),
+      workloads: [...new Set(group.map((row) => row.workload).filter(Boolean))].sort(),
+      researchQuestions: [...new Set(group.flatMap(researchQuestionsForRow))].sort(),
+    };
+  }).sort((left, right) => left.label.localeCompare(right.label));
+}
+
+function studyFamily(phase) {
+  const value = String(phase || "Unassigned");
+  if (value === "Strong scaling" || value === "Weak scaling") {
+    return { label: "Scaling efficiency", target: "scaling", changing: "GPU count" };
+  }
+  if (value === "Distributed training strategy") {
+    return { label: "Distributed strategies", target: "performance", changing: "DDP, FSDP, or ZeRO strategy" };
+  }
+  if (value === "Memory optimisation") {
+    return { label: "Memory optimisation", target: "memory", changing: "Micro-batch, checkpointing, or accumulation" };
+  }
+  if (value === "Precision study" || value === "Inference precision/quantization") {
+    return { label: "Precision and quantisation", target: "performance", changing: "Numeric precision" };
+  }
+  if (value === "Communication analysis" || value === "Data movement" || value === "Workload characterisation") {
+    return { label: "Bottleneck analysis", target: "scaling", changing: "Communication or data-movement setting" };
+  }
+  if (value.startsWith("Inference")) {
+    return { label: "Inference behaviour", target: "inference", changing: "Framework, request shape, or parallelism" };
+  }
+  if (value === "Hardware comparison") {
+    return { label: "Hardware comparison", target: "research", changing: "GPU platform" };
+  }
+  if (value === "Telemetry revalidation") {
+    return { label: "Useful-work efficiency", target: "overview", changing: "Measured workload condition" };
+  }
+  return { label: "Baseline and validation", target: "evidence", changing: "Workload or validation condition" };
+}
+
+function buildPhaseDistributionEntries(rows) {
+  const eligible = rows.filter((row) => row.status === "completed" && throughput(row) > 0);
+  const byCondition = groupRows(eligible, (row) => [conditionId(row), row.throughput_unit || "unit_not_recorded"]);
+  const conditions = Object.values(byCondition).map((group) => {
+    const first = group[0];
+    return {
+      platform: first.platform_id || "unlabelled",
+      comparability: first.comparability || "unspecified",
+      phase: first.phase || "Unassigned",
+      workload: first.workload || "Unassigned",
+      unit: first.throughput_unit || "unit_not_recorded",
+      conditionId: conditionId(first),
+      value: average(group.map(throughput).filter((value) => value > 0)),
+      trials: group.length,
+    };
+  });
+  const groups = groupRows(conditions, (row) => [row.platform, row.comparability, row.phase, row.workload, row.unit]);
+  return Object.entries(groups).map(([key, group]) => {
+    const [platform, comparability, phase, workload, unit] = key.split("\u0000");
+    const values = group.map((row) => row.value).filter((value) => value > 0).sort((left, right) => left - right);
+    return {
+      label: phase,
+      platform,
+      comparability,
+      phase,
+      workload,
+      unit,
+      conditionIds: group.map((row) => row.conditionId).filter(Boolean),
+      conditions: group.length,
+      trials: sum(group.map((row) => row.trials)),
+      median: median(values),
+      minimum: values[0] || 0,
+      maximum: values[values.length - 1] || 0,
+    };
+  }).filter((entry) => entry.median > 0).sort((left, right) => {
+    const leftKey = [left.platform, left.comparability, left.workload, left.unit, left.phase].join("|");
+    const rightKey = [right.platform, right.comparability, right.workload, right.unit, right.phase].join("|");
+    return leftKey.localeCompare(rightKey);
+  });
+}
+
 function renderEnergy(rows) {
   const entries = buildEnergyPowerEntries(rows);
   renderSeparatedBars("energyBars", entries, {
@@ -1590,6 +1681,13 @@ function average(values) {
   return numeric.length ? sum(numeric) / numeric.length : 0;
 }
 
+function median(values) {
+  const numeric = values.filter((value) => Number.isFinite(value)).sort((left, right) => left - right);
+  if (!numeric.length) return 0;
+  const middle = Math.floor(numeric.length / 2);
+  return numeric.length % 2 ? numeric[middle] : (numeric[middle - 1] + numeric[middle]) / 2;
+}
+
 function displayName(key) {
   return key.replaceAll("_", " ");
 }
@@ -1639,9 +1737,11 @@ if (typeof module !== "undefined" && module.exports) {
     buildInferenceGroups,
     buildMemorySeries,
     buildPhaseBarEntries,
+    buildPhaseDistributionEntries,
     buildRq1ScalingSeries,
     buildRq2StrategyGroups,
     buildScalingSeries,
+    buildStudyCoverageEntries,
     buildUncertaintyGroups,
     comparisonContext,
     summarizePhases,

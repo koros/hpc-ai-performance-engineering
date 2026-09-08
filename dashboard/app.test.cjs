@@ -9,9 +9,11 @@ const {
   buildInferenceGroups,
   buildMemorySeries,
   buildPhaseBarEntries,
+  buildPhaseDistributionEntries,
   buildRq1ScalingSeries,
   buildRq2StrategyGroups,
   buildScalingSeries,
+  buildStudyCoverageEntries,
   buildUncertaintyGroups,
   comparisonContext,
   summarizePhases,
@@ -42,6 +44,43 @@ run("fallback phase summaries preserve all statistical grouping fields", () => {
   assert.equal(summaryFor(summaries, "l40s", "exact", "gpt2_small").avg_throughput_tokens_sec, 110);
   assert.equal(summaryFor(summaries, "h100", "exact", "gpt2_small").avg_throughput_tokens_sec, 200);
   assert.equal(summaryFor(summaries, "l40s", "capacity_adjusted", "gpt2_small").avg_throughput_tokens_sec, 80);
+});
+
+run("phase distributions weight conditions once and retain trial coverage", () => {
+  const phaseRows = [
+    { ...result("l40s", "exact", "gpt2_small", 100), experiment_id: "E001", condition_id: "E001@l40s" },
+    { ...result("l40s", "exact", "gpt2_small", 120), experiment_id: "E001", condition_id: "E001@l40s" },
+    { ...result("l40s", "exact", "gpt2_small", 200), experiment_id: "E002", condition_id: "E002@l40s" },
+    { ...result("l40s", "exact", "gpt2_small", 220), experiment_id: "E002", condition_id: "E002@l40s" },
+  ];
+
+  const entries = buildPhaseDistributionEntries(phaseRows);
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].conditions, 2);
+  assert.equal(entries[0].trials, 4);
+  assert.equal(entries[0].minimum, 110);
+  assert.equal(entries[0].median, 160);
+  assert.equal(entries[0].maximum, 210);
+});
+
+run("study coverage maps evidence to controlled research families", () => {
+  const evidence = [
+    { ...result("l40s", "exact", "gpt2_small", 100), experiment_id: "E035", phase: "Weak scaling", research_questions: '["RQ1"]' },
+    { ...result("l40s", "exact", "gpt2_small", 120), experiment_id: "E036", phase: "Weak scaling", research_questions: '["RQ1"]' },
+    { ...result("h100", "exact", "distilbert", 200), experiment_id: "E047", phase: "Distributed training strategy", research_questions: '["RQ2"]' },
+  ];
+
+  const entries = buildStudyCoverageEntries(evidence);
+  const scaling = entries.find((entry) => entry.label === "Scaling efficiency");
+  const strategies = entries.find((entry) => entry.label === "Distributed strategies");
+
+  assert.equal(scaling.conditionIds.length, 2);
+  assert.equal(scaling.trials, 2);
+  assert.deepEqual(scaling.platforms, ["l40s"]);
+  assert.deepEqual(scaling.researchQuestions, ["RQ1"]);
+  assert.equal(strategies.target, "performance");
+  assert.match(strategies.changing, /DDP/);
 });
 
 run("progress counts retain platform and comparability boundaries", () => {
