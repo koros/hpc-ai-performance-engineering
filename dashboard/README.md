@@ -34,6 +34,7 @@ also accepts several analysis files at once for an offline/manual review.
 - Every analytical chart states which field or fields vary and lists a control only when that value is identical across the plotted rows.
 - The overview groups completed evidence into controlled study families, names the variable tested, and links to the appropriate research panel. Condition and trial totals indicate coverage only; they are never presented as performance rankings.
 - Memory evidence is routed by `study_type`: micro-batch and gradient-accumulation sweeps use their respective numeric setting on the x-axis, while activation checkpointing uses a controlled off/on comparison. These studies are not combined into one apparent micro-batch curve.
+- Data-movement evidence is likewise separated by its independent variable: worker count and prefetch depth use millisecond-scale curves, while pinned memory uses an off/on comparison with loading-time and throughput deltas. Platform, workload, and the remaining loader settings stay fixed within each panel.
 - Cross-phase throughput is kept in the evidence section as a descriptive distribution. Trials are averaged within each condition first, and each condition then contributes once to the displayed median and minimum–maximum range. The phase inventory intentionally omits pooled throughput averages.
 - Active filters appear as removable chips; **Reset filters** restores the complete evidence view.
 
