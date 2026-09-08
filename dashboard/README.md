@@ -32,7 +32,9 @@ also accepts several analysis files at once for an offline/manual review.
 - Narrow screens render result tables as labelled cards, avoiding page-wide horizontal scrolling.
 - The metric-focus filter can reduce the page to throughput, runtime, memory, energy/power, or latency views.
 - Every analytical chart states which field or fields vary and lists a control only when that value is identical across the plotted rows.
+- The overview groups completed evidence into controlled study families, names the variable tested, and links to the appropriate research panel. Condition and trial totals indicate coverage only; they are never presented as performance rankings.
 - Memory evidence is routed by `study_type`: micro-batch and gradient-accumulation sweeps use their respective numeric setting on the x-axis, while activation checkpointing uses a controlled off/on comparison. These studies are not combined into one apparent micro-batch curve.
+- Cross-phase throughput is kept in the evidence section as a descriptive distribution. Trials are averaged within each condition first, and each condition then contributes once to the displayed median and minimum–maximum range. The phase inventory intentionally omits pooled throughput averages.
 - Active filters appear as removable chips; **Reset filters** restores the complete evidence view.
 
 ## Experiment drill-down
@@ -65,6 +67,9 @@ argument rather than a generic results explorer:
 - **Traceable findings** link every displayed RQ1/RQ2 statement to its source
   condition IDs and trial sufficiency. RQ3–RQ7 remain visible as coverage cards
   until their dedicated conclusion views are added.
+- **Controlled Study Map** provides the bridge from collected phases to the
+  research views. It prevents workload, hardware, strategy, scaling, precision,
+  and memory changes from being compressed into one confounded leaderboard.
 
 The Research question filter applies to raw trial rows and the research-specific
 tables. Other summary tables intentionally ask the user to clear that filter,
