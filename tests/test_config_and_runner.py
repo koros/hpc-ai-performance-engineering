@@ -1959,8 +1959,11 @@ def test_dashboard_static_assets_exist() -> None:
     assert 'id="platformFilter"' in html
     assert 'id="comparabilityFilter"' in html
     assert 'id="trialTable"' in html
+    assert 'id="studyMap"' in html
+    assert 'id="phaseDistributions"' in html
     assert "Mixed units" in script
-    assert "buildPhaseBarEntries" in script
+    assert "buildStudyCoverageEntries" in script
+    assert "buildPhaseDistributionEntries" in script
 
 
 def test_hpc_smoke_runbook_exists() -> None:
