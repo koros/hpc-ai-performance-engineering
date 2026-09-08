@@ -2327,6 +2327,7 @@ def test_every_analysis_table_keeps_platform_groups_separate() -> None:
             "parameter_num_workers": "4",
             "parameter_pinned_memory": "true",
             "parameter_prefetch_factor": "2",
+            "parameter_data_movement_study_type": "num_workers",
             "parameter_memory_study_type": "micro_batch",
             "parameter_micro_batch_size": "1",
             "parameter_gradient_accumulation_steps": "1",
@@ -2379,6 +2380,7 @@ def test_every_analysis_table_keeps_platform_groups_separate() -> None:
     assert len(tables["strategy_summary"]) == 2
     assert len(tables["communication_summary"]) == 2
     assert len(tables["data_movement_summary"]) == 2
+    assert {row["study_type"] for row in tables["data_movement_summary"]} == {"num_workers"}
     assert len(tables["memory_summary"]) == 2
     assert len(tables["inference_summary"]) == 2
     assert len(tables["hardware_summary"]) == 2
