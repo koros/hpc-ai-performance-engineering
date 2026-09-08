@@ -74,6 +74,18 @@ main {
   display: none !important;
 }
 
+.dashboard-alert {
+  padding: 14px 16px;
+  border: 1px solid #f0b4ad;
+  border-radius: 10px;
+  background: #fff1f0;
+  color: #8f1d16;
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.45;
+  box-shadow: 0 8px 22px rgba(180, 35, 24, 0.08);
+}
+
 .dashboard-section {
   display: grid;
   gap: 18px;

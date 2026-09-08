@@ -18,6 +18,7 @@ const {
   buildStudyCoverageEntries,
   buildUncertaintyGroups,
   comparisonContext,
+  dashboardAlertMessage,
   pointAxisTicks,
   summarizePhases,
 } = require("./app.js");
@@ -105,6 +106,13 @@ run("strategy chart does not reference another chart's series variable", () => {
   const body = source.slice(start, end);
 
   assert.doesNotMatch(body, /\bseries\./);
+});
+
+run("dashboard reports loading and rendering failures instead of appearing empty", () => {
+  assert.match(dashboardAlertMessage({ loading: false, loadErrors: [], runtimeError: "series is not defined", resultCount: 650, protocol: "https:" }), /rendering stopped/);
+  assert.match(dashboardAlertMessage({ loading: false, loadErrors: [], runtimeError: "", resultCount: 0, protocol: "file:" }), /make serve-dashboard/);
+  assert.match(dashboardAlertMessage({ loading: false, loadErrors: ["results: HTTP 404"], runtimeError: "", resultCount: 0, protocol: "https:" }), /HTTP 404/);
+  assert.equal(dashboardAlertMessage({ loading: false, loadErrors: [], runtimeError: "", resultCount: 650, protocol: "https:" }), "");
 });
 
 run("progress counts retain platform and comparability boundaries", () => {

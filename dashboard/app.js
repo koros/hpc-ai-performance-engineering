@@ -15,6 +15,8 @@ const state = {
   researchFindingSummary: [],
   readinessReport: "",
   loading: true,
+  loadErrors: [],
+  runtimeError: "",
   sort: { table: "rankingTable", key: "throughput_tokens_sec", direction: -1 },
 };
 
@@ -121,21 +123,25 @@ const detailMetricSections = [
 if (typeof document !== "undefined") {
   document.addEventListener("DOMContentLoaded", () => {
     bindInputs();
-    loadDefaultData();
-    render();
+    safeRender();
+    loadDefaultData().catch((error) => {
+      state.loading = false;
+      state.loadErrors.push("Dashboard startup: " + errorMessage(error));
+      updateDashboardAlert();
+    });
   });
 }
 
 function bindInputs() {
-  filterDefinitions.forEach(([id]) => document.getElementById(id).addEventListener("change", render));
-  document.getElementById("evidenceFilter").addEventListener("change", render);
-  document.getElementById("metricFilter").addEventListener("change", render);
+  filterDefinitions.forEach(([id]) => document.getElementById(id).addEventListener("change", safeRender));
+  document.getElementById("evidenceFilter").addEventListener("change", safeRender);
+  document.getElementById("metricFilter").addEventListener("change", safeRender);
   document.getElementById("resetFilters").addEventListener("click", resetFilters);
   document.getElementById("resultsFile").addEventListener("change", (event) => {
     readFile(event.target.files[0]).then((text) => {
       state.results = parseCsv(text);
       rebuildFilters();
-      render();
+      safeRender();
     });
   });
   document.getElementById("analysisFiles").addEventListener("change", async (event) => {
@@ -148,12 +154,12 @@ function bindInputs() {
       if (key) state[key] = rows;
     });
     rebuildFilters();
-    render();
+    safeRender();
   });
   document.getElementById("readinessFile").addEventListener("change", (event) => {
     readFile(event.target.files[0]).then((text) => {
       state.readinessReport = text;
-      render();
+      safeRender();
     });
   });
   document.getElementById("experimentDialogClose").addEventListener("click", closeExperimentDialog);
@@ -174,33 +180,75 @@ function bindInputs() {
 }
 
 async function loadDefaultData() {
+  state.loadErrors = [];
   const entries = Object.entries(paths).filter(([key]) => key !== "readinessReport");
-  const loaded = await Promise.all(entries.map(async ([key, path]) => [key, await fetchCsv(path)]));
+  const loaded = await Promise.all(entries.map(async ([key, path]) => [key, await fetchCsv(path, key)]));
   loaded.forEach(([key, rows]) => {
     state[key] = rows;
   });
-  state.readinessReport = await fetchText(paths.readinessReport);
+  state.readinessReport = await fetchText(paths.readinessReport, "readinessReport");
   state.loading = false;
   rebuildFilters();
-  render();
+  safeRender();
 }
 
-async function fetchCsv(path) {
+async function fetchCsv(path, label) {
   try {
     const response = await fetch(path, { cache: "no-store" });
-    return response.ok ? parseCsv(await response.text()) : [];
-  } catch {
-    return [];
+    if (response.ok) return parseCsv(await response.text());
+    state.loadErrors.push(label + ": HTTP " + response.status);
+  } catch (error) {
+    state.loadErrors.push(label + ": " + errorMessage(error));
   }
+  return [];
 }
 
-async function fetchText(path) {
+async function fetchText(path, label) {
   try {
     const response = await fetch(path, { cache: "no-store" });
-    return response.ok ? response.text() : "";
-  } catch {
-    return "";
+    if (response.ok) return response.text();
+    state.loadErrors.push(label + ": HTTP " + response.status);
+  } catch (error) {
+    state.loadErrors.push(label + ": " + errorMessage(error));
   }
+  return "";
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function safeRender() {
+  try {
+    render();
+    state.runtimeError = "";
+  } catch (error) {
+    state.runtimeError = errorMessage(error);
+    console.error("Dashboard rendering failed", error);
+  }
+  updateDashboardAlert();
+}
+
+function updateDashboardAlert() {
+  const alert = document.getElementById("dashboardAlert");
+  const message = dashboardAlertMessage({
+    loading: state.loading,
+    loadErrors: state.loadErrors,
+    runtimeError: state.runtimeError,
+    resultCount: state.results.length,
+    protocol: window.location.protocol,
+  });
+  alert.textContent = message;
+  alert.hidden = !message;
+}
+
+function dashboardAlertMessage({ loading, loadErrors, runtimeError, resultCount, protocol }) {
+  if (runtimeError) return "Dashboard rendering stopped: " + runtimeError + ". Check the browser console for details.";
+  if (loading) return "";
+  if (protocol === "file:") return "Results cannot be loaded from a local file URL. Serve the repository root with make serve-dashboard, then open the displayed HTTP address.";
+  if (loadErrors.length) return "Some dashboard evidence could not be loaded: " + loadErrors.join("; ") + ".";
+  if (!resultCount) return "No experiment rows were loaded. Refresh the analysis outputs or select a results CSV manually.";
+  return "";
 }
 
 function readFile(file) {
@@ -535,14 +583,14 @@ function clearFilter(key) {
     if (definition) document.getElementById(definition[0]).value = "";
     if (key === "evidence_status") document.getElementById("evidenceFilter").value = "";
   }
-  render();
+  safeRender();
 }
 
 function resetFilters() {
   filterDefinitions.forEach(([id]) => { document.getElementById(id).value = ""; });
   document.getElementById("evidenceFilter").value = "";
   document.getElementById("metricFilter").value = "";
-  render();
+  safeRender();
 }
 
 function renderReadiness() {
@@ -1689,7 +1737,7 @@ function renderTrialBars(rows, metric) {
 function setSort(table, key) {
   if (state.sort.table === table && state.sort.key === key) state.sort.direction *= -1;
   else state.sort = { table, key, direction: 1 };
-  render();
+  safeRender();
 }
 
 function sortRows(rows, table) {
@@ -1940,6 +1988,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildStudyCoverageEntries,
     buildUncertaintyGroups,
     comparisonContext,
+    dashboardAlertMessage,
     pointAxisTicks,
     summarizePhases,
   };
