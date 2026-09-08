@@ -1227,6 +1227,72 @@ function buildDataMovementEntries(rows) {
   })).filter((entry) => entry.value >= 0).sort((left, right) => right.value - left.value);
 }
 
+function buildDataMovementSeries(rows, studyType) {
+  const definitions = {
+    num_workers: {
+      xField: "num_workers",
+      xLabel: "DataLoader workers",
+      title: "Worker count",
+      constants: ["platform_id", "comparability", "workload", "throughput_unit", "pinned_memory", "prefetch_factor"],
+    },
+    prefetch_factor: {
+      xField: "prefetch_factor",
+      xLabel: "Prefetch factor",
+      title: "Prefetch depth",
+      constants: ["platform_id", "comparability", "workload", "throughput_unit", "num_workers", "pinned_memory"],
+    },
+  };
+  const definition = definitions[studyType];
+  if (!definition) return [];
+  const eligible = rows.filter((row) => row.study_type === studyType && number(row[definition.xField]) >= 0 && number(row.avg_data_loading_seconds) > 0);
+  const grouped = groupRows(eligible, (row) => definition.constants.map((field) => row[field] || "unspecified"));
+  return Object.values(grouped).map((group) => {
+    const first = group[0];
+    return {
+      title: first.platform_id + " · " + first.comparability + " · " + first.workload,
+      subtitle: definition.title + " · loading and transfer time in milliseconds",
+      platform: first.platform_id,
+      comparability: first.comparability,
+      workload: first.workload,
+      unit: first.throughput_unit,
+      studyType,
+      comparison: comparisonContext(group, [definition.xLabel], definition.constants),
+      points: group.map((row) => ({
+        x: number(row[definition.xField]),
+        y: number(row.avg_data_loading_seconds) * 1000,
+        label: definition.xLabel + " " + row[definition.xField] + ": loading " + formatDecimal(number(row.avg_data_loading_seconds) * 1000, 2) + " ms; transfer " + formatDecimal(number(row.avg_transfer_seconds) * 1000, 2) + " ms; " + formatInteger(number(row.avg_throughput_tokens_sec)) + " " + row.throughput_unit + "; " + row.trials + " trials",
+        conditionId: conditionId(row),
+      })).sort((left, right) => left.x - right.x),
+    };
+  }).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function buildPinnedMemoryGroups(rows) {
+  const eligible = rows.filter((row) => row.study_type === "pinned_memory" && number(row.avg_data_loading_seconds) > 0);
+  const grouped = groupRows(eligible, (row) => [row.platform_id || "unlabelled", row.comparability || "unspecified", row.workload || "unassigned", row.throughput_unit || "unit_not_recorded", row.num_workers || "unspecified", row.prefetch_factor || "unspecified"]);
+  return Object.values(grouped).map((group) => {
+    const first = group[0];
+    return {
+      title: first.platform_id + " · " + first.comparability + " · " + first.workload,
+      subtitle: "Pinned-memory comparison · loading and transfer time in milliseconds",
+      platform: first.platform_id,
+      comparability: first.comparability,
+      workload: first.workload,
+      unit: first.throughput_unit,
+      comparison: comparisonContext(group, ["Pinned memory"], ["platform_id", "comparability", "workload", "throughput_unit", "num_workers", "prefetch_factor"]),
+      entries: group.map((row) => ({
+        label: booleanLabel(row.pinned_memory, "Pinned memory on", "Pinned memory off"),
+        value: number(row.avg_data_loading_seconds) * 1000,
+        transfer: number(row.avg_transfer_seconds) * 1000,
+        throughput: number(row.avg_throughput_tokens_sec),
+        trials: number(row.trials),
+        unit: row.throughput_unit,
+        conditionId: conditionId(row),
+      })).sort((left, right) => left.label.localeCompare(right.label)),
+    };
+  }).sort((left, right) => left.title.localeCompare(right.title));
+}
+
 function renderInference() {
   const result = filteredAnalysisRows(state.inferenceSummary, ["platform_id", "comparability", "workload", "throughput_unit", "precision", "gpus"]);
   const groups = buildInferenceGroups(result.rows);
@@ -1820,7 +1886,9 @@ if (typeof module !== "undefined" && module.exports) {
     buildGradientAccumulationSeries,
     buildInferenceGroups,
     buildMemorySeries,
+    buildDataMovementSeries,
     buildPhaseDistributionEntries,
+    buildPinnedMemoryGroups,
     buildRq1ScalingSeries,
     buildRq2StrategyGroups,
     buildScalingSeries,

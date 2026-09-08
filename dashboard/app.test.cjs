@@ -4,12 +4,14 @@ const fs = require("fs");
 const {
   buildCheckpointingGroups,
   buildCompletionEntries,
+  buildDataMovementSeries,
   buildEnergyPowerEntries,
   buildExperimentDetail,
   buildGradientAccumulationSeries,
   buildInferenceGroups,
   buildMemorySeries,
   buildPhaseDistributionEntries,
+  buildPinnedMemoryGroups,
   buildRq1ScalingSeries,
   buildRq2StrategyGroups,
   buildScalingSeries,
@@ -165,6 +167,43 @@ run("memory studies are routed to charts for their independent variable", () => 
   assert.deepEqual(checkpointing[0].entries.map((entry) => entry.label), ["Checkpointing off", "Checkpointing on"]);
   assert.equal(accumulation.length, 1);
   assert.deepEqual(accumulation[0].points.map((point) => point.x), [1, 2]);
+});
+
+run("data-movement studies isolate workers, pinned memory, and prefetch", () => {
+  const common = {
+    platform_id: "l40s",
+    comparability: "exact",
+    workload: "gpt2_small",
+    throughput_unit: "training_tokens_per_second",
+    num_workers: 4,
+    pinned_memory: "True",
+    prefetch_factor: 4,
+    trials: 3,
+    avg_data_loading_seconds: 0.006,
+    avg_transfer_seconds: 0.012,
+    avg_throughput_tokens_sec: 45_000,
+  };
+  const movementRows = [
+    { ...common, experiment_id: "E097", condition_id: "E097@l40s", study_type: "num_workers", num_workers: 2, avg_data_loading_seconds: 0.0066 },
+    { ...common, experiment_id: "E099", condition_id: "E099@l40s", study_type: "num_workers", num_workers: 8, avg_data_loading_seconds: 0.0059 },
+    { ...common, experiment_id: "E103", condition_id: "E103@l40s", study_type: "prefetch_factor", prefetch_factor: 2, avg_data_loading_seconds: 0.0065 },
+    { ...common, experiment_id: "E104", condition_id: "E104@l40s", study_type: "prefetch_factor", prefetch_factor: 8, avg_data_loading_seconds: 0.0062 },
+    { ...common, experiment_id: "E101", condition_id: "E101@l40s", study_type: "pinned_memory", pinned_memory: "False", avg_data_loading_seconds: 0.077 },
+    { ...common, experiment_id: "E102", condition_id: "E102@l40s", study_type: "pinned_memory", avg_data_loading_seconds: 0.0067 },
+    { ...common, experiment_id: "E097", condition_id: "E097@h100", platform_id: "h100", study_type: "num_workers", num_workers: 2, avg_data_loading_seconds: 0.003 },
+  ];
+
+  const workers = buildDataMovementSeries(movementRows, "num_workers");
+  const prefetch = buildDataMovementSeries(movementRows, "prefetch_factor");
+  const pinned = buildPinnedMemoryGroups(movementRows);
+
+  assert.equal(workers.length, 2);
+  assert.deepEqual(workers.find((group) => group.platform === "l40s").points.map((point) => point.x), [2, 8]);
+  assert.deepEqual(workers.find((group) => group.platform === "l40s").points.map((point) => Number(point.y.toFixed(1))), [6.6, 5.9]);
+  assert.equal(prefetch.length, 1);
+  assert.deepEqual(prefetch[0].points.map((point) => point.x), [2, 8]);
+  assert.equal(pinned.length, 1);
+  assert.deepEqual(pinned[0].entries.map((entry) => entry.label), ["Pinned memory off", "Pinned memory on"]);
 });
 
 run("research-question charts retain platform and comparability boundaries", () => {
