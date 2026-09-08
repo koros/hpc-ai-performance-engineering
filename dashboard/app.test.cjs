@@ -18,6 +18,7 @@ const {
   buildStudyCoverageEntries,
   buildUncertaintyGroups,
   comparisonContext,
+  pointAxisTicks,
   summarizePhases,
 } = require("./app.js");
 
@@ -90,6 +91,20 @@ run("dashboard controls use unique document identifiers", () => {
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
 
   assert.equal(new Set(ids).size, ids.length);
+});
+
+run("line charts label every discrete x value when the study is compact", () => {
+  assert.deepEqual(pointAxisTicks([16, 2, 8, 4, 8], [2, 16]), [2, 4, 8, 16]);
+  assert.deepEqual(pointAxisTicks([1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 9]), [1, 5, 9]);
+});
+
+run("strategy chart does not reference another chart's series variable", () => {
+  const source = fs.readFileSync("dashboard/app.js", "utf8");
+  const start = source.indexOf("function strategyTradeoffChartCard");
+  const end = source.indexOf("function renderResearchFindingList", start);
+  const body = source.slice(start, end);
+
+  assert.doesNotMatch(body, /\bseries\./);
 });
 
 run("progress counts retain platform and comparability boundaries", () => {

@@ -456,8 +456,7 @@ function strategyTradeoffChartCard(group) {
   const yDomain = paddedDomain(group.points.map((point) => point.y), true);
   const x = linearScale(xDomain[0], xDomain[1], left, width - right);
   const y = linearScale(yDomain[0], yDomain[1], height - bottom, top);
-  const pointXTicks = [...new Set(series.points.map((point) => point.x))].sort((leftValue, rightValue) => leftValue - rightValue);
-  const xTicks = pointXTicks.length <= 8 ? pointXTicks : [xDomain[0], (xDomain[0] + xDomain[1]) / 2, xDomain[1]];
+  const xTicks = [xDomain[0], (xDomain[0] + xDomain[1]) / 2, xDomain[1]];
   const yTicks = [yDomain[0], (yDomain[0] + yDomain[1]) / 2, yDomain[1]];
   const grids = xTicks.map((value) => '<line class="svg-grid" x1="' + x(value) + '" y1="' + top + '" x2="' + x(value) + '" y2="' + (height - bottom) + '"/><text class="svg-label" x="' + x(value) + '" y="' + (height - 18) + '" text-anchor="middle">' + formatCompact(value) + "</text>").join("") + yTicks.map((value) => '<line class="svg-grid" x1="' + left + '" y1="' + y(value) + '" x2="' + (width - right) + '" y2="' + y(value) + '"/><text class="svg-label" x="' + (left - 5) + '" y="' + (y(value) + 3) + '" text-anchor="end">' + formatCompact(value) + "</text>").join("");
   const points = group.points.map((point) => {
@@ -1172,7 +1171,7 @@ function lineChartCard(series, options, color) {
   const x = linearScale(xDomain[0], xDomain[1], left, width - right);
   const y = linearScale(yDomain[0], yDomain[1], height - bottom, top);
   const line = series.points.map((point, index) => (index ? "L" : "M") + x(point.x) + "," + y(point.y)).join(" ");
-  const xTicks = [xDomain[0], (xDomain[0] + xDomain[1]) / 2, xDomain[1]];
+  const xTicks = pointAxisTicks(series.points.map((point) => point.x), xDomain);
   const yTicks = [yDomain[0], (yDomain[0] + yDomain[1]) / 2, yDomain[1]];
   const grid = xTicks.map((value) => '<line class="svg-grid" x1="' + x(value) + '" y1="' + top + '" x2="' + x(value) + '" y2="' + (height - bottom) + '"/><text class="svg-label" x="' + x(value) + '" y="' + (height - 18) + '" text-anchor="middle">' + formatCompact(value) + "</text>").join("") + yTicks.map((value) => '<line class="svg-grid" x1="' + left + '" y1="' + y(value) + '" x2="' + (width - right) + '" y2="' + y(value) + '"/><text class="svg-label" x="' + (left - 5) + '" y="' + (y(value) + 3) + '" text-anchor="end">' + formatCompact(value) + "</text>").join("");
   const points = series.points.map((point) => '<circle class="svg-point" ' + conditionTargetAttributes(point) + ' fill="' + color + '" cx="' + x(point.x) + '" cy="' + y(point.y) + '" r="4"><title>' + escapeSvg(point.label) + "</title></circle>").join("");
@@ -1900,6 +1899,12 @@ function formatCompact(value) {
   return Number(value || 0).toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 2 });
 }
 
+function pointAxisTicks(values, domain) {
+  const ticks = [...new Set(values.filter((value) => Number.isFinite(value)))].sort((left, right) => left - right);
+  if (ticks.length && ticks.length <= 8) return ticks;
+  return [domain[0], (domain[0] + domain[1]) / 2, domain[1]];
+}
+
 function emptyState(message) {
   const element = document.createElement("div");
   element.className = "empty-state";
@@ -1935,6 +1940,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildStudyCoverageEntries,
     buildUncertaintyGroups,
     comparisonContext,
+    pointAxisTicks,
     summarizePhases,
   };
 }
