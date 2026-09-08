@@ -1,4 +1,5 @@
 const assert = require("assert").strict;
+const fs = require("fs");
 
 const {
   buildCheckpointingGroups,
@@ -8,7 +9,6 @@ const {
   buildGradientAccumulationSeries,
   buildInferenceGroups,
   buildMemorySeries,
-  buildPhaseBarEntries,
   buildPhaseDistributionEntries,
   buildRq1ScalingSeries,
   buildRq2StrategyGroups,
@@ -20,21 +20,21 @@ const {
 } = require("./app.js");
 
 const rows = [
-  result("l40s", "exact", "gpt2_small", 100),
-  result("l40s", "exact", "gpt2_small", 120),
-  result("h100", "exact", "gpt2_small", 200),
-  result("l40s", "capacity_adjusted", "gpt2_small", 80),
-  result("l40s", "exact", "distilbert", 50),
+  { ...result("l40s", "exact", "gpt2_small", 100), experiment_id: "E001", condition_id: "E001@l40s" },
+  { ...result("l40s", "exact", "gpt2_small", 120), experiment_id: "E001", condition_id: "E001@l40s" },
+  { ...result("h100", "exact", "gpt2_small", 200), experiment_id: "E001", condition_id: "E001@h100" },
+  { ...result("l40s", "capacity_adjusted", "gpt2_small", 80), experiment_id: "E201", condition_id: "E201@l40s" },
+  { ...result("l40s", "exact", "distilbert", 50), experiment_id: "E008", condition_id: "E008@l40s" },
 ];
 
-run("phase bars never average across platform, comparability, or workload", () => {
-  const entries = buildPhaseBarEntries(rows);
+run("phase distributions never pool platform, comparability, or workload", () => {
+  const entries = buildPhaseDistributionEntries(rows);
 
   assert.equal(entries.length, 4);
-  assert.equal(valueFor(entries, "l40s", "exact", "gpt2_small"), 110);
-  assert.equal(valueFor(entries, "h100", "exact", "gpt2_small"), 200);
-  assert.equal(valueFor(entries, "l40s", "capacity_adjusted", "gpt2_small"), 80);
-  assert.equal(valueFor(entries, "l40s", "exact", "distilbert"), 50);
+  assert.equal(distributionFor(entries, "l40s", "exact", "gpt2_small").median, 110);
+  assert.equal(distributionFor(entries, "h100", "exact", "gpt2_small").median, 200);
+  assert.equal(distributionFor(entries, "l40s", "capacity_adjusted", "gpt2_small").median, 80);
+  assert.equal(distributionFor(entries, "l40s", "exact", "distilbert").median, 50);
 });
 
 run("fallback phase summaries preserve all statistical grouping fields", () => {
@@ -81,6 +81,13 @@ run("study coverage maps evidence to controlled research families", () => {
   assert.deepEqual(scaling.researchQuestions, ["RQ1"]);
   assert.equal(strategies.target, "performance");
   assert.match(strategies.changing, /DDP/);
+});
+
+run("dashboard controls use unique document identifiers", () => {
+  const html = fs.readFileSync("dashboard/index.html", "utf8");
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
+
+  assert.equal(new Set(ids).size, ids.length);
 });
 
 run("progress counts retain platform and comparability boundaries", () => {
@@ -362,11 +369,11 @@ function inferenceResult(platform_id, comparability, workload) {
   };
 }
 
-function valueFor(entries, platform, comparability, workload) {
+function distributionFor(entries, platform, comparability, workload) {
   return entries.find(
     (entry) =>
       entry.platform === platform && entry.comparability === comparability && entry.workload === workload,
-  ).value;
+  );
 }
 
 function summaryFor(summaries, platform_id, comparability, workload) {

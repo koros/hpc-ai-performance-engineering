@@ -115,9 +115,9 @@
             <p class="chart-note">Counts are recorded trials, grouped by platform and comparability.</p>
           </article>
           <article class="panel chart-panel" data-metrics="throughput">
-            <div class="panel-heading"><h2>Phase Throughput</h2><span id="dataStatus">No data loaded</span></div>
-            <div id="phaseBars" class="bar-list"></div>
-            <p class="chart-note">Bars share a scale only within their throughput unit.</p>
+            <div class="panel-heading"><h2>Controlled Study Map</h2><span id="studyMapStatus">No study evidence</span></div>
+            <div id="studyMap" class="study-map"></div>
+            <p class="chart-note">Navigate by the variable being tested. Counts show evidence coverage only; they are not performance rankings.</p>
           </article>
         </div>
         <div class="content-grid">
@@ -231,8 +231,13 @@
           <div class="panel-heading"><h2>Trial Evidence and Uncertainty</h2><span id="trialCount">No trial evidence</span></div>
           <div class="table-wrap"><table id="trialTable"><thead></thead><tbody></tbody></table></div>
         </article>
+        <article class="panel chart-panel" data-metrics="throughput">
+          <div class="panel-heading"><h2>Descriptive Phase Distributions</h2><span id="dataStatus">No phase evidence</span></div>
+          <div id="phaseDistributions" class="distribution-list"></div>
+          <p class="chart-note">Each condition contributes once. The marker is the condition-weighted median and the line is the minimum–maximum range. These distributions describe coverage; use the controlled study panels above to infer effects.</p>
+        </article>
         <article class="panel" data-metrics="throughput runtime memory energy latency">
-          <div class="panel-heading"><h2>Phase Summary</h2><span id="phaseCount">0 rows</span></div>
+          <div class="panel-heading"><h2>Phase Evidence Inventory</h2><span id="phaseCount">0 rows</span></div>
           <div class="table-wrap"><table id="phaseTable"><thead></thead><tbody></tbody></table></div>
         </article>
       </section>
