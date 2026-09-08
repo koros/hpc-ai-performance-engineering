@@ -277,7 +277,17 @@ select {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.study-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 18px;
+}
+
 .content-grid > * {
+  min-width: 0;
+}
+
+.study-panel-grid > * {
   min-width: 0;
 }
 
@@ -713,6 +723,37 @@ select {
   display: grid;
   gap: 16px;
   padding-top: 4px;
+}
+
+.movement-effect {
+  display: grid;
+  gap: 3px;
+  margin: 4px 0 12px;
+  padding: 10px;
+  border: 1px solid #99d5ce;
+  border-radius: 8px;
+  background: #ecfdf9;
+}
+
+.movement-effect strong {
+  color: #065f46;
+  font-size: 0.86rem;
+}
+
+.movement-effect span {
+  color: #475569;
+  font-size: 0.7rem;
+}
+
+.movement-comparison-bars {
+  display: grid;
+  gap: 12px;
+}
+
+.movement-comparison-row {
+  padding: 8px;
+  border-radius: 7px;
+  background: rgba(248, 250, 252, 0.9);
 }
 
 .checkpointing-row {
@@ -1466,7 +1507,8 @@ td.numeric {
 
   .kpi-grid,
   .content-grid,
-  .readiness-grid {
+  .readiness-grid,
+  .study-panel-grid {
     grid-template-columns: 1fr;
   }
 

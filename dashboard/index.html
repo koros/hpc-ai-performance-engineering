@@ -203,11 +203,23 @@
             <p class="chart-note">Bandwidth and communication-to-compute ratio are meaningful only on the recorded platform/interconnect.</p>
           </article>
         </div>
-        <article class="panel chart-panel" data-metrics="throughput runtime">
-          <div class="panel-heading"><h2>Data Movement</h2><span id="movementStatus">No data-movement evidence</span></div>
-          <div id="movementBars" class="bar-list"></div>
-          <p class="chart-note">Bars report observed loading time for the stated worker, pinned-memory, and prefetch configuration.</p>
-        </article>
+        <div class="study-panel-grid">
+          <article class="panel chart-panel" data-metrics="throughput runtime">
+            <div class="panel-heading"><h2>DataLoader Worker Sweep</h2><span id="movementWorkersStatus">No worker evidence</span></div>
+            <div id="movementWorkerCharts" class="svg-chart-grid"></div>
+            <p class="chart-note">Changing: worker count. Held constant within each curve: platform, workload, pinned memory, prefetch factor, and throughput unit.</p>
+          </article>
+          <article class="panel chart-panel" data-metrics="throughput runtime">
+            <div class="panel-heading"><h2>Pinned-memory Effect</h2><span id="movementPinnedStatus">No pinned-memory evidence</span></div>
+            <div id="movementPinnedCharts" class="svg-chart-grid"></div>
+            <p class="chart-note">Changing: pinned memory off/on. Held constant: platform, workload, four workers, prefetch factor four, and throughput unit.</p>
+          </article>
+          <article class="panel chart-panel" data-metrics="throughput runtime">
+            <div class="panel-heading"><h2>Prefetch-depth Sweep</h2><span id="movementPrefetchStatus">No prefetch evidence</span></div>
+            <div id="movementPrefetchCharts" class="svg-chart-grid"></div>
+            <p class="chart-note">Changing: prefetch factor. Held constant: platform, workload, four workers, pinned memory enabled, and throughput unit.</p>
+          </article>
+        </div>
       </section>
 
       <section id="inference" class="dashboard-section">

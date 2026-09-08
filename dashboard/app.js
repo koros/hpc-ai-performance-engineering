@@ -456,7 +456,8 @@ function strategyTradeoffChartCard(group) {
   const yDomain = paddedDomain(group.points.map((point) => point.y), true);
   const x = linearScale(xDomain[0], xDomain[1], left, width - right);
   const y = linearScale(yDomain[0], yDomain[1], height - bottom, top);
-  const xTicks = [xDomain[0], (xDomain[0] + xDomain[1]) / 2, xDomain[1]];
+  const pointXTicks = [...new Set(series.points.map((point) => point.x))].sort((leftValue, rightValue) => leftValue - rightValue);
+  const xTicks = pointXTicks.length <= 8 ? pointXTicks : [xDomain[0], (xDomain[0] + xDomain[1]) / 2, xDomain[1]];
   const yTicks = [yDomain[0], (yDomain[0] + yDomain[1]) / 2, yDomain[1]];
   const grids = xTicks.map((value) => '<line class="svg-grid" x1="' + x(value) + '" y1="' + top + '" x2="' + x(value) + '" y2="' + (height - bottom) + '"/><text class="svg-label" x="' + x(value) + '" y="' + (height - 18) + '" text-anchor="middle">' + formatCompact(value) + "</text>").join("") + yTicks.map((value) => '<line class="svg-grid" x1="' + left + '" y1="' + y(value) + '" x2="' + (width - right) + '" y2="' + y(value) + '"/><text class="svg-label" x="' + (left - 5) + '" y="' + (y(value) + 3) + '" text-anchor="end">' + formatCompact(value) + "</text>").join("");
   const points = group.points.map((point) => {
@@ -1205,26 +1206,21 @@ function buildCommunicationEntries(rows) {
 
 function renderDataMovement() {
   const result = filteredAnalysisRows(state.dataMovementSummary, ["platform_id", "comparability", "workload", "throughput_unit"]);
-  const entries = buildDataMovementEntries(result.rows);
-  renderSeparatedBars("movementBars", entries, { empty: result.message || "No completed data-movement evidence.", value: (entry) => formatDecimal(entry.value, 3) + " s", changing: (group) => varyingLabels(group, ["platform", "comparability", "workload", "num_workers", "pinned_memory", "prefetch_factor"]), constants: ["platform", "comparability", "workload"] });
-  document.getElementById("movementStatus").textContent = result.message || entries.length + " conditions";
-  markPanel("movementBars", entries.length > 0, buildDataMovementEntries(state.dataMovementSummary).length > 0, "Data movement", "data_movement_summary.csv", true);
-}
-
-function buildDataMovementEntries(rows) {
-  return rows.map((row) => ({
-    label: row.platform_id + " · " + row.comparability + " · " + row.experiment_id + " · " + row.workload,
-    detail: "workers " + row.num_workers + "; pinned memory " + row.pinned_memory + "; prefetch " + row.prefetch_factor,
-    conditionId: conditionId(row),
-    platform: row.platform_id,
-    comparability: row.comparability,
-    workload: row.workload,
-    num_workers: row.num_workers,
-    pinned_memory: row.pinned_memory,
-    prefetch_factor: row.prefetch_factor,
-    unit: "seconds",
-    value: number(row.avg_data_loading_seconds),
-  })).filter((entry) => entry.value >= 0).sort((left, right) => right.value - left.value);
+  const workers = buildDataMovementSeries(result.rows, "num_workers");
+  const prefetch = buildDataMovementSeries(result.rows, "prefetch_factor");
+  const pinned = buildPinnedMemoryGroups(result.rows);
+  renderLineCharts("movementWorkerCharts", workers, { empty: result.message || "No completed worker-count evidence.", xLabel: "DataLoader workers", yLabel: "loading time (ms)" });
+  renderPinnedMemoryCharts("movementPinnedCharts", pinned, result.message || "No completed pinned-memory evidence.");
+  renderLineCharts("movementPrefetchCharts", prefetch, { empty: result.message || "No completed prefetch-factor evidence.", xLabel: "prefetch factor", yLabel: "loading time (ms)" });
+  document.getElementById("movementWorkersStatus").textContent = result.message || workers.length + " controlled curves";
+  document.getElementById("movementPinnedStatus").textContent = result.message || pinned.length + " controlled comparisons";
+  document.getElementById("movementPrefetchStatus").textContent = result.message || prefetch.length + " controlled curves";
+  const allWorkers = buildDataMovementSeries(state.dataMovementSummary, "num_workers");
+  const allPrefetch = buildDataMovementSeries(state.dataMovementSummary, "prefetch_factor");
+  const allPinned = buildPinnedMemoryGroups(state.dataMovementSummary);
+  markPanel("movementWorkerCharts", workers.length > 0, allWorkers.length > 0, "DataLoader worker sweep", "data_movement_summary.csv", true);
+  markPanel("movementPinnedCharts", pinned.length > 0, allPinned.length > 0, "Pinned-memory effect", "data_movement_summary.csv", true);
+  markPanel("movementPrefetchCharts", prefetch.length > 0, allPrefetch.length > 0, "Prefetch-depth sweep", "data_movement_summary.csv", true);
 }
 
 function buildDataMovementSeries(rows, studyType) {
@@ -1291,6 +1287,45 @@ function buildPinnedMemoryGroups(rows) {
       })).sort((left, right) => left.label.localeCompare(right.label)),
     };
   }).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function renderPinnedMemoryCharts(containerId, groups, emptyMessage) {
+  const container = document.getElementById(containerId);
+  container.replaceChildren();
+  if (!groups.length) {
+    container.append(emptyState(emptyMessage));
+    return;
+  }
+  groups.forEach((group) => container.append(pinnedMemoryChartCard(group)));
+}
+
+function pinnedMemoryChartCard(group) {
+  const card = chartCard(group.title, group.subtitle, group.comparison);
+  const off = group.entries.find((entry) => entry.label.endsWith("off"));
+  const on = group.entries.find((entry) => entry.label.endsWith("on"));
+  if (off && on && off.value > 0) {
+    const loadingChange = ((on.value - off.value) / off.value) * 100;
+    const throughputChange = off.throughput > 0 ? ((on.throughput - off.throughput) / off.throughput) * 100 : 0;
+    const effect = document.createElement("div");
+    effect.className = "movement-effect";
+    effect.innerHTML = '<strong>' + signedPercent(loadingChange) + ' loading time</strong><span>' + signedPercent(throughputChange) + " training throughput with pinned memory</span>";
+    card.append(effect);
+  }
+  const bars = document.createElement("div");
+  bars.className = "movement-comparison-bars";
+  const top = max(group.entries.map((entry) => entry.value)) || 1;
+  group.entries.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "bar-row movement-comparison-row";
+    setConditionTarget(row, entry.conditionId);
+    const stateClass = entry.label.endsWith("on") ? "checkpointing-on" : "checkpointing-off";
+    row.innerHTML = '<div class="bar-meta"><strong>' + escapeHtml(entry.label) + '</strong><span>' + formatDecimal(entry.value, 2) + ' ms loading</span></div>' +
+      '<div class="bar-detail">' + formatDecimal(entry.transfer, 2) + " ms transfer · " + formatInteger(entry.throughput) + " " + escapeHtml(entry.unit) + " · " + formatInteger(entry.trials) + ' trials</div>' +
+      '<div class="bar-track"><div class="bar-fill ' + stateClass + '" style="width: ' + Math.max(3, (entry.value / top) * 100) + '%"></div></div>';
+    bars.append(row);
+  });
+  card.append(bars);
+  return card;
 }
 
 function renderInference() {
@@ -1854,6 +1889,11 @@ function formatInteger(value) {
 
 function formatDecimal(value, digits) {
   return (value || 0).toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+function signedPercent(value) {
+  const sign = value > 0 ? "+" : "";
+  return sign + formatDecimal(value, 1) + "%";
 }
 
 function formatCompact(value) {
