@@ -153,24 +153,33 @@
 
       <section id="performance" class="dashboard-section">
         <div class="section-heading">
-          <div><p class="eyebrow">Training performance</p><h2>Uncertainty, strategy, and precision</h2></div>
-          <p>Completed trial summaries only. Error bars are 95% confidence intervals.</p>
+          <div><p class="eyebrow">Training performance</p><h2>Training speed and repeatability</h2></div>
+          <p>Compare one controlled study at a time. Every chart identifies what changes and what remains fixed.</p>
         </div>
-        <article class="panel chart-panel" data-metrics="throughput runtime">
-          <div class="panel-heading"><h2>Trial Throughput Uncertainty</h2><span id="uncertaintyStatus">No trial evidence</span></div>
+        <article class="panel chart-panel training-repeatability-panel" data-metrics="throughput runtime">
+          <div class="panel-heading training-panel-heading">
+            <div><h2>How consistent is training throughput?</h2><p>Select a study to compare only configurations designed to answer the same question.</p></div>
+            <label class="training-study-control">Study<select id="trainingStudyFilter" aria-label="Training study"></select></label>
+          </div>
+          <div id="trainingStudySummary" class="training-summary-grid" aria-live="polite"></div>
+          <div class="uncertainty-legend" aria-label="Chart legend">
+            <span><i class="legend-dot" aria-hidden="true"></i>Average throughput</span>
+            <span><i class="legend-whisker" aria-hidden="true"></i>95% confidence interval</span>
+            <span>Shorter intervals indicate a more precise average.</span>
+          </div>
           <div id="uncertaintyCharts" class="svg-chart-grid"></div>
-          <p class="chart-note">Small multiples never mix platforms, comparability classes, or throughput units.</p>
+          <p class="chart-note">Only completed training runs are shown. Platforms, workloads, comparability classes, and throughput units remain separate. Select a point for trial-level evidence.</p>
         </article>
         <div class="content-grid">
           <article class="panel chart-panel" data-metrics="throughput memory">
-            <div class="panel-heading"><h2>Distributed Strategy</h2><span id="strategyStatus">No strategy evidence</span></div>
-            <div id="strategyBars" class="bar-list"></div>
-            <p class="chart-note">Each bar represents one already-grouped strategy condition.</p>
+            <div class="panel-heading"><h2>Which distributed strategy performs best?</h2><span id="strategyStatus">No strategy evidence</span></div>
+            <div id="strategyBars" class="controlled-comparison-list"></div>
+            <p class="chart-note">Strategies are compared only when platform, workload, precision, GPU count, and throughput unit match.</p>
           </article>
           <article class="panel chart-panel" data-metrics="throughput memory latency">
-            <div class="panel-heading"><h2>Precision Trade-off</h2><span id="precisionStatus">No precision evidence</span></div>
-            <div id="precisionBars" class="bar-list"></div>
-            <p class="chart-note">Compare precision only within a matching platform, workload, mode, and unit.</p>
+            <div class="panel-heading"><h2>How does precision affect speed and memory?</h2><span id="precisionStatus">No precision evidence</span></div>
+            <div id="precisionBars" class="controlled-comparison-list"></div>
+            <p class="chart-note">Precision formats remain separated by platform, workload, training mode, and throughput unit.</p>
           </article>
         </div>
       </section>
