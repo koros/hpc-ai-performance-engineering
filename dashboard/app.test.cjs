@@ -109,6 +109,7 @@ run("strategy chart does not reference another chart's series variable", () => {
   const body = source.slice(start, end);
 
   assert.doesNotMatch(body, /\bseries\./);
+  assert.doesNotMatch(body, /efficiency(Min|Max)/);
 });
 
 run("dashboard reports loading and rendering failures instead of appearing empty", () => {
@@ -311,6 +312,8 @@ run("energy conditions retain all measured evidence and derive comparable effici
 
   assert.equal(entries.length, 13);
   assert.equal(entries[0].tokensPerKwh > 0, true);
+  assert.equal(entries[0].tokensPerKwhMin > 0, true);
+  assert.equal(entries[0].tokensPerKwhMax >= entries[0].tokensPerKwhMin, true);
   assert.equal(groups.length, 1);
   assert.equal(groups[0].points.length, 13);
   assert.equal(groups[0].platform, "h100");

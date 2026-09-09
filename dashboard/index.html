@@ -123,12 +123,28 @@
           </article>
         </div>
         <div class="content-grid">
-          <article class="panel chart-panel" data-metrics="energy">
-            <div class="panel-heading"><h2>Energy and Power</h2><span id="energyStatus">No energy evidence</span></div>
-            <div id="energyBars" class="bar-list"></div>
-            <p class="chart-note">Measured-region energy and sampled power are per recorded condition; they are not hardware-normalised comparisons. Select a bar for its measurement details.</p>
+          <article class="panel chart-panel panel-wide" data-metrics="energy">
+            <div class="panel-heading"><h2>Energy Efficiency and Power</h2><span id="energyStatus">No energy evidence</span></div>
+            <div id="energyCoverage" class="energy-coverage"></div>
+            <section class="energy-study-section">
+              <div class="energy-study-heading"><div><span>Efficiency landscape</span><h3>Throughput delivered per unit of energy</h3></div><p>Further right is faster; higher is more energy-efficient. Throughput units remain in separate panels.</p></div>
+              <div id="energyEfficiencyCharts" class="svg-chart-grid"></div>
+            </section>
+            <section class="energy-study-section">
+              <div class="energy-study-heading"><div><span>Power scaling</span><h3>Aggregate and per-GPU power as GPU count changes</h3></div><p>Controlled series retain workload, strategy, precision, and scaling protocol.</p></div>
+              <div id="energyScalingCharts" class="svg-chart-grid"></div>
+            </section>
+            <section class="energy-study-section">
+              <div class="energy-study-heading"><div><span>Energy to solution</span><h3>Fixed-work distributed-strategy comparisons</h3></div><p>Lower measured-region energy is better when batch, sequence length, steps, GPU count, and platform match.</p></div>
+              <div id="energySolutionCharts" class="svg-chart-grid"></div>
+            </section>
+            <details class="energy-evidence-details">
+              <summary><span>All measured-condition evidence</span><strong id="energyEvidenceStatus">No conditions</strong></summary>
+              <div id="energyBars" class="bar-list"></div>
+            </details>
+            <p class="chart-note">Only corrected measured-region telemetry is included. Select any point or bar to inspect its trial metrics and provenance.</p>
           </article>
-          <article class="panel" data-metrics="throughput runtime energy">
+          <article class="panel panel-wide" data-metrics="throughput runtime energy">
             <div class="panel-heading"><h2>Top Experiments</h2><span id="rankingCount">0 rows · select one for details</span></div>
             <div class="table-wrap"><table id="rankingTable"><thead></thead><tbody></tbody></table></div>
           </article>

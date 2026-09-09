@@ -883,16 +883,169 @@ function phaseDistributionRow(entry, scaleMaximum) {
 
 function renderEnergy(rows) {
   const entries = buildEnergyPowerEntries(rows);
-  const displayed = entries.slice(0, 12);
-  renderSeparatedBars("energyBars", displayed, {
+  const efficiencyGroups = buildEnergyEfficiencyGroups(rows);
+  const scalingSeries = buildEnergyPowerScalingSeries(rows);
+  const solutionGroups = buildEnergyToSolutionGroups(rows);
+  renderEnergyCoverage(entries, efficiencyGroups, scalingSeries, solutionGroups);
+  renderEnergyEfficiencyCharts("energyEfficiencyCharts", efficiencyGroups);
+  renderEnergyPowerScalingCharts("energyScalingCharts", scalingSeries);
+  renderEnergyToSolutionCharts("energySolutionCharts", solutionGroups);
+  renderSeparatedBars("energyBars", entries, {
     empty: "No measured-region energy evidence is available. Legacy full-window estimates are excluded.",
     barClass: "energy",
-    value: (entry) => formatDecimal(entry.value, 0) + " J · " + formatDecimal(entry.power, 1) + " W",
+    value: (entry) => formatDecimal(entry.value, 0) + " J · " + formatDecimal(entry.power, 1) + " W aggregate · " + formatDecimal(entry.powerPerGpu, 1) + " W/GPU",
     changing: (group) => varyingLabels(group, ["platform", "comparability", "experiment", "workload", "mode"]),
     constants: ["platform", "comparability", "workload", "mode"],
   });
-  document.getElementById("energyStatus").textContent = entries.length ? displayed.length + " shown of " + entries.length + " measured conditions" : "No energy evidence";
-  markPanel("energyBars", entries.length > 0, buildEnergyPowerEntries(state.results).length > 0, "Energy and power", "experiments.csv");
+  document.getElementById("energyStatus").textContent = entries.length ? entries.length + " measured conditions · " + sum(efficiencyGroups.map((group) => group.points.length)) + " efficiency observations" : "No energy evidence";
+  document.getElementById("energyEvidenceStatus").textContent = entries.length ? entries.length + " conditions · click to expand" : "No conditions";
+  markPanel("energyEfficiencyCharts", entries.length > 0, buildEnergyPowerEntries(state.results).length > 0, "Energy efficiency and power", "experiments.csv");
+}
+
+function renderEnergyCoverage(entries, efficiencyGroups, scalingSeries, solutionGroups) {
+  const container = document.getElementById("energyCoverage");
+  container.replaceChildren();
+  if (!entries.length) return;
+  const exactPlatforms = [...new Set(entries.filter((entry) => entry.comparability === "exact").map((entry) => entry.platform))];
+  const gpuCounts = [...new Set(entries.map((entry) => entry.gpus))].sort((left, right) => left - right);
+  const summary = document.createElement("div");
+  summary.className = "energy-coverage-summary";
+  summary.innerHTML = '<div><span>Measured conditions</span><strong>' + entries.length + '</strong></div><div><span>Controlled power series</span><strong>' + scalingSeries.length + '</strong></div><div><span>Fixed-work comparisons</span><strong>' + solutionGroups.length + '</strong></div><div><span>GPU counts represented</span><strong>' + escapeHtml(gpuCounts.join(", ")) + '</strong></div>';
+  container.append(summary);
+  const note = document.createElement("p");
+  note.className = exactPlatforms.length > 1 ? "energy-scope-note" : "energy-scope-note is-limited";
+  note.textContent = exactPlatforms.length > 1
+    ? "Exact measured-region evidence is available for " + exactPlatforms.join(" and ") + "; cross-platform comparisons still require matching workload and protocol."
+    : "Cross-platform energy comparison is pending: exact measured-region evidence currently covers " + (exactPlatforms.join(", ") || "no platform") + ". Platform-specific rows remain descriptive only.";
+  container.append(note);
+  if (!efficiencyGroups.length) {
+    const missing = document.createElement("p");
+    missing.className = "energy-scope-note is-limited";
+    missing.textContent = "Efficiency requires both measured power and throughput; no eligible paired observations match the active filters.";
+    container.append(missing);
+  }
+}
+
+function renderEnergyEfficiencyCharts(containerId, groups) {
+  const container = document.getElementById(containerId);
+  container.replaceChildren();
+  if (!groups.length) {
+    container.append(emptyState("No paired throughput and measured-power evidence matches the active filters."));
+    return;
+  }
+  groups.forEach((group) => container.append(energyEfficiencyChartCard(group)));
+}
+
+function energyEfficiencyChartCard(group) {
+  const card = chartCard(group.title, group.subtitle + " · " + group.points.length + " conditions", group.comparison);
+  const width = 520;
+  const height = 250;
+  const left = 66;
+  const right = 20;
+  const top = 18;
+  const bottom = 42;
+  const xDomain = paddedDomain(group.points.map((point) => point.x), true);
+  const yDomain = paddedDomain(group.points.flatMap((point) => [point.y, point.efficiencyMin, point.efficiencyMax]), true);
+  const x = linearScale(xDomain[0], xDomain[1], left, width - right);
+  const y = linearScale(yDomain[0], yDomain[1], height - bottom, top);
+  const xTicks = [xDomain[0], (xDomain[0] + xDomain[1]) / 2, xDomain[1]];
+  const yTicks = [yDomain[0], (yDomain[0] + yDomain[1]) / 2, yDomain[1]];
+  const topPower = max(group.points.map((point) => point.power)) || 1;
+  const grid = xTicks.map((value) => '<line class="svg-grid" x1="' + x(value) + '" y1="' + top + '" x2="' + x(value) + '" y2="' + (height - bottom) + '"/><text class="svg-label" x="' + x(value) + '" y="' + (height - 24) + '" text-anchor="middle">' + formatCompact(value) + '</text>').join("") + yTicks.map((value) => '<line class="svg-grid" x1="' + left + '" y1="' + y(value) + '" x2="' + (width - right) + '" y2="' + y(value) + '"/><text class="svg-label" x="' + (left - 6) + '" y="' + (y(value) + 3) + '" text-anchor="end">' + formatCompact(value) + '</text>').join("");
+  const points = group.points.map((point) => {
+    const radius = 4 + Math.sqrt(point.power / topPower) * 6;
+    const color = colors[(Math.max(1, point.gpus) - 1) % colors.length];
+    const title = point.label + "; " + formatCompact(point.x) + " " + displayName(group.throughputUnit) + "; " + formatCompact(point.y) + " tokens/kWh; " + formatDecimal(point.power, 1) + " W aggregate; " + point.trials + " trials";
+    const uncertainty = point.trials > 1 && point.efficiencyMax > point.efficiencyMin
+      ? '<line class="svg-whisker" x1="' + x(point.x) + '" y1="' + y(point.efficiencyMin) + '" x2="' + x(point.x) + '" y2="' + y(point.efficiencyMax) + '"/><line class="svg-whisker" x1="' + (x(point.x) - 3) + '" y1="' + y(point.efficiencyMin) + '" x2="' + (x(point.x) + 3) + '" y2="' + y(point.efficiencyMin) + '"/><line class="svg-whisker" x1="' + (x(point.x) - 3) + '" y1="' + y(point.efficiencyMax) + '" x2="' + (x(point.x) + 3) + '" y2="' + y(point.efficiencyMax) + '"/>'
+      : '';
+    return uncertainty + '<circle class="svg-point" ' + conditionTargetAttributes(point) + ' fill="' + color + '" cx="' + x(point.x) + '" cy="' + y(point.y) + '" r="' + radius + '"><title>' + escapeSvg(title) + '</title></circle>';
+  }).join("");
+  const labels = '<text class="svg-label axis-title" x="' + width / 2 + '" y="' + (height - 4) + '" text-anchor="middle">throughput (' + escapeSvg(displayName(group.throughputUnit)) + ')</text><text class="svg-label axis-title" transform="translate(12 ' + height / 2 + ') rotate(-90)" text-anchor="middle">tokens per kWh</text>';
+  card.append(svgElement(width, height, grid + points + labels));
+  card.append(energyLegend(group.points));
+  return card;
+}
+
+function energyLegend(points) {
+  const legend = document.createElement("div");
+  legend.className = "energy-legend";
+  const counts = [...new Set(points.map((point) => point.gpus))].sort((left, right) => left - right);
+  legend.innerHTML = counts.map((gpus) => '<span><i style="--legend-color:' + colors[(Math.max(1, gpus) - 1) % colors.length] + '"></i>' + gpus + ' GPU' + (gpus === 1 ? '' : 's') + '</span>').join("") + '<span class="energy-size-key">circle size = aggregate power</span>';
+  return legend;
+}
+
+function renderEnergyPowerScalingCharts(containerId, series) {
+  const container = document.getElementById(containerId);
+  container.replaceChildren();
+  if (!series.length) {
+    container.append(emptyState("No multi-GPU measured-power series matches the active filters."));
+    return;
+  }
+  series.forEach((group) => container.append(energyPowerScalingChartCard(group)));
+}
+
+function energyPowerScalingChartCard(group) {
+  const card = chartCard(group.title, group.subtitle, group.comparison);
+  const width = 520;
+  const height = 245;
+  const left = 62;
+  const right = 20;
+  const top = 18;
+  const bottom = 40;
+  const xDomain = paddedDomain(group.points.map((point) => point.x), false);
+  const yDomain = paddedDomain(group.points.flatMap((point) => [point.aggregatePower, point.perGpuPower]), true);
+  const x = linearScale(xDomain[0], xDomain[1], left, width - right);
+  const y = linearScale(yDomain[0], yDomain[1], height - bottom, top);
+  const xTicks = pointAxisTicks(group.points.map((point) => point.x), xDomain);
+  const yTicks = [yDomain[0], (yDomain[0] + yDomain[1]) / 2, yDomain[1]];
+  const grid = xTicks.map((value) => '<line class="svg-grid" x1="' + x(value) + '" y1="' + top + '" x2="' + x(value) + '" y2="' + (height - bottom) + '"/><text class="svg-label" x="' + x(value) + '" y="' + (height - 22) + '" text-anchor="middle">' + formatCompact(value) + '</text>').join("") + yTicks.map((value) => '<line class="svg-grid" x1="' + left + '" y1="' + y(value) + '" x2="' + (width - right) + '" y2="' + y(value) + '"/><text class="svg-label" x="' + (left - 6) + '" y="' + (y(value) + 3) + '" text-anchor="end">' + formatCompact(value) + '</text>').join("");
+  const aggregateLine = group.points.map((point, index) => (index ? "L" : "M") + x(point.x) + "," + y(point.aggregatePower)).join(" ");
+  const perGpuLine = group.points.map((point, index) => (index ? "L" : "M") + x(point.x) + "," + y(point.perGpuPower)).join(" ");
+  const aggregatePoints = group.points.map((point) => '<circle class="svg-point" ' + conditionTargetAttributes(point) + ' fill="#b45309" cx="' + x(point.x) + '" cy="' + y(point.aggregatePower) + '" r="5"><title>' + escapeSvg(point.label + "; aggregate " + formatDecimal(point.aggregatePower, 1) + " W; " + formatCompact(point.throughput) + " tokens/s") + '</title></circle>').join("");
+  const perGpuPoints = group.points.map((point) => '<circle class="svg-point" ' + conditionTargetAttributes(point) + ' fill="#0f766e" cx="' + x(point.x) + '" cy="' + y(point.perGpuPower) + '" r="4"><title>' + escapeSvg(point.label + "; " + formatDecimal(point.perGpuPower, 1) + " W per GPU") + '</title></circle>').join("");
+  const labels = '<text class="svg-label axis-title" x="' + width / 2 + '" y="' + (height - 4) + '" text-anchor="middle">GPU count</text><text class="svg-label axis-title" transform="translate(12 ' + height / 2 + ') rotate(-90)" text-anchor="middle">power (W)</text>';
+  card.append(svgElement(width, height, grid + '<path class="svg-line" stroke="#b45309" d="' + aggregateLine + '"/><path class="svg-line energy-per-gpu-line" stroke="#0f766e" d="' + perGpuLine + '"/>' + aggregatePoints + perGpuPoints + labels));
+  const legend = document.createElement("div");
+  legend.className = "energy-legend";
+  legend.innerHTML = '<span><i style="--legend-color:#b45309"></i>aggregate power</span><span><i style="--legend-color:#0f766e"></i>power per GPU</span>';
+  card.append(legend);
+  return card;
+}
+
+function renderEnergyToSolutionCharts(containerId, groups) {
+  const container = document.getElementById(containerId);
+  container.replaceChildren();
+  if (!groups.length) {
+    container.append(emptyState("No fixed-work distributed-strategy comparison matches the active filters."));
+    return;
+  }
+  groups.forEach((group) => container.append(energyToSolutionChartCard(group)));
+}
+
+function energyToSolutionChartCard(group) {
+  const card = chartCard(group.title, group.subtitle, group.comparison);
+  const width = 520;
+  const rowHeight = 35;
+  const height = 54 + group.entries.length * rowHeight;
+  const left = 168;
+  const right = 82;
+  const top = 18;
+  const scaleMaximum = max(group.entries.map((entry) => entry.energyMax)) || 1;
+  const scale = linearScale(0, scaleMaximum, left, width - right);
+  const bars = group.entries.map((entry, index) => {
+    const y = top + index * rowHeight;
+    const label = entry.strategyLabel.replaceAll("_", " ");
+    const title = entry.experiment + "; " + formatDecimal(entry.value, 0) + " J; " + formatCompact(entry.throughput) + " " + displayName(entry.throughputUnit) + "; measured " + formatDecimal(entry.duration, 2) + " s; range " + formatDecimal(entry.energyMin, 0) + "–" + formatDecimal(entry.energyMax, 0) + " J";
+    const whiskerY = y + 9;
+    const whisker = entry.trials > 1 && entry.energyMax > entry.energyMin
+      ? '<line class="svg-whisker energy-bar-whisker" x1="' + scale(entry.energyMin) + '" y1="' + whiskerY + '" x2="' + scale(entry.energyMax) + '" y2="' + whiskerY + '"/><line class="svg-whisker energy-bar-whisker" x1="' + scale(entry.energyMin) + '" y1="' + (whiskerY - 4) + '" x2="' + scale(entry.energyMin) + '" y2="' + (whiskerY + 4) + '"/><line class="svg-whisker energy-bar-whisker" x1="' + scale(entry.energyMax) + '" y1="' + (whiskerY - 4) + '" x2="' + scale(entry.energyMax) + '" y2="' + (whiskerY + 4) + '"/>'
+      : '';
+    return '<text class="svg-label energy-strategy-label" x="' + (left - 8) + '" y="' + (y + 13) + '" text-anchor="end">' + escapeSvg(label) + '</text><rect class="svg-energy-bar" ' + conditionTargetAttributes(entry) + ' x="' + left + '" y="' + y + '" width="' + Math.max(3, scale(entry.value) - left) + '" height="18" rx="3"><title>' + escapeSvg(title) + '</title></rect>' + whisker + '<text class="svg-value" x="' + (width - right + 7) + '" y="' + (y + 13) + '">' + formatCompact(entry.value) + ' J</text>';
+  }).join("");
+  const axis = '<line class="svg-axis" x1="' + left + '" y1="' + (height - 27) + '" x2="' + (width - right) + '" y2="' + (height - 27) + '"/><text class="svg-label axis-title" x="' + ((left + width - right) / 2) + '" y="' + (height - 5) + '" text-anchor="middle">measured-region energy (J) · lower is better</text>';
+  card.append(svgElement(width, height, bars + axis));
+  return card;
 }
 
 function buildEnergyPowerEntries(rows) {
@@ -953,6 +1106,8 @@ function buildEnergyPowerEntries(rows) {
       throughput: average(throughputValues),
       duration: average(durationValues),
       tokensPerKwh: average(efficiencyValues),
+      tokensPerKwhMin: efficiencyValues.length ? Math.min(...efficiencyValues) : 0,
+      tokensPerKwhMax: efficiencyValues.length ? Math.max(...efficiencyValues) : 0,
     };
   }).sort((left, right) => right.value - left.value);
 }
@@ -981,6 +1136,8 @@ function buildEnergyEfficiencyGroups(rows) {
       conditionId: entry.conditionId,
       energyMin: entry.energyMin,
       energyMax: entry.energyMax,
+      efficiencyMin: entry.tokensPerKwhMin,
+      efficiencyMax: entry.tokensPerKwhMax,
       trials: entry.trials,
     })),
   })).sort((left, right) => right.points.length - left.points.length || left.title.localeCompare(right.title));
@@ -2032,7 +2189,7 @@ function median(values) {
 }
 
 function displayName(key) {
-  return key.replaceAll("_", " ");
+  return key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replaceAll("_", " ").toLowerCase();
 }
 
 function formatCell(value) {
