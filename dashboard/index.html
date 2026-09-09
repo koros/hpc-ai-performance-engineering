@@ -186,9 +186,12 @@
             <p class="chart-note">Colours identify the same strategy everywhere. Platform, workload, precision, GPU count, batch settings, and throughput unit remain fixed within the selected comparison. Select a bar for trial details.</p>
           </article>
           <article class="panel chart-panel precision-analysis-panel panel-wide" data-metrics="throughput memory latency">
-            <div class="panel-heading"><h2>How does precision affect speed and memory?</h2><span id="precisionStatus">No precision evidence</span></div>
-            <div id="precisionBars" class="controlled-comparison-list"></div>
-            <p class="chart-note">Precision formats remain separated by platform, workload, training mode, and throughput unit.</p>
+            <div class="panel-heading"><div><h2>How does numeric precision affect speed and GPU memory?</h2><p class="panel-subtitle">Choose one matched workload, then compare FP32, FP16, and BF16 without changing the hardware or training setup.</p></div><span id="precisionStatus">No precision evidence</span></div>
+            <div class="precision-controls" aria-label="Numeric precision chart controls">
+              <label>Comparison<select id="precisionComparisonFilter" aria-label="Precision comparison"></select></label>
+            </div>
+            <div id="precisionBars" class="precision-visualization"></div>
+            <p class="chart-note">Colours identify the same precision format in both charts. Longer throughput bars are better; shorter memory bars use less GPU memory. Select any bar for trial details.</p>
           </article>
         </div>
       </section>
