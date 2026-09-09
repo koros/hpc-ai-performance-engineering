@@ -136,6 +136,7 @@ function bindInputs() {
   filterDefinitions.forEach(([id]) => document.getElementById(id).addEventListener("change", safeRender));
   document.getElementById("evidenceFilter").addEventListener("change", safeRender);
   document.getElementById("metricFilter").addEventListener("change", safeRender);
+  document.getElementById("trainingStudyFilter").addEventListener("change", safeRender);
   document.getElementById("resetFilters").addEventListener("click", resetFilters);
   document.getElementById("resultsFile").addEventListener("change", (event) => {
     readFile(event.target.files[0]).then((text) => {
@@ -293,6 +294,24 @@ function rebuildFilters() {
   filterDefinitions.forEach(([id, key]) => setFilterOptions(id, uniqueValues(state.results, key), key === "gpus"));
   setFilterOptions("researchQuestionFilter", uniqueValues(state.researchQuestionSummary, "research_question"));
   setFilterOptions("evidenceFilter", uniqueValues(state.trialSummary, "evidence_status"));
+  rebuildTrainingStudyFilter();
+}
+
+function rebuildTrainingStudyFilter() {
+  const select = document.getElementById("trainingStudyFilter");
+  const current = select.value;
+  const studies = uniqueValues(
+    state.trialSummary.filter((row) => row.mode === "training" && number(row.throughput_tokens_mean) > 0),
+    "phase",
+  );
+  select.replaceChildren();
+  studies.forEach((study) => select.append(option(study, study)));
+  const preferred = studies.includes(current)
+    ? current
+    : studies.includes("Strong scaling")
+      ? "Strong scaling"
+      : studies[0] || "";
+  select.value = preferred;
 }
 
 function setFilterOptions(id, values, numeric = false) {
@@ -1216,31 +1235,212 @@ function renderRankingTable() {
 }
 
 function renderUncertainty() {
-  const result = filteredAnalysisRows(state.trialSummary, ["platform_id", "comparability", "phase", "workload", "throughput_unit", "mode", "evidence_status"]);
-  const groups = buildUncertaintyGroups(result.rows);
-  renderErrorBarCharts("uncertaintyCharts", groups, result.message || "No completed trial throughput evidence.");
-  document.getElementById("uncertaintyStatus").textContent = result.message || groups.length + " unit-separated panels";
-  markPanel("uncertaintyCharts", groups.length > 0, buildUncertaintyGroups(state.trialSummary).length > 0, "Trial uncertainty", "trial_summary.csv");
+  const globalPhase = document.getElementById("phaseFilter").value;
+  const studyControl = document.getElementById("trainingStudyFilter");
+  const selectedStudy = globalPhase || studyControl.value;
+  studyControl.disabled = Boolean(globalPhase);
+  studyControl.title = globalPhase ? "The dashboard Phase filter is controlling this study." : "Choose a training study.";
+  const trainingRows = filteredTrialRowsWithEvidence().filter((row) => row.mode === "training" && (!selectedStudy || row.phase === selectedStudy));
+  const groups = buildUncertaintyGroups(trainingRows, state.results);
+  renderErrorBarCharts("uncertaintyCharts", groups, "No completed repeated training runs match this study and the active dashboard filters.");
+  renderTrainingStudySummary(groups, selectedStudy, "");
+  const configurations = sum(groups.map((group) => group.points.length));
+  document.getElementById("uncertaintyStatus").textContent = groups.length + " comparable group" + (groups.length === 1 ? "" : "s") + " · " + configurations + " configuration" + (configurations === 1 ? "" : "s");
+  markPanel("uncertaintyCharts", groups.length > 0, buildUncertaintyGroups(state.trialSummary.filter((row) => row.mode === "training"), state.results).length > 0, "Training repeatability", "trial_summary.csv");
 }
 
-function buildUncertaintyGroups(rows) {
-  const grouped = groupRows(rows.filter((row) => number(row.throughput_tokens_mean) > 0 && number(row.completed_trials) > 0), (row) => [row.platform_id || "unlabelled", row.comparability || "unspecified", row.workload || "unassigned", row.throughput_unit || "unit_not_recorded"]);
+function filteredTrialRowsWithEvidence() {
+  const conditionIds = new Set(filteredResults().map(conditionId).filter(Boolean));
+  const evidenceStatus = document.getElementById("evidenceFilter").value;
+  return state.trialSummary.filter((row) => conditionIds.has(conditionId(row)) && (!evidenceStatus || row.evidence_status === evidenceStatus));
+}
+
+function buildUncertaintyGroups(rows, evidenceRows = []) {
+  const metadata = conditionMetadata(evidenceRows);
+  const enriched = rows
+    .filter((row) => number(row.throughput_tokens_mean) > 0 && number(row.completed_trials) > 0)
+    .map((row) => ({ ...(metadata.get(conditionId(row)) || {}), ...row }));
+  const grouped = groupRows(enriched, (row) => [
+    row.phase || "Unclassified study",
+    row.platform_id || "unlabelled",
+    row.comparability || "unspecified",
+    row.workload || "unassigned",
+    row.throughput_unit || "unit_not_recorded",
+    trainingComparisonSubgroup(row),
+  ]);
   return Object.entries(grouped).map(([key, group]) => {
-    const [platform, comparability, workload, unit] = key.split("\u0000");
+    const [phase, platform, comparability, workload, unit] = key.split("\u0000");
+    const variableKeys = trainingVariableKeys(phase, group);
+    const constants = trainingConstantFields(phase, group);
     return {
-      title: platform + " · " + comparability + " · " + workload,
-      subtitle: unit,
-      platform, comparability, workload, unit,
-      comparison: comparisonContext(group, ["Experiment condition"], ["platform_id", "comparability", "workload", "throughput_unit"]),
+      title: displayPlatform(platform) + " · " + displayComparability(comparability) + " · " + displayWorkload(workload),
+      subtitle: humanizeThroughputUnit(unit),
+      phase, platform, comparability, workload, unit,
+      comparison: comparisonContext(
+        group,
+        variableKeys.length ? variableKeys.map(trainingVariableLabel) : ["Repeated runs of one configuration"],
+        constants,
+      ),
       points: group.map((row) => ({
-        label: row.experiment_id + " · " + row.workload,
+        label: trainingConfigurationLabel(row, variableKeys),
+        meta: trainingPointMeta(row),
         value: number(row.throughput_tokens_mean),
         low: number(row.throughput_tokens_ci95_low) || number(row.throughput_tokens_mean),
         high: number(row.throughput_tokens_ci95_high) || number(row.throughput_tokens_mean),
+        trials: number(row.completed_trials),
+        cvPercent: number(row.throughput_tokens_mean) > 0 ? number(row.throughput_tokens_std) / number(row.throughput_tokens_mean) * 100 : 0,
+        hasInterval: number(row.completed_trials) > 1 && number(row.throughput_tokens_ci95_high) > number(row.throughput_tokens_ci95_low),
         conditionId: conditionId(row),
       })).sort((left, right) => right.value - left.value).slice(0, 10),
     };
-  }).sort((left, right) => left.title.localeCompare(right.title));
+  }).sort((left, right) => (left.platform + left.workload + left.title).localeCompare(right.platform + right.workload + right.title));
+}
+
+function conditionMetadata(rows) {
+  const metadata = new Map();
+  rows.filter((row) => row.status === "completed").forEach((row) => {
+    const id = conditionId(row);
+    if (id && !metadata.has(id)) metadata.set(id, row);
+  });
+  return metadata;
+}
+
+function trainingComparisonSubgroup(row) {
+  if (row.phase === "Distributed training strategy") return "gpus=" + (row.gpus || "unspecified");
+  if (row.phase === "Memory optimisation") {
+    return [row.parameter_memory_study_type || "memory", row.gpus || "unspecified", row.strategy || "unspecified"].join("|");
+  }
+  return "study";
+}
+
+function trainingVariableKeys(phase, rows) {
+  const preferred = {
+    "Strong scaling": ["gpus"],
+    "Weak scaling": ["gpus", "global_batch_size"],
+    "Distributed training strategy": ["strategy"],
+    "Precision study": ["precision"],
+    "Communication analysis": ["strategy"],
+    "Baseline profiling": ["parameter_profile_target"],
+    "Workload characterisation": ["batch_size", "parameter_sequence_length"],
+  }[phase] || [];
+  const memoryStudy = rows[0] && rows[0].parameter_memory_study_type;
+  const memoryVariables = {
+    micro_batch: ["parameter_micro_batch_size"],
+    checkpointing: ["parameter_activation_checkpointing"],
+    gradient_accumulation: ["parameter_gradient_accumulation_steps"],
+  }[memoryStudy] || [];
+  const candidates = [...memoryVariables, ...preferred, "gpus", "strategy", "precision", "global_batch_size", "parameter_micro_batch_size", "parameter_gradient_accumulation_steps", "parameter_activation_checkpointing", "parameter_sequence_length"];
+  return [...new Set(candidates)].filter((key) => uniqueTrainingValues(rows, key).length > 1).slice(0, 3);
+}
+
+function trainingConstantFields(phase, rows) {
+  const fields = ["platform_id", "comparability", "workload", "throughput_unit", "precision"];
+  if (phase === "Distributed training strategy") fields.push("gpus");
+  if (phase === "Memory optimisation") fields.push("gpus", "strategy");
+  return [...new Set(fields)].filter((key) => uniqueTrainingValues(rows, key).length === 1);
+}
+
+function uniqueTrainingValues(rows, key) {
+  return [...new Set(rows.map((row) => String(trainingVariableValue(row, key) || "").trim()).filter(Boolean))];
+}
+
+function trainingVariableValue(row, key) {
+  if (key === "parameter_micro_batch_size") return row.parameter_micro_batch_size || row.per_gpu_batch_size || row.batch_size;
+  if (key === "parameter_sequence_length") return row.parameter_sequence_length || row.metric_sequence_length;
+  return row[key];
+}
+
+function trainingVariableLabel(key) {
+  return {
+    gpus: "GPU count",
+    strategy: "Distributed strategy",
+    precision: "Numerical precision",
+    global_batch_size: "Global batch size",
+    batch_size: "Batch size",
+    parameter_micro_batch_size: "Micro-batch size",
+    parameter_gradient_accumulation_steps: "Accumulation steps",
+    parameter_activation_checkpointing: "Activation checkpointing",
+    parameter_sequence_length: "Sequence length",
+    parameter_profile_target: "Profiler target",
+  }[key] || displayName(key);
+}
+
+function trainingConfigurationLabel(row, keys) {
+  if (!keys.length) return "Configuration " + row.experiment_id;
+  return keys.map((key) => {
+    const value = trainingVariableValue(row, key);
+    if (key === "gpus") return value + " GPU" + (number(value) === 1 ? "" : "s");
+    if (key === "strategy") return displayStrategy(value);
+    if (key === "precision") return String(value || "").toUpperCase();
+    if (key === "parameter_activation_checkpointing") return String(value).toLowerCase() === "true" ? "Checkpointing on" : "Checkpointing off";
+    if (key === "global_batch_size") return "Global batch " + value;
+    if (key === "batch_size") return "Batch " + value;
+    if (key === "parameter_micro_batch_size") return "Micro-batch " + value;
+    if (key === "parameter_gradient_accumulation_steps") return "Accumulate " + value + "×";
+    if (key === "parameter_sequence_length") return "Sequence " + value;
+    return String(value || row.experiment_id).replaceAll("_", " ");
+  }).join(" · ");
+}
+
+function trainingPointMeta(row) {
+  const trials = number(row.completed_trials);
+  const mean = number(row.throughput_tokens_mean);
+  const variation = mean > 0 && trials > 1 ? number(row.throughput_tokens_std) / mean * 100 : 0;
+  return row.experiment_id + " · " + formatInteger(trials) + " completed trial" + (trials === 1 ? "" : "s") + (trials > 1 ? " · " + formatDecimal(variation, 1) + "% run variation" : " · interval unavailable");
+}
+
+function renderTrainingStudySummary(groups, study, message) {
+  const container = document.getElementById("trainingStudySummary");
+  container.replaceChildren();
+  const points = groups.flatMap((group) => group.points.map((point) => ({ ...point, group })));
+  if (!points.length) {
+    container.append(emptyState(message || "No completed repeated training runs are available for this study."));
+    return;
+  }
+  const fastest = [...points].sort((left, right) => right.value - left.value)[0];
+  const repeatable = points.filter((point) => point.trials > 1).sort((left, right) => left.cvPercent - right.cvPercent)[0];
+  const cards = [
+    {
+      label: "Question answered",
+      value: trainingStudyQuestion(study),
+      detail: "One controlled study is shown at a time.",
+      wide: true,
+    },
+    {
+      label: "Configurations compared",
+      value: formatInteger(points.length),
+      detail: groups.length + " separate platform/workload group" + (groups.length === 1 ? "" : "s"),
+    },
+    {
+      label: "Fastest average",
+      value: formatCompact(fastest.value),
+      detail: fastest.group.title + " · " + fastest.label,
+    },
+    {
+      label: "Most consistent runs",
+      value: repeatable ? formatDecimal(repeatable.cvPercent, 1) + "% variation" : "Not estimable",
+      detail: repeatable ? repeatable.group.title + " · " + repeatable.label : "At least two completed trials are required.",
+    },
+  ];
+  cards.forEach((entry) => {
+    const card = document.createElement("article");
+    card.className = "training-summary-card" + (entry.wide ? " training-summary-question" : "");
+    card.innerHTML = "<span>" + escapeHtml(entry.label) + "</span><strong>" + escapeHtml(entry.value) + "</strong><small>" + escapeHtml(entry.detail) + "</small>";
+    container.append(card);
+  });
+}
+
+function trainingStudyQuestion(study) {
+  return {
+    "Strong scaling": "How much faster does a fixed workload run as GPU count increases?",
+    "Weak scaling": "Does throughput keep pace as workload and GPU count increase together?",
+    "Distributed training strategy": "Which distributed strategy delivers the highest throughput at the same GPU count?",
+    "Precision study": "How does numerical precision change training throughput?",
+    "Memory optimisation": "Which memory technique changes capacity without sacrificing too much throughput?",
+    "Communication analysis": "How does the distributed strategy affect communication performance?",
+    "Baseline profiling": "How consistent are the baseline profiler measurements?",
+    "Workload characterisation": "How does the workload respond to its tested configuration settings?",
+  }[study] || "How fast and repeatable are the completed training configurations?";
 }
 
 function renderErrorBarCharts(containerId, groups, emptyMessage) {
@@ -1255,73 +1455,138 @@ function renderErrorBarCharts(containerId, groups, emptyMessage) {
 
 function errorBarChartCard(group) {
   const card = chartCard(group.title, group.subtitle, group.comparison);
-  const width = 500;
-  const height = Math.max(110, group.points.length * 28 + 44);
-  const left = 145;
-  const right = 25;
-  const top = 16;
-  const bottom = 22;
+  card.classList.add("repeatability-chart-card");
+  const width = 620;
+  const rowHeight = 44;
+  const height = Math.max(142, group.points.length * rowHeight + 54);
+  const left = 205;
+  const right = 42;
+  const top = 18;
+  const bottom = 34;
   const domain = paddedDomain(group.points.flatMap((point) => [point.low, point.high, point.value]), true);
   const scale = linearScale(domain[0], domain[1], left, width - right);
-  const y = (index) => top + index * 28 + 8;
+  const y = (index) => top + index * rowHeight + 14;
   const ticks = [domain[0], (domain[0] + domain[1]) / 2, domain[1]];
-  const grids = ticks.map((value) => '<line class="svg-grid" x1="' + scale(value) + '" y1="' + (top - 8) + '" x2="' + scale(value) + '" y2="' + (height - bottom) + '"/><text class="svg-label" x="' + scale(value) + '" y="' + (height - 5) + '" text-anchor="middle">' + formatCompact(value) + "</text>").join("");
-  const marks = group.points.map((point, index) => '<text class="svg-label" x="' + (left - 7) + '" y="' + (y(index) + 3) + '" text-anchor="end">' + escapeSvg(point.label) + '</text><line class="svg-line" stroke="' + colors[index % colors.length] + '" x1="' + scale(point.low) + '" y1="' + y(index) + '" x2="' + scale(point.high) + '" y2="' + y(index) + '"/><circle class="svg-point" ' + conditionTargetAttributes(point) + ' fill="' + colors[index % colors.length] + '" cx="' + scale(point.value) + '" cy="' + y(index) + '" r="4"><title>' + escapeSvg(point.label + ": " + formatCompact(point.value) + " (" + formatCompact(point.low) + "–" + formatCompact(point.high) + ")") + "</title></circle>").join("");
-  card.append(svgElement(width, height, grids + marks));
+  const grids = ticks.map((value) => '<line class="svg-grid" x1="' + scale(value) + '" y1="' + (top - 8) + '" x2="' + scale(value) + '" y2="' + (height - bottom) + '"/><text class="svg-label svg-axis-label" x="' + scale(value) + '" y="' + (height - 8) + '" text-anchor="middle">' + formatCompact(value) + "</text>").join("");
+  const marks = group.points.map((point, index) => {
+    const interval = point.hasInterval
+      ? '<line class="svg-interval" x1="' + scale(point.low) + '" y1="' + y(index) + '" x2="' + scale(point.high) + '" y2="' + y(index) + '"/><line class="svg-interval-cap" x1="' + scale(point.low) + '" y1="' + (y(index) - 5) + '" x2="' + scale(point.low) + '" y2="' + (y(index) + 5) + '"/><line class="svg-interval-cap" x1="' + scale(point.high) + '" y1="' + (y(index) - 5) + '" x2="' + scale(point.high) + '" y2="' + (y(index) + 5) + '"/>'
+      : "";
+    const title = point.label + ": average " + formatInteger(point.value) + " " + humanizeThroughputUnit(group.unit) + (point.hasInterval ? "; 95% interval " + formatInteger(point.low) + "–" + formatInteger(point.high) : "; confidence interval unavailable");
+    return '<text class="svg-label svg-condition-label" x="' + (left - 9) + '" y="' + (y(index) - 3) + '" text-anchor="end">' + escapeSvg(point.label) + '</text><text class="svg-label svg-condition-meta" x="' + (left - 9) + '" y="' + (y(index) + 11) + '" text-anchor="end">' + escapeSvg(point.meta) + "</text>" + interval + '<circle class="svg-point repeatability-point" ' + conditionTargetAttributes(point) + ' fill="' + colors[index % colors.length] + '" cx="' + scale(point.value) + '" cy="' + y(index) + '" r="5"><title>' + escapeSvg(title) + "</title></circle>";
+  }).join("");
+  const svg = svgElement(width, height, grids + marks);
+  svg.setAttribute("aria-label", group.title + ": average throughput with 95% confidence intervals");
+  card.append(svg);
   return card;
 }
 
 function renderStrategy() {
-  const result = filteredAnalysisRows(state.strategySummary, ["platform_id", "comparability", "workload", "throughput_unit", "strategy", "precision", "gpus"]);
-  const entries = buildStrategyEntries(result.rows);
-  entries.forEach((entry) => {
-    entry.conditionIds = matchingConditionIds({ platform_id: entry.platform, comparability: entry.comparability, workload: entry.workload, model: entry.model, precision: entry.precision, strategy: entry.strategy, gpus: entry.gpus, throughput_unit: entry.unit });
-  });
-  renderSeparatedBars("strategyBars", entries, { empty: result.message || "No completed distributed-strategy evidence.", value: (entry) => formatInteger(entry.value) + " " + entry.unit, changing: (group) => varyingLabels(group, ["platform", "comparability", "workload", "strategy", "precision", "gpus"]), constants: ["platform", "comparability", "workload", "precision", "gpus"] });
-  document.getElementById("strategyStatus").textContent = result.message || entries.length + " conditions";
-  markPanel("strategyBars", entries.length > 0, buildStrategyEntries(state.strategySummary).length > 0, "Distributed strategy", "strategy_summary.csv", true);
+  const rows = filteredTrialRowsWithEvidence().filter((row) => row.mode === "training" && row.phase === "Distributed training strategy");
+  const groups = buildStrategyComparisonGroups(rows, state.results);
+  renderControlledComparisonCards("strategyBars", groups, "No matched distributed-strategy comparisons are available for the active filters.");
+  const conditions = sum(groups.map((group) => group.entries.length));
+  document.getElementById("strategyStatus").textContent = groups.length + " controlled comparison" + (groups.length === 1 ? "" : "s") + " · " + conditions + " configurations";
+  markPanel("strategyBars", groups.length > 0, buildStrategyComparisonGroups(state.trialSummary, state.results).length > 0, "Distributed strategy", "trial_summary.csv", true);
 }
 
-function buildStrategyEntries(rows) {
-  return rows.map((row) => ({
-    label: row.platform_id + " · " + row.comparability + " · " + row.workload + " · " + row.strategy,
-    detail: row.precision + " · " + row.gpus + " GPU" + (number(row.gpus) === 1 ? "" : "s"),
-    platform: row.platform_id,
-    comparability: row.comparability,
-    workload: row.workload,
-    model: row.model,
-    strategy: row.strategy,
-    precision: row.precision,
-    gpus: row.gpus,
-    unit: row.throughput_unit || "unit_not_recorded",
-    value: number(row.avg_throughput_tokens_sec),
-  })).filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value);
+function buildStrategyComparisonGroups(rows, evidenceRows = []) {
+  return buildControlledTrainingGroups(
+    rows,
+    evidenceRows,
+    (row) => row.mode === "training" && row.phase === "Distributed training strategy",
+    (row) => [row.platform_id, row.comparability, row.workload, row.model, row.precision, row.gpus, row.global_batch_size, trainingVariableValue(row, "parameter_sequence_length"), row.throughput_unit],
+    "strategy",
+    "ddp",
+  );
 }
 
 function renderPrecision() {
-  const result = filteredAnalysisRows(state.precisionSummary, ["platform_id", "comparability", "workload", "throughput_unit", "mode", "precision"]);
-  const entries = buildPrecisionEntries(result.rows);
-  entries.forEach((entry) => {
-    entry.conditionIds = matchingConditionIds({ platform_id: entry.platform, comparability: entry.comparability, workload: entry.workload, model: entry.model, mode: entry.mode, precision: entry.precision, throughput_unit: entry.unit });
-  });
-  renderSeparatedBars("precisionBars", entries, { empty: result.message || "No completed precision-study evidence.", value: (entry) => formatInteger(entry.value) + " " + entry.unit, changing: (group) => varyingLabels(group, ["platform", "comparability", "workload", "precision", "mode"]), constants: ["platform", "comparability", "workload", "mode"] });
-  document.getElementById("precisionStatus").textContent = result.message || entries.length + " conditions";
-  markPanel("precisionBars", entries.length > 0, buildPrecisionEntries(state.precisionSummary).length > 0, "Precision trade-off", "precision_summary.csv", true);
+  const rows = filteredTrialRowsWithEvidence().filter((row) => row.mode === "training" && row.phase === "Precision study");
+  const groups = buildPrecisionComparisonGroups(rows, state.results);
+  renderControlledComparisonCards("precisionBars", groups, "No matched training-precision comparisons are available for the active filters.");
+  const conditions = sum(groups.map((group) => group.entries.length));
+  document.getElementById("precisionStatus").textContent = groups.length + " controlled comparison" + (groups.length === 1 ? "" : "s") + " · " + conditions + " configurations";
+  markPanel("precisionBars", groups.length > 0, buildPrecisionComparisonGroups(state.trialSummary, state.results).length > 0, "Training precision", "trial_summary.csv", true);
 }
 
-function buildPrecisionEntries(rows) {
-  return rows.map((row) => ({
-    label: row.platform_id + " · " + row.comparability + " · " + row.workload + " · " + row.precision,
-    detail: row.mode + " · " + formatDecimal(number(row.avg_memory_used_gb), 2) + " GB",
-    platform: row.platform_id,
-    comparability: row.comparability,
-    workload: row.workload,
-    model: row.model,
-    precision: row.precision,
-    mode: row.mode,
-    unit: row.throughput_unit || "unit_not_recorded",
-    value: number(row.avg_throughput_tokens_sec),
-  })).filter((entry) => entry.value > 0).sort((left, right) => right.value - left.value);
+function buildPrecisionComparisonGroups(rows, evidenceRows = []) {
+  return buildControlledTrainingGroups(
+    rows,
+    evidenceRows,
+    (row) => row.mode === "training" && row.phase === "Precision study",
+    (row) => [row.platform_id, row.comparability, row.workload, row.model, row.mode, row.gpus, row.global_batch_size, trainingVariableValue(row, "parameter_sequence_length"), row.throughput_unit],
+    "precision",
+    "bf16",
+  );
+}
+
+function buildControlledTrainingGroups(rows, evidenceRows, predicate, groupKey, variableKey, baselineValue) {
+  const metadata = conditionMetadata(evidenceRows);
+  const enriched = rows
+    .filter((row) => predicate(row) && number(row.throughput_tokens_mean) > 0 && number(row.completed_trials) > 0)
+    .map((row) => ({ ...(metadata.get(conditionId(row)) || {}), ...row }));
+  return Object.values(groupRows(enriched, groupKey)).map((group) => {
+    const sample = group[0];
+    const entries = group.map((row) => ({
+      key: row[variableKey],
+      label: variableKey === "strategy" ? displayStrategy(row[variableKey]) : String(row[variableKey] || "").toUpperCase(),
+      value: number(row.throughput_tokens_mean),
+      memory: conditionMetricAverage(evidenceRows, conditionId(row), ["metric_nvidia_smi_memory_used_gb_measured_region", "metric_memory_used_gb", "memory_used_gb"]),
+      trials: number(row.completed_trials),
+      conditionId: conditionId(row),
+    })).sort((left, right) => right.value - left.value);
+    const baseline = entries.find((entry) => entry.key === baselineValue);
+    entries.forEach((entry) => {
+      entry.deltaPercent = baseline && baseline.value ? (entry.value / baseline.value - 1) * 100 : null;
+      entry.isBaseline = entry === baseline;
+    });
+    return {
+      title: displayPlatform(sample.platform_id) + " · " + displayWorkload(sample.workload) + " · " + sample.gpus + " GPU" + (number(sample.gpus) === 1 ? "" : "s"),
+      subtitle: displayComparability(sample.comparability) + " · " + (variableKey === "strategy" ? String(sample.precision || "").toUpperCase() : "Training") + " · " + humanizeThroughputUnit(sample.throughput_unit),
+      comparison: comparisonContext(group, [trainingVariableLabel(variableKey)], ["platform_id", "comparability", "workload", "precision", "gpus", "throughput_unit"]),
+      unit: sample.throughput_unit,
+      baselineLabel: baseline ? baseline.label : "",
+      entries,
+    };
+  }).filter((group) => group.entries.length > 1).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function conditionMetricAverage(rows, id, keys) {
+  const values = rows.filter((row) => row.status === "completed" && conditionId(row) === id).flatMap((row) => {
+    const value = firstRecorded(row, keys);
+    return hasValue(value) && Number.isFinite(Number.parseFloat(value)) ? [number(value)] : [];
+  });
+  return values.length ? average(values) : null;
+}
+
+function renderControlledComparisonCards(containerId, groups, emptyMessage) {
+  const container = document.getElementById(containerId);
+  container.replaceChildren();
+  if (!groups.length) {
+    container.append(emptyState(emptyMessage));
+    return;
+  }
+  groups.forEach((group) => {
+    const card = document.createElement("article");
+    card.className = "controlled-comparison-card";
+    card.innerHTML = "<h3>" + escapeHtml(group.title) + "</h3><p>" + escapeHtml(group.subtitle) + "</p>";
+    card.append(comparisonContract(group.comparison));
+    const bars = document.createElement("div");
+    bars.className = "controlled-bars";
+    const maximum = max(group.entries.map((entry) => entry.value));
+    group.entries.forEach((entry) => {
+      const row = document.createElement("div");
+      row.className = "controlled-bar-row";
+      setConditionTarget(row, entry.conditionId);
+      const relative = entry.isBaseline ? "Baseline" : entry.deltaPercent === null ? "No baseline" : signedPercent(entry.deltaPercent) + " vs " + group.baselineLabel;
+      const memory = entry.memory === null ? "memory not recorded" : formatDecimal(entry.memory, 2) + " GB memory";
+      row.innerHTML = '<div class="bar-meta"><strong>' + escapeHtml(entry.label) + '</strong><span>' + escapeHtml(formatInteger(entry.value) + " " + humanizeThroughputUnit(group.unit)) + '</span></div><div class="bar-detail">' + escapeHtml(relative + " · " + memory + " · " + entry.trials + " trials") + '</div><div class="bar-track"><div class="bar-fill" style="width: ' + Math.max(3, entry.value / maximum * 100) + '%"></div></div>';
+      bars.append(row);
+    });
+    card.append(bars);
+    container.append(card);
+  });
 }
 
 function renderMemory() {
@@ -2061,7 +2326,7 @@ function chartCard(title, subtitle, comparison) {
 function comparisonContext(rows, changing, constantFields) {
   const constants = constantFields.flatMap((key) => {
     const values = [...new Set(rows.map((row) => String(row[key] || "").trim()).filter(Boolean))];
-    return values.length === 1 ? [{ label: displayName(key), value: values[0] }] : [];
+    return values.length === 1 ? [{ label: displayFieldLabel(key), value: displayContextValue(key, values[0]) }] : [];
   });
   return { changing: changing.length ? changing : ["Multiple recorded settings"], constants };
 }
@@ -2091,8 +2356,8 @@ function comparisonContract(context) {
 }
 
 function varyingLabels(rows, fields) {
-  const labels = fields.filter((key) => new Set(rows.map((row) => String(row[key] || "").trim()).filter(Boolean)).size > 1).map(displayName);
-  return labels.length ? labels : ["Experiment condition"];
+  const labels = fields.filter((key) => new Set(rows.map((row) => String(row[key] || "").trim()).filter(Boolean)).size > 1).map(displayFieldLabel);
+  return labels.length ? labels : ["Configuration being tested"];
 }
 
 function conditionId(row) {
@@ -2192,6 +2457,69 @@ function displayName(key) {
   return key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replaceAll("_", " ").toLowerCase();
 }
 
+function displayFieldLabel(key) {
+  return {
+    platform: "Platform",
+    platform_id: "Platform",
+    comparability: "Configuration class",
+    workload: "Workload",
+    throughput_unit: "Throughput measure",
+    precision: "Precision",
+    strategy: "Strategy",
+    gpus: "GPU count",
+    mode: "Mode",
+  }[key] || displayName(key).replace(/^./, (character) => character.toUpperCase());
+}
+
+function displayContextValue(key, value) {
+  if (key === "platform" || key === "platform_id") return displayPlatform(value);
+  if (key === "comparability") return displayComparability(value);
+  if (key === "workload") return displayWorkload(value);
+  if (key === "throughput_unit") return humanizeThroughputUnit(value);
+  if (key === "strategy") return displayStrategy(value);
+  if (key === "precision") return String(value || "").toUpperCase();
+  return String(value || "").replaceAll("_", " ");
+}
+
+function displayPlatform(value) {
+  return { h100: "H100", l40s: "L40S" }[String(value || "").toLowerCase()] || String(value || "Unlabelled platform").toUpperCase();
+}
+
+function displayComparability(value) {
+  return {
+    exact: "Original configuration",
+    capacity_adjusted: "Capacity-adjusted",
+    platform_specific: "Platform-specific",
+  }[value] || String(value || "Unspecified configuration").replaceAll("_", " ");
+}
+
+function displayWorkload(value) {
+  return {
+    distilbert: "DistilBERT",
+    gpt2_small: "GPT-2 Small",
+    tinyllama: "TinyLlama",
+  }[value] || String(value || "Unassigned workload").replaceAll("_", " ");
+}
+
+function displayStrategy(value) {
+  return {
+    ddp: "DDP",
+    fsdp: "FSDP",
+    deepspeed_zero1: "DeepSpeed ZeRO-1",
+    deepspeed_zero2: "DeepSpeed ZeRO-2",
+    deepspeed_zero3: "DeepSpeed ZeRO-3",
+    none: "Single GPU",
+  }[value] || String(value || "Unspecified strategy").replaceAll("_", " ");
+}
+
+function humanizeThroughputUnit(value) {
+  return {
+    training_tokens_per_second: "Training tokens per second",
+    generated_tokens_per_second: "Generated tokens per second",
+    input_tokens_per_second: "Input tokens per second",
+  }[value] || String(value || "Throughput unit not recorded").replaceAll("_", " ");
+}
+
 function formatCell(value) {
   if (!isNumeric(value)) return value || "";
   const numeric = number(value);
@@ -2256,7 +2584,9 @@ if (typeof module !== "undefined" && module.exports) {
     buildRq1ScalingSeries,
     buildRq2StrategyGroups,
     buildScalingSeries,
+    buildStrategyComparisonGroups,
     buildStudyCoverageEntries,
+    buildPrecisionComparisonGroups,
     buildUncertaintyGroups,
     comparisonContext,
     dashboardAlertMessage,

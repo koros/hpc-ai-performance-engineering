@@ -18,7 +18,9 @@ const {
   buildRq1ScalingSeries,
   buildRq2StrategyGroups,
   buildScalingSeries,
+  buildStrategyComparisonGroups,
   buildStudyCoverageEntries,
+  buildPrecisionComparisonGroups,
   buildUncertaintyGroups,
   comparisonContext,
   dashboardAlertMessage,
@@ -147,6 +149,116 @@ run("uncertainty panels split platform, comparability, workload, and unit", () =
   ]);
 
   assert.equal(groups.length, 5);
+});
+
+run("training repeatability groups isolate study phase and expose the tested variable", () => {
+  const trial = (experiment_id, phase) => ({
+    condition_id: experiment_id + "@h100",
+    experiment_id,
+    platform_id: "h100",
+    comparability: "exact",
+    phase,
+    workload: "gpt2_small",
+    mode: "training",
+    throughput_unit: "training_tokens_per_second",
+    completed_trials: 3,
+    throughput_tokens_mean: experiment_id === "E034" ? 200 : 100,
+    throughput_tokens_std: 5,
+    throughput_tokens_ci95_low: 90,
+    throughput_tokens_ci95_high: 110,
+  });
+  const evidence = [
+    { condition_id: "E033@h100", experiment_id: "E033", status: "completed", gpus: 2, global_batch_size: 64 },
+    { condition_id: "E034@h100", experiment_id: "E034", status: "completed", gpus: 4, global_batch_size: 64 },
+  ];
+
+  const groups = buildUncertaintyGroups([
+    trial("E033", "Strong scaling"),
+    trial("E034", "Strong scaling"),
+    trial("E035", "Weak scaling"),
+  ], evidence);
+
+  assert.equal(groups.length, 2);
+  const strong = groups.find((group) => group.phase === "Strong scaling");
+  assert.deepEqual(strong.comparison.changing, ["GPU count"]);
+  assert.deepEqual(strong.points.map((point) => point.label), ["4 GPUs", "2 GPUs"]);
+  assert.match(strong.points[0].meta, /3 completed trials/);
+});
+
+run("distributed-strategy repeatability comparisons do not mix GPU counts", () => {
+  const common = {
+    platform_id: "h100", comparability: "exact", phase: "Distributed training strategy",
+    workload: "distilbert", mode: "training", throughput_unit: "training_tokens_per_second",
+    completed_trials: 3, throughput_tokens_mean: 100, throughput_tokens_std: 2,
+    throughput_tokens_ci95_low: 95, throughput_tokens_ci95_high: 105,
+  };
+  const trials = [
+    { ...common, condition_id: "E055@h100", experiment_id: "E055" },
+    { ...common, condition_id: "E056@h100", experiment_id: "E056" },
+  ];
+  const evidence = [
+    { condition_id: "E055@h100", status: "completed", gpus: 2, strategy: "ddp", precision: "bf16" },
+    { condition_id: "E056@h100", status: "completed", gpus: 4, strategy: "ddp", precision: "bf16" },
+  ];
+
+  assert.equal(buildUncertaintyGroups(trials, evidence).length, 2);
+});
+
+run("strategy comparisons are matched and report change relative to DDP", () => {
+  const common = {
+    platform_id: "h100", comparability: "exact", phase: "Distributed training strategy",
+    workload: "gpt2_small", model: "gpt2", mode: "training", precision: "bf16", gpus: 2,
+    global_batch_size: 64, throughput_unit: "training_tokens_per_second", completed_trials: 3,
+  };
+  const trials = [
+    { ...common, condition_id: "E047@h100", experiment_id: "E047", throughput_tokens_mean: 100 },
+    { ...common, condition_id: "E049@h100", experiment_id: "E049", throughput_tokens_mean: 125 },
+    { ...common, condition_id: "E050@h100", experiment_id: "E050", throughput_tokens_mean: 150, gpus: 4 },
+  ];
+  const evidence = [
+    { ...trials[0], status: "completed", strategy: "ddp", memory_used_gb: 10 },
+    { ...trials[1], status: "completed", strategy: "fsdp", memory_used_gb: 8 },
+    { ...trials[2], status: "completed", strategy: "fsdp", memory_used_gb: 8 },
+  ];
+
+  const groups = buildStrategyComparisonGroups(trials, evidence);
+
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].entries.length, 2);
+  assert.equal(groups[0].entries.find((entry) => entry.key === "fsdp").deltaPercent, 25);
+  assert.equal(groups[0].entries.find((entry) => entry.key === "ddp").isBaseline, true);
+});
+
+run("precision comparisons omit single-configuration groups", () => {
+  const common = {
+    comparability: "exact", phase: "Precision study", workload: "gpt2_small", model: "gpt2",
+    mode: "training", gpus: 1, global_batch_size: 16, throughput_unit: "training_tokens_per_second",
+    completed_trials: 3,
+  };
+  const trials = [
+    { ...common, condition_id: "E083@l40s", experiment_id: "E083", platform_id: "l40s", throughput_tokens_mean: 100 },
+    { ...common, condition_id: "E084@l40s", experiment_id: "E084", platform_id: "l40s", throughput_tokens_mean: 110 },
+    { ...common, condition_id: "E090@h100", experiment_id: "E090", platform_id: "h100", throughput_tokens_mean: 200 },
+  ];
+  const evidence = [
+    { ...trials[0], status: "completed", precision: "bf16" },
+    { ...trials[1], status: "completed", precision: "fp16" },
+    { ...trials[2], status: "completed", precision: "bf16" },
+  ];
+
+  const groups = buildPrecisionComparisonGroups(trials, evidence);
+
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].entries.length, 2);
+  assert.ok(Math.abs(groups[0].entries.find((entry) => entry.key === "fp16").deltaPercent - 10) < 1e-9);
+});
+
+run("training analysis uses plain-language labels without encoded uncertainty text", () => {
+  const html = fs.readFileSync("dashboard/index.html", "utf8");
+  const source = fs.readFileSync("dashboard/app.js", "utf8");
+
+  assert.match(html, /Training speed and repeatability/);
+  assert.doesNotMatch(html + source, /Experiment condition|&#x55;ncertainty/i);
 });
 
 run("memory and scaling series never cross platform or comparability boundaries", () => {
@@ -376,8 +488,8 @@ run("comparison context reports only genuinely constant controls", () => {
 
   assert.deepEqual(context.changing, ["Precision", "GPU count"]);
   assert.deepEqual(context.constants, [
-    { label: "platform id", value: "l40s" },
-    { label: "workload", value: "gpt2" },
+    { label: "Platform", value: "L40S" },
+    { label: "Workload", value: "gpt2" },
   ]);
 });
 
