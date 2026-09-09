@@ -74,6 +74,13 @@ const rankingColumns = ["experiment_id", "platform_id", "comparability", "worklo
 const phaseColumns = ["platform_id", "comparability", "phase", "workload", "throughput_unit", "experiments", "completed", "failed"];
 const trialColumns = ["experiment_id", "platform_id", "comparability", "workload", "completed_trials", "failed_trials", "evidence_status", "throughput_tokens_mean", "throughput_tokens_ci95_low", "throughput_tokens_ci95_high"];
 const colors = ["#0f766e", "#2563eb", "#7c3aed", "#b45309", "#be123c", "#0891b2", "#4d7c0f"];
+const strategyColors = {
+  ddp: "#2563eb",
+  fsdp: "#0f766e",
+  deepspeed_zero1: "#7c3aed",
+  deepspeed_zero2: "#d97706",
+  deepspeed_zero3: "#be123c",
+};
 
 const detailMetricSections = [
   ["Performance", [
@@ -137,6 +144,8 @@ function bindInputs() {
   document.getElementById("evidenceFilter").addEventListener("change", safeRender);
   document.getElementById("metricFilter").addEventListener("change", safeRender);
   document.getElementById("trainingStudyFilter").addEventListener("change", safeRender);
+  document.getElementById("strategyComparisonFilter").addEventListener("change", safeRender);
+  document.getElementById("strategyMetricFilter").addEventListener("change", safeRender);
   document.getElementById("resetFilters").addEventListener("click", resetFilters);
   document.getElementById("resultsFile").addEventListener("change", (event) => {
     readFile(event.target.files[0]).then((text) => {
@@ -609,6 +618,7 @@ function resetFilters() {
   filterDefinitions.forEach(([id]) => { document.getElementById(id).value = ""; });
   document.getElementById("evidenceFilter").value = "";
   document.getElementById("metricFilter").value = "";
+  document.getElementById("strategyMetricFilter").value = "throughput";
   safeRender();
 }
 
@@ -1489,10 +1499,23 @@ function errorBarChartCard(group) {
 function renderStrategy() {
   const rows = filteredTrialRowsWithEvidence().filter((row) => row.mode === "training" && row.phase === "Distributed training strategy");
   const groups = buildStrategyComparisonGroups(rows, state.results);
-  renderControlledComparisonCards("strategyBars", groups, "No matched distributed-strategy comparisons are available for the active filters.");
+  const selectedGroup = syncStrategyComparisonControl(groups);
+  const metric = document.getElementById("strategyMetricFilter").value || "throughput";
+  renderStrategyComparisonChart("strategyBars", selectedGroup, metric, "No matched distributed-strategy comparisons are available for the active filters.");
   const conditions = sum(groups.map((group) => group.entries.length));
-  document.getElementById("strategyStatus").textContent = groups.length + " controlled comparison" + (groups.length === 1 ? "" : "s") + " · " + conditions + " configurations";
+  document.getElementById("strategyStatus").textContent = groups.length + " matched comparison" + (groups.length === 1 ? "" : "s") + " available · " + conditions + " configurations";
   markPanel("strategyBars", groups.length > 0, buildStrategyComparisonGroups(state.trialSummary, state.results).length > 0, "Distributed strategy", "trial_summary.csv", true);
+}
+
+function syncStrategyComparisonControl(groups) {
+  const select = document.getElementById("strategyComparisonFilter");
+  const current = select.value;
+  select.replaceChildren();
+  groups.forEach((group) => select.append(option(group.selectorLabel, group.id)));
+  select.disabled = groups.length < 2;
+  if (groups.some((group) => group.id === current)) select.value = current;
+  else if (groups.length) select.value = groups[0].id;
+  return groups.find((group) => group.id === select.value) || groups[0] || null;
 }
 
 function buildStrategyComparisonGroups(rows, evidenceRows = []) {
@@ -1531,7 +1554,7 @@ function buildControlledTrainingGroups(rows, evidenceRows, predicate, groupKey, 
   const enriched = rows
     .filter((row) => predicate(row) && number(row.throughput_tokens_mean) > 0 && number(row.completed_trials) > 0)
     .map((row) => ({ ...(metadata.get(conditionId(row)) || {}), ...row }));
-  return Object.values(groupRows(enriched, groupKey)).map((group) => {
+  return Object.entries(groupRows(enriched, groupKey)).map(([groupId, group]) => {
     const sample = group[0];
     const entries = group.map((row) => ({
       key: row[variableKey],
@@ -1547,7 +1570,9 @@ function buildControlledTrainingGroups(rows, evidenceRows, predicate, groupKey, 
       entry.isBaseline = entry === baseline;
     });
     return {
+      id: groupId.split("\u0000").map((part) => encodeURIComponent(part)).join("::"),
       title: displayPlatform(sample.platform_id) + " · " + displayWorkload(sample.workload) + " · " + sample.gpus + " GPU" + (number(sample.gpus) === 1 ? "" : "s"),
+      selectorLabel: displayPlatform(sample.platform_id) + " · " + displayWorkload(sample.workload) + " · " + sample.gpus + " GPU" + (number(sample.gpus) === 1 ? "" : "s"),
       subtitle: displayComparability(sample.comparability) + " · " + (variableKey === "strategy" ? String(sample.precision || "").toUpperCase() : "Training") + " · " + humanizeThroughputUnit(sample.throughput_unit),
       comparison: comparisonContext(group, [trainingVariableLabel(variableKey)], ["platform_id", "comparability", "workload", "precision", "gpus", "throughput_unit"]),
       unit: sample.throughput_unit,
@@ -1555,6 +1580,100 @@ function buildControlledTrainingGroups(rows, evidenceRows, predicate, groupKey, 
       entries,
     };
   }).filter((group) => group.entries.length > 1).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function renderStrategyComparisonChart(containerId, group, metric, emptyMessage) {
+  const container = document.getElementById(containerId);
+  container.replaceChildren();
+  if (!group) {
+    container.append(emptyState(emptyMessage));
+    return;
+  }
+  const entries = group.entries.filter((entry) => metric === "throughput" || entry.memory !== null);
+  if (!entries.length) {
+    container.append(emptyState("GPU memory was not recorded for this matched comparison."));
+    return;
+  }
+  const context = document.createElement("div");
+  context.className = "strategy-context";
+  context.innerHTML = "<div><span>Comparison shown</span><strong>" + escapeHtml(group.title) + "</strong><small>" + escapeHtml(group.subtitle) + "</small></div>";
+  context.append(comparisonContract(group.comparison));
+  container.append(context);
+  container.append(strategySummary(group));
+  container.append(strategyLegend(group.entries));
+  container.append(strategyBarChart(group, entries, metric));
+  const note = document.createElement("p");
+  note.className = "strategy-chart-note";
+  note.textContent = metric === "throughput"
+    ? "Longer bars indicate higher average training throughput. Percentages are relative to the matched DDP baseline."
+    : "Shorter bars indicate lower average measured GPU memory. Throughput results remain available through the metric selector.";
+  container.append(note);
+}
+
+function strategySummary(group) {
+  const summary = document.createElement("div");
+  summary.className = "strategy-summary-grid";
+  const fastest = [...group.entries].sort((left, right) => right.value - left.value)[0];
+  const lowestMemory = group.entries.filter((entry) => entry.memory !== null).sort((left, right) => left.memory - right.memory)[0];
+  const totalTrials = sum(group.entries.map((entry) => entry.trials));
+  const cards = [
+    ["Highest throughput", fastest.label, formatInteger(fastest.value) + " " + humanizeThroughputUnit(group.unit) + (fastest.isBaseline ? " · DDP baseline" : fastest.deltaPercent === null ? "" : " · " + signedPercent(fastest.deltaPercent) + " vs " + group.baselineLabel)],
+    ["Lowest GPU memory", lowestMemory ? lowestMemory.label : "Not recorded", lowestMemory ? formatDecimal(lowestMemory.memory, 2) + " GB measured" : "No comparable memory evidence"],
+    ["Evidence in chart", group.entries.length + " strategies", totalTrials + " completed trials"],
+  ];
+  cards.forEach(([label, value, detail]) => {
+    const card = document.createElement("article");
+    card.innerHTML = "<span>" + escapeHtml(label) + "</span><strong>" + escapeHtml(value) + "</strong><small>" + escapeHtml(detail) + "</small>";
+    summary.append(card);
+  });
+  return summary;
+}
+
+function strategyLegend(entries) {
+  const legend = document.createElement("div");
+  legend.className = "strategy-legend";
+  entries.forEach((entry) => {
+    const item = document.createElement("span");
+    item.innerHTML = '<i style="--strategy-color: ' + strategyColor(entry.key) + '"></i>' + escapeHtml(entry.label);
+    legend.append(item);
+  });
+  return legend;
+}
+
+function strategyBarChart(group, entries, metric) {
+  const width = 760;
+  const rowHeight = 52;
+  const left = 165;
+  const right = 110;
+  const top = 24;
+  const bottom = 42;
+  const height = Math.max(150, top + entries.length * rowHeight + bottom);
+  const values = entries.map((entry) => metric === "memory" ? entry.memory : entry.value);
+  const maximum = max(values);
+  const scale = linearScale(0, maximum || 1, left, width - right);
+  const ticks = [0, maximum / 2, maximum];
+  const formatValue = (value) => metric === "memory" ? formatDecimal(value, 1) + " GB" : formatCompact(value);
+  const grids = ticks.map((value) => '<line class="svg-grid" x1="' + scale(value) + '" y1="' + (top - 8) + '" x2="' + scale(value) + '" y2="' + (height - bottom + 4) + '"/><text class="svg-label svg-axis-label" x="' + scale(value) + '" y="' + (height - 12) + '" text-anchor="middle">' + escapeSvg(formatValue(value)) + "</text>").join("");
+  const marks = entries.map((entry, index) => {
+    const value = metric === "memory" ? entry.memory : entry.value;
+    const y = top + index * rowHeight;
+    const barWidth = Math.max(3, scale(value) - left);
+    const detail = metric === "memory"
+      ? formatDecimal(value, 2) + " GB · " + formatInteger(entry.value) + " " + humanizeThroughputUnit(group.unit)
+      : formatInteger(value) + " · " + (entry.isBaseline ? "DDP baseline" : entry.deltaPercent === null ? "No DDP baseline" : signedPercent(entry.deltaPercent) + " vs " + group.baselineLabel);
+    const visibleDetail = metric === "memory"
+      ? formatDecimal(value, 2) + " GB"
+      : formatCompact(value) + (entry.isBaseline ? " · baseline" : entry.deltaPercent === null ? "" : " · " + signedPercent(entry.deltaPercent));
+    return '<text class="svg-label strategy-axis-name" x="' + (left - 10) + '" y="' + (y + 17) + '" text-anchor="end">' + escapeSvg(entry.label) + '</text><rect class="strategy-svg-bar" ' + conditionTargetAttributes(entry) + ' fill="' + strategyColor(entry.key) + '" x="' + left + '" y="' + y + '" width="' + barWidth + '" height="22" rx="4"><title>' + escapeSvg(entry.label + ": " + detail) + '</title></rect><text class="svg-value strategy-bar-value" x="' + (width - 8) + '" y="' + (y + 15) + '" text-anchor="end">' + escapeSvg(visibleDetail) + "</text>";
+  }).join("");
+  const svg = svgElement(width, height, grids + marks);
+  svg.classList.add("strategy-svg-chart");
+  svg.setAttribute("aria-label", group.title + ": strategy comparison by " + (metric === "memory" ? "GPU memory" : "training throughput"));
+  return svg;
+}
+
+function strategyColor(key) {
+  return strategyColors[key] || "#64748b";
 }
 
 function conditionMetricAverage(rows, id, keys) {
@@ -2599,6 +2718,7 @@ if (typeof module !== "undefined" && module.exports) {
     comparisonContext,
     dashboardAlertMessage,
     pointAxisTicks,
+    strategyColor,
     summarizePhases,
   };
 }

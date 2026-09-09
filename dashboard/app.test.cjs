@@ -25,6 +25,7 @@ const {
   comparisonContext,
   dashboardAlertMessage,
   pointAxisTicks,
+  strategyColor,
   summarizePhases,
 } = require("./app.js");
 
@@ -236,6 +237,17 @@ run("strategy comparisons are matched and report change relative to DDP", () => 
   assert.equal(groups[0].entries.length, 2);
   assert.equal(groups[0].entries.find((entry) => entry.key === "fsdp").deltaPercent, 25);
   assert.equal(groups[0].entries.find((entry) => entry.key === "ddp").isBaseline, true);
+  assert.ok(groups[0].id);
+  assert.doesNotMatch(groups[0].id, /\u0000/);
+});
+
+run("distributed strategies have stable distinct chart colours", () => {
+  const strategies = ["ddp", "fsdp", "deepspeed_zero1", "deepspeed_zero2", "deepspeed_zero3"];
+  const colours = strategies.map(strategyColor);
+
+  assert.equal(new Set(colours).size, strategies.length);
+  assert.equal(strategyColor("ddp"), "#2563eb");
+  assert.equal(strategyColor("unknown"), "#64748b");
 });
 
 run("precision comparisons omit single-configuration groups", () => {
