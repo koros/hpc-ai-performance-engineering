@@ -242,12 +242,36 @@ run("strategy comparisons are matched and report change relative to DDP", () => 
 });
 
 run("distributed strategies have stable distinct chart colours", () => {
-  const strategies = ["ddp", "fsdp", "deepspeed_zero1", "deepspeed_zero2", "deepspeed_zero3"];
+  const strategies = ["ddp", "fsdp_full_shard", "fsdp_sharded_grad_op", "deepspeed_zero1", "deepspeed_zero2", "deepspeed_zero3"];
   const colours = strategies.map(strategyColor);
 
   assert.equal(new Set(colours).size, strategies.length);
   assert.equal(strategyColor("ddp"), "#2563eb");
   assert.equal(strategyColor("unknown"), "#64748b");
+});
+
+run("FSDP variants remain distinct inside matched strategy comparisons", () => {
+  const common = {
+    platform_id: "h100", comparability: "exact", phase: "Distributed training strategy",
+    workload: "gpt2_small", model: "gpt2", mode: "training", precision: "bf16", gpus: 2,
+    global_batch_size: 64, throughput_unit: "training_tokens_per_second", completed_trials: 3,
+  };
+  const trials = [
+    { ...common, condition_id: "E047@h100", experiment_id: "E047", throughput_tokens_mean: 100 },
+    { ...common, condition_id: "E049@h100", experiment_id: "E049", throughput_tokens_mean: 125 },
+    { ...common, condition_id: "E051@h100", experiment_id: "E051", throughput_tokens_mean: 120 },
+  ];
+  const evidence = [
+    { ...trials[0], status: "completed", strategy: "ddp", memory_used_gb: 10 },
+    { ...trials[1], status: "completed", strategy: "fsdp", parameter_strategy_detail: "full_shard", memory_used_gb: 8 },
+    { ...trials[2], status: "completed", strategy: "fsdp", parameter_strategy_detail: "sharded_grad_op", memory_used_gb: 9 },
+  ];
+
+  const entries = buildStrategyComparisonGroups(trials, evidence)[0].entries;
+
+  assert.equal(new Set(entries.map((entry) => entry.key)).size, 3);
+  assert.ok(entries.some((entry) => entry.label === "FSDP · full shard"));
+  assert.ok(entries.some((entry) => entry.label === "FSDP · sharded gradients"));
 });
 
 run("precision comparisons omit single-configuration groups", () => {

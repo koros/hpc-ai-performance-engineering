@@ -77,6 +77,8 @@ const colors = ["#0f766e", "#2563eb", "#7c3aed", "#b45309", "#be123c", "#0891b2"
 const strategyColors = {
   ddp: "#2563eb",
   fsdp: "#0f766e",
+  fsdp_full_shard: "#0f766e",
+  fsdp_sharded_grad_op: "#14b8a6",
   deepspeed_zero1: "#7c3aed",
   deepspeed_zero2: "#d97706",
   deepspeed_zero3: "#be123c",
@@ -1557,14 +1559,15 @@ function buildControlledTrainingGroups(rows, evidenceRows, predicate, groupKey, 
   return Object.entries(groupRows(enriched, groupKey)).map(([groupId, group]) => {
     const sample = group[0];
     const entries = group.map((row) => ({
-      key: row[variableKey],
-      label: variableKey === "strategy" ? displayStrategy(row[variableKey]) : String(row[variableKey] || "").toUpperCase(),
+      key: variableKey === "strategy" ? strategyVariantKey(row) : row[variableKey],
+      baselineKey: row[variableKey],
+      label: variableKey === "strategy" ? strategyVariantLabel(row) : String(row[variableKey] || "").toUpperCase(),
       value: number(row.throughput_tokens_mean),
       memory: conditionMetricAverage(evidenceRows, conditionId(row), ["metric_nvidia_smi_memory_used_gb_measured_region", "metric_memory_used_gb", "memory_used_gb"]),
       trials: number(row.completed_trials),
       conditionId: conditionId(row),
     })).sort((left, right) => right.value - left.value);
-    const baseline = entries.find((entry) => entry.key === baselineValue);
+    const baseline = entries.find((entry) => entry.baselineKey === baselineValue);
     entries.forEach((entry) => {
       entry.deltaPercent = baseline && baseline.value ? (entry.value / baseline.value - 1) * 100 : null;
       entry.isBaseline = entry === baseline;
@@ -1674,6 +1677,21 @@ function strategyBarChart(group, entries, metric) {
 
 function strategyColor(key) {
   return strategyColors[key] || "#64748b";
+}
+
+function strategyVariantKey(row) {
+  if (row.strategy !== "fsdp") return row.strategy;
+  const detail = row.parameter_strategy_detail || row.metric_strategy_detail_observed || "";
+  return detail ? "fsdp_" + detail : "fsdp";
+}
+
+function strategyVariantLabel(row) {
+  if (row.strategy !== "fsdp") return displayStrategy(row.strategy);
+  const detail = row.parameter_strategy_detail || row.metric_strategy_detail_observed || "";
+  return {
+    full_shard: "FSDP · full shard",
+    sharded_grad_op: "FSDP · sharded gradients",
+  }[detail] || "FSDP";
 }
 
 function conditionMetricAverage(rows, id, keys) {
