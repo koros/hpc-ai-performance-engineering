@@ -348,6 +348,22 @@ select {
   border-bottom: 1px solid var(--line);
 }
 
+.panel-heading > div {
+  min-width: 0;
+}
+
+.panel-heading h2,
+.panel-subtitle {
+  margin: 0;
+}
+
+.panel-subtitle {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
 .training-panel-heading {
   align-items: flex-end;
 }
@@ -536,6 +552,186 @@ select {
 
 .controlled-comparison-card > .comparison-contract {
   margin-block: 10px;
+}
+
+.strategy-controls {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.5fr) minmax(220px, 0.8fr);
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #f8fafc;
+}
+
+.strategy-controls label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.strategy-controls select {
+  min-width: 0;
+  min-height: 40px;
+  padding-inline: 10px;
+  color: var(--text);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.strategy-controls select:disabled {
+  cursor: not-allowed;
+  background: #eef2f6;
+}
+
+.strategy-visualization {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.strategy-context {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.75fr) minmax(300px, 1.25fr);
+  align-items: start;
+  gap: 14px;
+}
+
+.strategy-context > div:first-child {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: #ecfdf9;
+}
+
+.strategy-context > div:first-child span,
+.strategy-summary-grid article > span {
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.strategy-context > div:first-child strong {
+  color: #134e4a;
+  font-size: 0.88rem;
+}
+
+.strategy-context > div:first-child small {
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.strategy-context .comparison-contract {
+  margin: 0;
+}
+
+.strategy-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.strategy-summary-grid article {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid #dbe4ea;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #fff, #f8fafc);
+}
+
+.strategy-summary-grid article strong {
+  color: #153d3a;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.strategy-summary-grid article small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.strategy-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.71rem;
+  font-weight: 700;
+}
+
+.strategy-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.strategy-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: var(--strategy-color);
+}
+
+.strategy-svg-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-width: 0;
+  overflow: visible;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.strategy-svg-bar {
+  cursor: pointer;
+  transition: opacity 140ms ease, filter 140ms ease;
+}
+
+.strategy-svg-bar:hover,
+.strategy-svg-bar:focus {
+  opacity: 0.82;
+  filter: drop-shadow(0 2px 2px rgba(15, 23, 42, 0.22));
+  outline: none;
+}
+
+.strategy-axis-name {
+  fill: #344054;
+  font-weight: 700;
+}
+
+.strategy-bar-value {
+  fill: #344054;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.strategy-chart-note {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: 7px;
+  background: #f1f5f9;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
 }
 
 .controlled-bars {
@@ -1980,6 +2176,10 @@ td.numeric {
   .training-summary-question {
     grid-column: 1 / -1;
   }
+
+  .strategy-context {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 820px) {
@@ -2144,6 +2344,21 @@ td.numeric {
 
   .training-summary-question {
     grid-column: auto;
+  }
+
+  .strategy-analysis-panel .panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .strategy-controls,
+  .strategy-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .strategy-visualization,
+  .strategy-controls {
+    padding-inline: 12px;
   }
 
   .uncertainty-legend {
