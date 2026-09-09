@@ -99,6 +99,15 @@ run("dashboard controls use unique document identifiers", () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
+run("every statically referenced dashboard element exists", () => {
+  const html = fs.readFileSync("dashboard/index.html", "utf8");
+  const source = fs.readFileSync("dashboard/app.js", "utf8");
+  const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]));
+  const referenced = [...source.matchAll(/getElementById\("([^"]+)"\)/g)].map((match) => match[1]);
+
+  assert.deepEqual([...new Set(referenced.filter((id) => !ids.has(id)))], []);
+});
+
 run("line charts label every discrete x value when the study is compact", () => {
   assert.deepEqual(pointAxisTicks([16, 2, 8, 4, 8], [2, 16]), [2, 4, 8, 16]);
   assert.deepEqual(pointAxisTicks([1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 9]), [1, 5, 9]);

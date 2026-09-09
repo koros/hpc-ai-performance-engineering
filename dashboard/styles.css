@@ -368,6 +368,13 @@ select {
   line-height: 1.45;
 }
 
+.panel-heading .training-status {
+  display: block;
+  margin-top: 7px;
+  color: var(--accent-strong);
+  font-size: 0.72rem;
+}
+
 .training-study-control {
   display: grid;
   flex: 0 1 280px;
