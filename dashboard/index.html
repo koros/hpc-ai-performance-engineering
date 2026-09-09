@@ -171,12 +171,21 @@
           <p class="chart-note">Only completed training runs are shown. Platforms, workloads, comparability classes, and throughput units remain separate. Select a point for trial-level evidence.</p>
         </article>
         <div class="content-grid">
-          <article class="panel chart-panel" data-metrics="throughput memory">
-            <div class="panel-heading"><h2>Which distributed strategy performs best?</h2><span id="strategyStatus">No strategy evidence</span></div>
-            <div id="strategyBars" class="controlled-comparison-list"></div>
-            <p class="chart-note">Strategies are compared only when platform, workload, precision, GPU count, and throughput unit match.</p>
+          <article class="panel chart-panel strategy-analysis-panel panel-wide" data-metrics="throughput memory">
+            <div class="panel-heading"><div><h2>Which distributed strategy performs best?</h2><p class="panel-subtitle">Choose one matched hardware and workload context, then compare strategies by throughput or memory.</p></div><span id="strategyStatus">No strategy evidence</span></div>
+            <div class="strategy-controls" aria-label="Distributed strategy chart controls">
+              <label>Comparison<select id="strategyComparisonFilter" aria-label="Strategy comparison"></select></label>
+              <label>Metric
+                <select id="strategyMetricFilter" aria-label="Strategy chart metric">
+                  <option value="throughput">Throughput — higher is better</option>
+                  <option value="memory">GPU memory — lower is better</option>
+                </select>
+              </label>
+            </div>
+            <div id="strategyBars" class="strategy-visualization"></div>
+            <p class="chart-note">Colours identify the same strategy everywhere. Platform, workload, precision, GPU count, batch settings, and throughput unit remain fixed within the selected comparison. Select a bar for trial details.</p>
           </article>
-          <article class="panel chart-panel" data-metrics="throughput memory latency">
+          <article class="panel chart-panel precision-analysis-panel panel-wide" data-metrics="throughput memory latency">
             <div class="panel-heading"><h2>How does precision affect speed and memory?</h2><span id="precisionStatus">No precision evidence</span></div>
             <div id="precisionBars" class="controlled-comparison-list"></div>
             <p class="chart-note">Precision formats remain separated by platform, workload, training mode, and throughput unit.</p>
