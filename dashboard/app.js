@@ -883,31 +883,142 @@ function phaseDistributionRow(entry, scaleMaximum) {
 
 function renderEnergy(rows) {
   const entries = buildEnergyPowerEntries(rows);
-  renderSeparatedBars("energyBars", entries, {
+  const displayed = entries.slice(0, 12);
+  renderSeparatedBars("energyBars", displayed, {
     empty: "No measured-region energy evidence is available. Legacy full-window estimates are excluded.",
     barClass: "energy",
     value: (entry) => formatDecimal(entry.value, 0) + " J · " + formatDecimal(entry.power, 1) + " W",
     changing: (group) => varyingLabels(group, ["platform", "comparability", "experiment", "workload", "mode"]),
     constants: ["platform", "comparability", "workload", "mode"],
   });
-  document.getElementById("energyStatus").textContent = entries.length ? entries.length + " recorded conditions" : "No energy evidence";
+  document.getElementById("energyStatus").textContent = entries.length ? displayed.length + " shown of " + entries.length + " measured conditions" : "No energy evidence";
   markPanel("energyBars", entries.length > 0, buildEnergyPowerEntries(state.results).length > 0, "Energy and power", "experiments.csv");
 }
 
 function buildEnergyPowerEntries(rows) {
-  const groups = groupRows(rows.filter((row) => row.energy_scope === "measured_region" && number(row.energy_joules) > 0), (row) => [row.platform_id || "unlabelled", row.comparability || "unspecified", row.experiment_id || "unknown", row.workload || "unassigned", row.mode || "unassigned"]);
-  return Object.entries(groups).map(([key, group]) => {
-    const [platform, comparability, experiment, workload, mode] = key.split("\u0000");
+  const eligible = rows.filter((row) => (!row.status || row.status === "completed") && row.energy_scope === "measured_region" && number(row.energy_joules) > 0);
+  const groups = groupRows(eligible, (row) => [conditionId(row) || [row.platform_id, row.comparability, row.experiment_id, row.workload, row.mode].join("|")]);
+  return Object.values(groups).map((group) => {
+    const first = group[0];
+    const powerValues = group.map(energyPower).filter((value) => value > 0);
+    const throughputValues = group.map(throughput).filter((value) => value > 0);
+    const energyValues = group.map((row) => number(row.energy_joules)).filter((value) => value > 0);
+    const durationValues = group.map((row) => number(row.measurement_duration_seconds || row.metric_nvidia_smi_measurement_duration_seconds)).filter((value) => value > 0);
+    const efficiencyValues = group.map((row) => {
+      const power = energyPower(row);
+      const rate = throughput(row);
+      return power > 0 && rate > 0 ? rate / power * 3_600_000 : 0;
+    }).filter((value) => value > 0);
+    const gpus = Math.max(1, number(first.gpus || first.metric_gpu_count));
+    const strategyDetail = first.parameter_strategy_detail || first.parameter_distributed_strategy || "";
+    const strategy = first.strategy || "none";
+    const strategyLabel = strategyDetail && strategyDetail !== strategy ? strategy + " · " + strategyDetail : strategy;
     return {
-      label: platform + " · " + comparability + " · " + experiment + " · " + workload,
-      detail: mode,
-      platform, comparability, experiment, workload, mode,
-      conditionId: conditionId(group[0]),
+      label: first.platform_id + " · " + first.comparability + " · " + first.experiment_id + " · " + first.workload,
+      detail: first.mode,
+      platform: first.platform_id || "unlabelled",
+      platform_id: first.platform_id || "unlabelled",
+      comparability: first.comparability || "unspecified",
+      experiment: first.experiment_id || "unknown",
+      experiment_id: first.experiment_id || "unknown",
+      workload: first.workload || "unassigned",
+      mode: first.mode || "unassigned",
+      precision: first.precision || "unspecified",
+      phase: first.phase || "unassigned",
+      scalingType: first.scaling_type || "",
+      scaling_type: first.scaling_type || "",
+      strategy,
+      strategyDetail,
+      strategyLabel,
+      gpus,
+      throughputUnit: first.throughput_unit || "",
+      throughput_unit: first.throughput_unit || "",
+      globalBatchSize: first.global_batch_size || "",
+      global_batch_size: first.global_batch_size || "",
+      perGpuBatchSize: first.per_gpu_batch_size || "",
+      per_gpu_batch_size: first.per_gpu_batch_size || "",
+      sequenceLength: first.metric_sequence_length || first.parameter_sequence_length || "",
+      sequence_length: first.metric_sequence_length || first.parameter_sequence_length || "",
+      steps: first.metric_steps || first.measured_iterations || "",
+      conditionId: conditionId(first),
       unit: "joules",
-      value: average(group.map((row) => number(row.energy_joules))),
-      power: average(group.map((row) => number(row.metric_nvidia_smi_power_draw_watts_measured_region || row.metric_power_draw_watts))),
+      trials: group.length,
+      value: average(energyValues),
+      energyMin: Math.min(...energyValues),
+      energyMax: Math.max(...energyValues),
+      power: average(powerValues),
+      powerMin: powerValues.length ? Math.min(...powerValues) : 0,
+      powerMax: powerValues.length ? Math.max(...powerValues) : 0,
+      powerPerGpu: average(powerValues) / gpus,
+      throughput: average(throughputValues),
+      duration: average(durationValues),
+      tokensPerKwh: average(efficiencyValues),
     };
-  }).sort((left, right) => right.value - left.value).slice(0, 12);
+  }).sort((left, right) => right.value - left.value);
+}
+
+function energyPower(row) {
+  return number(row.metric_nvidia_smi_power_draw_watts_measured_region || row.metric_power_draw_watts || row.power_draw_watts);
+}
+
+function buildEnergyEfficiencyGroups(rows) {
+  const groups = groupRows(buildEnergyPowerEntries(rows).filter((entry) => entry.throughput > 0 && entry.power > 0 && entry.throughputUnit), (entry) => [entry.platform, entry.comparability, entry.workload, entry.mode, entry.throughputUnit]);
+  return Object.values(groups).map((group) => ({
+    title: group[0].platform + " · " + group[0].workload + " · " + group[0].mode,
+    subtitle: group[0].comparability + " · " + displayName(group[0].throughputUnit),
+    platform: group[0].platform,
+    comparability: group[0].comparability,
+    workload: group[0].workload,
+    mode: group[0].mode,
+    throughputUnit: group[0].throughputUnit,
+    comparison: comparisonContext(group, varyingLabels(group, ["experiment", "gpus", "strategyLabel", "phase"]), ["platform", "comparability", "workload", "mode", "precision", "throughputUnit"]),
+    points: group.map((entry) => ({
+      x: entry.throughput,
+      y: entry.tokensPerKwh,
+      power: entry.power,
+      gpus: entry.gpus,
+      label: entry.experiment + " · " + entry.strategyLabel,
+      conditionId: entry.conditionId,
+      energyMin: entry.energyMin,
+      energyMax: entry.energyMax,
+      trials: entry.trials,
+    })),
+  })).sort((left, right) => right.points.length - left.points.length || left.title.localeCompare(right.title));
+}
+
+function buildEnergyPowerScalingSeries(rows) {
+  const groups = groupRows(buildEnergyPowerEntries(rows), (entry) => [entry.platform, entry.comparability, entry.workload, entry.mode, entry.precision, entry.strategyLabel, entry.throughputUnit, entry.phase, entry.scalingType]);
+  return Object.values(groups).filter((group) => new Set(group.map((entry) => entry.gpus)).size > 1).map((group) => {
+    const first = group[0];
+    return {
+      title: first.platform + " · " + first.workload + " · " + first.phase,
+      subtitle: first.comparability + " · " + first.strategyLabel + " · aggregate and per-GPU power",
+      comparison: comparisonContext(group, ["GPU count"], ["platform", "comparability", "workload", "mode", "precision", "strategyLabel", "throughputUnit", "phase", "scalingType", "global_batch_size", "per_gpu_batch_size"]),
+      points: group.map((entry) => ({
+        x: entry.gpus,
+        aggregatePower: entry.power,
+        perGpuPower: entry.powerPerGpu,
+        energy: entry.value,
+        throughput: entry.throughput,
+        label: entry.experiment,
+        conditionId: entry.conditionId,
+      })).sort((left, right) => left.x - right.x),
+    };
+  }).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function buildEnergyToSolutionGroups(rows) {
+  const strategyEntries = buildEnergyPowerEntries(rows).filter((entry) => entry.phase === "Distributed training strategy" && entry.throughput > 0);
+  const groups = groupRows(strategyEntries, (entry) => [entry.platform, entry.comparability, entry.workload, entry.mode, entry.gpus, entry.precision, entry.globalBatchSize, entry.sequenceLength, entry.steps, entry.throughputUnit, entry.phase]);
+  return Object.values(groups).filter((group) => new Set(group.map((entry) => entry.strategyLabel)).size > 1).map((group) => {
+    const first = group[0];
+    return {
+      title: first.platform + " · " + first.workload + " · " + first.gpus + " GPUs",
+      subtitle: first.comparability + " · fixed-work strategy comparison",
+      comparison: comparisonContext(group, ["Distributed strategy"], ["platform", "comparability", "workload", "mode", "gpus", "precision", "global_batch_size", "sequence_length", "steps", "throughputUnit"]),
+      entries: [...group].sort((left, right) => left.value - right.value),
+    };
+  }).sort((left, right) => left.title.localeCompare(right.title));
 }
 
 function renderSeparatedBars(containerId, entries, options) {
@@ -1974,7 +2085,10 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     buildCheckpointingGroups,
     buildCompletionEntries,
+    buildEnergyEfficiencyGroups,
     buildEnergyPowerEntries,
+    buildEnergyPowerScalingSeries,
+    buildEnergyToSolutionGroups,
     buildExperimentDetail,
     buildGradientAccumulationSeries,
     buildInferenceGroups,

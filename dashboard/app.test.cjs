@@ -4,8 +4,11 @@ const fs = require("fs");
 const {
   buildCheckpointingGroups,
   buildCompletionEntries,
+  buildEnergyEfficiencyGroups,
   buildDataMovementSeries,
   buildEnergyPowerEntries,
+  buildEnergyPowerScalingSeries,
+  buildEnergyToSolutionGroups,
   buildExperimentDetail,
   buildGradientAccumulationSeries,
   buildInferenceGroups,
@@ -294,6 +297,74 @@ run("energy views exclude legacy full-window estimates", () => {
   assert.match(energy[0].label, /E214/);
 });
 
+run("energy conditions retain all measured evidence and derive comparable efficiency", () => {
+  const rows = Array.from({ length: 13 }, (_, index) => ({
+    ...energyResult("h100", "exact", `E${String(index + 1).padStart(3, "0")}`, "gpt2", 1000 + index),
+    condition_id: `E${String(index + 1).padStart(3, "0")}@h100`,
+    gpus: index % 4 + 1,
+    throughput_tokens_sec: 100_000 + index * 100,
+    throughput_unit: "training_tokens_per_second",
+  }));
+
+  const entries = buildEnergyPowerEntries(rows);
+  const groups = buildEnergyEfficiencyGroups(rows);
+
+  assert.equal(entries.length, 13);
+  assert.equal(entries[0].tokensPerKwh > 0, true);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].points.length, 13);
+  assert.equal(groups[0].platform, "h100");
+});
+
+run("energy power scaling isolates platform and comparability", () => {
+  const common = {
+    phase: "Strong scaling",
+    scaling_type: "strong",
+    strategy: "ddp",
+    precision: "bf16",
+    mode: "training",
+    throughput_unit: "training_tokens_per_second",
+    global_batch_size: 64,
+  };
+  const rows = [
+    { ...energyResult("h100", "exact", "E033", "gpt2", 13_000), ...common, condition_id: "E033@h100", gpus: 2, throughput_tokens_sec: 250_000 },
+    { ...energyResult("h100", "exact", "E034", "gpt2", 28_000), ...common, condition_id: "E034@h100", gpus: 4, throughput_tokens_sec: 490_000 },
+    { ...energyResult("l40s", "exact", "E033", "gpt2", 15_000), ...common, condition_id: "E033@l40s", gpus: 2, throughput_tokens_sec: 120_000 },
+  ];
+
+  const series = buildEnergyPowerScalingSeries(rows);
+
+  assert.equal(series.length, 1);
+  assert.deepEqual(series[0].points.map((point) => point.x), [2, 4]);
+});
+
+run("energy-to-solution compares only fixed-work strategy conditions", () => {
+  const common = {
+    phase: "Distributed training strategy",
+    strategy: "ddp",
+    precision: "bf16",
+    mode: "training",
+    gpus: 2,
+    global_batch_size: 32,
+    metric_sequence_length: 1024,
+    metric_steps: 100,
+    throughput_unit: "training_tokens_per_second",
+    throughput_tokens_sec: 250_000,
+  };
+  const rows = [
+    { ...energyResult("h100", "exact", "E047", "gpt2", 13_600), ...common, condition_id: "E047@h100" },
+    { ...energyResult("h100", "exact", "E049", "gpt2", 13_300), ...common, condition_id: "E049@h100", strategy: "fsdp", parameter_strategy_detail: "full_shard" },
+    { ...energyResult("h100", "exact", "E054", "gpt2", 11_100), ...common, condition_id: "E054@h100", strategy: "deepspeed_zero3", parameter_strategy_detail: "zero_stage_3" },
+    { ...energyResult("h100", "exact", "E099", "gpt2", 99_000), ...common, condition_id: "E099@h100", global_batch_size: 64 },
+  ];
+
+  const groups = buildEnergyToSolutionGroups(rows);
+
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].entries.length, 3);
+  assert.deepEqual(groups[0].entries.map((entry) => entry.experiment), ["E054", "E049", "E047"]);
+});
+
 run("comparison context reports only genuinely constant controls", () => {
   const context = comparisonContext([
     { platform_id: "l40s", workload: "gpt2", precision: "bf16", gpus: 1 },
@@ -413,6 +484,7 @@ function energyResult(platform_id, comparability, experiment_id, workload, energ
     mode: "training",
     energy_joules,
     energy_scope: "measured_region",
+    status: "completed",
     metric_nvidia_smi_power_draw_watts_measured_region: 200,
   };
 }
