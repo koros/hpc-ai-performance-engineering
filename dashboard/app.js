@@ -83,6 +83,11 @@ const strategyColors = {
   deepspeed_zero2: "#d97706",
   deepspeed_zero3: "#be123c",
 };
+const precisionColors = {
+  fp32: "#475569",
+  fp16: "#7c3aed",
+  bf16: "#0f766e",
+};
 
 const detailMetricSections = [
   ["Performance", [
@@ -148,6 +153,7 @@ function bindInputs() {
   document.getElementById("trainingStudyFilter").addEventListener("change", safeRender);
   document.getElementById("strategyComparisonFilter").addEventListener("change", safeRender);
   document.getElementById("strategyMetricFilter").addEventListener("change", safeRender);
+  document.getElementById("precisionComparisonFilter").addEventListener("change", safeRender);
   document.getElementById("resetFilters").addEventListener("click", resetFilters);
   document.getElementById("resultsFile").addEventListener("change", (event) => {
     readFile(event.target.files[0]).then((text) => {
@@ -1510,7 +1516,11 @@ function renderStrategy() {
 }
 
 function syncStrategyComparisonControl(groups) {
-  const select = document.getElementById("strategyComparisonFilter");
+  return syncComparisonControl("strategyComparisonFilter", groups);
+}
+
+function syncComparisonControl(selectId, groups) {
+  const select = document.getElementById(selectId);
   const current = select.value;
   select.replaceChildren();
   groups.forEach((group) => select.append(option(group.selectorLabel, group.id)));
@@ -1534,9 +1544,10 @@ function buildStrategyComparisonGroups(rows, evidenceRows = []) {
 function renderPrecision() {
   const rows = filteredTrialRowsWithEvidence().filter((row) => row.mode === "training" && row.phase === "Precision study");
   const groups = buildPrecisionComparisonGroups(rows, state.results);
-  renderControlledComparisonCards("precisionBars", groups, "No matched training-precision comparisons are available for the active filters.");
+  const selectedGroup = syncComparisonControl("precisionComparisonFilter", groups);
+  renderPrecisionComparison("precisionBars", selectedGroup, "No matched training-precision comparisons are available for the active filters.");
   const conditions = sum(groups.map((group) => group.entries.length));
-  document.getElementById("precisionStatus").textContent = groups.length + " controlled comparison" + (groups.length === 1 ? "" : "s") + " · " + conditions + " configurations";
+  document.getElementById("precisionStatus").textContent = groups.length + " matched comparison" + (groups.length === 1 ? "" : "s") + " available · " + conditions + " configurations";
   markPanel("precisionBars", groups.length > 0, buildPrecisionComparisonGroups(state.trialSummary, state.results).length > 0, "Training precision", "trial_summary.csv", true);
 }
 
@@ -1549,6 +1560,130 @@ function buildPrecisionComparisonGroups(rows, evidenceRows = []) {
     "precision",
     "bf16",
   );
+}
+
+function renderPrecisionComparison(containerId, group, emptyMessage) {
+  const container = document.getElementById(containerId);
+  container.replaceChildren();
+  if (!group) {
+    container.append(emptyState(emptyMessage));
+    return;
+  }
+  const context = document.createElement("div");
+  context.className = "precision-context strategy-context";
+  context.innerHTML = "<div><span>Comparison shown</span><strong>" + escapeHtml(group.title) + "</strong><small>" + escapeHtml(group.subtitle) + "</small></div>";
+  context.append(comparisonContract(group.comparison));
+  container.append(context);
+  container.append(precisionSummary(group));
+  container.append(precisionLegend(group.entries));
+  const charts = document.createElement("div");
+  charts.className = "precision-chart-grid";
+  charts.append(precisionMetricChart(group, "throughput"));
+  charts.append(precisionMetricChart(group, "memory"));
+  container.append(charts);
+  container.append(precisionTakeaway(group));
+}
+
+function precisionSummary(group) {
+  const summary = document.createElement("div");
+  summary.className = "precision-summary-grid";
+  const fastest = [...group.entries].sort((left, right) => right.value - left.value)[0];
+  const memoryEntries = group.entries.filter((entry) => entry.memory !== null);
+  const lowestMemory = memoryEntries.length ? Math.min(...memoryEntries.map((entry) => entry.memory)) : null;
+  const memoryLeaders = memoryEntries.filter((entry) => Math.abs(entry.memory - lowestMemory) < 0.001).map((entry) => entry.label);
+  const bf16 = group.entries.find((entry) => entry.key === "bf16");
+  const fp32 = group.entries.find((entry) => entry.key === "fp32");
+  const bf16Advantage = bf16 && fp32 && fp32.value
+    ? formatDecimal(bf16.value / fp32.value, 2) + "× FP32 throughput"
+    : "Comparison unavailable";
+  const bf16Memory = bf16 && fp32 && bf16.memory !== null && fp32.memory
+    ? formatDecimal((1 - bf16.memory / fp32.memory) * 100, 1) + "% less memory"
+    : "Memory comparison unavailable";
+  const cards = [
+    ["Fastest format", fastest.label, formatInteger(fastest.value) + " " + humanizeThroughputUnit(group.unit)],
+    ["Lowest GPU memory", memoryLeaders.length ? memoryLeaders.join(" and ") : "Not recorded", lowestMemory === null ? "No comparable memory evidence" : formatDecimal(lowestMemory, 2) + " GB measured"],
+    ["BF16 compared with FP32", bf16Advantage, bf16Memory],
+    ["Evidence in comparison", group.entries.length + " precision formats", sum(group.entries.map((entry) => entry.trials)) + " completed trials"],
+  ];
+  cards.forEach(([label, value, detail]) => {
+    const card = document.createElement("article");
+    card.innerHTML = "<span>" + escapeHtml(label) + "</span><strong>" + escapeHtml(value) + "</strong><small>" + escapeHtml(detail) + "</small>";
+    summary.append(card);
+  });
+  return summary;
+}
+
+function precisionLegend(entries) {
+  const legend = document.createElement("div");
+  legend.className = "precision-legend strategy-legend";
+  entries.forEach((entry) => {
+    const item = document.createElement("span");
+    item.innerHTML = '<i style="--strategy-color: ' + precisionColor(entry.key) + '"></i>' + escapeHtml(entry.label);
+    legend.append(item);
+  });
+  return legend;
+}
+
+function precisionMetricChart(group, metric) {
+  const card = document.createElement("article");
+  card.className = "precision-metric-card";
+  const isMemory = metric === "memory";
+  card.innerHTML = "<div><span>" + (isMemory ? "Memory cost" : "Training speed") + "</span><h3>" + (isMemory ? "Measured GPU memory" : "Average training throughput") + "</h3><p>" + (isMemory ? "Shorter is better" : "Longer is better") + "</p></div>";
+  const entries = group.entries.filter((entry) => !isMemory || entry.memory !== null);
+  if (!entries.length) {
+    card.append(emptyState("GPU memory was not recorded for this comparison."));
+    return card;
+  }
+  const width = 620;
+  const left = 82;
+  const right = 118;
+  const top = 20;
+  const rowHeight = 54;
+  const bottom = 40;
+  const height = top + entries.length * rowHeight + bottom;
+  const values = entries.map((entry) => isMemory ? entry.memory : entry.value);
+  const maximum = max(values);
+  const scale = linearScale(0, maximum || 1, left, width - right);
+  const ticks = [0, maximum / 2, maximum];
+  const formatValue = (value) => isMemory ? formatDecimal(value, 1) + " GB" : formatCompact(value);
+  const grids = ticks.map((value) => '<line class="svg-grid" x1="' + scale(value) + '" y1="' + (top - 8) + '" x2="' + scale(value) + '" y2="' + (height - bottom + 4) + '"/><text class="svg-label svg-axis-label" x="' + scale(value) + '" y="' + (height - 12) + '" text-anchor="middle">' + escapeSvg(formatValue(value)) + "</text>").join("");
+  const marks = entries.map((entry, index) => {
+    const value = isMemory ? entry.memory : entry.value;
+    const y = top + index * rowHeight;
+    const detail = isMemory ? formatDecimal(value, 2) + " GB" : formatInteger(value);
+    const fullDetail = detail + (isMemory ? " measured GPU memory" : " " + humanizeThroughputUnit(group.unit));
+    return '<text class="svg-label precision-axis-name" x="' + (left - 10) + '" y="' + (y + 18) + '" text-anchor="end">' + escapeSvg(entry.label) + '</text><rect class="precision-svg-bar" ' + conditionTargetAttributes(entry) + ' fill="' + precisionColor(entry.key) + '" x="' + left + '" y="' + y + '" width="' + Math.max(3, scale(value) - left) + '" height="24" rx="4"><title>' + escapeSvg(entry.label + ": " + fullDetail) + '</title></rect><text class="svg-value precision-bar-value" x="' + (width - 8) + '" y="' + (y + 17) + '" text-anchor="end">' + escapeSvg(detail) + "</text>";
+  }).join("");
+  const svg = svgElement(width, height, grids + marks);
+  svg.classList.add("precision-svg-chart");
+  svg.setAttribute("aria-label", group.title + ": precision comparison by " + (isMemory ? "measured GPU memory" : "average training throughput"));
+  card.append(svg);
+  return card;
+}
+
+function precisionTakeaway(group) {
+  const takeaway = document.createElement("p");
+  takeaway.className = "precision-takeaway";
+  const bf16 = group.entries.find((entry) => entry.key === "bf16");
+  const fp16 = group.entries.find((entry) => entry.key === "fp16");
+  const fp32 = group.entries.find((entry) => entry.key === "fp32");
+  if (!bf16 || !fp32 || !fp32.value) {
+    takeaway.textContent = "The selected comparison does not contain both BF16 and FP32 evidence.";
+    return takeaway;
+  }
+  const speedRatio = bf16.value / fp32.value;
+  const memoryPhrase = bf16.memory !== null && fp32.memory
+    ? " while using " + formatDecimal(Math.abs((1 - bf16.memory / fp32.memory) * 100), 1) + "% " + (bf16.memory <= fp32.memory ? "less" : "more") + " measured GPU memory"
+    : "";
+  const fp16Phrase = fp16 && bf16.value
+    ? " FP16 throughput was " + formatDecimal(Math.abs((1 - fp16.value / bf16.value) * 100), 1) + "% " + (fp16.value <= bf16.value ? "below" : "above") + " BF16."
+    : "";
+  takeaway.innerHTML = "<strong>What this comparison shows:</strong> BF16 delivered " + escapeHtml(formatDecimal(speedRatio, 2)) + "× FP32 throughput" + escapeHtml(memoryPhrase) + "." + escapeHtml(fp16Phrase);
+  return takeaway;
+}
+
+function precisionColor(key) {
+  return precisionColors[key] || "#64748b";
 }
 
 function buildControlledTrainingGroups(rows, evidenceRows, predicate, groupKey, variableKey, baselineValue) {
@@ -2736,6 +2871,7 @@ if (typeof module !== "undefined" && module.exports) {
     comparisonContext,
     dashboardAlertMessage,
     pointAxisTicks,
+    precisionColor,
     strategyColor,
     summarizePhases,
   };

@@ -25,6 +25,7 @@ const {
   comparisonContext,
   dashboardAlertMessage,
   pointAxisTicks,
+  precisionColor,
   strategyColor,
   summarizePhases,
 } = require("./app.js");
@@ -296,6 +297,15 @@ run("precision comparisons omit single-configuration groups", () => {
   assert.equal(groups.length, 1);
   assert.equal(groups[0].entries.length, 2);
   assert.ok(Math.abs(groups[0].entries.find((entry) => entry.key === "fp16").deltaPercent - 10) < 1e-9);
+});
+
+run("precision formats have stable distinct chart colours", () => {
+  const formats = ["fp32", "fp16", "bf16"];
+  const colours = formats.map(precisionColor);
+
+  assert.equal(new Set(colours).size, formats.length);
+  assert.equal(precisionColor("bf16"), "#0f766e");
+  assert.equal(precisionColor("unknown"), "#64748b");
 });
 
 run("training analysis uses plain-language labels without encoded uncertainty text", () => {
