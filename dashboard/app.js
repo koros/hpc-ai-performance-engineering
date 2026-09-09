@@ -1329,12 +1329,16 @@ function trainingVariableKeys(phase, rows) {
     checkpointing: ["parameter_activation_checkpointing"],
     gradient_accumulation: ["parameter_gradient_accumulation_steps"],
   }[memoryStudy] || [];
-  const candidates = [...memoryVariables, ...preferred, "gpus", "strategy", "precision", "global_batch_size", "parameter_micro_batch_size", "parameter_gradient_accumulation_steps", "parameter_activation_checkpointing", "parameter_sequence_length"];
-  return [...new Set(candidates)].filter((key) => uniqueTrainingValues(rows, key).length > 1).slice(0, 3);
+  const focused = [...new Set([...memoryVariables, ...preferred])];
+  if (focused.length) return focused.filter((key) => uniqueTrainingValues(rows, key).length > 1);
+  const candidates = ["gpus", "strategy", "precision", "global_batch_size", "parameter_micro_batch_size", "parameter_gradient_accumulation_steps", "parameter_activation_checkpointing", "parameter_sequence_length"];
+  return candidates.filter((key) => uniqueTrainingValues(rows, key).length > 1).slice(0, 3);
 }
 
 function trainingConstantFields(phase, rows) {
-  const fields = ["platform_id", "comparability", "workload", "throughput_unit", "precision"];
+  const fields = ["platform_id", "comparability", "workload", "throughput_unit", "precision", "parameter_sequence_length"];
+  if (phase === "Strong scaling") fields.push("global_batch_size");
+  if (phase === "Weak scaling") fields.push("per_gpu_batch_size");
   if (phase === "Distributed training strategy") fields.push("gpus");
   if (phase === "Memory optimisation") fields.push("gpus", "strategy");
   return [...new Set(fields)].filter((key) => uniqueTrainingValues(rows, key).length === 1);
@@ -1356,6 +1360,7 @@ function trainingVariableLabel(key) {
     strategy: "Distributed strategy",
     precision: "Numerical precision",
     global_batch_size: "Global batch size",
+    per_gpu_batch_size: "Per-GPU batch size",
     batch_size: "Batch size",
     parameter_micro_batch_size: "Micro-batch size",
     parameter_gradient_accumulation_steps: "Accumulation steps",
@@ -2467,6 +2472,9 @@ function displayFieldLabel(key) {
     precision: "Precision",
     strategy: "Strategy",
     gpus: "GPU count",
+    global_batch_size: "Global batch size",
+    per_gpu_batch_size: "Per-GPU batch size",
+    parameter_sequence_length: "Sequence length",
     mode: "Mode",
   }[key] || displayName(key).replace(/^./, (character) => character.toUpperCase());
 }
