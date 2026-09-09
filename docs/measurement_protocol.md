@@ -35,6 +35,11 @@ The backward-compatible `energy_joules_estimate` and unqualified `nvidia_smi` po
 broader collector window. They are diagnostics only. Derived `energy_joules` and `tokens_per_kwh` values are populated
 solely from sufficient `measured_region` evidence; legacy or full-window values must never be substituted.
 
+For dashboard efficiency views, `tokens_per_kwh = throughput_tokens_sec / power_draw_watts_measured_region × 3,600,000`.
+The calculation is shown only when throughput and measured-region power are both present, and it remains separated by
+`throughput_unit`, platform, comparability class, workload, and mode. Aggregate multi-GPU power is also divided by the
+recorded GPU count for the per-GPU power series; that derived series does not replace aggregate energy-to-solution.
+
 Every result also records `throughput_unit`: `training_tokens_per_second` for optimizer work, `generated_tokens_per_second` for causal serving, `input_tokens_per_second` for classification inference, or `synthetic_tokens_per_second` for local smoke work. Rankings and charts must be filtered or grouped by this field; unlike units are not interchangeable.
 
 ## Reproducibility and Determinism
