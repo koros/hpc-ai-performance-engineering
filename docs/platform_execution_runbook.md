@@ -36,10 +36,10 @@ sinfo -p gpu_l40s,gpu_h100
 Do not use `--upgrade-strategy eager` on Lovelace; it can mix PyPI Torch/Numpy wheels with the Spack CUDA/PyTorch
 runtime and invalidate both DeepSpeed and vLLM checks.
 
-The L40S vLLM acceptance gate has passed using private PyTorch 2.8.0/CUDA 12.4 with Gloo/NCCL and vLLM 0.10.2. Do not
-install that stack into the shared `.venv`. Use `make submit-vllm-pilot` for E006 and `make submit-vllm-wave` for the
-dedicated performance waves; those targets bind the immutable bundle to the private environment. H100 vLLM rows remain
-deferred until the target-platform acceptance gate passes there.
+The L40S and H100 vLLM acceptance gates have passed using private PyTorch 2.8.0/CUDA 12.4 with Gloo/NCCL and vLLM
+0.10.2. Do not install that stack into the shared `.venv`. Use `make submit-vllm-pilot PLATFORM=<platform>` for E006
+and `make submit-vllm-wave PLATFORM=<platform> PLATFORM_WAVE=<wave>` for dedicated performance waves; those targets
+bind each platform's immutable bundle to the private environment.
 
 On an L40S allocation, capture the actual device and topology before accepting results:
 
@@ -137,7 +137,7 @@ remain active. Set `HPC_AI_ENABLE_DEEPSPEED_NVTX=1` only after verifying a compa
 Nsight study. The DeepSpeed `bf16`/`fp16` configuration is the sole mixed-precision controller for ZeRO rows; the
 runner does not nest PyTorch native AMP around the DeepSpeed engine.
 
-E007, H100-unaccepted vLLM rows, E032/E033/E067/E068 exact L40S rows, and backend/adapter rows listed as Deferred are
+E007, E032/E033/E067/E068 exact L40S rows, and backend/adapter rows listed as Deferred are
 not rendered by platform batch commands. L40S E006 and supported GPT-2/TinyLlama vLLM rows are rendered only by their
 dedicated private-environment waves, including `vllm-tp4`. E032 and E033 exhausted the exact GPT-2 strong-scaling
 shapes on the observed L40S capacity. E067 and E068 exhausted the exact GPT-2 micro-batch 32/64 shapes. Reduced-batch
@@ -217,7 +217,7 @@ with existing accepted evidence without rerunning or duplicating completed trial
 
 ## 5. H100 Recovery Path
 
-When `gpu_h100` returns, verify the node and start its independent wave 0:
+For H100 execution, verify the node and start or resume its independent waves:
 
 ```bash
 python3 -m hpc_ai_perf.cli check-slurm-profile --slurm-profile slurm/profiles/cluster_h100.json
@@ -235,6 +235,19 @@ useful-work definition, and `comparability` contract match. The hardware-compari
 
 Before using H100 power, utilisation, external-memory, or energy values in conclusions, run the independent H100
 `telemetry-revalidation` wave and follow [the GPU telemetry revalidation protocol](gpu_telemetry_revalidation.md).
+
+H100 vLLM uses the private environment, never the project `.venv`. After the diagnostic acceptance gate, collect a
+canonical pilot before performance evidence:
+
+```bash
+make submit-vllm-pilot PLATFORM=h100
+make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-pilot
+make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-pilot
+make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-pilot
+```
+
+Then use `make submit-vllm-wave PLATFORM=h100 PLATFORM_WAVE=<wave>` in this order: `vllm-framework`,
+`vllm-batching`, `vllm-concurrency`, `vllm-prompt`, `vllm-tp2`, and canary-gated `vllm-tp4`.
 
 ## 6. Recovery Rules
 

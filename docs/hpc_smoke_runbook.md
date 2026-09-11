@@ -23,9 +23,9 @@ Do not use `--upgrade-strategy eager` on the cluster. It can replace the site-pr
 wheels and create a mixed Spack/PyPI environment.
 
 The site Torch module lacks Gloo, so vLLM must not be installed into this shared environment. The private PyTorch
-2.8.0/CUDA 12.4 Gloo/NCCL wheel and vLLM 0.10.2 environment have passed the L40S serving gate. Submit canonical L40S
-vLLM waves through `make submit-vllm-pilot` or `make submit-vllm-wave`; these targets select the private environment.
-H100 vLLM rows remain deferred until their target-platform serving gate passes.
+2.8.0/CUDA 12.4 Gloo/NCCL wheel and vLLM 0.10.2 environment have passed the serving gate on both L40S and H100.
+Submit canonical vLLM waves through `make submit-vllm-pilot PLATFORM=<platform>` or
+`make submit-vllm-wave PLATFORM=<platform> PLATFORM_WAVE=<wave>`; these targets select the private environment.
 
 The Slurm scripts assume jobs are submitted from the project root. Load the required cluster modules for CUDA, Python, and PyTorch before activating the project virtual environment. On Lovelace, the project helper can be used:
 

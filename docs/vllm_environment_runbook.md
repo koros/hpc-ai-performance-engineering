@@ -13,9 +13,9 @@ The process has three gates:
 2. Build pinned vLLM `0.10.2` against that exact private wheel.
 3. Run E006 as a one-GPU acceptance job and require import, engine start, and one served request.
 
-All three gates have passed on L40S. The acceptance JSON is diagnostic only and is never imported into `results/raw/`;
-E006 must still run once through the immutable `vllm-pilot` wave before the performance waves are treated as released.
-H100 vLLM conditions remain deferred until this same acceptance gate passes on H100.
+All three gates have passed on L40S and H100; H100 acceptance was confirmed by Slurm job 1777640. Acceptance JSON is
+diagnostic only and is never imported into `results/raw/`. E006 must still run once per platform through the immutable
+`vllm-pilot` wave before that platform's performance waves are collected.
 
 Canonical `vllm-*` submission bundles treat this private environment as isolated: after loading the cluster modules,
 the generated Slurm script clears inherited `PYTHONPATH`/`PYTHONHOME`, activates the private environment, and then
@@ -198,15 +198,15 @@ sbatch --partition=gpu_h100 \
 The H100 job uses the same multi-architecture private build. If the user chose a custom environment location, include
 `HPC_AI_VLLM_ENV=/absolute/path/to/vllm-0.10.2-gloo` in that `--export` list as well.
 
-## Run Canonical L40S vLLM Waves
+## Run Canonical vLLM Waves
 
 Do not manually import the diagnostic acceptance record. Submit E006 as canonical matrix evidence first:
 
 ```bash
-make submit-vllm-pilot
-make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot
-make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot
-make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot
+make submit-vllm-pilot PLATFORM=h100
+make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-pilot
+make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-pilot
+make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-pilot
 ```
 
 After the pilot reports one provenance-valid completed trial, run the performance waves in this order:
@@ -225,15 +225,15 @@ After the pilot reports one provenance-valid completed trial, run the performanc
 For example:
 
 ```bash
-make submit-vllm-wave PLATFORM=l40s PLATFORM_WAVE=vllm-framework
-make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-framework
-make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-framework
-make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=vllm-framework
+make submit-vllm-wave PLATFORM=h100 PLATFORM_WAVE=vllm-framework
+make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-framework
+make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-framework
+make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-framework
 ```
 
 `submit-vllm-wave` always supplies the private environment to the immutable bundle. Never supply that environment to
-non-vLLM waves. Slurm job 1773321 verified four visible L40S GPUs on the eight-GPU node, so E148/E196 are routed to
-`vllm-tp4`; run a TP=4 canary before submitting their canonical trials. E215 is the canonical eight-rank allocation
+non-vLLM waves. The L40S and H100 conditions have separate immutable bundles and evidence roots. E148/E196 are routed
+to `vllm-tp4`; run a platform-matched TP=4 canary before submitting their canonical trials. E215 is the canonical eight-rank allocation
 and PCIe-topology gate. Run E230 after E215 and collect it before submitting E229. TP=8 is intentionally limited to
 TinyLlama because its 32 attention heads divide evenly by eight; GPT-2's 12 heads do not.
 

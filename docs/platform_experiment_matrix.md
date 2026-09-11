@@ -10,8 +10,8 @@ This matrix routes every source `E001-E200` experiment family to Mac M1, L40/L40
 **`Deferred`** means do not schedule that condition on the named platform yet.<br/>
 
 Current site policy: the PyTorch CUDA runtime is usable on both GPU partitions, so ordinary CUDA/NCCL/FSDP/DeepSpeed
-experiments remain scheduled. The private PyTorch 2.8.0/CUDA 12.4 and vLLM 0.10.2 stack has passed E006 on L40S,
-so supported L40S vLLM conditions use dedicated waves. H100 vLLM waits for the same target-platform gate, while
+experiments remain scheduled. The private PyTorch 2.8.0/CUDA 12.4 and vLLM 0.10.2 stack has passed E006 acceptance on
+L40S and H100, so supported vLLM conditions use platform-separated dedicated waves. Meanwhile,
 TensorRT-LLM remains deferred until its package, engine artefact, and load/request contract exist. The preserved
 one-GPU H100 E032 exact shape also exceeds available memory and is deferred independently; it is not silently
 replaced by a smaller batch.
@@ -20,7 +20,7 @@ replaced by a smaller batch.
 | --- | --- | --- | --- | --- | --- |
 | `E001`, `E002`, `E004-E005` | CUDA, DDP/NCCL, FSDP, DeepSpeed environment validation | No matrix run; use smoke/dev only | Resolved; wave 0, run first | Resolved; wave 0, run first | Mac cannot prove CUDA/NCCL/Slurm. Generated configs bind the logical row to the observed GPU, partition, CPU policy, and result root. |
 | `E003` | Four-GPU NCCL validation | No matrix run | Resolved; `4gpu-pilot`, 1 trial | Resolved when four H100 GPUs are available | Slurm job 1773321 verified four concurrent visible L40S GPUs on the eight-GPU node. E003 is the four-rank NCCL gate for all later L40S four-GPU waves. |
-| `E006` | vLLM environment validation | No | Resolved; `vllm-pilot`, 1 trial | Deferred | The private Gloo/NCCL-enabled PyTorch and vLLM stack passed import, engine-start, and served-request validation on L40S. H100 still needs the same acceptance gate. |
+| `E006` | vLLM environment validation | No | Resolved; `vllm-pilot`, 1 trial | Resolved; `vllm-pilot`, 1 trial | The private Gloo/NCCL-enabled PyTorch and vLLM stack passed import, engine-start, and served-request acceptance on both platforms. Canonical evidence is still collected independently. |
 | `E007` | TensorRT-LLM environment validation | No | Deferred | Deferred | CUDA 12.4.1 is validated, but the compatible TensorRT-LLM package, built engine artefact, pinned model, and load/request contract are still missing. |
 | `E008-E015`, `E018-E019` | GPT-2, DistilBERT, TinyLlama baseline trials | Dev proxy for `E008`, `E010`, `E012`, `E014`, `E018` | Resolved; wave 1, 3 trials | Resolved; wave 1, 3 trials | Mac validates adapters only. L40S/H100 establish separately tracked baseline evidence. |
 | `E016-E017` | TinyLlama training baseline/repeat | No; local tiny-random inference only | Resolved optional wave after memory pilot | Resolved optional wave after memory pilot | Full TinyLlama training is optional and memory/queue sensitive; do not substitute the tiny local model. |
@@ -42,7 +42,7 @@ replaced by a smaller batch.
 | `E121`, `E122`, `E125`, `E126` | H100 hardware-comparison half | No | No; use the L40S counterparts instead | Direct | These rows are explicitly H100-labelled and form matched pairs with `E123/E124/E127/E128`. |
 | `E123`, `E124`, `E127`, `E128` | L40S hardware-comparison half | No | Direct | No; use the H100 counterparts instead | Existing L40S configs preserve the controlled H100-vs-L40S comparison design. Confirm actual GPU name/memory first. |
 | `E129`, `E149-E150`, `E153`, `E156-E174`, `E177`, `E197-E198` | Supported PyTorch inference | Dev proxy only for PyTorch adapter paths | Resolved; wave 5 | Resolved; wave 5 | These rows use the validated PyTorch CUDA runtime and do not depend on vLLM or a CUDA compiler. |
-| `E130`, `E132-E148`, `E178`, `E180-E196` | vLLM serving, batching, concurrency, prompt, and tensor-parallel studies | No | Resolved in dedicated `vllm-*` waves, including `vllm-tp4` for E148/E196 | Deferred | The private L40S environment passed E006. E148/E196 require a four-GPU TP=4 canary before canonical submission; H100 rows still wait for H100 E006. Supplemental E229 adds TinyLlama TP=8 after E230; do not substitute PyTorch results for vLLM evidence. |
+| `E130`, `E132-E148`, `E178`, `E180-E196` | vLLM serving, batching, concurrency, prompt, and tensor-parallel studies | No | Resolved in dedicated `vllm-*` waves, including `vllm-tp4` for E148/E196 | Resolved in platform-separated `vllm-*` waves | Both target-platform acceptance gates passed. E148/E196 require a four-GPU TP=4 canary before canonical submission. Supplemental E229 adds L40S-only TinyLlama TP=8 after E230; do not substitute PyTorch results for vLLM evidence. |
 | `E131`, `E154`, `E155`, `E179` | Unsupported/incompatible inference frameworks | No | Deferred | Deferred | E131/E179 still need performance-adapter integration; generic vLLM/TensorRT-LLM causal adapters are incompatible with the current DistilBERT classification path. |
 | `E156-E161`, `E162-E174` | DistilBERT PyTorch batching, concurrency, prompt, and multi-GPU studies | No | Resolved; wave 5 | Resolved; wave 5 | These are classification-compatible PyTorch runs; preserve request shape and GPU count. |
 | `E149-E150`, `E173-E174`, `E197-E198` | Supported inference precision: FP16/BF16 | No | Resolved; wave 5 | Resolved; wave 5 | CUDA/serving precision comparison; validate each engine on the target GPU. |
@@ -54,7 +54,7 @@ replaced by a smaller batch.
 | --- | --- | --- |
 | Mac M1 | `configs/local/*.json` (4 smoke configs) and `configs/dev/*.json` (15 dev configs) | Workflow validation only. Keep results out of the `E001-E200` evidence set. |
 | L40/L40S | 176 planned source `E###@l40s` conditions, 5 capacity-adjusted conditions, 5 telemetry anchors, and 16 full-node conditions | Generated configs use `gpu_l40s`, 8 CPUs/GPU, PCIe, an eight-GPU node limit, and accepted evidence root `results/raw/l40s`. E215 must first prove the complete allocation and topology. Twenty-four source rows remain deferred: TensorRT-LLM/backend gaps, platform-specific comparison rows, and exact-shape E032/E033/E044/E067/E068 OOMs. E203/E204/E206/E207 are supplemental upper-bound OOM deferrals. |
-| H100 | 143 planned source `E###@h100` conditions plus 5 telemetry anchors | Generated configs use `gpu_h100`, 16 CPUs/GPU, NVLink, and accepted evidence root `results/raw/h100`. Fifty-seven source rows remain deferred, including E032 after a three-trial exact-shape OOM, 37 vLLM conditions pending H100 E006, TensorRT-LLM, backend/adapter gaps, and L40S-specific comparison rows. |
+| H100 | 180 planned source `E###@h100` conditions plus 5 telemetry anchors | Generated configs use `gpu_h100`, 16 CPUs/GPU, NVLink, and accepted evidence root `results/raw/h100`. Twenty source rows remain deferred: E032 after a three-trial exact-shape OOM, TensorRT-LLM/backend/adapter gaps, and four L40S-specific comparison rows. |
 
 ## Generated Companion-Config Contract
 
@@ -72,6 +72,6 @@ replaced by a smaller batch.
 | --- | --- | --- | --- |
 | 0 — prove the path | 4 smoke configs, then 15 dev configs | Resolved `E001`, `E002`, `E004-E005`; defer `E003` | Resolved `E001-E005` |
 | 1 — core evidence | Dev proxies only | Wave 1 baselines/characterisation, direct hardware pairs, then wave 3 pilot | Wave 1 baselines/characterisation, direct hardware pairs, then wave 3 pilot |
-| 2 — depth | Local shape checks | Waves 4, 4c, 4b, supported-PyTorch wave 5, then `vllm-pilot`, `vllm-framework`, `vllm-batching`, `vllm-concurrency`, `vllm-prompt`, and `vllm-tp2` | Waves 4, 4b, and supported-PyTorch wave 5 |
+| 2 — depth | Local shape checks | Waves 4, 4c, 4b, supported-PyTorch wave 5, then `vllm-pilot`, `vllm-framework`, `vllm-batching`, `vllm-concurrency`, `vllm-prompt`, and `vllm-tp2` | Waves 4, 4b, supported-PyTorch wave 5, then the same platform-separated vLLM sequence |
 | 3 — multi-GPU depth | Not applicable | `4gpu-pilot`, `4gpu-core`, `4gpu-communication`, then `8gpu-pilot`, full-node scaling/strategy/communication, and canary-gated TP=4/TP=8 vLLM | Four-GPU H100 waves after core and vLLM target-platform gates |
-| 4 — future work | Not applicable | TensorRT-LLM, FP8/INT8, and other deferred rows only after prerequisites | vLLM after H100 E006; other deferred rows only after prerequisites |
+| 4 — future work | Not applicable | TensorRT-LLM, FP8/INT8, and other deferred rows only after prerequisites | TensorRT-LLM, FP8/INT8, and other deferred rows only after prerequisites |

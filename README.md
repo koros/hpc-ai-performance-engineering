@@ -145,11 +145,10 @@ DS_BUILD_OPS=0 DS_BUILD_AIO=0 python -m pip install \
   -e ".[dev,yaml,workloads,distributed]"
 ```
 
-The L40S vLLM gate now uses a private PyTorch 2.8.0/CUDA 12.4 build with Gloo and NCCL plus pinned vLLM `0.10.2`.
+The Lovelace vLLM gate uses a private PyTorch 2.8.0/CUDA 12.4 build with Gloo and NCCL plus pinned vLLM `0.10.2`.
 Do not install a generic PyPI vLLM wheel into the shared environment: its CUDA ABI may target another runtime. The L40S
-E006 acceptance gate has passed, so E006 and the supported one-/two-GPU GPT-2/TinyLlama vLLM rows are scheduled in
-dedicated `vllm-*` waves that activate the private environment. H100 vLLM rows remain deferred until the same gate
-passes on H100, and four-GPU vLLM rows remain unavailable on the two-GPU L40S node. See the
+and H100 E006 acceptance gates have passed, so E006 and the supported one-/two-/four-GPU GPT-2/TinyLlama vLLM rows
+are scheduled in platform-separated `vllm-*` waves that activate the private environment. See the
 [vLLM environment runbook](docs/vllm_environment_runbook.md) and [deferred experiment audit](docs/deferred_experiment_audit.md).
 
 Do not use `--upgrade-strategy eager` on Lovelace because it can install PyPI Torch/Numpy over the Spack-provided CUDA

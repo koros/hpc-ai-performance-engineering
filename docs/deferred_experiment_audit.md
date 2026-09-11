@@ -1,11 +1,11 @@
 # Deferred Experiment Audit
 
-Audit date: 2026-09-06.
+Audit date: 2026-09-11.
 
-The L40S private PyTorch 2.8.0/CUDA 12.4 build now provides both Gloo and NCCL, the pinned vLLM 0.10.2 environment
-loads successfully, and the L40S E006 acceptance gate completed an engine start and served request. This resolves the
-former L40S-wide vLLM environment blocker. It does not establish H100 acceptance or remove independent hardware,
-memory-capacity, TensorRT-LLM, FP8, quantization, or adapter blockers.
+The private PyTorch 2.8.0/CUDA 12.4 build provides both Gloo and NCCL, and the pinned vLLM 0.10.2 environment has now
+passed E006 import, engine-start, and served-request acceptance on both L40S and H100. This resolves the former
+platform-wide vLLM environment blockers. It does not remove independent hardware, memory-capacity, TensorRT-LLM,
+FP8, quantization, or adapter blockers.
 
 ## Released From Deferred State
 
@@ -22,9 +22,12 @@ memory-capacity, TensorRT-LLM, FP8, quantization, or adapter blockers.
 | L40S | `E115-E116`, `E119-E120` | Planned; `4gpu-communication`, 3 trials | Four-GPU PCIe communication studies are released behind the E003 gate and remain platform-specific. |
 | L40S | `E148`, `E196` | Planned; `vllm-tp4`, 3 trials | The accepted private vLLM environment can now be exercised with four visible L40S GPUs; run only after E003 and a TP=4 canary pass. |
 | L40S | `E208-E209` | Planned; `optional-capacity`, 3 trials | A matched checkpointed one-/two-GPU pair preserves TinyLlama, BF16, sequence length 1024, and global batch 16 without changing the original H100 E044/E045 protocol. |
+| H100 | `E006` | Planned; `vllm-pilot`, 1 canonical trial | Slurm job 1777640 passed the H100 diagnostic gate with vLLM import, engine start, a served request, and positive generated-token throughput. |
+| H100 | `E130`, `E132-E148`, `E178`, `E180-E196` | Planned; platform-separated `vllm-*` waves, 3 trials | The accepted private environment targets `sm_90`; canonical evidence remains gated by E006, then the one-GPU families, TP=2, and TP=4. |
 
-The routed L40S vLLM scope now covers all 37 source conditions: one pilot plus 36 performance conditions. TP=4 remains
-canary-gated until it has started an engine and served a request with four visible GPUs. All dedicated vLLM waves must
+The routed vLLM scope now covers all 37 source conditions independently on each platform: one pilot plus 36
+performance conditions. TP=4 remains canary-gated until it has started an engine and served a request with four visible
+GPUs. All dedicated vLLM waves must
 be submitted with `make submit-vllm-wave`, which binds the immutable bundle to the private vLLM environment. The
 shared project `.venv` remains the runtime for non-vLLM waves.
 
@@ -41,7 +44,6 @@ produce 44 canonical L40S trials and are always analysed as L40S-only evidence.
 
 | Platform | Count | IDs | Blocking condition | Release requirement |
 | --- | ---: | --- | --- | --- |
-| H100 | 37 | `E006`, `E130`, `E132-E148`, `E178`, `E180-E196` | The private stack targets `sm_90`, but the serving gate has only passed on L40S. | Run the E006 acceptance job on H100; add H100 vLLM waves only after import, engine start, and request service pass there. |
 | L40S/H100 | 1 each | `E007` | CUDA 12.4.1 is now available, but TensorRT-LLM, a built engine, and the pinned build/load/request contract are missing. | Validate a compatible package and immutable engine artefact through E007 on each platform. |
 | L40S/H100 | 14 each | `E086`, `E089`, `E093`, `E096`, `E131`, `E151-E152`, `E154-E155`, `E175-E176`, `E179`, `E199-E200` | FP8/quantized artefacts, TensorRT performance adapters, or a classification-compatible DistilBERT serving contract are absent. | Supply the specific backend, calibration/artefact hashes, and compatible adapter required by each row. |
 | L40S | 4 | `E121-E122`, `E125-E126` | These are H100-labelled halves of controlled hardware comparisons. | Run on H100; use `E123-E124` and `E127-E128` for the L40S halves. |
@@ -57,7 +59,7 @@ produce 44 canonical L40S trials and are always analysed as L40S-only evidence.
 | Platform | Planned source conditions | Deferred source conditions | Planned supplemental probes | Deferred supplemental probes |
 | --- | ---: | ---: | ---: | ---: |
 | L40S | 176 | 24 | 5 | 4 |
-| H100 | 143 | 57 | 0 | 0 |
+| H100 | 180 | 20 | 0 | 0 |
 
 Every `E001-E200` source row still routes exactly once per platform. The supplemental `E201-E207` rows remain L40S-only
 capacity probes, while E208/E209 form an L40S-only checkpointed strong-scaling pair. Neither supplemental family is
