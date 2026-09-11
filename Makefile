@@ -107,10 +107,10 @@ submit-vllm-build:
 
 submit-vllm-acceptance:
 	test -r "$(VLLM_ENV)/bin/activate" || (echo "Run make submit-vllm-build and wait for it to succeed first" && exit 1)
-	sbatch --export=ALL,HPC_AI_VLLM_VERSION="$(VLLM_VERSION)",HPC_AI_VLLM_ENV="$(VLLM_ENV)" slurm/smoke/vllm_acceptance.sbatch
+	sbatch --partition=$(if $(filter h100,$(PLATFORM)),gpu_h100,gpu_l40s) --export=ALL,HPC_AI_EXPECTED_GPU_MODEL="$(RUNTIME_EXPECTED_GPU_MODEL)",HPC_AI_VLLM_VERSION="$(VLLM_VERSION)",HPC_AI_VLLM_ENV="$(VLLM_ENV)" slurm/smoke/vllm_acceptance.sbatch
 
 submit-vllm-pilot:
-	$(MAKE) submit-vllm-wave PLATFORM=l40s PLATFORM_WAVE=vllm-pilot
+	$(MAKE) submit-vllm-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=vllm-pilot
 
 submit-vllm-wave:
 	test -r "$(VLLM_ENV)/bin/activate" || (echo "Run make submit-vllm-build and make submit-vllm-acceptance first" && exit 1)

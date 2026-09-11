@@ -346,7 +346,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         )
         == 21
     )
-    assert sum(condition.status == "planned" for condition in h100_conditions) == 148
+    assert sum(condition.status == "planned" for condition in h100_conditions) == 185
 
 
 def test_telemetry_revalidation_wave_is_shared_but_platform_separated() -> None:
@@ -626,13 +626,6 @@ def test_completed_wave_evidence_uses_validated_platform_tracker_rows(monkeypatc
 
 
 def test_execution_matrix_defers_only_unaccepted_or_unsupported_backend_and_platform_rows() -> None:
-    h100_vllm_deferred_ids = {
-        "E006",
-        "E130",
-        *(f"E{index:03d}" for index in range(132, 149)),
-        "E178",
-        *(f"E{index:03d}" for index in range(180, 197)),
-    }
     shared_deferred_ids = {
         "E007",
     }
@@ -653,7 +646,7 @@ def test_execution_matrix_defers_only_unaccepted_or_unsupported_backend_and_plat
                 }
             )
         else:
-            expected_ids.update(h100_vllm_deferred_ids | {"E032"})
+            expected_ids.add("E032")
         conditions = load_platform_conditions(
             "platforms/execution_matrix.json",
             platform_id,
@@ -665,11 +658,7 @@ def test_execution_matrix_defers_only_unaccepted_or_unsupported_backend_and_plat
         assert all(condition.wave == "deferred" for condition in conditions)
 
 
-def test_execution_matrix_schedules_accepted_l40s_vllm_scope_in_dedicated_waves() -> None:
-    conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s", wave="vllm-pilot")
-
-    assert [(condition.matrix_id, condition.required_trials) for condition in conditions] == [("E006", 1)]
-
+def test_execution_matrix_schedules_accepted_vllm_scope_in_platform_separated_waves() -> None:
     later_waves = {
         "vllm-framework": {"E130", "E178"},
         "vllm-batching": {
@@ -687,11 +676,19 @@ def test_execution_matrix_schedules_accepted_l40s_vllm_scope_in_dedicated_waves(
         "vllm-tp2": {"E147", "E195"},
         "vllm-tp4": {"E148", "E196"},
     }
-    for wave, expected_ids in later_waves.items():
-        wave_conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s", wave=wave)
-        assert {condition.matrix_id for condition in wave_conditions} == expected_ids
-        assert {condition.required_trials for condition in wave_conditions} == {3}
-        assert {condition.comparability for condition in wave_conditions} == {"exact"}
+    for platform_id in ("l40s", "h100"):
+        pilot = load_platform_conditions("platforms/execution_matrix.json", platform_id, wave="vllm-pilot")
+        assert [(condition.matrix_id, condition.required_trials) for condition in pilot] == [("E006", 1)]
+        assert {condition.condition_id for condition in pilot} == {f"E006@{platform_id}"}
+
+        for wave, expected_ids in later_waves.items():
+            wave_conditions = load_platform_conditions("platforms/execution_matrix.json", platform_id, wave=wave)
+            assert {condition.matrix_id for condition in wave_conditions} == expected_ids
+            assert {condition.required_trials for condition in wave_conditions} == {3}
+            assert {condition.comparability for condition in wave_conditions} == {"exact"}
+            assert {condition.condition_id for condition in wave_conditions} == {
+                f"{experiment_id}@{platform_id}" for experiment_id in expected_ids
+            }
 
     all_vllm_ids = {"E006"}
     for expected_ids in later_waves.values():

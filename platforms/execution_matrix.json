@@ -242,6 +242,14 @@
     },
     {
       "platform": "h100",
+      "wave": "vllm-pilot",
+      "name": "H100 canonical vLLM environment pilot",
+      "experiment_ids": ["E006"],
+      "required_trials": 1,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "h100",
       "wave": "1",
       "name": "H100 core baselines and characterisation",
       "experiment_ids": ["E008-E015", "E018-E031"],
@@ -293,6 +301,54 @@
     },
     {
       "platform": "h100",
+      "wave": "vllm-framework",
+      "name": "H100 vLLM framework baselines",
+      "experiment_ids": ["E130", "E178"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "vllm-batching",
+      "name": "H100 vLLM batching studies",
+      "experiment_ids": ["E132-E137", "E180-E185"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "vllm-concurrency",
+      "name": "H100 vLLM concurrency studies",
+      "experiment_ids": ["E138-E142", "E186-E190"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "vllm-prompt",
+      "name": "H100 vLLM prompt-length studies",
+      "experiment_ids": ["E143-E146", "E191-E194"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "vllm-tp2",
+      "name": "H100 two-GPU vLLM tensor-parallel studies",
+      "experiment_ids": ["E147", "E195"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "vllm-tp4",
+      "name": "H100 four-GPU vLLM tensor-parallel studies",
+      "experiment_ids": ["E148", "E196"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
       "wave": "optional",
       "name": "H100 optional large-model work",
       "experiment_ids": ["E016-E017", "E044-E046"],
@@ -317,13 +373,6 @@
     }
   ],
   "deferred": [
-    {
-      "platforms": ["h100"],
-      "name": "vLLM serving blocked pending H100 acceptance",
-      "experiment_ids": ["E006", "E130", "E132-E148", "E178", "E180-E196"],
-      "comparability": "platform_specific",
-      "reason": "The site has a verified CUDA 12.4.1 source-build stack, but no isolated vLLM 0.10.2 environment has passed the E006 import, engine-start, and served-request gate on H100."
-    },
     {
       "platforms": ["l40s", "h100"],
       "name": "CUDA-toolkit-dependent TensorRT-LLM validation",
