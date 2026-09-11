@@ -1436,14 +1436,22 @@ def test_gpt2_inference_dispatches_to_causal_lm_helper(monkeypatch) -> None:
 
 
 @pytest.mark.parametrize(
-    ("config_path", "expected_tensor_parallel_size", "expected_compilation_config", "expected_execution_mode"),
+    (
+        "config_path",
+        "expected_tensor_parallel_size",
+        "expected_compilation_config",
+        "expected_execution_mode",
+        "expected_quantization",
+    ),
     [
-        ("configs/inference/E130_gpt2_small_framework_vllm.json", 1, None, "eager"),
+        ("configs/inference/E130_gpt2_small_framework_vllm.json", 1, None, "eager", None),
+        ("configs/inference/E151_gpt2_small_precision_fp8.json", 1, None, "eager", "fp8"),
         (
             "configs/inference/E147_gpt2_small_multi_gpu_2gpu.json",
             2,
             {"level": 0, "use_inductor": False},
             "eager_no_inductor",
+            None,
         ),
     ],
 )
@@ -1453,6 +1461,7 @@ def test_vllm_inference_uses_certified_eager_execution(
     expected_tensor_parallel_size: int,
     expected_compilation_config: dict[str, object] | None,
     expected_execution_mode: str,
+    expected_quantization: str | None,
 ) -> None:
     monkeypatch.delenv("TORCHDYNAMO_DISABLE", raising=False)
     config = load_experiment_config(Path(config_path))
@@ -1467,6 +1476,11 @@ def test_vllm_inference_uses_certified_eager_execution(
         @staticmethod
         def synchronize() -> None:
             return None
+
+        @staticmethod
+        def get_device_capability(index: int) -> tuple[int, int]:
+            assert index == 0
+            return (9, 0)
 
     class FakeGenerator:
         def manual_seed(self, seed: int):
@@ -1528,9 +1542,15 @@ def test_vllm_inference_uses_certified_eager_execution(
     assert llm_kwargs["tensor_parallel_size"] == expected_tensor_parallel_size
     assert llm_kwargs["enforce_eager"] is True
     assert llm_kwargs.get("compilation_config") == expected_compilation_config
+    assert llm_kwargs.get("quantization") == expected_quantization
     assert output.metrics["vllm_execution_mode"] == expected_execution_mode
     assert output.metrics["vllm_inductor_disabled"] == (expected_compilation_config is not None)
     assert output.metrics["vllm_torchdynamo_disabled"] == (expected_tensor_parallel_size > 1)
+    if expected_quantization == "fp8":
+        assert output.metrics["precision_backend"] == "vllm_fp8_online"
+        assert output.metrics["quantization_method"] == "fp8_w8a8_dynamic"
+        assert output.metrics["comparison_control_id"] == "E130"
+        assert output.metrics["quality_request_success_rate"] == 1.0
 
 
 def test_tinyllama_training_dispatches_to_causal_training(monkeypatch) -> None:
@@ -2135,6 +2155,15 @@ def test_research_preflight_rejects_unbuilt_backend_artifacts() -> None:
     assert "TensorRT-LLM config requires a built engine_path" in capability_issues(config)
 
 
+def test_vllm_fp8_requires_an_explicit_reproducible_contract() -> None:
+    config = load_experiment_config(Path("configs/inference/E151_gpt2_small_precision_fp8.json"))
+    parameters = dict(config.workload.parameters)
+    parameters.pop("quantization_method")
+    incomplete = replace(config, workload=replace(config.workload, parameters=parameters))
+
+    assert "vLLM FP8 inference requires quantization_method=fp8_w8a8_dynamic" in capability_issues(incomplete)
+
+
 def test_research_preflight_has_only_documented_execution_blockers() -> None:
     blocked = {entry.config.experiment_id for entry in discover_experiment_configs() if capability_issues(entry.config)}
 
@@ -2144,14 +2173,12 @@ def test_research_preflight_has_only_documented_execution_blockers() -> None:
         "E093",
         "E096",
         "E131",
-        "E151",
         "E152",
         "E154",
         "E155",
         "E175",
         "E176",
         "E179",
-        "E199",
         "E200",
     }
 

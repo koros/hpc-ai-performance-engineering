@@ -11,12 +11,15 @@
       "inference_study_type": "precision_quantization",
       "framework": "vllm",
       "precision_label": "FP8",
+      "precision_backend": "vllm_fp8_online",
+      "quantization_method": "fp8_w8a8_dynamic",
+      "base_compute_dtype": "bf16",
+      "comparison_control_id": "E178",
       "batch_size": 1,
       "concurrent_requests": 1,
       "prompt_length": 128,
       "max_new_tokens": 128,
-      "quality_sanity_check": true,
-      "requires_supported_fp8_backend": true
+      "quality_sanity_check": true
     }
   },
   "hardware": {
@@ -50,8 +53,6 @@
     }
   },
   "metadata": {
-    "execution_status": "deferred",
-    "defer_reason": "Requires a selected and validated FP8 inference backend and model artifact.",
     "matrix_id": "E199",
     "template": "inference_serving",
     "phase": "Inference precision/quantization",

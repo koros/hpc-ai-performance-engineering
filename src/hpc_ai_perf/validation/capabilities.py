@@ -16,12 +16,14 @@ TRANSFORMER_PARAMETER_KEYS = {
     "activation_checkpointing",
     "allreduce_bytes",
     "allreduce_iterations",
+    "base_compute_dtype",
     "baseline_kind",
     "batch_size",
     "capture_gpu_topology",
     "collect_gradient_synchronization",
     "collect_loss",
     "collect_sharded_communication",
+    "comparison_control_id",
     "communication_study_type",
     "comparison_axis",
     "concurrent_requests",
@@ -51,6 +53,7 @@ TRANSFORMER_PARAMETER_KEYS = {
     "num_workers",
     "per_gpu_batch_size",
     "pinned_memory",
+    "precision_backend",
     "precision_label",
     "prefetch_factor",
     "profile_target",
@@ -59,6 +62,7 @@ TRANSFORMER_PARAMETER_KEYS = {
     "quality_eval_samples",
     "quality_sanity_check",
     "quantization_bits",
+    "quantization_method",
     "repeat_index",
     "requests",
     "requires_supported_fp8_backend",
@@ -183,7 +187,16 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
             and not parameters.get("hf_model_revision")
         ):
             issues.append("matrix hf_model_name override must pin workload.parameters.hf_model_revision")
-        if config.runtime.precision in {"fp8", "int8", "int4"}:
+        if config.runtime.precision == "fp8" and config.mode == "inference" and parameters.get("framework") == "vllm":
+            if parameters.get("precision_backend") != "vllm_fp8_online":
+                issues.append("vLLM FP8 inference requires precision_backend=vllm_fp8_online")
+            if parameters.get("quantization_method") != "fp8_w8a8_dynamic":
+                issues.append("vLLM FP8 inference requires quantization_method=fp8_w8a8_dynamic")
+            if parameters.get("base_compute_dtype") != "bf16":
+                issues.append("vLLM FP8 inference requires base_compute_dtype=bf16")
+            if not parameters.get("comparison_control_id"):
+                issues.append("vLLM FP8 inference requires a comparison_control_id")
+        elif config.runtime.precision in {"fp8", "int8", "int4"}:
             issues.append(
                 f"precision {config.runtime.precision} requires a backend/model-specific implementation "
                 "not selected by this config"

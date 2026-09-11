@@ -697,10 +697,35 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     _prepare_runtime(torch, config, allow_distributed_strategy_none=True)
     if not torch.cuda.is_available():
         raise RuntimeError("vLLM matrix experiments require CUDA")
-    if config.runtime.precision not in {"fp16", "bf16"}:
+    if config.runtime.precision not in {"fp16", "bf16", "fp8"}:
         raise RuntimeError(f"Generic vLLM adapter does not support precision: {config.runtime.precision}")
 
     parameters = config.workload.parameters
+    quantization: str | None = None
+    quantization_method: str | None = None
+    base_compute_dtype: str | None = None
+    if config.runtime.precision == "fp8":
+        precision_backend = str(parameters.get("precision_backend", ""))
+        quantization_method = str(parameters.get("quantization_method", ""))
+        base_compute_dtype = str(parameters.get("base_compute_dtype", ""))
+        if precision_backend != "vllm_fp8_online":
+            raise RuntimeError("vLLM FP8 requires precision_backend=vllm_fp8_online")
+        if quantization_method != "fp8_w8a8_dynamic":
+            raise RuntimeError("vLLM FP8 requires quantization_method=fp8_w8a8_dynamic")
+        if base_compute_dtype != "bf16":
+            raise RuntimeError("vLLM FP8 requires base_compute_dtype=bf16")
+        compute_capability = tuple(torch.cuda.get_device_capability(0))
+        if compute_capability < (8, 9):
+            raise RuntimeError(
+                "vLLM FP8 W8A8 requires NVIDIA compute capability 8.9 or newer; "
+                f"observed {compute_capability[0]}.{compute_capability[1]}"
+            )
+        dtype = "bfloat16"
+        quantization = "fp8"
+    else:
+        dtype = "bfloat16" if config.runtime.precision == "bf16" else "float16"
+        precision_backend = f"vllm_{dtype}"
+
     batch_size = int(parameters.get("batch_size", 1))
     concurrency = int(parameters.get("concurrent_requests", 1))
     prompt_length = int(parameters.get("prompt_length", 128))
@@ -722,7 +747,6 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     from vllm import LLM, SamplingParams
 
     model_name = str(parameters.get("hf_model_name", config.workload.model))
-    dtype = "bfloat16" if config.runtime.precision == "bf16" else "float16"
     llm_kwargs: dict[str, Any] = {
         "model": model_name,
         "revision": _selected_model_revision(config, model_name),
@@ -736,6 +760,8 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         # compiler while retaining CUDA, NCCL, and the vLLM engine itself.
         "enforce_eager": True,
     }
+    if quantization is not None:
+        llm_kwargs["quantization"] = quantization
     inductor_disabled = tensor_parallel_size > 1
     if inductor_disabled:
         # vLLM 0.10.2 preserves ``use_inductor=True`` in its configuration
@@ -766,6 +792,7 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     ttft_samples: list[float] = []
     queueing_samples: list[float] = []
     generated_tokens = 0
+    nonempty_outputs = 0
     with measured_region():
         cuda_timer = _start_cuda_timer(torch)
         start_all = time.perf_counter()
@@ -774,7 +801,9 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
             outputs = llm.generate(prompts, sampling_params=sampling, use_tqdm=False)
             elapsed = time.perf_counter() - start
             for output in outputs:
-                generated_tokens += sum(len(candidate.token_ids) for candidate in output.outputs)
+                output_tokens = sum(len(candidate.token_ids) for candidate in output.outputs)
+                generated_tokens += output_tokens
+                nonempty_outputs += int(output_tokens > 0)
                 request_metrics = getattr(output, "metrics", None)
                 arrival = getattr(request_metrics, "arrival_time", None)
                 first = getattr(request_metrics, "first_token_time", None)
@@ -814,12 +843,32 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "vllm_execution_mode": "eager_no_inductor" if inductor_disabled else "eager",
         "vllm_inductor_disabled": inductor_disabled,
         "vllm_torchdynamo_disabled": torchdynamo_disabled,
-        "precision_backend": f"vllm_{dtype}",
-        "compute_dtype_observed": dtype,
-        "parameter_dtype_observed": dtype,
+        "precision_backend": precision_backend,
+        "compute_dtype_observed": "fp8_w8a8" if quantization is not None else dtype,
+        "parameter_dtype_observed": "fp8_e4m3" if quantization is not None else dtype,
         "hf_model_name": model_name,
         "hf_model_revision": _selected_model_revision(config, model_name),
     }
+    if quantization is not None:
+        metrics.update(
+            {
+                "quantization_method": quantization_method,
+                "quantization_mode": "online",
+                "vllm_quantization": quantization,
+                "base_compute_dtype": base_compute_dtype,
+                "comparison_control_id": str(parameters["comparison_control_id"]),
+            }
+        )
+    if bool(parameters.get("quality_sanity_check", False)):
+        metrics.update(
+            {
+                "quality_protocol": "fixed_synthetic_generation_sanity_v1",
+                "quality_requests": request_count,
+                "quality_nonempty_outputs": nonempty_outputs,
+                "quality_request_success_rate": nonempty_outputs / max(request_count, 1),
+                "quality_generated_tokens_positive": generated_tokens > 0,
+            }
+        )
     if cuda_event_seconds is not None:
         metrics["cuda_event_seconds"] = cuda_event_seconds
     if ttft_samples:
