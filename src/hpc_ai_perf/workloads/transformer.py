@@ -772,6 +772,14 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         llm_kwargs["compilation_config"] = {"level": 0, "use_inductor": False}
 
     llm = LLM(**llm_kwargs)
+    model_config = getattr(getattr(llm, "llm_engine", None), "model_config", None)
+    observed_quantization = getattr(model_config, "quantization", None)
+    observed_base_dtype = str(getattr(model_config, "dtype", dtype))
+    if quantization is not None and observed_quantization != quantization:
+        raise RuntimeError(
+            "vLLM did not activate the requested quantization backend: "
+            f"requested {quantization}, observed {observed_quantization!r}"
+        )
     sampling = SamplingParams(temperature=0.0, max_tokens=max_new_tokens)
     requests_per_round = batch_size * concurrency
     generator = torch.Generator().manual_seed(config.runtime.seed)
@@ -844,8 +852,10 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "vllm_inductor_disabled": inductor_disabled,
         "vllm_torchdynamo_disabled": torchdynamo_disabled,
         "precision_backend": precision_backend,
-        "compute_dtype_observed": "fp8_w8a8" if quantization is not None else dtype,
-        "parameter_dtype_observed": "fp8_e4m3" if quantization is not None else dtype,
+        "compute_dtype_observed": observed_base_dtype,
+        "parameter_dtype_observed": (
+            "mixed_fp8_linear_bf16_unquantized" if quantization is not None else observed_base_dtype
+        ),
         "hf_model_name": model_name,
         "hf_model_revision": _selected_model_revision(config, model_name),
     }
@@ -854,7 +864,8 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
             {
                 "quantization_method": quantization_method,
                 "quantization_mode": "online",
-                "vllm_quantization": quantization,
+                "vllm_quantization": observed_quantization,
+                "quantized_linear_compute": "fp8_w8a8",
                 "base_compute_dtype": base_compute_dtype,
                 "comparison_control_id": str(parameters["comparison_control_id"]),
             }

@@ -1519,6 +1519,12 @@ def test_vllm_inference_uses_certified_eager_execution(
             else:
                 assert "TORCHDYNAMO_DISABLE" not in os.environ
             llm_kwargs.update(kwargs)
+            self.llm_engine = types.SimpleNamespace(
+                model_config=types.SimpleNamespace(
+                    quantization=kwargs.get("quantization"),
+                    dtype=kwargs["dtype"],
+                )
+            )
 
         @staticmethod
         def get_tokenizer() -> FakeTokenizer:
@@ -1549,8 +1555,44 @@ def test_vllm_inference_uses_certified_eager_execution(
     if expected_quantization == "fp8":
         assert output.metrics["precision_backend"] == "vllm_fp8_online"
         assert output.metrics["quantization_method"] == "fp8_w8a8_dynamic"
+        assert output.metrics["vllm_quantization"] == "fp8"
+        assert output.metrics["quantized_linear_compute"] == "fp8_w8a8"
         assert output.metrics["comparison_control_id"] == "E130"
         assert output.metrics["quality_request_success_rate"] == 1.0
+
+
+def test_vllm_fp8_rejects_an_engine_that_did_not_activate_quantization(monkeypatch) -> None:
+    config = load_experiment_config(Path("configs/inference/E151_gpt2_small_precision_fp8.json"))
+    config = replace(config, runtime=replace(config.runtime, max_steps=1))
+
+    class FakeCuda:
+        @staticmethod
+        def is_available() -> bool:
+            return True
+
+        @staticmethod
+        def get_device_capability(index: int) -> tuple[int, int]:
+            return (9, 0)
+
+    fake_torch = types.ModuleType("torch")
+    fake_torch.cuda = FakeCuda()
+    fake_vllm = types.ModuleType("vllm")
+    fake_vllm.SamplingParams = object
+
+    class FakeLlm:
+        def __init__(self, **kwargs) -> None:
+            self.llm_engine = types.SimpleNamespace(
+                model_config=types.SimpleNamespace(quantization=None, dtype="bfloat16")
+            )
+
+    fake_vllm.LLM = FakeLlm
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setitem(sys.modules, "vllm", fake_vllm)
+    monkeypatch.setattr(transformer_module.importlib.util, "find_spec", lambda _: object())
+    monkeypatch.setattr(transformer_module, "_prepare_runtime", lambda *args, **kwargs: None)
+
+    with pytest.raises(RuntimeError, match="did not activate the requested quantization backend"):
+        transformer_module._run_vllm_inference(config)
 
 
 def test_tinyllama_training_dispatches_to_causal_training(monkeypatch) -> None:
