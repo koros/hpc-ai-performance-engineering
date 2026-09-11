@@ -333,7 +333,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in source_ids
     )
 
-    assert l40s_planned_source_count == 176
+    assert l40s_planned_source_count == 178
     assert (
         sum(condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in supplemental_ids)
         == 26
@@ -346,7 +346,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         )
         == 21
     )
-    assert sum(condition.status == "planned" for condition in h100_conditions) == 185
+    assert sum(condition.status == "planned" for condition in h100_conditions) == 187
 
 
 def test_telemetry_revalidation_wave_is_shared_but_platform_separated() -> None:
@@ -661,6 +661,7 @@ def test_execution_matrix_defers_only_unaccepted_or_unsupported_backend_and_plat
 def test_execution_matrix_schedules_accepted_vllm_scope_in_platform_separated_waves() -> None:
     later_waves = {
         "vllm-framework": {"E130", "E178"},
+        "vllm-fp8": {"E151", "E199"},
         "vllm-batching": {
             *(f"E{index:03d}" for index in range(132, 138)),
             *(f"E{index:03d}" for index in range(180, 186)),
@@ -693,7 +694,7 @@ def test_execution_matrix_schedules_accepted_vllm_scope_in_platform_separated_wa
     all_vllm_ids = {"E006"}
     for expected_ids in later_waves.values():
         all_vllm_ids.update(expected_ids)
-    assert len(all_vllm_ids) == 37
+    assert len(all_vllm_ids) == 39
     assert {"E148", "E196"} <= all_vllm_ids
 
 

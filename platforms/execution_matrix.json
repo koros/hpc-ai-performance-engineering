@@ -96,6 +96,14 @@
     },
     {
       "platform": "l40s",
+      "wave": "vllm-fp8",
+      "name": "L40S vLLM FP8 precision study",
+      "experiment_ids": ["E151", "E199"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
       "wave": "vllm-batching",
       "name": "L40S vLLM batching studies",
       "experiment_ids": ["E132-E137", "E180-E185"],
@@ -309,6 +317,14 @@
     },
     {
       "platform": "h100",
+      "wave": "vllm-fp8",
+      "name": "H100 vLLM FP8 precision study",
+      "experiment_ids": ["E151", "E199"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
       "wave": "vllm-batching",
       "name": "H100 vLLM batching studies",
       "experiment_ids": ["E132-E137", "E180-E185"],
@@ -383,7 +399,7 @@
     {
       "platforms": ["l40s", "h100"],
       "name": "Backend or adapter blocked",
-      "experiment_ids": ["E086", "E089", "E093", "E096", "E131", "E151-E152", "E154-E155", "E175-E176", "E179", "E199-E200"],
+      "experiment_ids": ["E086", "E089", "E093", "E096", "E131", "E152", "E154-E155", "E175-E176", "E179", "E200"],
       "comparability": "platform_specific",
       "reason": "Requires a backend artefact or workload-compatible adapter that is not yet validated."
     },

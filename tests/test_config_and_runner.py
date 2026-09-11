@@ -2164,6 +2164,34 @@ def test_vllm_fp8_requires_an_explicit_reproducible_contract() -> None:
     assert "vLLM FP8 inference requires quantization_method=fp8_w8a8_dynamic" in capability_issues(incomplete)
 
 
+@pytest.mark.parametrize(
+    ("fp8_path", "control_path"),
+    [
+        (
+            "configs/inference/E151_gpt2_small_precision_fp8.json",
+            "configs/inference/E130_gpt2_small_framework_vllm.json",
+        ),
+        (
+            "configs/inference/E199_tinyllama_precision_fp8.json",
+            "configs/inference/E178_tinyllama_framework_vllm.json",
+        ),
+    ],
+)
+def test_vllm_fp8_conditions_match_their_bf16_controls(fp8_path: str, control_path: str) -> None:
+    fp8 = load_experiment_config(Path(fp8_path))
+    control = load_experiment_config(Path(control_path))
+    controlled_parameters = ("batch_size", "concurrent_requests", "prompt_length", "max_new_tokens")
+
+    assert fp8.workload.parameters["comparison_control_id"] == control.experiment_id
+    assert fp8.workload.name == control.workload.name
+    assert fp8.workload.model == control.workload.model
+    assert fp8.workload.model_revision == control.workload.model_revision
+    assert fp8.hardware.gpus == control.hardware.gpus
+    assert fp8.runtime.max_steps == control.runtime.max_steps
+    for parameter in controlled_parameters:
+        assert fp8.workload.parameters[parameter] == control.workload.parameters[parameter]
+
+
 def test_research_preflight_has_only_documented_execution_blockers() -> None:
     blocked = {entry.config.experiment_id for entry in discover_experiment_configs() if capability_issues(entry.config)}
 
