@@ -87,7 +87,7 @@ L40S is suitable for supported single-, two-, four-, and—after E215—eight-GP
 
 ### H100: active independent collection path
 
-Generate the 180 planned H100 source conditions from the same matrix and begin or resume with the earliest incomplete
+Generate the 182 planned H100 source conditions from the same matrix and begin or resume with the earliest incomplete
 wave. This is
 the only target that supports the dissertation's current wording about one-to-four H100 scaling and H100 NVLink
 behaviour. No L40S result is promoted or relabelled; matched conditions are compared only after both exist.
@@ -101,7 +101,7 @@ Use the H100 node for the core baseline trials, 1/2/4-GPU scaling, distributed-s
 | H100 `E032` | The preserved GPT-2 Small BF16 one-GPU, batch-64 strong-scaling shape OOMed in all three trials: 70.34 GiB allocated and 7.65 GiB free before a further 12.27 GiB allocation failed on the observed 79.19 GiB device. | Keep the exact condition and failure evidence immutable. Register any reduced-batch investigation separately as H100-only `capacity_adjusted` evidence. |
 | `E007` | CUDA 12.4.1 is available, but TensorRT-LLM still lacks a compatible package, built engine, pinned model, and saved-engine contract. | A compatible pinned environment, immutable engine artefact, and successful build/load/request result on each target platform. |
 | `E131`, `E155`, `E179` | TensorRT-LLM performance integration is absent; `E155` is also not a valid generic DistilBERT classification adapter. | Reuse the validated E007 engine contract in causal-LM benchmarks; design a separate classification contract for E155. |
-| `E086`, `E089`, `E093`, `E096`, `E151`, `E175`, `E199` | FP8 backend/model implementation is not selected or validated. | A documented, tested backend and model path on the target GPU. |
+| `E086`, `E089`, `E093`, `E096`, `E175` | Training FP8 or DistilBERT classification FP8 implementation is not selected or validated. E151/E199 now have a separate online vLLM FP8 W8A8 path. | A documented, tested backend and model path appropriate to training or classification. |
 | `E152`, `E176`, `E200` | Quantization method, calibration, and immutable quantized artefact are absent. | Named method, calibration protocol, artefact hash, and matching serving runtime. |
 | `E154` | vLLM is a causal-generation engine, not the current DistilBERT classification adapter. | A valid classification serving adapter or a redesign of the comparison. |
 

@@ -46,15 +46,16 @@ replaced by a smaller batch.
 | `E131`, `E154`, `E155`, `E179` | Unsupported/incompatible inference frameworks | No | Deferred | Deferred | E131/E179 still need performance-adapter integration; generic vLLM/TensorRT-LLM causal adapters are incompatible with the current DistilBERT classification path. |
 | `E156-E161`, `E162-E174` | DistilBERT PyTorch batching, concurrency, prompt, and multi-GPU studies | No | Resolved; wave 5 | Resolved; wave 5 | These are classification-compatible PyTorch runs; preserve request shape and GPU count. |
 | `E149-E150`, `E173-E174`, `E197-E198` | Supported inference precision: FP16/BF16 | No | Resolved; wave 5 | Resolved; wave 5 | CUDA/serving precision comparison; validate each engine on the target GPU. |
-| `E151-E152`, `E175-E176`, `E199-E200` | FP8 and INT8 inference/quantization | No | Deferred | Deferred | FP8 backend or quantized/calibrated immutable artefact is not yet available. |
+| `E151`, `E199` | vLLM online FP8 W8A8 inference | No | Resolved; `vllm-fp8` | Resolved; `vllm-fp8` | Online FP8 is selected explicitly from pinned BF16 checkpoints. Compare only with the same-platform BF16 vLLM controls E130/E178; synthetic generation checks are stability evidence, not semantic quality evidence. |
+| `E152`, `E175-E176`, `E200` | Remaining FP8 classification and INT8 quantization | No | Deferred | Deferred | DistilBERT still needs a classification-compatible FP8 backend; INT8 rows need one named method, calibration protocol, and immutable artefact. |
 
 ## Directly Runnable Config Sets
 
 | Platform | Current configs you can run without changing target hardware labels | Important condition |
 | --- | --- | --- |
 | Mac M1 | `configs/local/*.json` (4 smoke configs) and `configs/dev/*.json` (15 dev configs) | Workflow validation only. Keep results out of the `E001-E200` evidence set. |
-| L40/L40S | 176 planned source `E###@l40s` conditions, 5 capacity-adjusted conditions, 5 telemetry anchors, and 16 full-node conditions | Generated configs use `gpu_l40s`, 8 CPUs/GPU, PCIe, an eight-GPU node limit, and accepted evidence root `results/raw/l40s`. E215 must first prove the complete allocation and topology. Twenty-four source rows remain deferred: TensorRT-LLM/backend gaps, platform-specific comparison rows, and exact-shape E032/E033/E044/E067/E068 OOMs. E203/E204/E206/E207 are supplemental upper-bound OOM deferrals. |
-| H100 | 180 planned source `E###@h100` conditions plus 5 telemetry anchors | Generated configs use `gpu_h100`, 16 CPUs/GPU, NVLink, and accepted evidence root `results/raw/h100`. Twenty source rows remain deferred: E032 after a three-trial exact-shape OOM, TensorRT-LLM/backend/adapter gaps, and four L40S-specific comparison rows. |
+| L40/L40S | 178 planned source `E###@l40s` conditions, 26 planned supplemental conditions, and 4 deferred supplemental capacity probes | Generated configs use `gpu_l40s`, 8 CPUs/GPU, PCIe, an eight-GPU node limit, and accepted evidence root `results/raw/l40s`. E215 must first prove the complete allocation and topology. Twenty-two source rows remain deferred: TensorRT-LLM/backend gaps, platform-specific comparison rows, and exact-shape E032/E033/E044/E067/E068 OOMs. E203/E204/E206/E207 are supplemental upper-bound OOM deferrals. |
+| H100 | 182 planned source `E###@h100` conditions plus 5 telemetry anchors | Generated configs use `gpu_h100`, 16 CPUs/GPU, NVLink, and accepted evidence root `results/raw/h100`. Eighteen source rows remain deferred: E032 after a three-trial exact-shape OOM, TensorRT-LLM/backend/adapter gaps, and four L40S-specific comparison rows. |
 
 ## Generated Companion-Config Contract
 
@@ -72,6 +73,6 @@ replaced by a smaller batch.
 | --- | --- | --- | --- |
 | 0 — prove the path | 4 smoke configs, then 15 dev configs | Resolved `E001`, `E002`, `E004-E005`; defer `E003` | Resolved `E001-E005` |
 | 1 — core evidence | Dev proxies only | Wave 1 baselines/characterisation, direct hardware pairs, then wave 3 pilot | Wave 1 baselines/characterisation, direct hardware pairs, then wave 3 pilot |
-| 2 — depth | Local shape checks | Waves 4, 4c, 4b, supported-PyTorch wave 5, then `vllm-pilot`, `vllm-framework`, `vllm-batching`, `vllm-concurrency`, `vllm-prompt`, and `vllm-tp2` | Waves 4, 4b, supported-PyTorch wave 5, then the same platform-separated vLLM sequence |
+| 2 — depth | Local shape checks | Waves 4, 4c, 4b, supported-PyTorch wave 5, then `vllm-pilot`, `vllm-framework`, `vllm-fp8`, `vllm-batching`, `vllm-concurrency`, `vllm-prompt`, and `vllm-tp2` | Waves 4, 4b, supported-PyTorch wave 5, then the same platform-separated vLLM sequence |
 | 3 — multi-GPU depth | Not applicable | `4gpu-pilot`, `4gpu-core`, `4gpu-communication`, then `8gpu-pilot`, full-node scaling/strategy/communication, and canary-gated TP=4/TP=8 vLLM | Four-GPU H100 waves after core and vLLM target-platform gates |
 | 4 — future work | Not applicable | TensorRT-LLM, FP8/INT8, and other deferred rows only after prerequisites | TensorRT-LLM, FP8/INT8, and other deferred rows only after prerequisites |

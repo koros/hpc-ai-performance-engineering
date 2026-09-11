@@ -108,6 +108,7 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `5` | Supported PyTorch inference rows | 3 | PyTorch engine, request shape, concurrency, and precision verified. |
 | `vllm-pilot` | `E006` | 1 | Canonical import, engine-start, and served-request evidence in the accepted private environment. |
 | `vllm-framework` | `E130`, `E178` | 3 | One-GPU framework baselines pass before larger serving sweeps. |
+| `vllm-fp8` | `E151`, `E199` | 3 | Online FP8 W8A8 results are compared with same-platform BF16 vLLM controls E130/E178. |
 | `vllm-batching` | `E132-E137`, `E180-E185` | 3 | Batch-size sweep completes with request and generated-token metrics. |
 | `vllm-concurrency` | `E138-E142`, `E186-E190` | 3 | Concurrency sweep completes with latency and throughput metrics. |
 | `vllm-prompt` | `E143-E146`, `E191-E194` | 3 | Prompt-length sweep completes with TTFT and generation metrics. |
@@ -247,7 +248,7 @@ make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-pilot
 ```
 
 Then use `make submit-vllm-wave PLATFORM=h100 PLATFORM_WAVE=<wave>` in this order: `vllm-framework`,
-`vllm-batching`, `vllm-concurrency`, `vllm-prompt`, `vllm-tp2`, and canary-gated `vllm-tp4`.
+`vllm-fp8`, `vllm-batching`, `vllm-concurrency`, `vllm-prompt`, `vllm-tp2`, and canary-gated `vllm-tp4`.
 
 ## 6. Recovery Rules
 

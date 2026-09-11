@@ -2045,7 +2045,7 @@ def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
     assert "slurm/smoke/gpt2_small_smoke.sbatch" in report
     assert "Submission Gate" in report
     assert "Research-readiness blockers: 0" in report
-    assert "Deferred scope rows: 15" in report
+    assert "Deferred scope rows: 13" in report
 
 
 def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:

@@ -214,6 +214,7 @@ After the pilot reports one provenance-valid completed trial, run the performanc
 | Wave | Conditions | Trials | Purpose |
 | --- | --- | ---: | --- |
 | `vllm-framework` | `E130`, `E178` | 3 | GPT-2 and TinyLlama framework baselines. |
+| `vllm-fp8` | `E151`, `E199` | 3 | Online FP8 W8A8 against same-platform BF16 vLLM controls E130/E178. |
 | `vllm-batching` | `E132-E137`, `E180-E185` | 3 | Serving batch-size sweeps. |
 | `vllm-concurrency` | `E138-E142`, `E186-E190` | 3 | Concurrent-request sweeps. |
 | `vllm-prompt` | `E143-E146`, `E191-E194` | 3 | Prompt-length sweeps. |
@@ -230,6 +231,20 @@ make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-framework
 make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-framework
 make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-framework
 ```
+
+After the BF16 framework controls are collected, run the FP8 study with the same private environment:
+
+```bash
+make submit-vllm-wave PLATFORM=h100 PLATFORM_WAVE=vllm-fp8
+make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-fp8
+make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-fp8
+make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-fp8
+```
+
+Repeat with `PLATFORM=l40s`. E151 and E199 use vLLM's online `quantization="fp8"` path with BF16 as the base
+dtype. Their result records must report `precision_backend=vllm_fp8_online`,
+`quantization_method=fp8_w8a8_dynamic`, `quantization_mode=online`, and the expected control ID. The fixed synthetic
+generation check verifies non-empty request completion only; it must not be presented as a semantic accuracy result.
 
 `submit-vllm-wave` always supplies the private environment to the immutable bundle. Never supply that environment to
 non-vLLM waves. The L40S and H100 conditions have separate immutable bundles and evidence roots. E148/E196 are routed
