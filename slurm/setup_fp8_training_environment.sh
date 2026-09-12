@@ -8,6 +8,7 @@ FP8_BASE="${HPC_AI_FP8_BASE:-${HOME}/.local/share/hpc-ai-performance-engineering
 FP8_ENV="${HPC_AI_FP8_ENV:-${FP8_BASE}/fp8-training-te${TE_VERSION}}"
 TORCH_WHEEL_DIR="${HPC_AI_TORCH_WHEEL_DIR:-${FP8_BASE}/wheels/pytorch-2.8.0-cu124-gloo}"
 CUDNN_HOME="${HPC_AI_CUDNN_HOME:-}"
+NCCL_HOME="${HPC_AI_NCCL_HOME:-}"
 MAX_JOBS="${HPC_AI_TE_MAX_JOBS:-${SLURM_CPUS_PER_TASK:-4}}"
 
 usage() {
@@ -19,6 +20,7 @@ Options:
   --env-dir PATH          Destination virtual environment.
   --torch-wheel-dir PATH  Private PyTorch 2.8/CUDA 12.4 wheel directory.
   --cudnn-home PATH       Matching cuDNN development root containing include/cudnn.h.
+  --nccl-home PATH        Matching NCCL development root containing include/nccl.h.
   --max-jobs COUNT        Parallel extension build jobs.
   --help                  Show this message.
 EOF
@@ -30,6 +32,7 @@ while [[ $# -gt 0 ]]; do
     --env-dir) FP8_ENV="$2"; shift 2 ;;
     --torch-wheel-dir) TORCH_WHEEL_DIR="$2"; shift 2 ;;
     --cudnn-home) CUDNN_HOME="$2"; shift 2 ;;
+    --nccl-home) NCCL_HOME="$2"; shift 2 ;;
     --max-jobs) MAX_JOBS="$2"; shift 2 ;;
     --help) usage; exit 0 ;;
     *) echo "ERROR: unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -41,6 +44,9 @@ FP8_ENV="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$FP
 TORCH_WHEEL_DIR="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$TORCH_WHEEL_DIR")"
 if [[ -n "$CUDNN_HOME" ]]; then
   CUDNN_HOME="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$CUDNN_HOME")"
+fi
+if [[ -n "$NCCL_HOME" ]]; then
+  NCCL_HOME="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$NCCL_HOME")"
 fi
 if [[ ! "$MAX_JOBS" =~ ^[1-9][0-9]*$ ]]; then
   echo "ERROR: --max-jobs must be a positive integer; got $MAX_JOBS" >&2
@@ -74,6 +80,18 @@ if [[ ! -r "$CUDNN_HOME/include/cudnn.h" ]]; then
 fi
 if ! compgen -G "$CUDNN_HOME/lib/libcudnn.so*" >/dev/null; then
   echo "ERROR: cuDNN shared library is missing under $CUDNN_HOME/lib" >&2
+  exit 3
+fi
+if [[ -z "$NCCL_HOME" ]]; then
+  echo "ERROR: set --nccl-home or HPC_AI_NCCL_HOME to a matching NCCL development root" >&2
+  exit 3
+fi
+if [[ ! -r "$NCCL_HOME/include/nccl.h" ]]; then
+  echo "ERROR: NCCL header is missing: $NCCL_HOME/include/nccl.h" >&2
+  exit 3
+fi
+if ! compgen -G "$NCCL_HOME/lib/libnccl.so*" >/dev/null; then
+  echo "ERROR: NCCL shared library is missing under $NCCL_HOME/lib" >&2
   exit 3
 fi
 
@@ -113,10 +131,12 @@ export NVTE_BUILD_THREADS_PER_JOB=1
 export NVTE_CUDA_INCLUDE_PATH="$CUDA_HOME/include"
 export CUDNN_HOME
 export CUDNN_PATH="$CUDNN_HOME"
-export CMAKE_PREFIX_PATH="$CUDNN_HOME${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
-export CPATH="$CUDNN_HOME/include${CPATH:+:$CPATH}"
-export LIBRARY_PATH="$CUDNN_HOME/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
-export LD_LIBRARY_PATH="$CUDNN_HOME/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export NCCL_HOME
+export NCCL_PATH="$NCCL_HOME"
+export CMAKE_PREFIX_PATH="$CUDNN_HOME:$NCCL_HOME${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
+export CPATH="$CUDNN_HOME/include:$NCCL_HOME/include${CPATH:+:$CPATH}"
+export LIBRARY_PATH="$CUDNN_HOME/lib:$NCCL_HOME/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$CUDNN_HOME/lib:$NCCL_HOME/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 uv pip install --python "$FP8_ENV/bin/python" --no-build-isolation \
   "transformer-engine[pytorch]==${TE_VERSION}"
 
@@ -163,6 +183,8 @@ manifest = {
     "transformer_engine_linear": True,
     "cudnn_home": os.environ["CUDNN_HOME"],
     "cudnn_runtime": torch.backends.cudnn.version(),
+    "nccl_home": os.environ["NCCL_HOME"],
+    "nccl_runtime": torch.cuda.nccl.version(),
     "environment": str(environment),
 }
 (environment / "BUILD_MANIFEST.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
