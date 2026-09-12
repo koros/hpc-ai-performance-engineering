@@ -154,11 +154,13 @@ verify-fp8-training-acceptance:
 
 submit-fp8-training-wave: verify-fp8-training-acceptance
 	test "$(PLATFORM)" = "l40s" || (echo "The released training-fp8 wave is currently L40S-specific" && exit 1)
-	$(MAKE) submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8 VENV_ACTIVATE="$(FP8_ENV)/bin/activate"
+	test -r "$(FP8_ENV)/bin/activate_hpc_ai_fp8" || (echo "Run make submit-fp8-training-build and wait for it to succeed first" && exit 1)
+	$(MAKE) submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8 VENV_ACTIVATE="$(FP8_ENV)/bin/activate_hpc_ai_fp8"
 
 retry-fp8-training-wave: verify-fp8-training-acceptance
 	test "$(PLATFORM)" = "l40s" || (echo "The released training-fp8 wave is currently L40S-specific" && exit 1)
-	$(MAKE) retry-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8 VENV_ACTIVATE="$(FP8_ENV)/bin/activate"
+	test -r "$(FP8_ENV)/bin/activate_hpc_ai_fp8" || (echo "Run make submit-fp8-training-build and wait for it to succeed first" && exit 1)
+	$(MAKE) retry-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8 VENV_ACTIVATE="$(FP8_ENV)/bin/activate_hpc_ai_fp8"
 
 check-l40s-runtime:
 	$(MAKE) check-platform-runtime PLATFORM=l40s

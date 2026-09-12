@@ -20,13 +20,14 @@ ACCEPTANCE_OUTPUT_DIR="$PROJECT_ROOT/build/fp8_acceptance/$PLATFORM_ID"
 cd "$PROJECT_ROOT"
 source slurm/modules_for_hpc_ai
 
-if [[ ! -r "$FP8_ENV/bin/activate" ]]; then
+FP8_ACTIVATE="$FP8_ENV/bin/activate_hpc_ai_fp8"
+if [[ ! -r "$FP8_ACTIVATE" ]]; then
   echo "ERROR: isolated FP8 training environment is missing: $FP8_ENV" >&2
   echo "Run make submit-fp8-training-build and wait for it to succeed first." >&2
   exit 3
 fi
 unset PYTHONPATH PYTHONHOME
-source "$FP8_ENV/bin/activate"
+source "$FP8_ACTIVATE"
 export PYTHONPATH="$PROJECT_ROOT/src"
 export TOKENIZERS_PARALLELISM=false
 
