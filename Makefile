@@ -34,6 +34,8 @@ VLLM_ENV ?= $(VLLM_BASE)/vllm-$(VLLM_VERSION)-gloo
 VLLM_SOURCE ?= $(VLLM_BASE)/src/vllm-v$(VLLM_VERSION)-gloo
 TRANSFORMER_ENGINE_VERSION ?= 2.8.0
 TRANSFORMER_ENGINE_CUDNN_VERSION ?= 9.3.0.75
+TRANSFORMER_ENGINE_CUBLAS_VERSION ?= 12.4.5.8
+TRANSFORMER_ENGINE_NVRTC_VERSION ?= 12.4.127
 FP8_ENV ?= $(VLLM_BASE)/fp8-training-te$(TRANSFORMER_ENGINE_VERSION)
 FP8_ACCEPTANCE_ROOT ?= build/fp8_acceptance/$(PLATFORM)
 NCCL_HOME ?=
@@ -134,13 +136,13 @@ retry-vllm-wave:
 setup-fp8-training-environment:
 	test -n "$(NCCL_HOME)" || (echo "Set NCCL_HOME to a matching NCCL development root" && exit 1)
 	test -r "$(NCCL_HOME)/include/nccl.h" || (echo "NCCL_HOME must contain include/nccl.h" && exit 1)
-	HPC_AI_TE_VERSION="$(TRANSFORMER_ENGINE_VERSION)" HPC_AI_TE_CUDNN_VERSION="$(TRANSFORMER_ENGINE_CUDNN_VERSION)" HPC_AI_NCCL_HOME="$(NCCL_HOME)" bash slurm/setup_fp8_training_environment.sh --project-root "$(CURDIR)" --env-dir "$(FP8_ENV)" --torch-wheel-dir "$(TORCH_GLOO_WHEEL_DIR)" --nccl-home "$(NCCL_HOME)"
+	HPC_AI_TE_VERSION="$(TRANSFORMER_ENGINE_VERSION)" HPC_AI_TE_CUDNN_VERSION="$(TRANSFORMER_ENGINE_CUDNN_VERSION)" HPC_AI_TE_CUBLAS_VERSION="$(TRANSFORMER_ENGINE_CUBLAS_VERSION)" HPC_AI_TE_NVRTC_VERSION="$(TRANSFORMER_ENGINE_NVRTC_VERSION)" HPC_AI_NCCL_HOME="$(NCCL_HOME)" bash slurm/setup_fp8_training_environment.sh --project-root "$(CURDIR)" --env-dir "$(FP8_ENV)" --torch-wheel-dir "$(TORCH_GLOO_WHEEL_DIR)" --nccl-home "$(NCCL_HOME)"
 
 submit-fp8-training-build:
 	test -r "$(TORCH_GLOO_WHEEL_DIR)/BUILD_MANIFEST.json" || (echo "Run make submit-pytorch-gloo-build and wait for it to succeed first" && exit 1)
 	test -n "$(NCCL_HOME)" || (echo "Set NCCL_HOME to a matching NCCL development root" && exit 1)
 	test -r "$(NCCL_HOME)/include/nccl.h" || (echo "NCCL_HOME must contain include/nccl.h" && exit 1)
-	sbatch --export=ALL,HPC_AI_TE_VERSION="$(TRANSFORMER_ENGINE_VERSION)",HPC_AI_TE_CUDNN_VERSION="$(TRANSFORMER_ENGINE_CUDNN_VERSION)",HPC_AI_FP8_ENV="$(FP8_ENV)",HPC_AI_TORCH_WHEEL_DIR="$(TORCH_GLOO_WHEEL_DIR)",HPC_AI_NCCL_HOME="$(NCCL_HOME)" slurm/smoke/fp8_training_build_l40s.sbatch
+	sbatch --export=ALL,HPC_AI_TE_VERSION="$(TRANSFORMER_ENGINE_VERSION)",HPC_AI_TE_CUDNN_VERSION="$(TRANSFORMER_ENGINE_CUDNN_VERSION)",HPC_AI_TE_CUBLAS_VERSION="$(TRANSFORMER_ENGINE_CUBLAS_VERSION)",HPC_AI_TE_NVRTC_VERSION="$(TRANSFORMER_ENGINE_NVRTC_VERSION)",HPC_AI_FP8_ENV="$(FP8_ENV)",HPC_AI_TORCH_WHEEL_DIR="$(TORCH_GLOO_WHEEL_DIR)",HPC_AI_NCCL_HOME="$(NCCL_HOME)" slurm/smoke/fp8_training_build_l40s.sbatch
 
 submit-fp8-training-acceptance:
 	test "$(PLATFORM)" = "l40s" || (echo "The current FP8 training acceptance configs are L40S-specific" && exit 1)

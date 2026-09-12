@@ -4,6 +4,8 @@ set -euo pipefail
 
 TE_VERSION="${HPC_AI_TE_VERSION:-2.8.0}"
 TE_CUDNN_VERSION="${HPC_AI_TE_CUDNN_VERSION:-9.3.0.75}"
+TE_CUBLAS_VERSION="${HPC_AI_TE_CUBLAS_VERSION:-12.4.5.8}"
+TE_NVRTC_VERSION="${HPC_AI_TE_NVRTC_VERSION:-12.4.127}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FP8_BASE="${HPC_AI_FP8_BASE:-${HOME}/.local/share/hpc-ai-performance-engineering}"
 FP8_ENV="${HPC_AI_FP8_ENV:-${FP8_BASE}/fp8-training-te${TE_VERSION}}"
@@ -110,19 +112,33 @@ uv pip install --python "$FP8_ENV/bin/python" \
 # the different major SONAMEs can coexist when the TE-owned cuDNN 9 library is
 # isolated in this environment.
 uv pip install --python "$FP8_ENV/bin/python" \
-  "nvidia-cudnn-cu12==${TE_CUDNN_VERSION}"
-CUDNN_HOME="$("$FP8_ENV/bin/python" - <<'PY'
+  "nvidia-cudnn-cu12==${TE_CUDNN_VERSION}" \
+  "nvidia-cublas-cu12==${TE_CUBLAS_VERSION}" \
+  "nvidia-cuda-nvrtc-cu12==${TE_NVRTC_VERSION}"
+readarray -t nvidia_roots < <("$FP8_ENV/bin/python" - <<'PY'
 from pathlib import Path
 import sysconfig
 
-root = Path(sysconfig.get_paths()["purelib"]) / "nvidia" / "cudnn"
-if not (root / "include" / "cudnn.h").is_file():
-    raise SystemExit(f"cuDNN 9 header is missing: {root / 'include' / 'cudnn.h'}")
-if not list((root / "lib").glob("libcudnn.so.9*")):
-    raise SystemExit(f"cuDNN 9 shared library is missing: {root / 'lib'}")
-print(root)
+site_packages = Path(sysconfig.get_paths()["purelib"])
+cudnn = site_packages / "nvidia" / "cudnn"
+cublas = site_packages / "nvidia" / "cublas"
+nvrtc = site_packages / "nvidia" / "cuda_nvrtc"
+if not (cudnn / "include" / "cudnn.h").is_file():
+    raise SystemExit(f"cuDNN 9 header is missing: {cudnn / 'include' / 'cudnn.h'}")
+if not list((cudnn / "lib").glob("libcudnn.so.9*")):
+    raise SystemExit(f"cuDNN 9 shared library is missing: {cudnn / 'lib'}")
+if not (cublas / "lib" / "libcublas.so.12").is_file() or not (cublas / "lib" / "libcublasLt.so.12").is_file():
+    raise SystemExit(f"matching cuBLAS libraries are missing: {cublas / 'lib'}")
+if not list((nvrtc / "lib").glob("libnvrtc.so.12*")):
+    raise SystemExit(f"matching NVRTC library is missing: {nvrtc / 'lib'}")
+print(cudnn)
+print(cublas)
+print(nvrtc)
 PY
-)"
+)
+CUDNN_HOME="${nvidia_roots[0]}"
+CUBLAS_HOME="${nvidia_roots[1]}"
+NVRTC_HOME="${nvidia_roots[2]}"
 
 # TE 2.8 is pinned because its public installation and FP8 recipe APIs are the
 # contract implemented by this repository. Build its PyTorch extension against
@@ -133,12 +149,13 @@ export NVTE_BUILD_THREADS_PER_JOB=1
 export NVTE_CUDA_INCLUDE_PATH="$CUDA_HOME/include"
 export CUDNN_HOME
 export CUDNN_PATH="$CUDNN_HOME"
+export CUBLAS_HOME NVRTC_HOME
 export NCCL_HOME
 export NCCL_PATH="$NCCL_HOME"
-export CMAKE_PREFIX_PATH="$CUDNN_HOME:$NCCL_HOME${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
+export CMAKE_PREFIX_PATH="$CUDNN_HOME:$CUBLAS_HOME:$NVRTC_HOME:$NCCL_HOME${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
 export CPATH="$CUDNN_HOME/include:$NCCL_HOME/include${CPATH:+:$CPATH}"
-export LIBRARY_PATH="$CUDNN_HOME/lib:$NCCL_HOME/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
-export LD_LIBRARY_PATH="$CUDNN_HOME/lib:$NCCL_HOME/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LIBRARY_PATH="$CUBLAS_HOME/lib:$NVRTC_HOME/lib:$CUDNN_HOME/lib:$NCCL_HOME/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$CUBLAS_HOME/lib:$NVRTC_HOME/lib:$CUDNN_HOME/lib:$NCCL_HOME/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 uv pip install --python "$FP8_ENV/bin/python" --no-build-isolation \
   "transformer-engine[pytorch]==${TE_VERSION}"
 
@@ -185,6 +202,10 @@ manifest = {
     "transformer_engine_linear": True,
     "cudnn_home": os.environ["CUDNN_HOME"],
     "cudnn_version": version("nvidia-cudnn-cu12"),
+    "cublas_home": os.environ["CUBLAS_HOME"],
+    "cublas_version": version("nvidia-cublas-cu12"),
+    "nvrtc_home": os.environ["NVRTC_HOME"],
+    "nvrtc_version": version("nvidia-cuda-nvrtc-cu12"),
     "torch_cudnn_runtime": torch.backends.cudnn.version(),
     "nccl_home": os.environ["NCCL_HOME"],
     "nccl_runtime": torch.cuda.nccl.version(),
