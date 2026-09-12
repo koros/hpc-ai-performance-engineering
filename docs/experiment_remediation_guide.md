@@ -24,7 +24,7 @@ Completed locally:
 
 Deferred from the executable deployment scope or awaiting external evidence:
 
-- L40S `E086`/`E093` are released only through the Transformer Engine acceptance gate and use E231/E232 as backend-matched BF16 controls. H100 E086/E093 and inference/classification rows E089/E096/E175 remain deferred until their platform/backend-specific gates are supplied. E151/E199 use their separate accepted vLLM online-FP8 contract.
+- L40S `E086`/`E093` are released only through the Transformer Engine acceptance gate and use E231/E232 as backend-matched BF16 controls. H100 has its own real-model Transformer Engine diagnostic gate, but E086/E093 remain deferred until H100 backend-matched BF16 controls are registered and accepted. Inference/classification rows E089/E096/E175 remain deferred pending their platform/backend-specific gates. E151/E199 use their separate accepted vLLM online-FP8 contract.
 - `E152`, `E176`, and `E200` are marked deferred until a named quantization method, calibration protocol, and quantized artefact are supplied.
 - `E007` now has a saved-engine build/load/request contract and is deferred only until a compatible TensorRT-LLM release succeeds on the target H100.
 - `E131` and `E179` remain deferred until the validated E007 contract is integrated into the performance adapter; `E155` additionally requires a classification-compatible design.

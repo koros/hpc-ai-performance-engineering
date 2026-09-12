@@ -432,7 +432,7 @@
       "name": "H100 Transformer Engine training acceptance pending",
       "experiment_ids": ["E086", "E093"],
       "comparability": "platform_specific",
-      "reason": "The Transformer Engine FP8 training adapter is implemented, but only the L40S-specific environment and real-model acceptance gate are currently defined. Preserve these source rows for a separate H100 acceptance and backend-matched BF16 control wave."
+      "reason": "The shared private Transformer Engine stack is architecture-capable for H100, but H100 real-model acceptance and a platform-specific backend-matched BF16 control wave must pass before releasing canonical E086/E093 evidence."
     },
     {
       "platforms": ["l40s"],

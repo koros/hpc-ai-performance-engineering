@@ -187,6 +187,20 @@ make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8
 make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8
 ```
 
+The same private Torch/Transformer Engine build targets both L40S (`sm_89`) and H100 (`sm_90`). Run the H100
+acceptance gate independently before planning any H100 training-FP8 evidence:
+
+```bash
+make submit-fp8-training-acceptance PLATFORM=h100
+# After the H100 acceptance job completes successfully:
+make verify-fp8-training-acceptance PLATFORM=h100
+```
+
+This writes separate diagnostic records below `build/fp8_acceptance/h100/` using H100-labelled configurations.
+It confirms the runtime and real-model adapter on H100, but does not release `E086`/`E093`: those source rows still
+need separately registered H100 Transformer Engine BF16 controls, so the final comparison does not conflate numeric
+precision with a backend change.
+
 `submit-fp8-training-build` installs the pinned private cuDNN/cuBLAS/NVRTC/Triton set inside the isolated
 environment and passes the NCCL root as `HPC_AI_NCCL_HOME`. Its private library directories precede the system
 toolkit at runtime, so the cuBLAS and cuBLASLt pair remain ABI-matched. The builder validates the NCCL header/shared
