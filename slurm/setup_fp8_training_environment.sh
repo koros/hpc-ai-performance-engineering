@@ -3,11 +3,11 @@
 set -euo pipefail
 
 TE_VERSION="${HPC_AI_TE_VERSION:-2.8.0}"
+TE_CUDNN_VERSION="${HPC_AI_TE_CUDNN_VERSION:-9.3.0.75}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FP8_BASE="${HPC_AI_FP8_BASE:-${HOME}/.local/share/hpc-ai-performance-engineering}"
 FP8_ENV="${HPC_AI_FP8_ENV:-${FP8_BASE}/fp8-training-te${TE_VERSION}}"
 TORCH_WHEEL_DIR="${HPC_AI_TORCH_WHEEL_DIR:-${FP8_BASE}/wheels/pytorch-2.8.0-cu124-gloo}"
-CUDNN_HOME="${HPC_AI_CUDNN_HOME:-}"
 NCCL_HOME="${HPC_AI_NCCL_HOME:-}"
 MAX_JOBS="${HPC_AI_TE_MAX_JOBS:-${SLURM_CPUS_PER_TASK:-4}}"
 
@@ -19,7 +19,6 @@ Options:
   --project-root PATH     Repository containing slurm/modules_for_hpc_ai.
   --env-dir PATH          Destination virtual environment.
   --torch-wheel-dir PATH  Private PyTorch 2.8/CUDA 12.4 wheel directory.
-  --cudnn-home PATH       Matching cuDNN development root containing include/cudnn.h.
   --nccl-home PATH        Matching NCCL development root containing include/nccl.h.
   --max-jobs COUNT        Parallel extension build jobs.
   --help                  Show this message.
@@ -31,7 +30,6 @@ while [[ $# -gt 0 ]]; do
     --project-root) PROJECT_ROOT="$2"; shift 2 ;;
     --env-dir) FP8_ENV="$2"; shift 2 ;;
     --torch-wheel-dir) TORCH_WHEEL_DIR="$2"; shift 2 ;;
-    --cudnn-home) CUDNN_HOME="$2"; shift 2 ;;
     --nccl-home) NCCL_HOME="$2"; shift 2 ;;
     --max-jobs) MAX_JOBS="$2"; shift 2 ;;
     --help) usage; exit 0 ;;
@@ -42,9 +40,6 @@ done
 PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd)"
 FP8_ENV="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$FP8_ENV")"
 TORCH_WHEEL_DIR="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$TORCH_WHEEL_DIR")"
-if [[ -n "$CUDNN_HOME" ]]; then
-  CUDNN_HOME="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$CUDNN_HOME")"
-fi
 if [[ -n "$NCCL_HOME" ]]; then
   NCCL_HOME="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$NCCL_HOME")"
 fi
@@ -70,18 +65,6 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 3
 fi
 
-if [[ -z "$CUDNN_HOME" ]]; then
-  echo "ERROR: set --cudnn-home or HPC_AI_CUDNN_HOME to a matching cuDNN development root" >&2
-  exit 3
-fi
-if [[ ! -r "$CUDNN_HOME/include/cudnn.h" ]]; then
-  echo "ERROR: cuDNN header is missing: $CUDNN_HOME/include/cudnn.h" >&2
-  exit 3
-fi
-if ! compgen -G "$CUDNN_HOME/lib/libcudnn.so*" >/dev/null; then
-  echo "ERROR: cuDNN shared library is missing under $CUDNN_HOME/lib" >&2
-  exit 3
-fi
 if [[ -z "$NCCL_HOME" ]]; then
   echo "ERROR: set --nccl-home or HPC_AI_NCCL_HOME to a matching NCCL development root" >&2
   exit 3
@@ -121,6 +104,25 @@ fi
 uv pip install --python "$FP8_ENV/bin/python" "$TORCH_WHEEL"
 uv pip install --python "$FP8_ENV/bin/python" \
   "setuptools>=68" wheel packaging "cmake>=3.18" ninja "pybind11>=2.6"
+
+# Transformer Engine 2.8's CUDA-12 core is linked against cuDNN 9. The
+# cluster's private Torch wheel continues to use its matching cuDNN 8 runtime;
+# the different major SONAMEs can coexist when the TE-owned cuDNN 9 library is
+# isolated in this environment.
+uv pip install --python "$FP8_ENV/bin/python" \
+  "nvidia-cudnn-cu12==${TE_CUDNN_VERSION}"
+CUDNN_HOME="$("$FP8_ENV/bin/python" - <<'PY'
+from pathlib import Path
+import sysconfig
+
+root = Path(sysconfig.get_paths()["purelib"]) / "nvidia" / "cudnn"
+if not (root / "include" / "cudnn.h").is_file():
+    raise SystemExit(f"cuDNN 9 header is missing: {root / 'include' / 'cudnn.h'}")
+if not list((root / "lib").glob("libcudnn.so.9*")):
+    raise SystemExit(f"cuDNN 9 shared library is missing: {root / 'lib'}")
+print(root)
+PY
+)"
 
 # TE 2.8 is pinned because its public installation and FP8 recipe APIs are the
 # contract implemented by this repository. Build its PyTorch extension against
@@ -182,7 +184,8 @@ manifest = {
     "transformer_engine_version": observed_te,
     "transformer_engine_linear": True,
     "cudnn_home": os.environ["CUDNN_HOME"],
-    "cudnn_runtime": torch.backends.cudnn.version(),
+    "cudnn_version": version("nvidia-cudnn-cu12"),
+    "torch_cudnn_runtime": torch.backends.cudnn.version(),
     "nccl_home": os.environ["NCCL_HOME"],
     "nccl_runtime": torch.cuda.nccl.version(),
     "environment": str(environment),

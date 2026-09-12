@@ -12,11 +12,10 @@ set -euo pipefail
 
 PROJECT_ROOT="${SLURM_SUBMIT_DIR:?Submit this script from the project root}"
 cd "$PROJECT_ROOT"
-if [[ -z "${HPC_AI_CUDNN_HOME:-}" || -z "${HPC_AI_NCCL_HOME:-}" ]]; then
-  echo "ERROR: HPC_AI_CUDNN_HOME and HPC_AI_NCCL_HOME must name matching development roots" >&2
+if [[ -z "${HPC_AI_NCCL_HOME:-}" ]]; then
+  echo "ERROR: HPC_AI_NCCL_HOME must name a matching NCCL development root" >&2
   exit 2
 fi
 bash slurm/setup_fp8_training_environment.sh \
   --project-root "$PROJECT_ROOT" \
-  --cudnn-home "$HPC_AI_CUDNN_HOME" \
   --nccl-home "$HPC_AI_NCCL_HOME"
