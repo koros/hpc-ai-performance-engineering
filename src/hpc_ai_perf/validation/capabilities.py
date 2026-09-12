@@ -24,6 +24,8 @@ TRANSFORMER_PARAMETER_KEYS = {
     "collect_loss",
     "collect_sharded_communication",
     "comparison_control_id",
+    "comparison_role",
+    "comparison_treatment_id",
     "communication_study_type",
     "comparison_axis",
     "concurrent_requests",
@@ -203,6 +205,15 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
                 issues.append("FP8 training requires stack=pytorch_transformer_engine")
             if config.distributed.strategy != "none" or config.hardware.gpus != 1:
                 issues.append("validated Transformer Engine FP8 training currently supports one GPU")
+        elif config.mode == "training" and parameters.get("precision_backend") == "transformer_engine":
+            if config.runtime.precision != "bf16":
+                issues.append("Transformer Engine training controls must use BF16 or the validated FP8 path")
+            if parameters.get("base_compute_dtype") != "bf16":
+                issues.append("Transformer Engine BF16 controls require base_compute_dtype=bf16")
+            if parameters.get("stack") != "pytorch_transformer_engine":
+                issues.append("Transformer Engine BF16 controls require stack=pytorch_transformer_engine")
+            if config.distributed.strategy != "none" or config.hardware.gpus != 1:
+                issues.append("validated Transformer Engine BF16 controls currently support one GPU")
         elif config.runtime.precision == "fp8" and config.mode == "inference" and parameters.get("framework") == "vllm":
             if parameters.get("precision_backend") != "vllm_fp8_online":
                 issues.append("vLLM FP8 inference requires precision_backend=vllm_fp8_online")

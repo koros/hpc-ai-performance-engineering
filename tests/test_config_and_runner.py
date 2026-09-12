@@ -766,6 +766,20 @@ def test_fp8_training_precision_requires_transformer_engine_context() -> None:
     assert transformer_module._precision_backend("fp8") == "transformer_engine_delayed_scaling_hybrid"
 
 
+def test_transformer_engine_backend_selects_matched_module_conversion() -> None:
+    config = load_experiment_config(Path("configs/precision_studies/E086_gpt2_small_training_fp8.json"))
+    parameters = dict(config.workload.parameters)
+    parameters["precision_backend"] = "transformer_engine"
+    bf16 = replace(
+        config,
+        runtime=replace(config.runtime, precision="bf16"),
+        workload=replace(config.workload, parameters=parameters),
+    )
+
+    assert transformer_module._uses_transformer_engine(config)
+    assert transformer_module._uses_transformer_engine(bf16)
+
+
 def test_transformer_engine_conversion_replaces_only_shape_compatible_projections() -> None:
     import torch
 

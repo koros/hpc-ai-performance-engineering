@@ -34,7 +34,7 @@ class TransformerWorkload(Workload):
 
     def prepare(self, config: ExperimentConfig) -> None:
         required = list(self.required_packages)
-        if config.mode == "training" and config.runtime.precision == "fp8":
+        if config.mode == "training" and _uses_transformer_engine(config):
             required.append("transformer_engine")
         if config.distributed.strategy.startswith("deepspeed"):
             required.append("deepspeed")
@@ -102,7 +102,7 @@ def _run_causal_training(config: ExperimentConfig) -> WorkloadRunOutput:
     runtime = _prepare_runtime(torch, config)
     parameters = config.workload.parameters
     model_name = str(parameters.get("hf_model_name", config.workload.model))
-    model_dtype = torch.bfloat16 if config.runtime.precision == "fp8" else torch.float32
+    model_dtype = torch.bfloat16 if _uses_transformer_engine(config) else torch.float32
     model = auto_model.from_pretrained(
         model_name,
         revision=_selected_model_revision(config, model_name),
@@ -117,7 +117,7 @@ def _run_classification_training(config: ExperimentConfig) -> WorkloadRunOutput:
     parameters = config.workload.parameters
     model_name = str(parameters.get("hf_model_name", config.workload.model))
     num_labels = int(parameters.get("num_labels", 2))
-    model_dtype = torch.bfloat16 if config.runtime.precision == "fp8" else torch.float32
+    model_dtype = torch.bfloat16 if _uses_transformer_engine(config) else torch.float32
     model = auto_model.from_pretrained(
         model_name,
         revision=_selected_model_revision(config, model_name),
@@ -168,9 +168,14 @@ def _run_training_loop(
             model.config.use_cache = False
 
     fp8_context = None
-    fp8_metadata: dict[str, int | float | str | bool | None] = {}
-    if config.runtime.precision == "fp8":
-        model, fp8_context, fp8_metadata = _configure_transformer_engine_fp8(torch, config, model, device)
+    transformer_engine_metadata: dict[str, int | float | str | bool | None] = {}
+    if _uses_transformer_engine(config):
+        model, fp8_context, transformer_engine_metadata = _configure_transformer_engine_training(
+            torch,
+            config,
+            model,
+            device,
+        )
 
     model, optimizer, engine, deepspeed_nvtx_annotations_disabled = _configure_training_strategy(
         torch,
@@ -332,7 +337,7 @@ def _run_training_loop(
         "parameter_dtype_observed": str(next(model.parameters()).dtype),
         "dataset_execution": "cpu_dataloader" if data_iterator is not None else "synthetic_device_tensors",
         "deepspeed_nvtx_annotations_disabled": deepspeed_nvtx_annotations_disabled,
-        **fp8_metadata,
+        **transformer_engine_metadata,
     }
     if cuda_event_seconds is not None:
         metrics["cuda_event_seconds"] = cuda_event_seconds
@@ -1072,30 +1077,38 @@ def _training_precision(
     return context, scaler
 
 
-def _configure_transformer_engine_fp8(
+def _uses_transformer_engine(config: ExperimentConfig) -> bool:
+    return str(config.workload.parameters.get("precision_backend", "")) == "transformer_engine"
+
+
+def _configure_transformer_engine_training(
     torch: Any,
     config: ExperimentConfig,
     model: Any,
     device: Any,
-) -> tuple[Any, Any, dict[str, int | float | str | bool | None]]:
-    """Replace eligible HF projection layers with real Transformer Engine FP8 modules.
+) -> tuple[Any, Any | None, dict[str, int | float | str | bool | None]]:
+    """Replace eligible HF projections with matched Transformer Engine modules.
 
     Transformer Engine autocast only quantizes Transformer Engine modules. Merely
     wrapping an unmodified Hugging Face model would therefore produce mislabeled
-    evidence. This conversion handles ``torch.nn.Linear`` and GPT-2 ``Conv1D``
-    projections, while intentionally retaining unsupported output heads in BF16.
+    FP8 evidence. The same conversion is used for the BF16 controls so the
+    controlled comparison changes precision without also changing module
+    implementation. Unsupported output heads intentionally remain in BF16.
     """
     parameters = config.workload.parameters
     if parameters.get("precision_backend") != "transformer_engine":
-        raise RuntimeError("FP8 training requires precision_backend=transformer_engine")
-    if parameters.get("quantization_method") != "fp8_delayed_scaling_hybrid":
-        raise RuntimeError("FP8 training requires quantization_method=fp8_delayed_scaling_hybrid")
+        raise RuntimeError("Transformer Engine training requires precision_backend=transformer_engine")
+    if config.runtime.precision not in {"bf16", "fp8"}:
+        raise RuntimeError("Validated Transformer Engine training supports BF16 controls and FP8 treatments")
     if parameters.get("base_compute_dtype") != "bf16":
-        raise RuntimeError("FP8 training requires base_compute_dtype=bf16")
+        raise RuntimeError("Transformer Engine training requires base_compute_dtype=bf16")
     if getattr(device, "type", str(device)) != "cuda" or not torch.cuda.is_available():
-        raise RuntimeError("Transformer Engine FP8 training requires CUDA")
+        raise RuntimeError("Transformer Engine training requires CUDA")
     capability = tuple(int(value) for value in torch.cuda.get_device_capability(device))
-    if capability < (8, 9):
+    fp8_enabled = config.runtime.precision == "fp8"
+    if fp8_enabled and parameters.get("quantization_method") != "fp8_delayed_scaling_hybrid":
+        raise RuntimeError("FP8 training requires quantization_method=fp8_delayed_scaling_hybrid")
+    if fp8_enabled and capability < (8, 9):
         raise RuntimeError(
             "Transformer Engine FP8 training requires NVIDIA compute capability 8.9 or newer; "
             f"observed {capability[0]}.{capability[1]}"
@@ -1111,24 +1124,27 @@ def _configure_transformer_engine_fp8(
     if not converted:
         raise RuntimeError("Transformer Engine conversion found no FP8-compatible projection layers")
 
-    recipe = DelayedScaling(
-        fp8_format=Format.HYBRID,
-        amax_history_len=int(parameters.get("fp8_amax_history_len", 16)),
-        amax_compute_algo="max",
-    )
-    autocast = getattr(te, "autocast", None)
-    if autocast is not None:
+    context = None
+    context_api = None
+    if fp8_enabled:
+        recipe = DelayedScaling(
+            fp8_format=Format.HYBRID,
+            amax_history_len=int(parameters.get("fp8_amax_history_len", 16)),
+            amax_compute_algo="max",
+        )
+        autocast = getattr(te, "autocast", None)
+        if autocast is not None:
 
-        def context() -> Any:
-            return autocast(enabled=True, recipe=recipe)
+            def context() -> Any:
+                return autocast(enabled=True, recipe=recipe)
 
-        context_api = "transformer_engine.pytorch.autocast"
-    else:  # Transformer Engine releases before the autocast rename.
+            context_api = "transformer_engine.pytorch.autocast"
+        else:  # Transformer Engine releases before the autocast rename.
 
-        def context() -> Any:
-            return te.fp8_autocast(enabled=True, fp8_recipe=recipe)
+            def context() -> Any:
+                return te.fp8_autocast(enabled=True, fp8_recipe=recipe)
 
-        context_api = "transformer_engine.pytorch.fp8_autocast"
+            context_api = "transformer_engine.pytorch.fp8_autocast"
 
     try:
         from importlib.metadata import version
@@ -1142,11 +1158,15 @@ def _configure_transformer_engine_fp8(
         "transformer_engine_modules": ",".join(converted),
         "transformer_engine_skipped_projection_count": len(skipped),
         "transformer_engine_skipped_projections": ",".join(skipped),
-        "fp8_recipe": "delayed_scaling_hybrid",
-        "fp8_amax_history_len": int(parameters.get("fp8_amax_history_len", 16)),
+        "precision_backend": (
+            "transformer_engine_delayed_scaling_hybrid" if fp8_enabled else "transformer_engine_bf16"
+        ),
+        "compute_dtype_observed": "fp8_mixed_bf16" if fp8_enabled else "bf16",
+        "fp8_recipe": "delayed_scaling_hybrid" if fp8_enabled else None,
+        "fp8_amax_history_len": int(parameters.get("fp8_amax_history_len", 16)) if fp8_enabled else None,
         "fp8_autocast_api": context_api,
         "fp8_compute_capability": f"{capability[0]}.{capability[1]}",
-        "fp8_forward_enabled": True,
+        "fp8_forward_enabled": fp8_enabled,
     }
     return model, context, metadata
 
