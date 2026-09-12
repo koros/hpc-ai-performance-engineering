@@ -347,7 +347,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         )
         == 23
     )
-    assert sum(condition.status == "planned" for condition in h100_conditions) == 187
+    assert sum(condition.status == "planned" for condition in h100_conditions) == 186
 
 
 def test_telemetry_revalidation_wave_is_shared_but_platform_separated() -> None:
@@ -490,6 +490,15 @@ def test_l40s_wave_four_collection_scope_excludes_exact_micro_batch_oom_deferral
     assert "E068" not in wave_four
     assert "E096" not in wave_four
     assert {"E064", "E074", "E112"} <= wave_four
+
+
+def test_h100_wave_four_collection_scope_excludes_measured_micro_batch_oom_deferral() -> None:
+    wave_four = _planned_wave_experiment_ids("h100", "4")
+
+    assert len(wave_four) == 45
+    assert "E068" not in wave_four
+    assert "E096" not in wave_four
+    assert {"E063", "E067", "E112"} <= wave_four
 
 
 def test_l40s_capacity_adjusted_wave_materializes_boundary_probes(tmp_path: Path) -> None:
@@ -667,7 +676,7 @@ def test_execution_matrix_defers_only_unaccepted_or_unsupported_backend_and_plat
                 }
             )
         else:
-            expected_ids.add("E032")
+            expected_ids.update({"E032", "E068"})
         conditions = load_platform_conditions(
             "platforms/execution_matrix.json",
             platform_id,
