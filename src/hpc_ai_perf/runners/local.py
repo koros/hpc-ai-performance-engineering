@@ -180,9 +180,9 @@ def _environment(
     }
     environment.update({key: value for key, value in bundle_environment.items() if value})
     environment.update(nvidia_smi_device_metadata())
-    for package in ["datasets", "deepspeed", "transformers", "vllm"]:
+    for package in ["datasets", "deepspeed", "transformers", "vllm", "transformer-engine"]:
         try:
-            environment[f"{package}_version"] = version(package)
+            environment[f"{package.replace('-', '_')}_version"] = version(package)
         except PackageNotFoundError:
             environment[f"{package}_version"] = None
     return environment

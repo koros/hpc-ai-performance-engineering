@@ -201,7 +201,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 packages = {}
-for package in (\"torch\", \"transformers\", \"datasets\", \"deepspeed\", \"vllm\"):
+for package in (\"torch\", \"transformers\", \"datasets\", \"deepspeed\", \"vllm\", \"transformer-engine\"):
     try:
         packages[package] = version(package)
     except PackageNotFoundError:
@@ -232,7 +232,7 @@ print(json.dumps({
         return contract
 
     packages: dict[str, str | None] = {}
-    for package in ("torch", "transformers", "datasets", "deepspeed", "vllm"):
+    for package in ("torch", "transformers", "datasets", "deepspeed", "vllm", "transformer-engine"):
         try:
             packages[package] = version(package)
         except PackageNotFoundError:

@@ -126,6 +126,7 @@ def test_capture_environment_contract_can_probe_a_selected_virtualenv_python() -
 
     assert contract["python_executable"] == str(Path(sys.executable))
     assert isinstance(contract["packages"], dict)
+    assert "transformer-engine" in contract["packages"]
     assert "loaded_modules" not in contract
 
 
