@@ -146,9 +146,9 @@ submit-fp8-training-build:
 	sbatch --export=ALL,HPC_AI_TE_VERSION="$(TRANSFORMER_ENGINE_VERSION)",HPC_AI_TE_CUDNN_VERSION="$(TRANSFORMER_ENGINE_CUDNN_VERSION)",HPC_AI_TE_CUBLAS_VERSION="$(TRANSFORMER_ENGINE_CUBLAS_VERSION)",HPC_AI_TE_NVRTC_VERSION="$(TRANSFORMER_ENGINE_NVRTC_VERSION)",HPC_AI_TE_TRITON_VERSION="$(TRANSFORMER_ENGINE_TRITON_VERSION)",HPC_AI_FP8_ENV="$(FP8_ENV)",HPC_AI_TORCH_WHEEL_DIR="$(TORCH_GLOO_WHEEL_DIR)",HPC_AI_NCCL_HOME="$(NCCL_HOME)" slurm/smoke/fp8_training_build_l40s.sbatch
 
 submit-fp8-training-acceptance:
-	test "$(PLATFORM)" = "l40s" || (echo "The current FP8 training acceptance configs are L40S-specific" && exit 1)
+	@case "$(PLATFORM)" in l40s|h100) ;; *) echo "FP8 training acceptance supports PLATFORM=l40s or PLATFORM=h100"; exit 1;; esac
 	test -r "$(FP8_ENV)/BUILD_MANIFEST.json" || (echo "Run make submit-fp8-training-build and wait for it to succeed first" && exit 1)
-	sbatch --partition=gpu_l40s --export=ALL,HPC_AI_EXPECTED_GPU_MODEL="L40S",HPC_AI_FP8_ENV="$(FP8_ENV)" slurm/smoke/fp8_training_acceptance.sbatch
+	sbatch --partition=$(if $(filter h100,$(PLATFORM)),gpu_h100,gpu_l40s) --export=ALL,HPC_AI_EXPECTED_GPU_MODEL="$(RUNTIME_EXPECTED_GPU_MODEL)",HPC_AI_FP8_ENV="$(FP8_ENV)" slurm/smoke/fp8_training_acceptance.sbatch
 
 verify-fp8-training-acceptance:
 	$(PYTHON) scripts/verify_fp8_training_acceptance.py --result-root "$(FP8_ACCEPTANCE_ROOT)" --expected-gpu-model "$(RUNTIME_EXPECTED_GPU_MODEL)"

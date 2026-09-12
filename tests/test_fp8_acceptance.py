@@ -6,35 +6,44 @@ import sys
 from pathlib import Path
 
 
+def _write_complete_result(
+    root: Path,
+    experiment_id: str,
+    workload: str,
+    gpu_model: str,
+) -> None:
+    record = {
+        "experiment_id": experiment_id,
+        "workload": workload,
+        "precision": "fp8",
+        "status": "completed",
+        "error": None,
+        "metrics": {
+            "precision_backend": "transformer_engine_delayed_scaling_hybrid",
+            "compute_dtype_observed": "fp8_mixed_bf16",
+            "fp8_forward_enabled": True,
+            "transformer_engine_module_count": 4,
+            "transformer_engine_version": "2.8.0",
+            "throughput_tokens_sec": 100.0,
+            "loss": 1.0,
+            "quality_finite": True,
+            "quality_loss": 1.1,
+        },
+        "environment": {
+            "git_commit": "a" * 40,
+            "git_dirty": False,
+            "observed_gpu_model": gpu_model,
+        },
+    }
+    (root / f"{experiment_id}.json").write_text(json.dumps(record), encoding="utf-8")
+
+
 def test_fp8_acceptance_verifier_requires_both_model_paths(tmp_path: Path) -> None:
     for experiment_id, workload in (
         ("fp8_gpt2_training_acceptance", "gpt2_small"),
         ("fp8_distilbert_training_acceptance", "distilbert"),
     ):
-        record = {
-            "experiment_id": experiment_id,
-            "workload": workload,
-            "precision": "fp8",
-            "status": "completed",
-            "error": None,
-            "metrics": {
-                "precision_backend": "transformer_engine_delayed_scaling_hybrid",
-                "compute_dtype_observed": "fp8_mixed_bf16",
-                "fp8_forward_enabled": True,
-                "transformer_engine_module_count": 4,
-                "transformer_engine_version": "2.8.0",
-                "throughput_tokens_sec": 100.0,
-                "loss": 1.0,
-                "quality_finite": True,
-                "quality_loss": 1.1,
-            },
-            "environment": {
-                "git_commit": "a" * 40,
-                "git_dirty": False,
-                "observed_gpu_model": "NVIDIA L40S",
-            },
-        }
-        (tmp_path / f"{experiment_id}.json").write_text(json.dumps(record), encoding="utf-8")
+        _write_complete_result(tmp_path, experiment_id, workload, "NVIDIA L40S")
 
     completed = subprocess.run(
         [
@@ -57,6 +66,37 @@ def test_fp8_acceptance_verifier_requires_both_model_paths(tmp_path: Path) -> No
     assert set(summary["results"]) == {
         "fp8_gpt2_training_acceptance",
         "fp8_distilbert_training_acceptance",
+    }
+
+
+def test_fp8_acceptance_verifier_accepts_h100_model_paths(tmp_path: Path) -> None:
+    for experiment_id, workload in (
+        ("fp8_gpt2_training_acceptance_h100", "gpt2_small"),
+        ("fp8_distilbert_training_acceptance_h100", "distilbert"),
+    ):
+        _write_complete_result(tmp_path, experiment_id, workload, "NVIDIA H100 80GB HBM3")
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "scripts/verify_fp8_training_acceptance.py",
+            "--result-root",
+            str(tmp_path),
+            "--expected-gpu-model",
+            "H100",
+            "--expected-git-commit",
+            "a" * 40,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    summary = json.loads(completed.stdout)
+    assert summary["platform"] == "h100"
+    assert set(summary["results"]) == {
+        "fp8_gpt2_training_acceptance_h100",
+        "fp8_distilbert_training_acceptance_h100",
     }
 
 

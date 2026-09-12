@@ -10,9 +10,15 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-EXPECTED_RESULTS = {
-    "fp8_gpt2_training_acceptance": "gpt2_small",
-    "fp8_distilbert_training_acceptance": "distilbert",
+EXPECTED_RESULTS_BY_PLATFORM = {
+    "l40s": {
+        "fp8_gpt2_training_acceptance": "gpt2_small",
+        "fp8_distilbert_training_acceptance": "distilbert",
+    },
+    "h100": {
+        "fp8_gpt2_training_acceptance_h100": "gpt2_small",
+        "fp8_distilbert_training_acceptance_h100": "distilbert",
+    },
 }
 
 
@@ -24,9 +30,16 @@ def main() -> None:
     args = parser.parse_args()
 
     expected_commit = args.expected_git_commit or _git_head()
+    platform_id = _platform_id(args.expected_gpu_model)
+    expected_results = EXPECTED_RESULTS_BY_PLATFORM.get(platform_id)
+    if expected_results is None:
+        supported = ", ".join(sorted(EXPECTED_RESULTS_BY_PLATFORM))
+        raise SystemExit(
+            f"Unsupported expected GPU model {args.expected_gpu_model!r}; FP8 acceptance supports: {supported}"
+        )
     issues: list[str] = []
     accepted: dict[str, dict[str, Any]] = {}
-    for experiment_id, workload in EXPECTED_RESULTS.items():
+    for experiment_id, workload in expected_results.items():
         path = args.result_root / f"{experiment_id}.json"
         if not path.is_file():
             issues.append(f"missing result: {path}")
@@ -73,7 +86,26 @@ def main() -> None:
 
     if issues:
         raise SystemExit("FP8 training acceptance failed:\n- " + "\n- ".join(issues))
-    print(json.dumps({"status": "completed", "git_commit": expected_commit, "results": accepted}, indent=2))
+    print(
+        json.dumps(
+            {
+                "status": "completed",
+                "platform": platform_id,
+                "git_commit": expected_commit,
+                "results": accepted,
+            },
+            indent=2,
+        )
+    )
+
+
+def _platform_id(expected_gpu_model: str) -> str:
+    token = expected_gpu_model.lower()
+    if "l40s" in token:
+        return "l40s"
+    if "h100" in token:
+        return "h100"
+    return ""
 
 
 def _git_head() -> str | None:

@@ -31,6 +31,21 @@ source "$FP8_ACTIVATE"
 export PYTHONPATH="$PROJECT_ROOT/src"
 export TOKENIZERS_PARALLELISM=false
 
+case "$PLATFORM_ID" in
+  l40s)
+    GPT2_CONFIG="configs/smoke/fp8_gpt2_training_acceptance.json"
+    DISTILBERT_CONFIG="configs/smoke/fp8_distilbert_training_acceptance.json"
+    ;;
+  h100)
+    GPT2_CONFIG="configs/smoke/fp8_gpt2_training_acceptance_h100.json"
+    DISTILBERT_CONFIG="configs/smoke/fp8_distilbert_training_acceptance_h100.json"
+    ;;
+  *)
+    echo "ERROR: unsupported FP8 acceptance platform derived from expected GPU: $EXPECTED_GPU_MODEL" >&2
+    exit 2
+    ;;
+esac
+
 python scripts/check_private_torch.py \
   --expected-environment "$FP8_ENV" \
   --expected-version 2.8.0 \
@@ -40,10 +55,10 @@ python scripts/check_private_torch.py \
   --require-cuda
 
 python -m hpc_ai_perf.cli run \
-  --config configs/smoke/fp8_gpt2_training_acceptance.json \
+  --config "$GPT2_CONFIG" \
   --output-dir "$ACCEPTANCE_OUTPUT_DIR"
 python -m hpc_ai_perf.cli run \
-  --config configs/smoke/fp8_distilbert_training_acceptance.json \
+  --config "$DISTILBERT_CONFIG" \
   --output-dir "$ACCEPTANCE_OUTPUT_DIR"
 
 python scripts/verify_fp8_training_acceptance.py \
