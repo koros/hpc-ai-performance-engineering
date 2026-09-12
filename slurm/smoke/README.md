@@ -66,6 +66,19 @@ it is an environment gate, not canonical matrix evidence. The L40S gate has pass
 `make submit-vllm-pilot`. After that canonical pilot passes, use `make submit-vllm-wave PLATFORM=l40s
 PLATFORM_WAVE=vllm-framework` and the remaining dedicated wave names from the vLLM runbook.
 
+For L40S FP8 training, use the separate Transformer Engine environment and two-model gate:
+
+```bash
+make submit-fp8-training-build
+make submit-fp8-training-acceptance PLATFORM=l40s
+make verify-fp8-training-acceptance PLATFORM=l40s
+make submit-fp8-training-wave PLATFORM=l40s
+```
+
+The gate executes real GPT-2 and DistilBERT forward/backward steps and requires converted Transformer Engine modules,
+finite training/quality losses, and positive throughput. The canonical `training-fp8` wave adds matched Transformer
+Engine BF16 controls E231/E232 beside FP8 treatments E086/E093. Do not import the ignored acceptance records.
+
 Edit the partition if needed, replace the module-loading helper if the site stack changes, and add an account line only if the target HPC site requires one.
 
 After smoke jobs complete:

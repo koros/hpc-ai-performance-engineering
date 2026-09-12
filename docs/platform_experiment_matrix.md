@@ -1,6 +1,6 @@
 # Enhanced Platform Experiment Matrix
 
-This matrix routes every source `E001-E200` experiment family to Mac M1, L40/L40S, and H100. It also records L40S-only supplemental conditions `E201-E230`; these add capacity, telemetry, and full-node evidence without replacing or editing the authoritative source matrix.
+This matrix routes every source `E001-E200` experiment family to Mac M1, L40/L40S, and H100. It also records L40S-only supplemental conditions `E201-E232`; these add capacity, telemetry, full-node evidence, and backend-matched FP8 controls without replacing the authoritative source matrix.
 
 **Legend:** <br/>
 **`Direct`** means the logical row already represents that platform's hardware-comparison half. <br/>
@@ -35,8 +35,10 @@ replaced by a smaller batch.
 | `E210-E213` | GPU telemetry revalidation anchors | No | Resolved; `telemetry-revalidation` | Resolved; `telemetry-revalidation` | Separate one-/two-GPU training, inference, and communication anchors verify UUID-bound nvidia-smi attribution on each platform. They are `platform_specific` diagnostic evidence and do not replace or pool with their reference rows. |
 | `E214` | Measured-region communication-energy anchor | No | Planned; `energy-revalidation` | Planned; `energy-revalidation` | Repeats the E113/E213 two-GPU communication protocol with timestamp-integrated schema-v3 energy bounded after warm-up and before profiler finalization. |
 | `E215-E230` | L40S full-node scaling, strategy, communication, and TinyLlama TP=8 extension | No | Planned; `8gpu-pilot` → `8gpu-scaling` → `8gpu-strategy` → `8gpu-communication` → `vllm-tp8-canary` → `vllm-tp8` | No source-row change | L40S-only research extension for the eight-GPU PCIe node. E215 captures the full allocation's NCCL/PCIe topology. E230 is a one-trial vLLM TP=8 gate; only TinyLlama (32 attention heads) is TP=8 compatible. These conditions are not H100 substitutes or cross-platform pooled evidence. |
+| `E231-E232` | Transformer Engine BF16 training controls | No | Planned; `training-fp8` | No | L40S-only backend-matched controls for E086/E093. They prevent the FP8 analysis from conflating precision with a change from ordinary PyTorch modules to Transformer Engine modules. |
 | `E083-E085`, `E087-E088`, `E090-E092`, `E094-E095` | Supported FP32/FP16/BF16 precision study | No | Resolved; wave 4 | Resolved; wave 4 | Valid NVIDIA precision comparisons after target-platform validation. Mac runs fp32 dev paths only. |
-| `E086`, `E089`, `E093`, `E096` | FP8 precision study | No | Deferred | Deferred | A selected, validated FP8 backend/model path is not yet implemented. |
+| `E086`, `E093` | FP8 training precision study | No | Acceptance-gated; `training-fp8` | Deferred pending H100 acceptance | Transformer Engine 2.8.0 delayed-scaling Hybrid FP8 with BF16 base compute; compare only with E231/E232 on L40S. |
+| `E089`, `E096` | Original inference FP8 precision rows | No | Deferred | Deferred | These rows still lack a workload-compatible selected backend; the separately defined E151/E199 vLLM online-FP8 conditions do not silently replace them. |
 | `E097-E112` | Data movement: workers, pinned memory, prefetch | No | Resolved; wave 4 | Resolved; wave 4 | Pinned-memory and transfer results are CUDA/node dependent; platform profiles preserve the different CPU allocation policies. |
 | `E113-E120` | NCCL and FSDP communication analysis | No | Two-GPU rows use wave 4b; four-GPU E115/E116/E119/E120 use `4gpu-communication`; analyse NCCL over PCIe | Resolved wave 4b; include NVLink evidence where available | Mac has no NCCL. L40S cannot produce H100/NVLink evidence, so the two condition sets are platform-specific. |
 | `E121`, `E122`, `E125`, `E126` | H100 hardware-comparison half | No | No; use the L40S counterparts instead | Direct | These rows are explicitly H100-labelled and form matched pairs with `E123/E124/E127/E128`. |
@@ -54,7 +56,7 @@ replaced by a smaller batch.
 | Platform | Current configs you can run without changing target hardware labels | Important condition |
 | --- | --- | --- |
 | Mac M1 | `configs/local/*.json` (4 smoke configs) and `configs/dev/*.json` (15 dev configs) | Workflow validation only. Keep results out of the `E001-E200` evidence set. |
-| L40/L40S | 178 planned source `E###@l40s` conditions, 26 planned supplemental conditions, and 4 deferred supplemental capacity probes | Generated configs use `gpu_l40s`, 8 CPUs/GPU, PCIe, an eight-GPU node limit, and accepted evidence root `results/raw/l40s`. E215 must first prove the complete allocation and topology. Twenty-two source rows remain deferred: TensorRT-LLM/backend gaps, platform-specific comparison rows, and exact-shape E032/E033/E044/E067/E068 OOMs. E203/E204/E206/E207 are supplemental upper-bound OOM deferrals. |
+| L40/L40S | 180 planned source `E###@l40s` conditions, 28 planned supplemental conditions, and 4 deferred supplemental capacity probes | Generated configs use `gpu_l40s`, 8 CPUs/GPU, PCIe, an eight-GPU node limit, and accepted evidence root `results/raw/l40s`. E215 must first prove the complete allocation and topology. Twenty source rows remain deferred: TensorRT-LLM/backend gaps, platform-specific comparison rows, and exact-shape E032/E033/E044/E067/E068 OOMs. E203/E204/E206/E207 are supplemental upper-bound OOM deferrals. |
 | H100 | 182 planned source `E###@h100` conditions plus 5 telemetry anchors | Generated configs use `gpu_h100`, 16 CPUs/GPU, NVLink, and accepted evidence root `results/raw/h100`. Eighteen source rows remain deferred: E032 after a three-trial exact-shape OOM, TensorRT-LLM/backend/adapter gaps, and four L40S-specific comparison rows. |
 
 ## Generated Companion-Config Contract

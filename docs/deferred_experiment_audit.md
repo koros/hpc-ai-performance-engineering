@@ -5,7 +5,7 @@ Audit date: 2026-09-11.
 The private PyTorch 2.8.0/CUDA 12.4 build provides both Gloo and NCCL, and the pinned vLLM 0.10.2 environment has now
 passed E006 import, engine-start, and served-request acceptance on both L40S and H100. This resolves the former
 platform-wide vLLM environment blockers. E151 and E199 now also have an explicit online vLLM FP8 W8A8 path. It does
-not remove independent hardware, memory-capacity, TensorRT-LLM, training-FP8, INT8, or classification-adapter
+not remove independent hardware, memory-capacity, TensorRT-LLM, INT8, or classification-adapter
 blockers.
 
 ## Released From Deferred State
@@ -26,6 +26,7 @@ blockers.
 | H100 | `E006` | Planned; `vllm-pilot`, 1 canonical trial | Slurm job 1777640 passed the H100 diagnostic gate with vLLM import, engine start, a served request, and positive generated-token throughput. |
 | H100 | `E130`, `E132-E148`, `E178`, `E180-E196` | Planned; platform-separated `vllm-*` waves, 3 trials | The accepted private environment targets `sm_90`; canonical evidence remains gated by E006, then the one-GPU families, TP=2, and TP=4. |
 | L40S/H100 | `E151`, `E199` | Planned; `vllm-fp8`, 3 trials per platform | The adapter selects online vLLM FP8 W8A8 explicitly, requires SM 8.9 or newer, records the quantization contract, and binds GPT-2/TinyLlama to BF16 vLLM controls E130/E178. |
+| L40S | `E086`, `E093`, `E231-E232` | Acceptance-gated; `training-fp8`, 3 trials | E086/E093 use Transformer Engine delayed-scaling Hybrid FP8. E231/E232 provide BF16 controls using the same converted modules and workload shape. |
 
 The routed vLLM scope now covers all 39 source conditions independently on each platform: one pilot plus 38
 performance conditions. TP=4 remains canary-gated until it has started an engine and served a request with four visible
@@ -35,19 +36,24 @@ shared project `.venv` remains the runtime for non-vLLM waves.
 
 ## L40S Full-node Extension
 
-`E215-E230` are new L40S-only supplemental conditions, not rows released from the `E001-E200` deferred source matrix.
+`E215-E230` are L40S-only full-node supplemental conditions, not rows released from the `E001-E200` deferred source matrix.
 They preserve all original H100 configurations, including the exact rows that will later use the four-GPU H100 node.
 The required order is E215 (eight-rank NCCL and PCIe topology), E216-E220 scaling, E221-E224 DDP/FSDP strategy,
 E225-E228 communication, E230 TinyLlama TP=8 vLLM canary, then E229 TP=8 performance. E229 is intentionally
 TinyLlama-only: its 32 attention heads are divisible by eight, whereas GPT-2's 12 heads are not. These 16 conditions
 produce 44 canonical L40S trials and are always analysed as L40S-only evidence.
 
+`E231-E232` are L40S Transformer Engine BF16 controls for source FP8 treatments E086/E093. They hold module
+implementation, model revision, workload shape, seed, and step count constant so the treatment comparison changes
+numeric precision rather than precision and backend together.
+
 ## Deferred After Audit
 
 | Platform | Count | IDs | Blocking condition | Release requirement |
 | --- | ---: | --- | --- | --- |
 | L40S/H100 | 1 each | `E007` | CUDA 12.4.1 is now available, but TensorRT-LLM, a built engine, and the pinned build/load/request contract are missing. | Validate a compatible package and immutable engine artefact through E007 on each platform. |
-| L40S/H100 | 12 each | `E086`, `E089`, `E093`, `E096`, `E131`, `E152`, `E154-E155`, `E175-E176`, `E179`, `E200` | Training FP8, INT8 artefacts, TensorRT performance adapters, or a classification-compatible DistilBERT serving contract are absent. | Supply the specific backend, calibration/artefact hashes, and compatible adapter required by each row. |
+| L40S | 10 | `E089`, `E096`, `E131`, `E152`, `E154-E155`, `E175-E176`, `E179`, `E200` | INT8 artefacts, TensorRT performance adapters, or a classification-compatible DistilBERT serving contract are absent. | Supply the specific backend, calibration/artefact hashes, and compatible adapter required by each row. |
+| H100 | 12 | `E086`, `E089`, `E093`, `E096`, `E131`, `E152`, `E154-E155`, `E175-E176`, `E179`, `E200` | The shared blockers apply, and E086/E093 still need H100-specific Transformer Engine acceptance and controls. | Supply missing artefacts/adapters and release E086/E093 only after H100 real-model acceptance. |
 | L40S | 4 | `E121-E122`, `E125-E126` | These are H100-labelled halves of controlled hardware comparisons. | Run on H100; use `E123-E124` and `E127-E128` for the L40S halves. |
 | H100 | 4 | `E123-E124`, `E127-E128` | These are L40S-labelled halves of controlled hardware comparisons. | Run on L40S; use `E121-E122` and `E125-E126` for the H100 halves. |
 | L40S | 2 | `E032-E033` | Exact GPT-2 strong-scaling shapes repeatedly exceeded 44.52 GiB. | Preserve for a platform with sufficient memory; do not relabel smaller shapes as exact evidence. |
@@ -60,9 +66,9 @@ produce 44 canonical L40S trials and are always analysed as L40S-only evidence.
 
 | Platform | Planned source conditions | Deferred source conditions | Planned supplemental probes | Deferred supplemental probes |
 | --- | ---: | ---: | ---: | ---: |
-| L40S | 178 | 22 | 26 | 4 |
+| L40S | 180 | 20 | 28 | 4 |
 | H100 | 182 | 18 | 5 | 0 |
 
 Every `E001-E200` source row still routes exactly once per platform. The supplemental `E201-E207` rows remain L40S-only
-capacity probes, while E208/E209 form an L40S-only checkpointed strong-scaling pair. Neither supplemental family is
-pooled with exact H100 evidence.
+capacity probes, E208/E209 form an L40S-only checkpointed strong-scaling pair, and E231/E232 are backend-matched
+BF16 controls for released L40S FP8 treatments. None is silently substituted for an H100 condition.

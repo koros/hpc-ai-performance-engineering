@@ -103,6 +103,7 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `2` | `E123`, `E124`, `E127`, `E128` direct L40S comparison anchors | 3 | All matched L40S anchors Complete. |
 | `3` | L40S one-/two-GPU scaling and strategy conditions, excluding E032/E033 | 3 | Supported one-/two-GPU rows are valid. E032 and E033 remain deferred after exact-shape L40S OOMs; four-GPU rows use `4gpu-core`. |
 | `4` | Supported exact memory, precision, and data movement rows, excluding E067/E068 | 3 | No silent OOM-driven shape changes; precision backend observed. E067/E068 remain H100-exact rows and L40S OOM deferrals. |
+| `training-fp8` | `E231`/`E232` Transformer Engine BF16 controls and `E086`/`E093` FP8 treatments | 3 | Run only through `make submit-fp8-training-wave` after both real-model acceptance checks pass at the current commit. Compare each treatment only with its named backend-matched control. |
 | `4c` | `E201-E202`, `E205` capacity-adjusted GPT-2 L40S micro-batch probes | 3 | Interpret only as L40S capacity-boundary evidence; E203/E204/E206/E207 are confirmed OOM upper-bound probes and must not be pooled with exact E067/E068. |
 | `4b` | `E113`, `E114`, `E117`, `E118` communication | 3 | Interpret as two-GPU NCCL over installed PCIe topology; no NVLink claims. |
 | `5` | Supported PyTorch inference rows | 3 | PyTorch engine, request shape, concurrency, and precision verified. |
@@ -153,6 +154,34 @@ The exact one-GPU TinyLlama strong-scaling row E044 also exceeded L40S memory in
 preserved unchanged as an exact H100 condition and deferred only on L40S. The supplemental E208/E209 pair applies
 activation checkpointing consistently to the original one-/two-GPU workload shapes and is labelled
 `capacity_adjusted`; it must not be pooled with exact E044/E045 evidence.
+
+### Transformer Engine FP8 training release sequence
+
+Keep the FP8 stack separate from both the shared project `.venv` and the private vLLM environment. The build uses the
+private PyTorch 2.8.0/CUDA 12.4 wheel with Gloo/NCCL, pins Transformer Engine 2.8.0, and records an environment
+manifest. From a clean, current checkout on the login node:
+
+```bash
+source slurm/modules_for_hpc_ai
+source .venv/bin/activate
+
+make submit-fp8-training-build
+# After the build job completes successfully:
+make submit-fp8-training-acceptance PLATFORM=l40s
+# After the acceptance job completes successfully:
+make verify-fp8-training-acceptance PLATFORM=l40s
+
+make submit-fp8-training-wave PLATFORM=l40s
+make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8
+make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8
+make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8
+```
+
+The acceptance JSON under `build/fp8_acceptance/` is diagnostic and must not be imported as canonical evidence. The
+canonical wave must report Transformer Engine modules for all four rows, `transformer_engine_bf16` for E231/E232,
+and `transformer_engine_delayed_scaling_hybrid` plus `fp8_forward_enabled=true` for E086/E093. E086 is paired only
+with E231; E093 is paired only with E232. Existing E085/E092 PyTorch-AMP evidence remains valid for its original
+condition but is not the controlled backend match for this FP8 comparison.
 
 ### Full-node L40S release sequence
 
