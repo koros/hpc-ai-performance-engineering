@@ -1271,16 +1271,17 @@ def _research_evidence_status(
         if energy_trials < completed_trials:
             return "partial_energy_evidence"
     if research_question == "RQ6":
-        own_ids = {row.get("experiment_id") for row in group_rows}
-        other_ids = {
-            row.get("experiment_id")
+        own_signatures = {_hardware_comparison_signature(row) for row in group_rows}
+        other_signatures = {
+            _hardware_comparison_signature(row)
             for row in all_direct_rows
             if row.get("platform_id") != platform_id
             and _value(row, "comparability") == _value(group_rows[0], "comparability")
             and research_question in _research_questions_for_row(row)
             and _row_addresses_research_question(row, research_question)
+            and row.get("status") == "completed"
         }
-        if not own_ids.intersection(other_ids):
+        if not own_signatures.intersection(other_signatures):
             return "awaiting_matched_platform"
     if not all(_condition_is_sufficient(rows) for rows in condition_rows.values()):
         return "insufficient_data"
@@ -1305,8 +1306,35 @@ def _research_scope_note(
             "legacy full-window estimates are excluded."
         )
     if research_question == "RQ6":
-        return "Use only matched condition IDs and exact comparability classes for a hardware comparison."
+        return "Use only matched protocol signatures and exact comparability classes for a hardware comparison."
     return "Completed evidence is grouped within this platform and comparability class."
+
+
+def _hardware_comparison_signature(row: dict[str, str]) -> tuple[str, ...]:
+    """Identify the platform-independent controls for one hardware comparison.
+
+    Hardware rows deliberately use different experiment IDs on H100 and L40S,
+    so an experiment-ID intersection cannot establish whether the protocols
+    match.  The signature retains the workload and execution controls while
+    excluding the platform-specific label.
+    """
+    return tuple(
+        _value(row, field)
+        for field in (
+            "workload",
+            "model",
+            "mode",
+            "precision",
+            "gpus",
+            "batch_size",
+            "global_batch_size",
+            "per_gpu_batch_size",
+            "throughput_unit",
+            "parameter_sequence_length",
+            "parameter_prompt_length",
+            "framework",
+        )
+    )
 
 
 def _matching_scaling_rows(rows: list[dict[str, str]], summary: dict[str, Any]) -> list[dict[str, str]]:

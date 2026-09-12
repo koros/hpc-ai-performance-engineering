@@ -2709,6 +2709,36 @@ def test_research_question_summary_marks_incomplete_energy_as_partial() -> None:
     assert summary["evidence_status"] == "partial_energy_evidence"
 
 
+def test_rq6_matches_hardware_protocols_with_different_experiment_ids() -> None:
+    def row(experiment_id: str, platform_id: str) -> dict[str, str]:
+        return {
+            "condition_id": f"{experiment_id}@{platform_id}",
+            "experiment_id": experiment_id,
+            "platform_id": platform_id,
+            "comparability": "exact",
+            "phase": "Hardware comparison",
+            "workload": "gpt2_small",
+            "model": "gpt2",
+            "mode": "training",
+            "precision": "bf16",
+            "gpus": "1",
+            "batch_size": "16",
+            "global_batch_size": "16",
+            "per_gpu_batch_size": "16",
+            "parameter_sequence_length": "1024",
+            "throughput_unit": "training_tokens_per_second",
+            "status": "completed",
+            "required_trials": "1",
+        }
+
+    summaries = build_analysis_tables([row("E121", "h100"), row("E123", "l40s")])["research_question_summary"]
+    rq6 = [entry for entry in summaries if entry["research_question"] == "RQ6"]
+
+    assert {entry["platform_id"] for entry in rq6} == {"h100", "l40s"}
+    assert {entry["evidence_status"] for entry in rq6} == {"sufficient"}
+    assert all("matched protocol signatures" in entry["scope_note"] for entry in rq6)
+
+
 def test_analysis_rejects_ambiguous_processed_matrix_rows() -> None:
     row = {
         "experiment_id": "E008",
