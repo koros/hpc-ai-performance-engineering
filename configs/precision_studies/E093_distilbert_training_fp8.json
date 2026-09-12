@@ -9,6 +9,11 @@
     "dataset": "synthetic_classification_v1",
     "parameters": {
       "precision_label": "FP8",
+      "precision_backend": "transformer_engine",
+      "quantization_method": "fp8_delayed_scaling_hybrid",
+      "base_compute_dtype": "bf16",
+      "comparison_control_id": "E092",
+      "fp8_amax_history_len": 16,
       "batch_size": 32,
       "sequence_length": 512,
       "stack": "pytorch_transformer_engine",
@@ -48,7 +53,7 @@
   },
   "metadata": {
     "execution_status": "deferred",
-    "defer_reason": "Requires a selected and validated H100 FP8 training backend with recorded model/runtime support.",
+    "defer_reason": "The Transformer Engine FP8 training path is implemented but remains gated by the platform acceptance run.",
     "matrix_id": "E093",
     "template": "precision_study",
     "phase": "Precision study",

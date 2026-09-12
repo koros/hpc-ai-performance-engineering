@@ -2267,6 +2267,48 @@ def test_vllm_fp8_requires_an_explicit_reproducible_contract() -> None:
     ("fp8_path", "control_path"),
     [
         (
+            "configs/precision_studies/E086_gpt2_small_training_fp8.json",
+            "configs/precision_studies/E085_gpt2_small_training_bf16.json",
+        ),
+        (
+            "configs/precision_studies/E093_distilbert_training_fp8.json",
+            "configs/precision_studies/E092_distilbert_training_bf16.json",
+        ),
+    ],
+)
+def test_transformer_engine_fp8_training_conditions_match_their_bf16_controls(
+    fp8_path: str,
+    control_path: str,
+) -> None:
+    fp8 = load_experiment_config(Path(fp8_path))
+    control = load_experiment_config(Path(control_path))
+
+    assert capability_issues(fp8) == []
+    assert fp8.workload.parameters["precision_backend"] == "transformer_engine"
+    assert fp8.workload.parameters["quantization_method"] == "fp8_delayed_scaling_hybrid"
+    assert fp8.workload.parameters["base_compute_dtype"] == "bf16"
+    assert fp8.workload.parameters["comparison_control_id"] == control.experiment_id
+    assert fp8.workload.name == control.workload.name
+    assert fp8.workload.model == control.workload.model
+    assert fp8.workload.model_revision == control.workload.model_revision
+    assert fp8.workload.parameters["batch_size"] == control.workload.parameters["batch_size"]
+    assert fp8.workload.parameters["sequence_length"] == control.workload.parameters["sequence_length"]
+    assert fp8.runtime.max_steps == control.runtime.max_steps
+
+
+def test_transformer_engine_fp8_training_rejects_an_implicit_backend() -> None:
+    config = load_experiment_config(Path("configs/precision_studies/E086_gpt2_small_training_fp8.json"))
+    parameters = dict(config.workload.parameters)
+    parameters.pop("precision_backend")
+    incomplete = replace(config, workload=replace(config.workload, parameters=parameters))
+
+    assert "FP8 training requires precision_backend=transformer_engine" in capability_issues(incomplete)
+
+
+@pytest.mark.parametrize(
+    ("fp8_path", "control_path"),
+    [
+        (
             "configs/inference/E151_gpt2_small_precision_fp8.json",
             "configs/inference/E130_gpt2_small_framework_vllm.json",
         ),
@@ -2295,9 +2337,7 @@ def test_research_preflight_has_only_documented_execution_blockers() -> None:
     blocked = {entry.config.experiment_id for entry in discover_experiment_configs() if capability_issues(entry.config)}
 
     assert blocked == {
-        "E086",
         "E089",
-        "E093",
         "E096",
         "E131",
         "E152",

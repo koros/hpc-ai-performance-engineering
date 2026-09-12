@@ -38,6 +38,7 @@ TRANSFORMER_PARAMETER_KEYS = {
     "framework",
     "framework_label",
     "frameworks",
+    "fp8_amax_history_len",
     "fsdp_config",
     "global_batch_size",
     "gradient_accumulation_steps",
@@ -187,7 +188,22 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
             and not parameters.get("hf_model_revision")
         ):
             issues.append("matrix hf_model_name override must pin workload.parameters.hf_model_revision")
-        if config.runtime.precision == "fp8" and config.mode == "inference" and parameters.get("framework") == "vllm":
+        if config.runtime.precision == "fp8" and config.mode == "training":
+            if parameters.get("precision_backend") != "transformer_engine":
+                issues.append("FP8 training requires precision_backend=transformer_engine")
+            if parameters.get("quantization_method") != "fp8_delayed_scaling_hybrid":
+                issues.append("FP8 training requires quantization_method=fp8_delayed_scaling_hybrid")
+            if parameters.get("base_compute_dtype") != "bf16":
+                issues.append("FP8 training requires base_compute_dtype=bf16")
+            if not parameters.get("comparison_control_id"):
+                issues.append("FP8 training requires a BF16 comparison_control_id")
+            if int(parameters.get("fp8_amax_history_len", 0)) < 1:
+                issues.append("FP8 training requires fp8_amax_history_len of at least 1")
+            if parameters.get("stack") != "pytorch_transformer_engine":
+                issues.append("FP8 training requires stack=pytorch_transformer_engine")
+            if config.distributed.strategy != "none" or config.hardware.gpus != 1:
+                issues.append("validated Transformer Engine FP8 training currently supports one GPU")
+        elif config.runtime.precision == "fp8" and config.mode == "inference" and parameters.get("framework") == "vllm":
             if parameters.get("precision_backend") != "vllm_fp8_online":
                 issues.append("vLLM FP8 inference requires precision_backend=vllm_fp8_online")
             if parameters.get("quantization_method") != "fp8_w8a8_dynamic":
@@ -201,7 +217,7 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
                 f"precision {config.runtime.precision} requires a backend/model-specific implementation "
                 "not selected by this config"
             )
-        elif config.mode == "training" and config.runtime.precision not in {"fp32", "fp16", "bf16"}:
+        elif config.mode == "training" and config.runtime.precision not in {"fp32", "fp16", "bf16", "fp8"}:
             issues.append(f"training precision is not implemented: {config.runtime.precision}")
 
     framework = parameters.get("framework")
