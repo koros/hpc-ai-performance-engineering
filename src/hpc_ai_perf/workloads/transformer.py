@@ -34,6 +34,8 @@ class TransformerWorkload(Workload):
 
     def prepare(self, config: ExperimentConfig) -> None:
         required = list(self.required_packages)
+        if config.mode == "training" and config.runtime.precision == "fp8":
+            required.append("transformer_engine")
         if config.distributed.strategy.startswith("deepspeed"):
             required.append("deepspeed")
         if config.mode == "inference" and _selected_framework(config) == "vllm":
@@ -100,10 +102,11 @@ def _run_causal_training(config: ExperimentConfig) -> WorkloadRunOutput:
     runtime = _prepare_runtime(torch, config)
     parameters = config.workload.parameters
     model_name = str(parameters.get("hf_model_name", config.workload.model))
+    model_dtype = torch.bfloat16 if config.runtime.precision == "fp8" else torch.float32
     model = auto_model.from_pretrained(
         model_name,
         revision=_selected_model_revision(config, model_name),
-        torch_dtype=torch.float32,
+        torch_dtype=model_dtype,
     )
     return _run_training_loop(torch, config, runtime, model, task="causal_lm", model_name=model_name)
 
@@ -114,11 +117,12 @@ def _run_classification_training(config: ExperimentConfig) -> WorkloadRunOutput:
     parameters = config.workload.parameters
     model_name = str(parameters.get("hf_model_name", config.workload.model))
     num_labels = int(parameters.get("num_labels", 2))
+    model_dtype = torch.bfloat16 if config.runtime.precision == "fp8" else torch.float32
     model = auto_model.from_pretrained(
         model_name,
         revision=_selected_model_revision(config, model_name),
         num_labels=num_labels,
-        torch_dtype=torch.float32,
+        torch_dtype=model_dtype,
         ignore_mismatched_sizes=True,
     )
     return _run_training_loop(
@@ -163,6 +167,11 @@ def _run_training_loop(
         if hasattr(model.config, "use_cache"):
             model.config.use_cache = False
 
+    fp8_context = None
+    fp8_metadata: dict[str, int | float | str | bool | None] = {}
+    if config.runtime.precision == "fp8":
+        model, fp8_context, fp8_metadata = _configure_transformer_engine_fp8(torch, config, model, device)
+
     model, optimizer, engine, deepspeed_nvtx_annotations_disabled = _configure_training_strategy(
         torch,
         config,
@@ -179,6 +188,7 @@ def _run_training_loop(
         config.runtime.precision,
         device,
         managed_by_deepspeed=deepspeed_managed_precision,
+        fp8_context=fp8_context,
     )
     data_iterator = _training_data_iterator(
         torch,
@@ -318,10 +328,11 @@ def _run_training_loop(
             config.runtime.precision,
             managed_by_deepspeed=deepspeed_managed_precision,
         ),
-        "compute_dtype_observed": config.runtime.precision,
+        "compute_dtype_observed": "fp8_mixed_bf16" if fp8_context is not None else config.runtime.precision,
         "parameter_dtype_observed": str(next(model.parameters()).dtype),
         "dataset_execution": "cpu_dataloader" if data_iterator is not None else "synthetic_device_tensors",
         "deepspeed_nvtx_annotations_disabled": deepspeed_nvtx_annotations_disabled,
+        **fp8_metadata,
     }
     if cuda_event_seconds is not None:
         metrics["cuda_event_seconds"] = cuda_event_seconds
@@ -1026,6 +1037,7 @@ def _training_precision(
     device: Any,
     *,
     managed_by_deepspeed: bool = False,
+    fp8_context: Any | None = None,
 ) -> tuple[Any, Any | None]:
     if managed_by_deepspeed:
         # DeepSpeed owns mixed precision and loss scaling through the bf16/fp16
@@ -1034,6 +1046,12 @@ def _training_precision(
         return nullcontext, None
     if precision == "fp32":
         return nullcontext, None
+    if precision == "fp8":
+        if fp8_context is None:
+            raise RuntimeError("FP8 training requires a configured Transformer Engine context")
+        if getattr(device, "type", str(device)) != "cuda":
+            raise RuntimeError("FP8 training requires a CUDA device")
+        return fp8_context, None
     if precision not in {"fp16", "bf16"}:
         raise RuntimeError(
             f"Training precision {precision} requires a dedicated validated backend; generic substitution is forbidden"
@@ -1052,6 +1070,136 @@ def _training_precision(
         except (AttributeError, TypeError):  # pragma: no cover
             scaler = torch.cuda.amp.GradScaler()
     return context, scaler
+
+
+def _configure_transformer_engine_fp8(
+    torch: Any,
+    config: ExperimentConfig,
+    model: Any,
+    device: Any,
+) -> tuple[Any, Any, dict[str, int | float | str | bool | None]]:
+    """Replace eligible HF projection layers with real Transformer Engine FP8 modules.
+
+    Transformer Engine autocast only quantizes Transformer Engine modules. Merely
+    wrapping an unmodified Hugging Face model would therefore produce mislabeled
+    evidence. This conversion handles ``torch.nn.Linear`` and GPT-2 ``Conv1D``
+    projections, while intentionally retaining unsupported output heads in BF16.
+    """
+    parameters = config.workload.parameters
+    if parameters.get("precision_backend") != "transformer_engine":
+        raise RuntimeError("FP8 training requires precision_backend=transformer_engine")
+    if parameters.get("quantization_method") != "fp8_delayed_scaling_hybrid":
+        raise RuntimeError("FP8 training requires quantization_method=fp8_delayed_scaling_hybrid")
+    if parameters.get("base_compute_dtype") != "bf16":
+        raise RuntimeError("FP8 training requires base_compute_dtype=bf16")
+    if getattr(device, "type", str(device)) != "cuda" or not torch.cuda.is_available():
+        raise RuntimeError("Transformer Engine FP8 training requires CUDA")
+    capability = tuple(int(value) for value in torch.cuda.get_device_capability(device))
+    if capability < (8, 9):
+        raise RuntimeError(
+            "Transformer Engine FP8 training requires NVIDIA compute capability 8.9 or newer; "
+            f"observed {capability[0]}.{capability[1]}"
+        )
+    if importlib.util.find_spec("transformer_engine.pytorch") is None:
+        raise RuntimeError("Transformer Engine PyTorch support is not installed")
+
+    import transformer_engine.pytorch as te
+    from transformer_engine.common.recipe import DelayedScaling, Format
+
+    model = model.to(dtype=torch.bfloat16)
+    converted, skipped = _convert_projection_layers_to_transformer_engine(torch, te, model)
+    if not converted:
+        raise RuntimeError("Transformer Engine conversion found no FP8-compatible projection layers")
+
+    recipe = DelayedScaling(
+        fp8_format=Format.HYBRID,
+        amax_history_len=int(parameters.get("fp8_amax_history_len", 16)),
+        amax_compute_algo="max",
+    )
+    autocast = getattr(te, "autocast", None)
+    if autocast is not None:
+
+        def context() -> Any:
+            return autocast(enabled=True, recipe=recipe)
+
+        context_api = "transformer_engine.pytorch.autocast"
+    else:  # Transformer Engine releases before the autocast rename.
+
+        def context() -> Any:
+            return te.fp8_autocast(enabled=True, fp8_recipe=recipe)
+
+        context_api = "transformer_engine.pytorch.fp8_autocast"
+
+    try:
+        from importlib.metadata import version
+
+        te_version = version("transformer-engine")
+    except Exception:  # pragma: no cover - unusual source/editable installations
+        te_version = str(getattr(te, "__version__", "unknown"))
+    metadata: dict[str, int | float | str | bool | None] = {
+        "transformer_engine_version": te_version,
+        "transformer_engine_module_count": len(converted),
+        "transformer_engine_modules": ",".join(converted),
+        "transformer_engine_skipped_projection_count": len(skipped),
+        "transformer_engine_skipped_projections": ",".join(skipped),
+        "fp8_recipe": "delayed_scaling_hybrid",
+        "fp8_amax_history_len": int(parameters.get("fp8_amax_history_len", 16)),
+        "fp8_autocast_api": context_api,
+        "fp8_compute_capability": f"{capability[0]}.{capability[1]}",
+        "fp8_forward_enabled": True,
+    }
+    return model, context, metadata
+
+
+def _convert_projection_layers_to_transformer_engine(
+    torch: Any,
+    te: Any,
+    model: Any,
+) -> tuple[list[str], list[str]]:
+    """Convert shape-compatible Linear/Conv1D projections and preserve weights."""
+    converted: list[str] = []
+    skipped: list[str] = []
+
+    def visit(parent: Any, prefix: str = "") -> None:
+        for name, child in list(parent.named_children()):
+            qualified = f"{prefix}.{name}" if prefix else name
+            is_linear = isinstance(child, torch.nn.Linear)
+            is_hf_conv1d = type(child).__name__ == "Conv1D" and type(child).__module__.startswith("transformers")
+            if not (is_linear or is_hf_conv1d):
+                visit(child, qualified)
+                continue
+
+            if is_linear:
+                in_features = int(child.in_features)
+                out_features = int(child.out_features)
+                source_weight = child.weight.detach()
+            else:
+                in_features = int(child.weight.shape[0])
+                out_features = int(child.weight.shape[1])
+                source_weight = child.weight.detach().transpose(0, 1)
+            if in_features % 16 or out_features % 16:
+                skipped.append(qualified)
+                continue
+
+            replacement = te.Linear(
+                in_features,
+                out_features,
+                bias=child.bias is not None,
+                params_dtype=torch.bfloat16,
+            )
+            replacement = replacement.to(device=child.weight.device, dtype=torch.bfloat16)
+            with torch.no_grad():
+                replacement.weight.copy_(source_weight.to(replacement.weight))
+                replacement.weight.requires_grad_(child.weight.requires_grad)
+                if child.bias is not None and replacement.bias is not None:
+                    replacement.bias.copy_(child.bias.detach().to(replacement.bias))
+                    replacement.bias.requires_grad_(child.bias.requires_grad)
+            replacement.train(child.training)
+            setattr(parent, name, replacement)
+            converted.append(qualified)
+
+    visit(model)
+    return converted, skipped
 
 
 def _enable_activation_checkpointing(model: Any, *, prefer_non_reentrant: bool) -> str:
@@ -1378,6 +1526,7 @@ def _precision_backend(precision: str, *, managed_by_deepspeed: bool = False) ->
         "fp32": "pytorch_fp32",
         "fp16": "pytorch_amp_fp16",
         "bf16": "pytorch_amp_bf16",
+        "fp8": "transformer_engine_delayed_scaling_hybrid",
     }.get(precision, f"unsupported_{precision}")
 
 

@@ -747,6 +747,63 @@ def test_deepspeed_managed_precision_does_not_nest_native_amp() -> None:
     assert transformer_module._precision_backend("bf16", managed_by_deepspeed=True) == "deepspeed_bf16"
 
 
+def test_fp8_training_precision_requires_transformer_engine_context() -> None:
+    device = types.SimpleNamespace(type="cuda")
+
+    with pytest.raises(RuntimeError, match="configured Transformer Engine context"):
+        transformer_module._training_precision(object(), "fp8", device)
+
+    context_factory = lambda: transformer_module.nullcontext()  # noqa: E731
+    context, scaler = transformer_module._training_precision(
+        object(),
+        "fp8",
+        device,
+        fp8_context=context_factory,
+    )
+
+    assert context is context_factory
+    assert scaler is None
+    assert transformer_module._precision_backend("fp8") == "transformer_engine_delayed_scaling_hybrid"
+
+
+def test_transformer_engine_conversion_replaces_only_shape_compatible_projections() -> None:
+    import torch
+
+    class Conv1D(torch.nn.Module):
+        __module__ = "transformers.pytorch_utils"
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.weight = torch.nn.Parameter(torch.arange(16 * 32, dtype=torch.float32).reshape(16, 32))
+            self.bias = torch.nn.Parameter(torch.zeros(32))
+
+    class FakeTELinear(torch.nn.Linear):
+        def __init__(self, in_features, out_features, bias=True, params_dtype=None) -> None:
+            super().__init__(in_features, out_features, bias=bias, dtype=params_dtype)
+
+    class Model(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.projection = torch.nn.Linear(16, 32)
+            self.conv_projection = Conv1D()
+            self.classifier = torch.nn.Linear(32, 3)
+
+    model = Model()
+    linear_weight = model.projection.weight.detach().clone()
+    conv_weight = model.conv_projection.weight.detach().clone()
+    fake_te = types.SimpleNamespace(Linear=FakeTELinear)
+
+    converted, skipped = transformer_module._convert_projection_layers_to_transformer_engine(torch, fake_te, model)
+
+    assert converted == ["projection", "conv_projection"]
+    assert skipped == ["classifier"]
+    assert isinstance(model.projection, FakeTELinear)
+    assert isinstance(model.conv_projection, FakeTELinear)
+    assert torch.allclose(model.projection.weight.float(), linear_weight, atol=2e-3)
+    assert torch.allclose(model.conv_projection.weight.float(), conv_weight.transpose(0, 1), atol=1.0)
+    assert isinstance(model.classifier, torch.nn.Linear)
+
+
 def test_fsdp_activation_checkpointing_prefers_non_reentrant_kwargs() -> None:
     class FakeModel:
         def __init__(self) -> None:
