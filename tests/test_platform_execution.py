@@ -314,9 +314,9 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
 
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 231)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 233)}
     l40s_only_supplemental_ids = {f"E{index:03d}" for index in range(201, 210)} | {
-        f"E{index:03d}" for index in range(215, 231)
+        f"E{index:03d}" for index in range(215, 233)
     }
     shared_telemetry_ids = {f"E{index:03d}" for index in range(210, 215)}
 
@@ -334,10 +334,10 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in source_ids
     )
 
-    assert l40s_planned_source_count == 178
+    assert l40s_planned_source_count == 180
     assert (
         sum(condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in supplemental_ids)
-        == 26
+        == 28
     )
     assert (
         sum(
@@ -345,7 +345,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
             for condition in l40s_conditions
             if condition.matrix_id in l40s_only_supplemental_ids
         )
-        == 21
+        == 23
     )
     assert sum(condition.status == "planned" for condition in h100_conditions) == 187
 
@@ -443,6 +443,26 @@ def test_l40s_eight_gpu_conditions_use_architecture_aware_release_waves() -> Non
     assert entries["E215"].config.workload.parameters["capture_gpu_topology"] is True
     assert entries["E229"].config.workload.parameters["tensor_parallel_size"] == 8
     assert entries["E230"].config.workload.parameters["tensor_parallel_size"] == 8
+
+
+def test_l40s_fp8_training_wave_pairs_transformer_engine_controls_and_treatments() -> None:
+    conditions = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "l40s",
+        wave="training-fp8",
+        include_deferred=False,
+    )
+
+    assert {condition.matrix_id for condition in conditions} == {"E086", "E093", "E231", "E232"}
+    assert {condition.required_trials for condition in conditions} == {3}
+    assert {condition.comparability for condition in conditions} == {"exact"}
+
+    h100 = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "h100",
+        experiment_ids={"E086", "E093"},
+    )
+    assert {condition.status for condition in h100} == {"deferred"}
 
 
 def test_l40s_wave_three_collection_scope_excludes_gpt2_strong_scaling_oom_deferrals() -> None:

@@ -62,6 +62,14 @@
     },
     {
       "platform": "l40s",
+      "wave": "training-fp8",
+      "name": "L40S Transformer Engine BF16 and FP8 training",
+      "experiment_ids": ["E086", "E093", "E231-E232"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
       "wave": "4c",
       "name": "L40S capacity-adjusted GPT-2 memory probes",
       "experiment_ids": ["E201-E202", "E205"],
@@ -399,9 +407,16 @@
     {
       "platforms": ["l40s", "h100"],
       "name": "Backend or adapter blocked",
-      "experiment_ids": ["E086", "E089", "E093", "E096", "E131", "E152", "E154-E155", "E175-E176", "E179", "E200"],
+      "experiment_ids": ["E089", "E096", "E131", "E152", "E154-E155", "E175-E176", "E179", "E200"],
       "comparability": "platform_specific",
       "reason": "Requires a backend artefact or workload-compatible adapter that is not yet validated."
+    },
+    {
+      "platforms": ["h100"],
+      "name": "H100 Transformer Engine training acceptance pending",
+      "experiment_ids": ["E086", "E093"],
+      "comparability": "platform_specific",
+      "reason": "The Transformer Engine FP8 training adapter is implemented, but only the L40S-specific environment and real-model acceptance gate are currently defined. Preserve these source rows for a separate H100 acceptance and backend-matched BF16 control wave."
     },
     {
       "platforms": ["l40s"],

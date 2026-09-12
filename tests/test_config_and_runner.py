@@ -94,9 +94,9 @@ def test_discover_matrix_configs() -> None:
     entries = discover_experiment_configs()
     experiment_ids = {entry.config.experiment_id for entry in entries}
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 231)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 233)}
 
-    assert len(entries) == 230
+    assert len(entries) == 232
     assert experiment_ids == source_ids | supplemental_ids
 
 
@@ -2151,14 +2151,14 @@ def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
     report = report_path.read_text(encoding="utf-8")
 
     assert "Source matrix configs discovered: 200" in report
-    assert "Supplemental platform probes discovered: 25" in report
+    assert "Supplemental platform probes discovered: 27" in report
     assert "Cross-platform telemetry anchors discovered: 5" in report
-    assert "Total E-number configs discovered: 230" in report
+    assert "Total E-number configs discovered: 232" in report
     assert "`gpt2_small`" in report
     assert "slurm/smoke/gpt2_small_smoke.sbatch" in report
     assert "Submission Gate" in report
     assert "Research-readiness blockers: 0" in report
-    assert "Deferred scope rows: 13" in report
+    assert "Deferred scope rows: 11" in report
 
 
 def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
@@ -2199,13 +2199,12 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
 
     assert csv_path == output_csv
     assert markdown_path == output_markdown
-    assert len(rows) == 230
+    assert len(rows) == 232
     assert e033["status"] == "Completed"
     assert e033["runtime_seconds"] == "600.0"
     assert e034["status"] == "Configured"
-    assert e086["status"] == "Deferred"
+    assert e086["status"] == "Configured"
     assert e201["status"] == "Configured"
-    assert "precision fp8" in e086["notes"]
     assert "| Completed | 1 |" in markdown_path.read_text(encoding="utf-8")
 
 
@@ -2282,11 +2281,11 @@ def test_vllm_fp8_requires_an_explicit_reproducible_contract() -> None:
     [
         (
             "configs/precision_studies/E086_gpt2_small_training_fp8.json",
-            "configs/precision_studies/E085_gpt2_small_training_bf16.json",
+            "configs/precision_studies/E231_l40s_gpt2_transformer_engine_bf16_control.json",
         ),
         (
             "configs/precision_studies/E093_distilbert_training_fp8.json",
-            "configs/precision_studies/E092_distilbert_training_bf16.json",
+            "configs/precision_studies/E232_l40s_distilbert_transformer_engine_bf16_control.json",
         ),
     ],
 )
@@ -2298,10 +2297,14 @@ def test_transformer_engine_fp8_training_conditions_match_their_bf16_controls(
     control = load_experiment_config(Path(control_path))
 
     assert capability_issues(fp8) == []
+    assert capability_issues(control) == []
     assert fp8.workload.parameters["precision_backend"] == "transformer_engine"
     assert fp8.workload.parameters["quantization_method"] == "fp8_delayed_scaling_hybrid"
     assert fp8.workload.parameters["base_compute_dtype"] == "bf16"
     assert fp8.workload.parameters["comparison_control_id"] == control.experiment_id
+    assert control.workload.parameters["precision_backend"] == "transformer_engine"
+    assert control.workload.parameters["comparison_treatment_id"] == fp8.experiment_id
+    assert control.runtime.precision == "bf16"
     assert fp8.workload.name == control.workload.name
     assert fp8.workload.model == control.workload.model
     assert fp8.workload.model_revision == control.workload.model_revision

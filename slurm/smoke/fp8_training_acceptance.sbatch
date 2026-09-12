@@ -13,7 +13,7 @@ set -euo pipefail
 
 PROJECT_ROOT="${SLURM_SUBMIT_DIR:?Submit this script from the project root}"
 EXPECTED_GPU_MODEL="${HPC_AI_EXPECTED_GPU_MODEL:-L40S}"
-FP8_ENV="${HPC_AI_FP8_ENV:-${HOME}/.local/share/hpc-ai-performance-engineering/fp8-training-te2.8}"
+FP8_ENV="${HPC_AI_FP8_ENV:-${HOME}/.local/share/hpc-ai-performance-engineering/fp8-training-te2.8.0}"
 PLATFORM_ID="$(tr '[:upper:]' '[:lower:]' <<<"$EXPECTED_GPU_MODEL")"
 ACCEPTANCE_OUTPUT_DIR="$PROJECT_ROOT/build/fp8_acceptance/$PLATFORM_ID"
 
