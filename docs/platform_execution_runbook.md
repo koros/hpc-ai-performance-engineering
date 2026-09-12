@@ -210,6 +210,11 @@ The H100 wave pairs GPT-2 `E086` with H100-only Transformer Engine BF16 control 
 with H100-only control `E234`. The platform resolver records those control-ID overrides in each resolved H100 config;
 it never reuses the L40S `E231/E232` evidence.
 
+The verifier permits an earlier successful acceptance record only when its commit is an ancestor of the current
+checkout and `git diff` shows that the FP8 runtime contract (activation, smoke configurations, runner, workload, and
+environment scripts) is unchanged. Adding controls or documentation therefore does not waste an H100 re-acceptance;
+any runtime-contract change still requires a fresh gate.
+
 `submit-fp8-training-build` installs the pinned private cuDNN/cuBLAS/NVRTC/Triton set inside the isolated
 environment and passes the NCCL root as `HPC_AI_NCCL_HOME`. Its private library directories precede the system
 toolkit at runtime, so the cuBLAS and cuBLASLt pair remain ABI-matched. The builder validates the NCCL header/shared
