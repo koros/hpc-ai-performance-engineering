@@ -800,6 +800,7 @@ def test_transformer_engine_conversion_replaces_only_shape_compatible_projection
             super().__init__()
             self.projection = torch.nn.Linear(16, 32)
             self.conv_projection = Conv1D()
+            self.pre_classifier = torch.nn.Linear(32, 32)
             self.classifier = torch.nn.Linear(32, 3)
 
     model = Model()
@@ -810,9 +811,10 @@ def test_transformer_engine_conversion_replaces_only_shape_compatible_projection
     converted, skipped = transformer_module._convert_projection_layers_to_transformer_engine(torch, fake_te, model)
 
     assert converted == ["projection", "conv_projection"]
-    assert skipped == ["classifier"]
+    assert skipped == ["pre_classifier", "classifier"]
     assert isinstance(model.projection, FakeTELinear)
     assert isinstance(model.conv_projection, FakeTELinear)
+    assert isinstance(model.pre_classifier, torch.nn.Linear)
     assert torch.allclose(model.projection.weight.float(), linear_weight, atol=2e-3)
     assert torch.allclose(model.conv_projection.weight.float(), conv_weight.transpose(0, 1), atol=1.0)
     assert isinstance(model.classifier, torch.nn.Linear)

@@ -1176,9 +1176,16 @@ def _convert_projection_layers_to_transformer_engine(
     te: Any,
     model: Any,
 ) -> tuple[list[str], list[str]]:
-    """Convert shape-compatible Linear/Conv1D projections and preserve weights."""
+    """Convert shape-compatible encoder/decoder projections and preserve weights.
+
+    Sequence-classification heads operate on pooled ``[batch, hidden]``
+    activations. A small diagnostic batch can violate Transformer Engine's FP8
+    requirement that the flattened leading dimension is divisible by eight, so
+    those task heads deliberately remain BF16.
+    """
     converted: list[str] = []
     skipped: list[str] = []
+    task_head_names = {"classifier", "pre_classifier", "score"}
 
     def visit(parent: Any, prefix: str = "") -> None:
         for name, child in list(parent.named_children()):
@@ -1187,6 +1194,10 @@ def _convert_projection_layers_to_transformer_engine(
             is_hf_conv1d = type(child).__name__ == "Conv1D" and type(child).__module__.startswith("transformers")
             if not (is_linear or is_hf_conv1d):
                 visit(child, qualified)
+                continue
+
+            if name in task_head_names:
+                skipped.append(qualified)
                 continue
 
             if is_linear:
