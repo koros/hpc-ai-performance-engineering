@@ -586,6 +586,23 @@ def test_wave_status_stops_retrying_conditions_deferred_after_submission() -> No
     assert [experiment.experiment_id for experiment in current.experiments] == ["E016", "E017", "E045"]
 
 
+def test_explicit_h100_deferral_overrides_historical_wave_membership() -> None:
+    wave_five = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "h100",
+        wave="5",
+        include_deferred=False,
+    )
+    assert "E172" not in {condition.matrix_id for condition in wave_five}
+
+    deferred = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "h100",
+        experiment_ids={"E172"},
+    )
+    assert [(condition.condition_id, condition.status) for condition in deferred] == [("E172@h100", "deferred")]
+
+
 def test_retry_scope_includes_new_policy_conditions_missing_from_prior_attempt(monkeypatch, tmp_path: Path) -> None:
     state_path = tmp_path / "wave_4c.json"
     state_path.write_text("{}", encoding="utf-8")

@@ -102,11 +102,28 @@ def load_platform_conditions(
     experiment_ids: set[str] | None = None,
     include_deferred: bool = True,
 ) -> list[PlatformCondition]:
-    """Expand tracked wave/range declarations into platform conditions."""
+    """Expand tracked wave/range declarations into platform conditions.
+
+    An explicit platform deferral overrides an older planned-wave declaration.
+    This permits collection of completed historical siblings after a condition is
+    deferred without mutating or discarding that condition's original evidence.
+    """
     matrix_path = Path(path)
     data = json.loads(matrix_path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError(f"Execution matrix must be a JSON object: {matrix_path}")
+    deferred_entries = [
+        deferred
+        for deferred in data.get("deferred", [])
+        if isinstance(deferred, dict) and platform_id in deferred.get("platforms", [])
+    ]
+    deferred_ids = (
+        set().union(
+            *(_expand_experiment_selectors(deferred.get("experiment_ids", [])) for deferred in deferred_entries)
+        )
+        if deferred_entries
+        else set()
+    )
     conditions: list[PlatformCondition] = []
     for wave_data in data.get("waves", []):
         if not isinstance(wave_data, dict) or str(wave_data.get("platform")) != platform_id:
@@ -119,6 +136,7 @@ def load_platform_conditions(
             raise ValueError(f"Unsupported comparability value: {comparability}")
         ids = _expand_experiment_selectors(wave_data.get("experiment_ids", []))
         ids -= _expand_experiment_selectors(wave_data.get("exclude_ids", []))
+        ids -= deferred_ids
         for experiment_id in sorted(ids, key=_experiment_number):
             conditions.append(
                 PlatformCondition(
@@ -131,9 +149,7 @@ def load_platform_conditions(
                 )
             )
     if include_deferred and wave in {None, "deferred"}:
-        for deferred in data.get("deferred", []):
-            if not isinstance(deferred, dict) or platform_id not in deferred.get("platforms", []):
-                continue
+        for deferred in deferred_entries:
             ids = _expand_experiment_selectors(deferred.get("experiment_ids", []))
             for experiment_id in sorted(ids, key=_experiment_number):
                 conditions.append(
