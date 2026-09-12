@@ -188,7 +188,7 @@ make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8
 ```
 
 The same private Torch/Transformer Engine build targets both L40S (`sm_89`) and H100 (`sm_90`). Run the H100
-acceptance gate independently before planning any H100 training-FP8 evidence:
+acceptance gate independently before the H100 controlled training-FP8 wave:
 
 ```bash
 make submit-fp8-training-acceptance PLATFORM=h100
@@ -197,9 +197,18 @@ make verify-fp8-training-acceptance PLATFORM=h100
 ```
 
 This writes separate diagnostic records below `build/fp8_acceptance/h100/` using H100-labelled configurations.
-It confirms the runtime and real-model adapter on H100, but does not release `E086`/`E093`: those source rows still
-need separately registered H100 Transformer Engine BF16 controls, so the final comparison does not conflate numeric
-precision with a backend change.
+After it passes, submit the separately controlled canonical wave:
+
+```bash
+make submit-fp8-training-wave PLATFORM=h100
+make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=training-fp8
+make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=training-fp8
+make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=training-fp8
+```
+
+The H100 wave pairs GPT-2 `E086` with H100-only Transformer Engine BF16 control `E233`, and DistilBERT `E093`
+with H100-only control `E234`. The platform resolver records those control-ID overrides in each resolved H100 config;
+it never reuses the L40S `E231/E232` evidence.
 
 `submit-fp8-training-build` installs the pinned private cuDNN/cuBLAS/NVRTC/Triton set inside the isolated
 environment and passes the NCCL root as `HPC_AI_NCCL_HOME`. Its private library directories precede the system
@@ -209,11 +218,11 @@ does not mutate the shared modules or the project `.venv`. It also generates `bi
 and canonical FP8 wave jobs source that wrapper so their private CUDA-library search order matches the successful
 build.
 
-The acceptance JSON under `build/fp8_acceptance/` is diagnostic and must not be imported as canonical evidence. The
-canonical wave must report Transformer Engine modules for all four rows, `transformer_engine_bf16` for E231/E232,
-and `transformer_engine_delayed_scaling_hybrid` plus `fp8_forward_enabled=true` for E086/E093. E086 is paired only
-with E231; E093 is paired only with E232. Existing E085/E092 PyTorch-AMP evidence remains valid for its original
-condition but is not the controlled backend match for this FP8 comparison.
+The acceptance JSON under `build/fp8_acceptance/` is diagnostic and must not be imported as canonical evidence. Each
+canonical wave must report Transformer Engine modules for all four rows, `transformer_engine_bf16` for its controls,
+and `transformer_engine_delayed_scaling_hybrid` plus `fp8_forward_enabled=true` for E086/E093. On L40S, E086/E093
+pair with E231/E232; on H100 they pair with E233/E234. Existing E085/E092 PyTorch-AMP evidence remains valid for
+its original condition but is not the controlled backend match for either FP8 comparison.
 
 ### Full-node L40S release sequence
 
