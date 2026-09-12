@@ -21,6 +21,25 @@ EXPECTED_RESULTS_BY_PLATFORM = {
     },
 }
 
+# A canonical wave may add controls, execution-matrix routing, or documentation
+# after a successful diagnostic gate. Those changes do not invalidate the gate.
+# Changes to any path below do: they can alter environment activation, smoke
+# inputs, workload execution, or the recorded runtime contract.
+FP8_RUNTIME_CONTRACT_PATHS = (
+    "configs/smoke/fp8_gpt2_training_acceptance.json",
+    "configs/smoke/fp8_distilbert_training_acceptance.json",
+    "configs/smoke/fp8_gpt2_training_acceptance_h100.json",
+    "configs/smoke/fp8_distilbert_training_acceptance_h100.json",
+    "slurm/modules_for_hpc_ai",
+    "slurm/setup_fp8_training_environment.sh",
+    "slurm/smoke/fp8_training_acceptance.sbatch",
+    "scripts/check_private_torch.py",
+    "src/hpc_ai_perf/cli.py",
+    "src/hpc_ai_perf/config/experiment.py",
+    "src/hpc_ai_perf/runners/local.py",
+    "src/hpc_ai_perf/workloads/transformer.py",
+)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -70,13 +89,20 @@ def main() -> None:
             issues.append(prefix + "held-out quality loss is not finite")
         if environment.get("git_dirty") is not False:
             issues.append(prefix + "repository was dirty during acceptance")
-        if expected_commit and environment.get("git_commit") != expected_commit:
-            issues.append(prefix + f"git commit differs from current acceptance target {expected_commit}")
+        acceptance_commit = str(environment.get("git_commit") or "")
+        commit_compatibility = "current"
+        if expected_commit and acceptance_commit != expected_commit:
+            if _is_compatible_runtime_ancestor(acceptance_commit, expected_commit):
+                commit_compatibility = "compatible_runtime_ancestor"
+            else:
+                issues.append(prefix + f"git commit differs from current acceptance target {expected_commit}")
         if args.expected_gpu_model.lower() not in str(environment.get("observed_gpu_model", "")).lower():
             issues.append(prefix + f"expected GPU token {args.expected_gpu_model!r} was not observed")
         accepted[experiment_id] = {
             "result": str(path),
             "workload": workload,
+            "acceptance_git_commit": acceptance_commit,
+            "commit_compatibility": commit_compatibility,
             "transformer_engine_version": metrics.get("transformer_engine_version"),
             "transformer_engine_module_count": metrics.get("transformer_engine_module_count"),
             "loss": metrics.get("loss"),
@@ -116,6 +142,35 @@ def _git_head() -> str | None:
         text=True,
     )
     return completed.stdout.strip() or None
+
+
+def _is_compatible_runtime_ancestor(acceptance_commit: str, current_commit: str) -> bool:
+    """Allow a prior gate only if no FP8 runtime-contract path changed since it."""
+    if not acceptance_commit or not current_commit:
+        return False
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", acceptance_commit, current_commit],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if ancestor.returncode != 0:
+        return False
+    changed_runtime_contract = subprocess.run(
+        [
+            "git",
+            "diff",
+            "--quiet",
+            acceptance_commit,
+            current_commit,
+            "--",
+            *FP8_RUNTIME_CONTRACT_PATHS,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return changed_runtime_contract.returncode == 0
 
 
 def _finite(value: object) -> bool:

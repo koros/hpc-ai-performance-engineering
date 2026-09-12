@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from scripts import verify_fp8_training_acceptance
+
 
 def _write_complete_result(
     root: Path,
@@ -130,3 +132,23 @@ def test_fp8_acceptance_verifier_rejects_a_non_fp8_backend(tmp_path: Path) -> No
     assert completed.returncode != 0
     assert "Transformer Engine precision backend was not observed" in completed.stderr
     assert "missing result" in completed.stderr
+
+
+def test_fp8_acceptance_permits_only_clean_runtime_ancestor(monkeypatch) -> None:
+    responses = iter((0, 0))
+
+    def fake_run(*_args, **_kwargs):
+        return subprocess.CompletedProcess(args=[], returncode=next(responses), stdout="", stderr="")
+
+    monkeypatch.setattr(verify_fp8_training_acceptance.subprocess, "run", fake_run)
+    assert verify_fp8_training_acceptance._is_compatible_runtime_ancestor("a" * 40, "b" * 40)
+
+
+def test_fp8_acceptance_rejects_changed_runtime_contract(monkeypatch) -> None:
+    responses = iter((0, 1))
+
+    def fake_run(*_args, **_kwargs):
+        return subprocess.CompletedProcess(args=[], returncode=next(responses), stdout="", stderr="")
+
+    monkeypatch.setattr(verify_fp8_training_acceptance.subprocess, "run", fake_run)
+    assert not verify_fp8_training_acceptance._is_compatible_runtime_ancestor("a" * 40, "b" * 40)
