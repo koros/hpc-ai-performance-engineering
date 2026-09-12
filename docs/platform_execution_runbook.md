@@ -191,7 +191,8 @@ make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8
 passes the NCCL root as `HPC_AI_NCCL_HOME`. Its private library directories precede the system toolkit at runtime, so
 the cuBLAS and cuBLASLt pair remain ABI-matched. The builder validates the NCCL header/shared library, sets
 CMake/include/library paths, and records package/root/runtime versions in `BUILD_MANIFEST.json`. It does not mutate
-the shared modules or the project `.venv`.
+the shared modules or the project `.venv`. It also generates `bin/activate_hpc_ai_fp8`; acceptance and canonical
+FP8 wave jobs source that wrapper so their private CUDA-library search order matches the successful build.
 
 The acceptance JSON under `build/fp8_acceptance/` is diagnostic and must not be imported as canonical evidence. The
 canonical wave must report Transformer Engine modules for all four rows, `transformer_engine_bf16` for E231/E232,

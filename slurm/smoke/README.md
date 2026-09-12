@@ -84,7 +84,7 @@ finite training/quality losses, and positive throughput. The canonical `training
 Engine BF16 controls E231/E232 beside FP8 treatments E086/E093. Do not import the ignored acceptance records.
 The isolated builder installs Transformer Engine's pinned cuDNN 9 and CUDA-12.4-matched cuBLAS/NVRTC dependencies
 privately and uses the NCCL header/library root only for this environment; it does not alter the shared project
-environment.
+environment. Its generated `bin/activate_hpc_ai_fp8` wrapper is used by the acceptance and canonical wave jobs.
 
 Edit the partition if needed, replace the module-loading helper if the site stack changes, and add an account line only if the target HPC site requires one.
 
