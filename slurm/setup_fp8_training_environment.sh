@@ -6,6 +6,7 @@ TE_VERSION="${HPC_AI_TE_VERSION:-2.8.0}"
 TE_CUDNN_VERSION="${HPC_AI_TE_CUDNN_VERSION:-9.3.0.75}"
 TE_CUBLAS_VERSION="${HPC_AI_TE_CUBLAS_VERSION:-12.4.5.8}"
 TE_NVRTC_VERSION="${HPC_AI_TE_NVRTC_VERSION:-12.4.127}"
+TE_TRITON_VERSION="${HPC_AI_TE_TRITON_VERSION:-3.4.0}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FP8_BASE="${HPC_AI_FP8_BASE:-${HOME}/.local/share/hpc-ai-performance-engineering}"
 FP8_ENV="${HPC_AI_FP8_ENV:-${FP8_BASE}/fp8-training-te${TE_VERSION}}"
@@ -105,7 +106,8 @@ fi
 
 uv pip install --python "$FP8_ENV/bin/python" "$TORCH_WHEEL"
 uv pip install --python "$FP8_ENV/bin/python" \
-  "setuptools>=68" wheel packaging "cmake>=3.18" ninja "pybind11>=2.6"
+  "setuptools>=68" wheel packaging "cmake>=3.18" ninja "pybind11>=2.6" \
+  "triton==${TE_TRITON_VERSION}"
 
 # Transformer Engine 2.8's CUDA-12 core is linked against cuDNN 9. The
 # cluster's private Torch wheel continues to use its matching cuDNN 8 runtime;
@@ -250,6 +252,7 @@ manifest = {
     "cublas_version": version("nvidia-cublas-cu12"),
     "nvrtc_home": os.environ["NVRTC_HOME"],
     "nvrtc_version": version("nvidia-cuda-nvrtc-cu12"),
+    "triton_version": version("triton"),
     "torch_cudnn_runtime": torch.backends.cudnn.version(),
     "nccl_home": os.environ["NCCL_HOME"],
     "nccl_runtime": torch.cuda.nccl.version(),
