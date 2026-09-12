@@ -300,9 +300,17 @@
     },
     {
       "platform": "h100",
-      "wave": "4b",
-      "name": "H100 NVLink communication",
-      "experiment_ids": ["E113-E120"],
+      "wave": "4b-2gpu",
+      "name": "H100 NVLink two-GPU communication",
+      "experiment_ids": ["E113-E114", "E117-E118"],
+      "required_trials": 3,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "h100",
+      "wave": "4b-4gpu",
+      "name": "H100 NVLink four-GPU communication",
+      "experiment_ids": ["E115-E116", "E119-E120"],
       "required_trials": 3,
       "comparability": "platform_specific"
     },
@@ -373,9 +381,17 @@
     },
     {
       "platform": "h100",
-      "wave": "optional",
-      "name": "H100 optional large-model work",
-      "experiment_ids": ["E016-E017", "E044-E046"],
+      "wave": "optional-1to2gpu",
+      "name": "H100 TinyLlama one- and two-GPU baselines and scaling",
+      "experiment_ids": ["E016-E017", "E044-E045"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "optional-4gpu",
+      "name": "H100 TinyLlama four-GPU strong scaling",
+      "experiment_ids": ["E046"],
       "required_trials": 3,
       "comparability": "exact"
     },

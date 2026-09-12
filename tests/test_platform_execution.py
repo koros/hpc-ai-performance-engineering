@@ -347,7 +347,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         )
         == 23
     )
-    assert sum(condition.status == "planned" for condition in h100_conditions) == 186
+    assert sum(condition.status == "planned" for condition in h100_conditions) == 185
 
 
 def test_telemetry_revalidation_wave_is_shared_but_platform_separated() -> None:
@@ -415,6 +415,32 @@ def test_l40s_four_gpu_conditions_use_dedicated_release_waves() -> None:
         assert {condition.required_trials for condition in conditions} == {required_trials}
         assert {condition.comparability for condition in conditions} == {comparability}
         assert all(entries[condition.matrix_id].config.hardware.gpus == 4 for condition in conditions)
+
+
+def test_h100_resource_homogeneous_waves_separate_two_and_four_gpu_work() -> None:
+    entries = {entry.config.experiment_id: entry for entry in discover_experiment_configs()}
+    expected = {
+        "4b-2gpu": ({"E113", "E114", "E117", "E118"}, 2, "platform_specific"),
+        "4b-4gpu": ({"E115", "E116", "E119", "E120"}, 4, "platform_specific"),
+        "optional-1to2gpu": ({"E016", "E017", "E044", "E045"}, None, "exact"),
+        "optional-4gpu": ({"E046"}, 4, "exact"),
+    }
+
+    for wave, (expected_ids, expected_gpus, comparability) in expected.items():
+        conditions = load_platform_conditions(
+            "platforms/execution_matrix.json",
+            "h100",
+            wave=wave,
+            include_deferred=False,
+        )
+        assert {condition.matrix_id for condition in conditions} == expected_ids
+        assert {condition.required_trials for condition in conditions} == {3}
+        assert {condition.comparability for condition in conditions} == {comparability}
+        gpu_counts = {entries[condition.matrix_id].config.hardware.gpus for condition in conditions}
+        if expected_gpus is not None:
+            assert gpu_counts == {expected_gpus}
+        else:
+            assert gpu_counts <= {1, 2}
 
 
 def test_l40s_eight_gpu_conditions_use_architecture_aware_release_waves() -> None:
@@ -553,7 +579,7 @@ def test_l40s_checkpointed_scaling_wave_preserves_original_h100_protocol(tmp_pat
         for condition in load_platform_conditions(
             "platforms/execution_matrix.json",
             "h100",
-            wave="optional",
+            wave="optional-1to2gpu",
             include_deferred=False,
         )
         if condition.matrix_id == "E044"
