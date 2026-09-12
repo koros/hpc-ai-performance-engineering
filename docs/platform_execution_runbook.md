@@ -297,6 +297,29 @@ make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-pilot
 Then use `make submit-vllm-wave PLATFORM=h100 PLATFORM_WAVE=<wave>` in this order: `vllm-framework`,
 `vllm-fp8`, `vllm-batching`, `vllm-concurrency`, `vllm-prompt`, `vllm-tp2`, and canary-gated `vllm-tp4`.
 
+### H100 resource-homogeneous waves
+
+H100 has four GPUs, but a reservation may expose fewer. The following waves deliberately separate collectable
+one-/two-GPU work from full-node work; do not submit a full-node wave while only two GPUs are allocated.
+
+| Wave | Conditions | GPU request per job | Trials |
+| --- | --- | ---: | ---: |
+| `4b-2gpu` | `E113`, `E114`, `E117`, `E118` | 2 | 3 each |
+| `optional-1to2gpu` | `E016`, `E017`, `E044`, `E045` | 1 or 2 | 3 each |
+| `4b-4gpu` | `E115`, `E116`, `E119`, `E120` | 4 | 3 each |
+| `optional-4gpu` | `E046` | 4 | 3 |
+| `vllm-tp4` | `E148`, `E196` | 4 | 3 each |
+
+With a two-GPU H100 allocation, submit and collect the first two waves independently:
+
+```bash
+make submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=4b-2gpu
+make submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=optional-1to2gpu
+```
+
+When a full four-GPU/64-CPU node allocation is available, submit `4b-4gpu`, `optional-4gpu`, and the private-vLLM
+`vllm-tp4` wave. E172 remains separately deferred until that same full-node allocation is explicitly available.
+
 ## 6. Recovery Rules
 
 - Failed trial: retain it, diagnose, and rerun the same repetition. The tracker counts only the latest record for that
