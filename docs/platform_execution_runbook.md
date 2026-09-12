@@ -162,7 +162,7 @@ private PyTorch 2.8.0/CUDA 12.4 wheel with Gloo/NCCL, pins Transformer Engine 2.
 manifest. Transformer Engine 2.8 requires cuDNN 9.3+, while the private Torch wheel reports its own cuDNN 8.9.7
 runtime. The builder therefore installs a private cuDNN 9.3.0.75 package for Transformer Engine, together with
 CUDA-12.4-matched cuBLAS 12.4.5.8 and NVRTC 12.4.127 libraries. It uses the matching UoP Spack NCCL 2.27.7
-development root for compilation.
+development root for compilation and pins Triton 3.4.0 for the PyTorch 2.8/Transformer Engine Python modules.
 From a clean, current checkout on the login node:
 
 ```bash
@@ -187,12 +187,13 @@ make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8
 make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8
 ```
 
-`submit-fp8-training-build` installs the pinned private cuDNN/cuBLAS/NVRTC set inside the isolated environment and
-passes the NCCL root as `HPC_AI_NCCL_HOME`. Its private library directories precede the system toolkit at runtime, so
-the cuBLAS and cuBLASLt pair remain ABI-matched. The builder validates the NCCL header/shared library, sets
-CMake/include/library paths, and records package/root/runtime versions in `BUILD_MANIFEST.json`. It does not mutate
-the shared modules or the project `.venv`. It also generates `bin/activate_hpc_ai_fp8`; acceptance and canonical
-FP8 wave jobs source that wrapper so their private CUDA-library search order matches the successful build.
+`submit-fp8-training-build` installs the pinned private cuDNN/cuBLAS/NVRTC/Triton set inside the isolated
+environment and passes the NCCL root as `HPC_AI_NCCL_HOME`. Its private library directories precede the system
+toolkit at runtime, so the cuBLAS and cuBLASLt pair remain ABI-matched. The builder validates the NCCL header/shared
+library, sets CMake/include/library paths, and records package/root/runtime versions in `BUILD_MANIFEST.json`. It
+does not mutate the shared modules or the project `.venv`. It also generates `bin/activate_hpc_ai_fp8`; acceptance
+and canonical FP8 wave jobs source that wrapper so their private CUDA-library search order matches the successful
+build.
 
 The acceptance JSON under `build/fp8_acceptance/` is diagnostic and must not be imported as canonical evidence. The
 canonical wave must report Transformer Engine modules for all four rows, `transformer_engine_bf16` for E231/E232,
