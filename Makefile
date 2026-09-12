@@ -154,14 +154,14 @@ verify-fp8-training-acceptance:
 	$(PYTHON) scripts/verify_fp8_training_acceptance.py --result-root "$(FP8_ACCEPTANCE_ROOT)" --expected-gpu-model "$(RUNTIME_EXPECTED_GPU_MODEL)"
 
 submit-fp8-training-wave: verify-fp8-training-acceptance
-	test "$(PLATFORM)" = "l40s" || (echo "The released training-fp8 wave is currently L40S-specific" && exit 1)
+	@case "$(PLATFORM)" in l40s|h100) ;; *) echo "FP8 training waves support PLATFORM=l40s or PLATFORM=h100"; exit 1;; esac
 	test -r "$(FP8_ENV)/bin/activate_hpc_ai_fp8" || (echo "Run make submit-fp8-training-build and wait for it to succeed first" && exit 1)
-	$(MAKE) submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8 VENV_ACTIVATE="$(FP8_ENV)/bin/activate_hpc_ai_fp8"
+	$(MAKE) submit-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=training-fp8 VENV_ACTIVATE="$(FP8_ENV)/bin/activate_hpc_ai_fp8"
 
 retry-fp8-training-wave: verify-fp8-training-acceptance
-	test "$(PLATFORM)" = "l40s" || (echo "The released training-fp8 wave is currently L40S-specific" && exit 1)
+	@case "$(PLATFORM)" in l40s|h100) ;; *) echo "FP8 training waves support PLATFORM=l40s or PLATFORM=h100"; exit 1;; esac
 	test -r "$(FP8_ENV)/bin/activate_hpc_ai_fp8" || (echo "Run make submit-fp8-training-build and wait for it to succeed first" && exit 1)
-	$(MAKE) retry-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8 VENV_ACTIVATE="$(FP8_ENV)/bin/activate_hpc_ai_fp8"
+	$(MAKE) retry-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=training-fp8 VENV_ACTIVATE="$(FP8_ENV)/bin/activate_hpc_ai_fp8"
 
 check-l40s-runtime:
 	$(MAKE) check-platform-runtime PLATFORM=l40s

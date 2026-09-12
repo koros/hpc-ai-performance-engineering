@@ -300,6 +300,18 @@
     },
     {
       "platform": "h100",
+      "wave": "training-fp8",
+      "name": "H100 Transformer Engine BF16 and FP8 training",
+      "experiment_ids": ["E086", "E093", "E233-E234"],
+      "workload_parameter_overrides": {
+        "E086": {"comparison_control_id": "E233"},
+        "E093": {"comparison_control_id": "E234"}
+      },
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
       "wave": "4b-2gpu",
       "name": "H100 NVLink two-GPU communication",
       "experiment_ids": ["E113-E114", "E117-E118"],
@@ -426,13 +438,6 @@
       "experiment_ids": ["E089", "E096", "E131", "E152", "E154-E155", "E175-E176", "E179", "E200"],
       "comparability": "platform_specific",
       "reason": "Requires a backend artefact or workload-compatible adapter that is not yet validated."
-    },
-    {
-      "platforms": ["h100"],
-      "name": "H100 Transformer Engine training acceptance pending",
-      "experiment_ids": ["E086", "E093"],
-      "comparability": "platform_specific",
-      "reason": "The shared private Transformer Engine stack is architecture-capable for H100, but H100 real-model acceptance and a platform-specific backend-matched BF16 control wave must pass before releasing canonical E086/E093 evidence."
     },
     {
       "platforms": ["l40s"],

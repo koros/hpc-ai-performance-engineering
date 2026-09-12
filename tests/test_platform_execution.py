@@ -314,11 +314,12 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
 
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 233)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 235)}
     l40s_only_supplemental_ids = {f"E{index:03d}" for index in range(201, 210)} | {
         f"E{index:03d}" for index in range(215, 233)
     }
     shared_telemetry_ids = {f"E{index:03d}" for index in range(210, 215)}
+    h100_only_supplemental_ids = {"E233", "E234"}
 
     l40s_conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s")
     h100_conditions = load_platform_conditions("platforms/execution_matrix.json", "h100")
@@ -327,9 +328,11 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     assert {condition.matrix_id for condition in l40s_conditions if condition.matrix_id in source_ids} == source_ids
     assert {
         condition.matrix_id for condition in l40s_conditions if condition.matrix_id not in source_ids
-    } == supplemental_ids
-    assert len(h100_conditions) == 205
-    assert {condition.matrix_id for condition in h100_conditions} == source_ids | shared_telemetry_ids
+    } == l40s_only_supplemental_ids | shared_telemetry_ids
+    assert len(h100_conditions) == 207
+    assert {
+        condition.matrix_id for condition in h100_conditions
+    } == source_ids | shared_telemetry_ids | h100_only_supplemental_ids
     l40s_planned_source_count = sum(
         condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in source_ids
     )
@@ -347,7 +350,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         )
         == 23
     )
-    assert sum(condition.status == "planned" for condition in h100_conditions) == 185
+    assert sum(condition.status == "planned" for condition in h100_conditions) == 189
 
 
 def test_telemetry_revalidation_wave_is_shared_but_platform_separated() -> None:
@@ -488,7 +491,34 @@ def test_l40s_fp8_training_wave_pairs_transformer_engine_controls_and_treatments
         "h100",
         experiment_ids={"E086", "E093"},
     )
-    assert {condition.status for condition in h100} == {"deferred"}
+    assert {condition.status for condition in h100} == {"planned"}
+    assert {condition.wave for condition in h100} == {"training-fp8"}
+
+
+def test_h100_fp8_training_wave_uses_h100_backend_matched_controls() -> None:
+    conditions = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "h100",
+        wave="training-fp8",
+        include_deferred=False,
+    )
+    assert {condition.matrix_id for condition in conditions} == {"E086", "E093", "E233", "E234"}
+    assert {condition.required_trials for condition in conditions} == {3}
+    assert {condition.comparability for condition in conditions} == {"exact"}
+
+    profile = load_platform_profile("platforms/h100.json")
+    entries = {entry.config.experiment_id: entry for entry in discover_experiment_configs()}
+    resolved = {
+        condition.matrix_id: resolve_platform_config(entries[condition.matrix_id], profile, condition)
+        for condition in conditions
+    }
+
+    assert resolved["E086"].workload.parameters["comparison_control_id"] == "E233"
+    assert resolved["E093"].workload.parameters["comparison_control_id"] == "E234"
+    assert resolved["E086"].metadata["platform_workload_parameter_overrides"] == {"comparison_control_id": "E233"}
+    assert resolved["E233"].workload.parameters["comparison_treatment_id"] == "E086"
+    assert resolved["E234"].workload.parameters["comparison_treatment_id"] == "E093"
+    assert resolved["E233"].hardware.gpu_model == "NVIDIA H100 SXM 80GB"
 
 
 def test_l40s_wave_three_collection_scope_excludes_gpt2_strong_scaling_oom_deferrals() -> None:

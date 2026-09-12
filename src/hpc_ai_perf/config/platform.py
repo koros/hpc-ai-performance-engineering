@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -80,6 +80,7 @@ class PlatformCondition:
     comparability: str
     status: str = "planned"
     reason: str = ""
+    workload_parameter_overrides: dict[str, Any] = field(default_factory=dict)
 
     @property
     def condition_id(self) -> str:
@@ -136,8 +137,20 @@ def load_platform_conditions(
             raise ValueError(f"Unsupported comparability value: {comparability}")
         ids = _expand_experiment_selectors(wave_data.get("experiment_ids", []))
         ids -= _expand_experiment_selectors(wave_data.get("exclude_ids", []))
+        overrides_by_experiment = wave_data.get("workload_parameter_overrides", {})
+        if not isinstance(overrides_by_experiment, dict):
+            raise ValueError("workload_parameter_overrides must be an object")
+        unknown_override_ids = set(overrides_by_experiment) - ids
+        if unknown_override_ids:
+            raise ValueError(
+                "workload_parameter_overrides names conditions outside its wave: "
+                + ", ".join(sorted(unknown_override_ids))
+            )
         ids -= deferred_ids
         for experiment_id in sorted(ids, key=_experiment_number):
+            parameter_overrides = overrides_by_experiment.get(experiment_id, {})
+            if not isinstance(parameter_overrides, dict):
+                raise ValueError(f"workload_parameter_overrides[{experiment_id!r}] must be an object")
             conditions.append(
                 PlatformCondition(
                     matrix_id=experiment_id,
@@ -146,6 +159,7 @@ def load_platform_conditions(
                     wave_name=str(wave_data["name"]),
                     required_trials=int(wave_data.get("required_trials", 1)),
                     comparability=comparability,
+                    workload_parameter_overrides=dict(parameter_overrides),
                 )
             )
     if include_deferred and wave in {None, "deferred"}:
@@ -234,6 +248,10 @@ def resolve_platform_config(
     else:
         metadata.pop("execution_status", None)
         metadata.pop("defer_reason", None)
+    if condition.workload_parameter_overrides:
+        metadata["platform_workload_parameter_overrides"] = dict(condition.workload_parameter_overrides)
+    else:
+        metadata.pop("platform_workload_parameter_overrides", None)
     hardware = replace(
         entry.config.hardware,
         platform=profile.platform,
@@ -241,7 +259,11 @@ def resolve_platform_config(
         interconnect=profile.interconnect,
     )
     runtime = replace(entry.config.runtime, output_dir=profile.output_root)
-    return replace(entry.config, hardware=hardware, runtime=runtime, metadata=metadata)
+    workload = replace(
+        entry.config.workload,
+        parameters={**entry.config.workload.parameters, **condition.workload_parameter_overrides},
+    )
+    return replace(entry.config, workload=workload, hardware=hardware, runtime=runtime, metadata=metadata)
 
 
 def _expand_experiment_selectors(selectors: object) -> set[str]:
