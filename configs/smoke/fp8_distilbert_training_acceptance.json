@@ -1,0 +1,51 @@
+{
+  "experiment_id": "fp8_distilbert_training_acceptance",
+  "experiment": "transformer_engine_fp8_distilbert_training_acceptance",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+    "dataset": "synthetic_classification_v1",
+    "parameters": {
+      "precision_label": "FP8",
+      "precision_backend": "transformer_engine",
+      "quantization_method": "fp8_delayed_scaling_hybrid",
+      "base_compute_dtype": "bf16",
+      "comparison_control_id": "E092",
+      "fp8_amax_history_len": 16,
+      "batch_size": 2,
+      "sequence_length": 128,
+      "num_labels": 2,
+      "stack": "pytorch_transformer_engine",
+      "collect_loss": true,
+      "quality_sanity_check": true
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpus": 1,
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "fp8",
+    "max_steps": 2,
+    "seed": 1337,
+    "output_dir": "build/fp8_acceptance/l40s"
+  },
+  "profiling": {
+    "enabled": false,
+    "profilers": [],
+    "parameters": {}
+  },
+  "metadata": {
+    "purpose": "Diagnostic gate for the real DistilBERT Transformer Engine FP8 training adapter."
+  }
+}

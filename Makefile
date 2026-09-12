@@ -32,12 +32,16 @@ TORCH_GLOO_SOURCE ?= $(VLLM_BASE)/src/pytorch-v$(TORCH_VERSION)
 TORCH_GLOO_WHEEL_DIR ?= $(VLLM_BASE)/wheels/pytorch-$(TORCH_VERSION)-cu124-gloo
 VLLM_ENV ?= $(VLLM_BASE)/vllm-$(VLLM_VERSION)-gloo
 VLLM_SOURCE ?= $(VLLM_BASE)/src/vllm-v$(VLLM_VERSION)-gloo
+TRANSFORMER_ENGINE_VERSION ?= 2.8.0
+FP8_ENV ?= $(VLLM_BASE)/fp8-training-te$(TRANSFORMER_ENGINE_VERSION)
+FP8_ACCEPTANCE_ROOT ?= build/fp8_acceptance/$(PLATFORM)
 
 DEV_CONFIGS := $(sort $(wildcard configs/dev/*.json))
 DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
 
 # Dev targets run local Mac/workstation checks; matrix tracking stays separate.
 .PHONY: check-cuda-toolchain
+.PHONY: setup-fp8-training-environment submit-fp8-training-build submit-fp8-training-acceptance verify-fp8-training-acceptance
 .PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile check-platform-runtime check-l40s-runtime check-h100-runtime check-cuda-toolchain setup-pytorch-gloo-environment submit-pytorch-gloo-build setup-vllm-environment submit-vllm-build submit-vllm-acceptance submit-vllm-pilot submit-vllm-wave retry-vllm-wave materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-rendered-platform-wave submit-rendered-platform-wave submit-platform-wave status-platform-wave collect-platform-wave retry-platform-wave stage-platform-wave create-platform-wave-bundle plan-platform-wave-bundle init-platform-wave-bundle-status dry-run-submit-platform-wave-bundle submit-platform-wave-bundle import-platform-wave-bundle track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results audit-telemetry track-progress track-dev-progress validate validate-result-evidence readiness-report refresh build-dashboard-site serve-dashboard
 
 install-dev:
@@ -121,6 +125,24 @@ retry-vllm-wave:
 	test -r "$(VLLM_ENV)/bin/activate" || (echo "Run make submit-vllm-build and make submit-vllm-acceptance first" && exit 1)
 	@case "$(PLATFORM_WAVE)" in vllm-*) ;; *) echo "Set PLATFORM_WAVE to a dedicated vllm-* wave"; exit 1;; esac
 	$(MAKE) retry-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=$(PLATFORM_WAVE) VENV_ACTIVATE="$(VLLM_ENV)/bin/activate"
+
+# Transformer Engine is compiled against the same private Torch ABI as vLLM,
+# but lives in a separate environment so neither experimental stack mutates the
+# other. Canonical FP8 evidence is gated by two real-model acceptance runs.
+setup-fp8-training-environment:
+	HPC_AI_TE_VERSION="$(TRANSFORMER_ENGINE_VERSION)" bash slurm/setup_fp8_training_environment.sh --project-root "$(CURDIR)" --env-dir "$(FP8_ENV)" --torch-wheel-dir "$(TORCH_GLOO_WHEEL_DIR)"
+
+submit-fp8-training-build:
+	test -r "$(TORCH_GLOO_WHEEL_DIR)/BUILD_MANIFEST.json" || (echo "Run make submit-pytorch-gloo-build and wait for it to succeed first" && exit 1)
+	sbatch --export=ALL,HPC_AI_TE_VERSION="$(TRANSFORMER_ENGINE_VERSION)",HPC_AI_FP8_ENV="$(FP8_ENV)",HPC_AI_TORCH_WHEEL_DIR="$(TORCH_GLOO_WHEEL_DIR)" slurm/smoke/fp8_training_build_l40s.sbatch
+
+submit-fp8-training-acceptance:
+	test "$(PLATFORM)" = "l40s" || (echo "The current FP8 training acceptance configs are L40S-specific" && exit 1)
+	test -r "$(FP8_ENV)/BUILD_MANIFEST.json" || (echo "Run make submit-fp8-training-build and wait for it to succeed first" && exit 1)
+	sbatch --partition=gpu_l40s --export=ALL,HPC_AI_EXPECTED_GPU_MODEL="L40S",HPC_AI_FP8_ENV="$(FP8_ENV)" slurm/smoke/fp8_training_acceptance.sbatch
+
+verify-fp8-training-acceptance:
+	$(PYTHON) scripts/verify_fp8_training_acceptance.py --result-root "$(FP8_ACCEPTANCE_ROOT)" --expected-gpu-model "$(RUNTIME_EXPECTED_GPU_MODEL)"
 
 check-l40s-runtime:
 	$(MAKE) check-platform-runtime PLATFORM=l40s
