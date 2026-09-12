@@ -160,7 +160,8 @@ activation checkpointing consistently to the original one-/two-GPU workload shap
 Keep the FP8 stack separate from both the shared project `.venv` and the private vLLM environment. The build uses the
 private PyTorch 2.8.0/CUDA 12.4 wheel with Gloo/NCCL, pins Transformer Engine 2.8.0, and records an environment
 manifest. It also requires the matching cuDNN *development* root: the active private Torch wheel reports cuDNN
-8.9.7 (`8907`), so use the UoP Spack cuDNN 8.9.7.29 headers and libraries rather than a different cuDNN wheel.
+8.9.7 (`8907`), and NCCL 2.27.7. Use the corresponding UoP Spack headers and libraries rather than a different
+cuDNN or NCCL wheel.
 From a clean, current checkout on the login node:
 
 ```bash
@@ -173,7 +174,13 @@ export CUDNN_HOME="${CUDNN_HEADER%/include/cudnn.h}"
 test -r "$CUDNN_HOME/include/cudnn.h"
 test -r "$CUDNN_HOME/lib/libcudnn.so"
 
-make submit-fp8-training-build CUDNN_HOME="$CUDNN_HOME"
+NCCL_HEADER="$(find "${SPACK_INSTALL_ROOT:?Set SPACK_INSTALL_ROOT to the site package root}" \
+  -type f -path '*/nccl-2.27.7-*/include/nccl.h' -print -quit)"
+export NCCL_HOME="${NCCL_HEADER%/include/nccl.h}"
+test -r "$NCCL_HOME/include/nccl.h"
+test -r "$NCCL_HOME/lib/libnccl.so"
+
+make submit-fp8-training-build CUDNN_HOME="$CUDNN_HOME" NCCL_HOME="$NCCL_HOME"
 # After the build job completes successfully:
 make submit-fp8-training-acceptance PLATFORM=l40s
 # After the acceptance job completes successfully:
@@ -185,10 +192,10 @@ make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8
 make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=training-fp8
 ```
 
-`submit-fp8-training-build` passes this root only to the isolated build job as `HPC_AI_CUDNN_HOME`; the builder
-validates the header and shared library, sets `CUDNN_HOME`, `CUDNN_PATH`, CMake/include/library paths, and records
-the selected root plus the observed cuDNN runtime in `BUILD_MANIFEST.json`. It does not mutate the shared modules or
-the project `.venv`.
+`submit-fp8-training-build` passes these roots only to the isolated build job as `HPC_AI_CUDNN_HOME` and
+`HPC_AI_NCCL_HOME`; the builder validates their headers and shared libraries, sets CMake/include/library paths, and
+records the selected roots plus observed runtime versions in `BUILD_MANIFEST.json`. It does not mutate the shared
+modules or the project `.venv`.
 
 The acceptance JSON under `build/fp8_acceptance/` is diagnostic and must not be imported as canonical evidence. The
 canonical wave must report Transformer Engine modules for all four rows, `transformer_engine_bf16` for E231/E232,
