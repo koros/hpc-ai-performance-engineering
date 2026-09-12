@@ -69,15 +69,11 @@ PLATFORM_WAVE=vllm-framework` and the remaining dedicated wave names from the vL
 For L40S FP8 training, use the separate Transformer Engine environment and two-model gate:
 
 ```bash
-CUDNN_HEADER="$(find "${SPACK_INSTALL_ROOT:?Set SPACK_INSTALL_ROOT to the site package root}" \
-  -type f -path '*/cudnn-8.9.7.29-*/include/cudnn.h' -print -quit)"
-export CUDNN_HOME="${CUDNN_HEADER%/include/cudnn.h}"
-test -r "$CUDNN_HOME/include/cudnn.h"
 NCCL_HEADER="$(find "${SPACK_INSTALL_ROOT:?Set SPACK_INSTALL_ROOT to the site package root}" \
   -type f -path '*/nccl-2.27.7-*/include/nccl.h' -print -quit)"
 export NCCL_HOME="${NCCL_HEADER%/include/nccl.h}"
 test -r "$NCCL_HOME/include/nccl.h"
-make submit-fp8-training-build CUDNN_HOME="$CUDNN_HOME" NCCL_HOME="$NCCL_HOME"
+make submit-fp8-training-build NCCL_HOME="$NCCL_HOME"
 make submit-fp8-training-acceptance PLATFORM=l40s
 make verify-fp8-training-acceptance PLATFORM=l40s
 make submit-fp8-training-wave PLATFORM=l40s
@@ -86,8 +82,8 @@ make submit-fp8-training-wave PLATFORM=l40s
 The gate executes real GPT-2 and DistilBERT forward/backward steps and requires converted Transformer Engine modules,
 finite training/quality losses, and positive throughput. The canonical `training-fp8` wave adds matched Transformer
 Engine BF16 controls E231/E232 beside FP8 treatments E086/E093. Do not import the ignored acceptance records.
-The isolated builder uses the cuDNN and NCCL header/library roots only for this environment; it does not alter the
-shared project environment.
+The isolated builder installs Transformer Engine's pinned cuDNN 9 dependency privately and uses the NCCL
+header/library root only for this environment; it does not alter the shared project environment.
 
 Edit the partition if needed, replace the module-loading helper if the site stack changes, and add an account line only if the target HPC site requires one.
 
