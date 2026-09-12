@@ -447,6 +447,13 @@
       "reason": "All three exact H100 E068 trials OOMed at GPT-2 Small BF16, sequence length 1024, and micro-batch 64. PyTorch had 70.34 GiB allocated with 7.65 GiB free on the observed 79.19 GiB H100 when a further 12.27 GiB allocation failed; only 544 MiB was reserved but unallocated. Preserve E068 and its failed bundle unchanged. Any lower micro-batch investigation must use a new H100-only capacity-adjusted condition and must not be pooled with exact E068."
     },
     {
+      "platforms": ["h100"],
+      "name": "H100 E172 awaiting full-node reservation allocation",
+      "experiment_ids": ["E172"],
+      "comparability": "platform_specific",
+      "reason": "E172 is an exact four-GPU DistilBERT inference scaling condition, but its active H100 reservation supplies only two GPUs and 32 CPU cores while the preserved source configuration requests all four GPUs and 64 CPU cores on one node. No trial has run or failed. Keep E172 deferred until a full-node H100 allocation is available, then restore the original exact configuration and collect three trials separately."
+    },
+    {
       "platforms": ["l40s"],
       "name": "L40S TinyLlama exact one-GPU strong-scaling shape exceeds available memory",
       "experiment_ids": ["E044"],

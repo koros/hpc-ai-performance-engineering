@@ -676,7 +676,7 @@ def test_execution_matrix_defers_only_unaccepted_or_unsupported_backend_and_plat
                 }
             )
         else:
-            expected_ids.update({"E032", "E068"})
+            expected_ids.update({"E032", "E068", "E172"})
         conditions = load_platform_conditions(
             "platforms/execution_matrix.json",
             platform_id,
