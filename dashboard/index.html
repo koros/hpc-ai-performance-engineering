@@ -9,35 +9,45 @@
   </head>
   <body>
     <header class="app-header">
-      <div>
-        <p class="eyebrow">H100 and L40S experiment results</p>
-        <h1>HPC AI Performance Dashboard</h1>
+      <div class="brand-lockup">
+        <img src="logo.svg" alt="" width="52" height="52" />
+        <div>
+          <p class="eyebrow">H100 and L40S research evidence</p>
+          <h1>HPC AI Performance Dashboard</h1>
+          <p class="header-summary">Controlled evidence for scaling, memory, precision, communication, inference, and energy efficiency.</p>
+        </div>
       </div>
-      <div class="header-actions">
-        <label class="file-button">Results CSV<input id="resultsFile" type="file" accept=".csv" /></label>
-        <label class="file-button">Analysis CSVs<input id="analysisFiles" type="file" accept=".csv" multiple /></label>
-        <label class="file-button">Readiness MD<input id="readinessFile" type="file" accept=".md,text/markdown,text/plain" /></label>
-      </div>
+      <details class="data-controls">
+        <summary>Load local evidence</summary>
+        <div class="header-actions">
+          <label class="file-button">Results CSV<input id="resultsFile" type="file" accept=".csv" /></label>
+          <label class="file-button">Analysis CSVs<input id="analysisFiles" type="file" accept=".csv" multiple /></label>
+          <label class="file-button">Readiness MD<input id="readinessFile" type="file" accept=".md,text/markdown,text/plain" /></label>
+        </div>
+      </details>
     </header>
 
     <main>
       <div id="dashboardAlert" class="dashboard-alert" role="alert" hidden></div>
 
+      <section class="research-snapshot" aria-labelledby="snapshotTitle">
+        <div class="snapshot-copy">
+          <p class="eyebrow">Current evidence snapshot</p>
+          <h2 id="snapshotTitle"><span id="heroTrialCount">0</span> validated trials, organised into research decisions</h2>
+          <p id="heroSummary">Loading the latest H100 and L40S evidence…</p>
+          <div id="snapshotScope" class="snapshot-scope" aria-live="polite"></div>
+        </div>
+        <div id="researchReadinessDial" class="readiness-dial" aria-label="Research-question readiness">
+          <div><strong id="heroReadyQuestions">0/7</strong><span>questions<br />answer-ready</span></div>
+        </div>
+        <div id="campaignHighlights" class="campaign-highlights"></div>
+      </section>
+
       <section class="toolbar" aria-label="Dashboard filters">
         <label>Platform<select id="platformFilter"></select></label>
-        <label>Comparability<select id="comparabilityFilter"></select></label>
-        <label>Phase<select id="phaseFilter"></select></label>
         <label>Workload<select id="workloadFilter"></select></label>
-        <label>Throughput unit<select id="throughputUnitFilter"></select></label>
-        <label>Priority<select id="priorityFilter"></select></label>
-        <label>Status<select id="statusFilter"></select></label>
-        <label>Wave<select id="waveFilter"></select></label>
         <label>Mode<select id="modeFilter"></select></label>
-        <label>Strategy<select id="strategyFilter"></select></label>
-        <label>Precision<select id="precisionFilter"></select></label>
-        <label>GPUs<select id="gpuFilter"></select></label>
         <label>Research question<select id="researchQuestionFilter"></select></label>
-        <label>Evidence<select id="evidenceFilter"></select></label>
         <label>Metric focus
           <select id="metricFilter">
             <option value="">All metrics</option>
@@ -48,6 +58,21 @@
             <option value="latency">Latency</option>
           </select>
         </label>
+        <details class="advanced-filters">
+          <summary>More filters</summary>
+          <div>
+            <label>Comparability<select id="comparabilityFilter"></select></label>
+            <label>Phase<select id="phaseFilter"></select></label>
+            <label>Throughput unit<select id="throughputUnitFilter"></select></label>
+            <label>Priority<select id="priorityFilter"></select></label>
+            <label>Status<select id="statusFilter"></select></label>
+            <label>Wave<select id="waveFilter"></select></label>
+            <label>Strategy<select id="strategyFilter"></select></label>
+            <label>Precision<select id="precisionFilter"></select></label>
+            <label>GPUs<select id="gpuFilter"></select></label>
+            <label>Evidence<select id="evidenceFilter"></select></label>
+          </div>
+        </details>
       </section>
 
       <section class="filter-summary" aria-live="polite">
@@ -60,6 +85,7 @@
         <a href="#overview">Overview</a>
         <a href="#performance">Training performance</a>
         <a href="#memory">Memory and capacity</a>
+        <a href="#hardware">Hardware comparison</a>
         <a href="#scaling">Scaling and communication</a>
         <a href="#inference">Inference</a>
         <a href="#evidence">Evidence quality</a>
@@ -88,12 +114,12 @@
           <p class="chart-note">A coverage card records direct completed evidence, not a pooled performance average. Platform gaps remain visibly pending until matching evidence is collected.</p>
         </article>
         <div class="content-grid">
-          <article class="panel chart-panel" data-metrics="throughput runtime">
+          <article id="research-scaling" class="panel chart-panel" data-metrics="throughput runtime">
             <div class="panel-heading"><h2>RQ1: Scaling efficiency</h2><span id="rq1Status">No scaling findings</span></div>
             <div id="rq1ScalingCharts" class="svg-chart-grid"></div>
             <p class="chart-note">Strong and weak scaling use separate curves. Each begins at its smallest GPU-count baseline (1.00×), while point labels report both speedup and parallel efficiency.</p>
           </article>
-          <article class="panel chart-panel" data-metrics="throughput memory">
+          <article id="research-strategy" class="panel chart-panel" data-metrics="throughput memory">
             <div class="panel-heading"><h2>RQ2: Throughput–memory trade-off</h2><span id="rq2Status">No matched strategy findings</span></div>
             <div id="rq2StrategyCharts" class="svg-chart-grid"></div>
             <p class="chart-note">Points use matching workload, precision, GPU count, sequence length, global batch, and accumulation settings. Pareto-frontier points are observed trade-offs, not universal winners.</p>
@@ -124,7 +150,7 @@
         </div>
         <div class="content-grid">
           <article class="panel chart-panel panel-wide" data-metrics="energy">
-            <div class="panel-heading"><h2>Energy Efficiency and Power</h2><span id="energyStatus">No energy evidence</span></div>
+            <div class="panel-heading"><div><p class="panel-kicker">RQ5 · Useful work efficiency</p><h2>Energy Efficiency and Power</h2></div><span id="energyStatus">No energy evidence</span></div>
             <div id="energyCoverage" class="energy-coverage"></div>
             <section class="energy-study-section">
               <div class="energy-study-heading"><div><span>Efficiency landscape</span><h3>Throughput delivered per unit of energy</h3></div><p>Further right is faster; higher is more energy-efficient. Throughput units remain in separate panels.</p></div>
@@ -186,14 +212,27 @@
             <p class="chart-note">Colours identify the same strategy everywhere. Platform, workload, precision, GPU count, batch settings, and throughput unit remain fixed within the selected comparison. Select a bar for trial details.</p>
           </article>
           <article class="panel chart-panel precision-analysis-panel panel-wide" data-metrics="throughput memory">
-            <div class="panel-heading"><div><h2>How does numeric precision affect speed and GPU memory?</h2><p class="panel-subtitle">Choose one matched workload, then compare FP32, FP16, and BF16 without changing the hardware or training setup.</p></div><span id="precisionStatus">No precision evidence</span></div>
+            <div class="panel-heading"><div><p class="panel-kicker">RQ3 · Precision and quality</p><h2>How does numeric precision affect speed and GPU memory?</h2><p class="panel-subtitle">Choose one matched workload, then compare FP32, FP16, BF16, and validated FP8 evidence without changing the hardware or training setup.</p></div><span id="precisionStatus">No precision evidence</span></div>
             <div class="precision-controls" aria-label="Numeric precision chart controls">
               <label>Comparison<select id="precisionComparisonFilter" aria-label="Precision comparison"></select></label>
             </div>
             <div id="precisionBars" class="precision-visualization"></div>
-            <p class="chart-note">Colours identify the same precision format in both charts. Longer throughput bars are better; shorter memory bars use less GPU memory. Select any bar for trial details.</p>
+            <p class="chart-note">Colours identify the same precision format in both charts. Longer throughput bars are better; shorter memory bars use less GPU memory. Loss values are short-run quality sanity checks, not downstream task-quality claims. Select any bar for trial details.</p>
           </article>
         </div>
+      </section>
+
+      <section id="hardware" class="dashboard-section">
+        <div class="section-heading">
+          <div><p class="eyebrow">RQ6 · Hardware comparison</p><h2>What changes when the GPU platform changes?</h2></div>
+          <p>Only matched one-GPU protocols are compared. Workload, mode, precision, batch settings, and throughput units remain fixed.</p>
+        </div>
+        <article class="panel chart-panel hardware-analysis-panel" data-metrics="throughput memory latency">
+          <div class="panel-heading"><div><h2>H100 versus L40S</h2><p class="panel-subtitle">Select one controlled workload and execution mode.</p></div><span id="hardwareStatus">No matched hardware evidence</span></div>
+          <div class="hardware-controls"><label>Comparison<select id="hardwareComparisonFilter" aria-label="Hardware comparison"></select></label></div>
+          <div id="hardwareComparison" class="hardware-visualization"></div>
+          <p class="chart-note">Energy is omitted because the original L40S hardware-comparison rows predate measured-region telemetry. Throughput, latency, and memory remain valid for this comparison.</p>
+        </article>
       </section>
 
       <section id="memory" class="dashboard-section">
@@ -227,7 +266,7 @@
 
       <section id="scaling" class="dashboard-section">
         <div class="section-heading">
-          <div><p class="eyebrow">Scaling and communication</p><h2>Parallel efficiency and data movement</h2></div>
+          <div><p class="eyebrow">RQ1 and RQ4 · Scaling and bottlenecks</p><h2>Parallel efficiency and data movement</h2></div>
           <p>Scaling, NCCL, and data-loader measurements appear as each study completes.</p>
         </div>
         <div class="content-grid">

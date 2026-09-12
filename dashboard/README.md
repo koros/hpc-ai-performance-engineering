@@ -59,8 +59,12 @@ Metric groups with no recorded values are omitted. The trial mini-chart uses agg
 The first dashboard section turns refreshed evidence into an explicit research
 argument rather than a generic results explorer:
 
-- **RQ1–RQ7 coverage cards** show direct condition/trial coverage, platform and
-  comparability scope, and the limitation that applies to each question.
+- The **current evidence snapshot** reports active-view conditions, validated
+  trials, research-question readiness, validated FP8 coverage, measured-region
+  energy coverage, and the remaining legacy-telemetry boundary.
+- **RQ1–RQ7 decision cards** condense platform-level coverage into one card per
+  research question. Each card shows trial completion, platform scope, the
+  remaining limitation, and a direct link to the relevant evidence view.
 - **RQ1 scaling** plots only within-platform speedup and parallel efficiency.
   L40S scaling is labelled supporting evidence because the primary question is
   framed around H100 one-to-four-GPU scaling.
@@ -74,6 +78,15 @@ argument rather than a generic results explorer:
 - **Controlled Study Map** provides the bridge from collected phases to the
   research views. It prevents workload, hardware, strategy, scaling, precision,
   and memory changes from being compressed into one confounded leaderboard.
+- **RQ3 precision controls** now include validated FP8 training alongside FP32,
+  FP16, and BF16, with throughput, memory, and short-run quality-loss context.
+- **RQ6 hardware comparisons** match H100 and L40S by protocol rather than by
+  experiment ID. Throughput is shown beside memory for training or p50 latency
+  for inference; unmatched or legacy energy measurements are not implied.
+
+The five most commonly used filters remain visible. Comparability, phase,
+strategy, precision, GPU count, wave, and evidence-quality controls are grouped
+under **More filters** to keep the initial view focused on interpretation.
 
 The Research question filter applies to raw trial rows and the research-specific
 tables. Other summary tables intentionally ask the user to clear that filter,

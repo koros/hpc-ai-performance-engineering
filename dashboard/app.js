@@ -87,6 +87,20 @@ const precisionColors = {
   fp32: "#475569",
   fp16: "#7c3aed",
   bf16: "#0f766e",
+  fp8: "#e11d48",
+};
+const hardwareColors = {
+  h100: "#7c3aed",
+  l40s: "#0f766e",
+};
+const researchTargets = {
+  RQ1: "research-scaling",
+  RQ2: "research-strategy",
+  RQ3: "precisionBars",
+  RQ4: "scaling",
+  RQ5: "energyCoverage",
+  RQ6: "hardwareComparison",
+  RQ7: "evidence",
 };
 
 const detailMetricSections = [
@@ -154,6 +168,7 @@ function bindInputs() {
   document.getElementById("strategyComparisonFilter").addEventListener("change", safeRender);
   document.getElementById("strategyMetricFilter").addEventListener("change", safeRender);
   document.getElementById("precisionComparisonFilter").addEventListener("change", safeRender);
+  document.getElementById("hardwareComparisonFilter").addEventListener("change", safeRender);
   document.getElementById("resetFilters").addEventListener("click", resetFilters);
   document.getElementById("resultsFile").addEventListener("change", (event) => {
     readFile(event.target.files[0]).then((text) => {
@@ -397,6 +412,7 @@ function filteredAnalysisRows(rows, supported) {
 function render() {
   const rows = filteredResults();
   renderActiveFilters();
+  renderResearchSnapshot(rows);
   renderResearchQuestions();
   renderKpis(rows);
   renderReadiness();
@@ -408,6 +424,7 @@ function render() {
   renderUncertainty();
   renderStrategy();
   renderPrecision();
+  renderHardware();
   renderMemory();
   renderScaling();
   renderCommunication();
@@ -416,6 +433,96 @@ function render() {
   renderPhaseTable();
   renderTrialTable();
   organizeSections();
+}
+
+function renderResearchSnapshot(rows) {
+  const completed = rows.filter((row) => row.status === "completed");
+  const conditions = uniqueConditionIds(rows);
+  const research = buildResearchQuestionOverview(state.researchQuestionSummary);
+  const ready = research.filter((entry) => entry.status === "ready");
+  const partial = research.filter((entry) => entry.status === "partial");
+  const fp8Rows = completed.filter((row) => String(row.precision).toLowerCase() === "fp8");
+  const fp8Conditions = uniqueConditionIds(fp8Rows);
+  const measuredEnergy = completed.filter((row) => row.energy_scope === "measured_region" && row.energy_measurement_status === "sufficient");
+  const legacyTelemetry = completed.filter((row) => row.gpu_telemetry_mapping === "legacy_positional");
+  const platforms = uniqueValues(rows, "platform_id").map(displayPlatform);
+  const filtered = Object.values(selectedFilters()).some(Boolean) || Boolean(document.getElementById("metricFilter").value);
+
+  document.getElementById("heroTrialCount").textContent = formatInteger(completed.length);
+  document.getElementById("heroReadyQuestions").textContent = ready.length + "/" + research.length;
+  document.getElementById("heroSummary").textContent = partial.length
+    ? ready.length + " research questions are answer-ready. " + partial.map((entry) => entry.researchQuestion).join(", ") + " retains a clearly labelled evidence limitation."
+    : "Every research question represented in the current analysis has sufficient direct evidence.";
+  document.getElementById("researchReadinessDial").style.setProperty("--readiness", research.length ? (ready.length / research.length) * 360 + "deg" : "0deg");
+
+  const scope = document.getElementById("snapshotScope");
+  scope.replaceChildren();
+  [filtered ? "Filtered view" : "Complete evidence view", platforms.join(" + ") || "No platform", formatInteger(conditions.length) + " conditions"].forEach((label) => {
+    const chip = document.createElement("span");
+    chip.textContent = label;
+    scope.append(chip);
+  });
+
+  const highlights = [
+    {
+      label: "Evidence coverage",
+      value: formatInteger(conditions.length) + " conditions",
+      detail: formatInteger(completed.length) + " completed trials in the active view",
+      tone: "complete",
+    },
+    {
+      label: "Validated FP8 training",
+      value: fp8Conditions.length ? formatInteger(fp8Conditions.length) + " conditions" : "Not in this view",
+      detail: fp8Rows.length ? formatInteger(fp8Rows.length) + " trials across " + uniqueValues(fp8Rows, "platform_id").map(displayPlatform).join(" and ") : "Adjust filters to inspect FP8 evidence",
+      tone: fp8Rows.length ? "new" : "muted",
+    },
+    {
+      label: "Energy-ready evidence",
+      value: formatInteger(measuredEnergy.length) + " trials",
+      detail: "Measured-region records with sufficient samples",
+      tone: measuredEnergy.length ? "complete" : "muted",
+    },
+    {
+      label: "Telemetry boundary",
+      value: formatInteger(legacyTelemetry.length) + " legacy rows",
+      detail: "Retained for non-energy metrics; legacy power and energy are excluded",
+      tone: legacyTelemetry.length ? "caution" : "complete",
+    },
+  ];
+  const container = document.getElementById("campaignHighlights");
+  container.replaceChildren();
+  highlights.forEach((entry) => {
+    const card = document.createElement("article");
+    card.className = "campaign-highlight highlight-" + entry.tone;
+    card.innerHTML = "<span>" + escapeHtml(entry.label) + "</span><strong>" + escapeHtml(entry.value) + "</strong><small>" + escapeHtml(entry.detail) + "</small>";
+    container.append(card);
+  });
+}
+
+function buildResearchQuestionOverview(rows) {
+  return Object.entries(groupRows(rows, (row) => [row.research_question])).map(([researchQuestion, group]) => {
+    const statuses = group.map((row) => row.evidence_status);
+    const positive = statuses.every((status) => status === "sufficient" || status === "supporting_platform_evidence");
+    const pending = statuses.every((status) => status.startsWith("awaiting") || status === "insufficient_data");
+    const status = positive ? "ready" : pending ? "pending" : "partial";
+    const completedTrials = sum(group.map((row) => number(row.completed_trials)));
+    const requiredTrials = sum(group.map((row) => number(row.required_trials)));
+    return {
+      researchQuestion,
+      objective: group[0].objective,
+      question: group[0].question,
+      status,
+      statusLabel: status === "ready" ? "Answer-ready" : status === "pending" ? "Awaiting evidence" : researchQuestion === "RQ5" ? "Partial energy coverage" : "Evidence limitation",
+      conditions: sum(group.map((row) => number(row.direct_conditions))),
+      completedTrials,
+      requiredTrials,
+      energyTrials: sum(group.map((row) => number(row.energy_trials))),
+      platforms: uniqueValues(group, "platform_id").map(displayPlatform),
+      comparabilities: uniqueValues(group, "comparability").map(displayComparability),
+      limitation: group.find((row) => row.evidence_status !== "sufficient")?.scope_note || group[0].limitation,
+      target: researchTargets[researchQuestion] || "research",
+    };
+  }).sort((left, right) => left.researchQuestion.localeCompare(right.researchQuestion));
 }
 
 function renderResearchQuestions() {
@@ -451,22 +558,26 @@ function renderResearchCoverage(rows, message) {
     container.append(emptyState(message || "No research-question coverage is available. Run the refresh pipeline after collecting accepted evidence."));
     return;
   }
-  rows.sort((left, right) => (left.research_question + left.platform_id + left.comparability).localeCompare(right.research_question + right.platform_id + right.comparability)).forEach((row) => {
+  buildResearchQuestionOverview(rows).forEach((row) => {
     const card = document.createElement("article");
-    const awaiting = row.evidence_status.startsWith("awaiting") || row.evidence_status === "insufficient_data";
-    card.className = "research-question-card" + (awaiting ? " is-pending" : "");
-    const conditionLabel = number(row.direct_conditions) === 1 ? "condition" : "conditions";
-    card.innerHTML = '<div class="research-card-heading"><strong>' + escapeHtml(row.research_question) + " · " + escapeHtml(row.objective) + '</strong><span class="evidence-badge evidence-' + escapeHtml(row.evidence_status) + '">' + escapeHtml(displayEvidenceStatus(row.evidence_status)) + "</span></div>" +
+    card.className = "research-question-card research-status-" + row.status;
+    const completion = row.requiredTrials ? Math.min(100, row.completedTrials / row.requiredTrials * 100) : 0;
+    const energyNote = row.researchQuestion === "RQ5" ? '<span class="rq-energy-note">' + formatInteger(row.energyTrials) + " measured-region energy trials</span>" : "";
+    card.innerHTML = '<div class="research-card-heading"><div><span class="rq-index">' + escapeHtml(row.researchQuestion) + '</span><strong>' + escapeHtml(row.objective) + '</strong></div><span class="evidence-badge evidence-' + escapeHtml(row.status) + '">' + escapeHtml(row.statusLabel) + "</span></div>" +
       '<p class="research-question-text">' + escapeHtml(row.question) + "</p>" +
-      '<dl class="research-metrics"><div><dt>Scope</dt><dd>' + escapeHtml((row.platform_id || "not recorded") + (row.comparability ? " · " + row.comparability : "")) + '</dd></div><div><dt>Direct evidence</dt><dd>' + formatInteger(number(row.direct_conditions)) + " " + conditionLabel + " · " + formatInteger(number(row.completed_trials)) + "/" + formatInteger(number(row.required_trials)) + " trials</dd></div></dl>" +
-      '<p class="research-note">' + escapeHtml(row.scope_note || row.limitation) + "</p>";
+      '<div class="rq-platforms">' + row.platforms.map((platform) => "<span>" + escapeHtml(platform) + "</span>").join("") + "</div>" +
+      '<div class="rq-progress"><div><span>Trial coverage</span><strong>' + formatInteger(row.completedTrials) + "/" + formatInteger(row.requiredTrials) + '</strong></div><div class="rq-progress-track"><i style="width:' + completion + '%"></i></div></div>' +
+      '<div class="rq-evidence-line"><span>' + formatInteger(row.conditions) + " direct conditions</span>" + energyNote + "</div>" +
+      '<p class="research-note">' + escapeHtml(row.limitation) + "</p>" +
+      '<a class="rq-link" href="#' + escapeHtml(row.target) + '">Inspect the evidence <span aria-hidden="true">→</span></a>';
     container.append(card);
   });
 }
 
 function researchCoverageLabel(rows) {
-  const sufficient = rows.filter((row) => row.evidence_status === "sufficient" || row.evidence_status === "supporting_platform_evidence").length;
-  return sufficient + " coverage entries with completed evidence";
+  const questions = buildResearchQuestionOverview(rows);
+  const ready = questions.filter((row) => row.status === "ready").length;
+  return ready + " of " + questions.length + " research questions answer-ready";
 }
 
 function buildRq1ScalingSeries(rows) {
@@ -1599,10 +1710,15 @@ function precisionSummary(group) {
   const bf16Memory = bf16 && fp32 && bf16.memory !== null && fp32.memory
     ? formatDecimal((1 - bf16.memory / fp32.memory) * 100, 1) + "% less memory"
     : "Memory comparison unavailable";
+  const qualityEntries = group.entries.filter((entry) => entry.qualityLoss !== null);
+  const qualityRange = qualityEntries.length
+    ? formatDecimal(Math.min(...qualityEntries.map((entry) => entry.qualityLoss)), 3) + "–" + formatDecimal(Math.max(...qualityEntries.map((entry) => entry.qualityLoss)), 3)
+    : "Not recorded";
   const cards = [
     ["Fastest format", fastest.label, formatInteger(fastest.value) + " " + humanizeThroughputUnit(group.unit)],
     ["Lowest GPU memory", memoryLeaders.length ? memoryLeaders.join(" and ") : "Not recorded", lowestMemory === null ? "No comparable memory evidence" : formatDecimal(lowestMemory, 2) + " GB measured"],
     ["BF16 compared with FP32", bf16Advantage, bf16Memory],
+    ["Quality-loss sanity range", qualityRange, qualityEntries.length ? "Short-run loss across the displayed formats" : "No comparable quality-loss evidence"],
     ["Evidence in comparison", group.entries.length + " precision formats", sum(group.entries.map((entry) => entry.trials)) + " completed trials"],
   ];
   cards.forEach(([label, value, detail]) => {
@@ -1664,21 +1780,20 @@ function precisionMetricChart(group, metric) {
 function precisionTakeaway(group) {
   const takeaway = document.createElement("p");
   takeaway.className = "precision-takeaway";
+  const fastest = [...group.entries].sort((left, right) => right.value - left.value)[0];
   const bf16 = group.entries.find((entry) => entry.key === "bf16");
-  const fp16 = group.entries.find((entry) => entry.key === "fp16");
-  const fp32 = group.entries.find((entry) => entry.key === "fp32");
-  if (!bf16 || !fp32 || !fp32.value) {
-    takeaway.textContent = "The selected comparison does not contain both BF16 and FP32 evidence.";
+  if (!fastest || !bf16 || !bf16.value) {
+    takeaway.textContent = "The selected comparison does not contain enough matched evidence for a relative interpretation.";
     return takeaway;
   }
-  const speedRatio = bf16.value / fp32.value;
-  const memoryPhrase = bf16.memory !== null && fp32.memory
-    ? " while using " + formatDecimal(Math.abs((1 - bf16.memory / fp32.memory) * 100), 1) + "% " + (bf16.memory <= fp32.memory ? "less" : "more") + " measured GPU memory"
+  const speedRatio = fastest.value / bf16.value;
+  const memoryPhrase = fastest.memory !== null && bf16.memory
+    ? " and used " + formatDecimal(Math.abs((1 - fastest.memory / bf16.memory) * 100), 1) + "% " + (fastest.memory <= bf16.memory ? "less" : "more") + " measured GPU memory"
     : "";
-  const fp16Phrase = fp16 && bf16.value
-    ? " FP16 throughput was " + formatDecimal(Math.abs((1 - fp16.value / bf16.value) * 100), 1) + "% " + (fp16.value <= bf16.value ? "below" : "above") + " BF16."
+  const qualityPhrase = fastest.qualityLoss !== null
+    ? " Its short-run quality loss was " + formatDecimal(fastest.qualityLoss, 3) + "; interpret this as a sanity check, not a downstream quality verdict."
     : "";
-  takeaway.innerHTML = "<strong>What this comparison shows:</strong> BF16 delivered " + escapeHtml(formatDecimal(speedRatio, 2)) + "× FP32 throughput" + escapeHtml(memoryPhrase) + "." + escapeHtml(fp16Phrase);
+  takeaway.innerHTML = "<strong>What this comparison shows:</strong> " + escapeHtml(fastest.label) + " was fastest at " + escapeHtml(formatDecimal(speedRatio, 2)) + "× BF16 throughput" + escapeHtml(memoryPhrase) + "." + escapeHtml(qualityPhrase);
   return takeaway;
 }
 
@@ -1699,6 +1814,7 @@ function buildControlledTrainingGroups(rows, evidenceRows, predicate, groupKey, 
       label: variableKey === "strategy" ? strategyVariantLabel(row) : String(row[variableKey] || "").toUpperCase(),
       value: number(row.throughput_tokens_mean),
       memory: conditionMetricAverage(evidenceRows, conditionId(row), ["metric_nvidia_smi_memory_used_gb_measured_region", "metric_memory_used_gb", "memory_used_gb"]),
+      qualityLoss: conditionMetricAverage(evidenceRows, conditionId(row), ["metric_quality_loss", "metric_loss"]),
       trials: number(row.completed_trials),
       conditionId: conditionId(row),
     })).sort((left, right) => right.value - left.value);
@@ -1718,6 +1834,127 @@ function buildControlledTrainingGroups(rows, evidenceRows, predicate, groupKey, 
       entries,
     };
   }).filter((group) => group.entries.length > 1).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function renderHardware() {
+  const filtered = filteredAnalysisRows(state.hardwareSummary, ["platform_id", "comparability", "workload", "mode", "precision"]);
+  const groups = buildHardwareComparisonGroups(filtered.rows);
+  const selectedGroup = syncComparisonControl("hardwareComparisonFilter", groups);
+  renderHardwareComparison("hardwareComparison", selectedGroup, filtered.message || "No matched H100 and L40S hardware comparison is available for the active filters.");
+  const conditions = sum(groups.map((group) => group.entries.length));
+  document.getElementById("hardwareStatus").textContent = filtered.message || (groups.length ? groups.length + " matched protocols · " + conditions + " platform conditions" : "No matched hardware evidence");
+  markPanel("hardwareComparison", groups.length > 0, buildHardwareComparisonGroups(state.hardwareSummary).length > 0, "Hardware comparison", "hardware_summary.csv", true);
+}
+
+function buildHardwareComparisonGroups(rows) {
+  const eligible = rows.filter((row) => row.comparability === "exact" && number(row.avg_throughput_tokens_sec) > 0);
+  const grouped = groupRows(eligible, (row) => [row.comparability, row.workload, row.model, row.mode, row.precision, row.throughput_unit]);
+  return Object.entries(grouped).map(([groupId, group]) => {
+    const platforms = new Set(group.map((row) => row.platform_id));
+    if (!platforms.has("h100") || !platforms.has("l40s")) return null;
+    const sample = group[0];
+    const entries = group.map((row) => ({
+      key: row.platform_id,
+      label: displayPlatform(row.platform_id),
+      value: number(row.avg_throughput_tokens_sec),
+      memory: isNumeric(row.avg_memory_used_gb) ? number(row.avg_memory_used_gb) : null,
+      latency: isNumeric(row.avg_latency_p50_ms) ? number(row.avg_latency_p50_ms) : null,
+      trials: number(row.trials),
+      conditionId: conditionId(row),
+    })).sort((left, right) => right.value - left.value);
+    return {
+      id: groupId.split("\u0000").map((part) => encodeURIComponent(part)).join("::"),
+      title: displayWorkload(sample.workload) + " · " + (sample.mode === "training" ? "Training" : "Inference"),
+      selectorLabel: displayWorkload(sample.workload) + " · " + (sample.mode === "training" ? "Training" : "Inference"),
+      subtitle: String(sample.precision || "").toUpperCase() + " · " + displayComparability(sample.comparability) + " · " + humanizeThroughputUnit(sample.throughput_unit),
+      comparison: comparisonContext(group, ["GPU platform"], ["comparability", "workload", "model", "mode", "precision", "throughput_unit"]),
+      mode: sample.mode,
+      unit: sample.throughput_unit,
+      entries,
+    };
+  }).filter(Boolean).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function renderHardwareComparison(containerId, group, emptyMessage) {
+  const container = document.getElementById(containerId);
+  container.replaceChildren();
+  if (!group) {
+    container.append(emptyState(emptyMessage));
+    return;
+  }
+  const context = document.createElement("div");
+  context.className = "hardware-context strategy-context";
+  context.innerHTML = "<div><span>Controlled comparison</span><strong>" + escapeHtml(group.title) + "</strong><small>" + escapeHtml(group.subtitle) + "</small></div>";
+  context.append(comparisonContract(group.comparison));
+  container.append(context);
+  container.append(hardwareComparisonSummary(group));
+  const legend = document.createElement("div");
+  legend.className = "hardware-legend strategy-legend";
+  group.entries.forEach((entry) => {
+    const item = document.createElement("span");
+    item.innerHTML = '<i style="--strategy-color: ' + hardwareColor(entry.key) + '"></i>' + escapeHtml(entry.label);
+    legend.append(item);
+  });
+  container.append(legend);
+  const charts = document.createElement("div");
+  charts.className = "hardware-chart-grid";
+  charts.append(hardwareMetricChart(group, "throughput"));
+  charts.append(hardwareMetricChart(group, group.mode === "inference" ? "latency" : "memory"));
+  container.append(charts);
+}
+
+function hardwareComparisonSummary(group) {
+  const summary = document.createElement("div");
+  summary.className = "hardware-summary-grid";
+  const fastest = group.entries[0];
+  const h100 = group.entries.find((entry) => entry.key === "h100");
+  const l40s = group.entries.find((entry) => entry.key === "l40s");
+  const ratio = h100 && l40s && l40s.value ? h100.value / l40s.value : null;
+  const secondaryKey = group.mode === "inference" ? "latency" : "memory";
+  const secondary = group.entries.filter((entry) => entry[secondaryKey] !== null).sort((left, right) => left[secondaryKey] - right[secondaryKey])[0];
+  const cards = [
+    ["Throughput leader", fastest.label, formatInteger(fastest.value) + " " + humanizeThroughputUnit(group.unit)],
+    ["H100 / L40S throughput", ratio === null ? "Not estimable" : formatDecimal(ratio, 2) + "×", ratio === null ? "Both platforms are required" : ratio >= 1 ? "H100 relative to the matched L40S run" : "L40S was faster in this matched condition"],
+    [group.mode === "inference" ? "Lowest p50 latency" : "Lowest GPU memory", secondary ? secondary.label : "Not recorded", secondary ? formatDecimal(secondary[secondaryKey], 2) + (secondaryKey === "latency" ? " ms" : " GB") : "No secondary metric"],
+    ["Evidence in comparison", sum(group.entries.map((entry) => entry.trials)) + " trials", group.entries.length + " matched platform conditions"],
+  ];
+  cards.forEach(([label, value, detail]) => {
+    const card = document.createElement("article");
+    card.innerHTML = "<span>" + escapeHtml(label) + "</span><strong>" + escapeHtml(value) + "</strong><small>" + escapeHtml(detail) + "</small>";
+    summary.append(card);
+  });
+  return summary;
+}
+
+function hardwareMetricChart(group, metric) {
+  const card = document.createElement("article");
+  card.className = "hardware-metric-card";
+  const labels = {
+    throughput: ["Performance", "Average throughput", "Higher is better"],
+    memory: ["Memory footprint", "Average measured GPU memory", "Lower is better"],
+    latency: ["Responsiveness", "Median request latency", "Lower is better"],
+  }[metric];
+  card.innerHTML = "<div><span>" + labels[0] + "</span><h3>" + labels[1] + "</h3><p>" + labels[2] + "</p></div>";
+  const key = metric === "throughput" ? "value" : metric;
+  const entries = group.entries.filter((entry) => entry[key] !== null);
+  const maximum = max(entries.map((entry) => entry[key])) || 1;
+  const bars = document.createElement("div");
+  bars.className = "hardware-bars";
+  entries.forEach((entry) => {
+    const value = entry[key];
+    const row = document.createElement("article");
+    row.className = "hardware-bar-row";
+    setConditionTarget(row, entry.conditionId);
+    const formatted = metric === "throughput" ? formatInteger(value) : formatDecimal(value, 2) + (metric === "memory" ? " GB" : " ms");
+    row.innerHTML = '<div><strong>' + escapeHtml(entry.label) + "</strong><span>" + escapeHtml(formatted) + '</span></div><div class="hardware-bar-track"><i style="width:' + Math.max(3, value / maximum * 100) + "%;--hardware-color:" + hardwareColor(entry.key) + '"></i></div>';
+    bars.append(row);
+  });
+  card.append(bars);
+  return card;
+}
+
+function hardwareColor(key) {
+  return hardwareColors[key] || "#64748b";
 }
 
 function renderStrategyComparisonChart(containerId, group, metric, emptyMessage) {
@@ -2856,6 +3093,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildEnergyToSolutionGroups,
     buildExperimentDetail,
     buildGradientAccumulationSeries,
+    buildHardwareComparisonGroups,
     buildInferenceGroups,
     buildMemorySeries,
     buildDataMovementSeries,
@@ -2863,6 +3101,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildPinnedMemoryGroups,
     buildRq1ScalingSeries,
     buildRq2StrategyGroups,
+    buildResearchQuestionOverview,
     buildScalingSeries,
     buildStrategyComparisonGroups,
     buildStudyCoverageEntries,

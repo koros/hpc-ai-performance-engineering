@@ -11,12 +11,14 @@ const {
   buildEnergyToSolutionGroups,
   buildExperimentDetail,
   buildGradientAccumulationSeries,
+  buildHardwareComparisonGroups,
   buildInferenceGroups,
   buildMemorySeries,
   buildPhaseDistributionEntries,
   buildPinnedMemoryGroups,
   buildRq1ScalingSeries,
   buildRq2StrategyGroups,
+  buildResearchQuestionOverview,
   buildScalingSeries,
   buildStrategyComparisonGroups,
   buildStudyCoverageEntries,
@@ -300,12 +302,49 @@ run("precision comparisons omit single-configuration groups", () => {
 });
 
 run("precision formats have stable distinct chart colours", () => {
-  const formats = ["fp32", "fp16", "bf16"];
+  const formats = ["fp32", "fp16", "bf16", "fp8"];
   const colours = formats.map(precisionColor);
 
   assert.equal(new Set(colours).size, formats.length);
   assert.equal(precisionColor("bf16"), "#0f766e");
+  assert.equal(precisionColor("fp8"), "#e11d48");
   assert.equal(precisionColor("unknown"), "#64748b");
+});
+
+run("research overview condenses platform rows into one decision per question", () => {
+  const rows = [
+    { research_question: "RQ1", objective: "Scaling", question: "Scale?", platform_id: "h100", comparability: "exact", direct_conditions: 2, completed_trials: 6, required_trials: 6, energy_trials: 6, evidence_status: "sufficient", limitation: "Primary evidence." },
+    { research_question: "RQ1", objective: "Scaling", question: "Scale?", platform_id: "l40s", comparability: "exact", direct_conditions: 3, completed_trials: 9, required_trials: 9, energy_trials: 0, evidence_status: "supporting_platform_evidence", scope_note: "Supporting evidence." },
+    { research_question: "RQ5", objective: "Energy", question: "Efficient?", platform_id: "l40s", comparability: "exact", direct_conditions: 4, completed_trials: 12, required_trials: 12, energy_trials: 3, evidence_status: "partial_energy_evidence", scope_note: "Measured-region subset." },
+  ];
+
+  const overview = buildResearchQuestionOverview(rows);
+  const rq1 = overview.find((entry) => entry.researchQuestion === "RQ1");
+  const rq5 = overview.find((entry) => entry.researchQuestion === "RQ5");
+
+  assert.equal(overview.length, 2);
+  assert.equal(rq1.status, "ready");
+  assert.equal(rq1.conditions, 5);
+  assert.deepEqual(rq1.platforms, ["H100", "L40S"]);
+  assert.equal(rq5.status, "partial");
+  assert.equal(rq5.statusLabel, "Partial energy coverage");
+});
+
+run("hardware comparisons require matched exact evidence from both platforms", () => {
+  const common = {
+    comparability: "exact", workload: "gpt2_small", model: "gpt2", mode: "training",
+    precision: "bf16", throughput_unit: "training_tokens_per_second", trials: 3,
+    avg_memory_used_gb: 28,
+  };
+  const groups = buildHardwareComparisonGroups([
+    { ...common, condition_id: "E121@h100", experiment_id: "E121", platform_id: "h100", avg_throughput_tokens_sec: 200 },
+    { ...common, condition_id: "E123@l40s", experiment_id: "E123", platform_id: "l40s", avg_throughput_tokens_sec: 100 },
+    { ...common, condition_id: "E999@l40s", experiment_id: "E999", platform_id: "l40s", comparability: "capacity_adjusted", avg_throughput_tokens_sec: 90 },
+  ]);
+
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].entries.length, 2);
+  assert.deepEqual(groups[0].entries.map((entry) => entry.key), ["h100", "l40s"]);
 });
 
 run("training analysis uses plain-language labels without encoded uncertainty text", () => {
