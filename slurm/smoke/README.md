@@ -82,8 +82,9 @@ make submit-fp8-training-wave PLATFORM=l40s
 The gate executes real GPT-2 and DistilBERT forward/backward steps and requires converted Transformer Engine modules,
 finite training/quality losses, and positive throughput. The canonical `training-fp8` wave adds matched Transformer
 Engine BF16 controls E231/E232 beside FP8 treatments E086/E093. Do not import the ignored acceptance records.
-The isolated builder installs Transformer Engine's pinned cuDNN 9 dependency privately and uses the NCCL
-header/library root only for this environment; it does not alter the shared project environment.
+The isolated builder installs Transformer Engine's pinned cuDNN 9 and CUDA-12.4-matched cuBLAS/NVRTC dependencies
+privately and uses the NCCL header/library root only for this environment; it does not alter the shared project
+environment.
 
 Edit the partition if needed, replace the module-loading helper if the site stack changes, and add an account line only if the target HPC site requires one.
 
