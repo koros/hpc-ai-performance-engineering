@@ -94,9 +94,9 @@ def test_discover_matrix_configs() -> None:
     entries = discover_experiment_configs()
     experiment_ids = {entry.config.experiment_id for entry in entries}
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 235)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 239)}
 
-    assert len(entries) == 234
+    assert len(entries) == 238
     assert experiment_ids == source_ids | supplemental_ids
 
 
@@ -2153,9 +2153,9 @@ def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
     report = report_path.read_text(encoding="utf-8")
 
     assert "Source matrix configs discovered: 200" in report
-    assert "Supplemental platform probes discovered: 29" in report
+    assert "Supplemental platform probes discovered: 33" in report
     assert "Cross-platform telemetry anchors discovered: 5" in report
-    assert "Total E-number configs discovered: 234" in report
+    assert "Total E-number configs discovered: 238" in report
     assert "`gpt2_small`" in report
     assert "slurm/smoke/gpt2_small_smoke.sbatch" in report
     assert "Submission Gate" in report
@@ -2201,7 +2201,7 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
 
     assert csv_path == output_csv
     assert markdown_path == output_markdown
-    assert len(rows) == 234
+    assert len(rows) == 238
     assert e033["status"] == "Completed"
     assert e033["runtime_seconds"] == "600.0"
     assert e034["status"] == "Configured"

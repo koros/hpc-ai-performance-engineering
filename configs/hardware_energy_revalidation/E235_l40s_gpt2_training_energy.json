@@ -1,0 +1,58 @@
+{
+  "experiment_id": "E235",
+  "experiment": "hardware_energy_revalidation_gpt2_training_l40s",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "comparison_axis": "gpu_model",
+      "hardware_label": "L40S",
+      "batch_size": 16,
+      "sequence_length": 1024,
+      "stack": "pytorch_single_gpu"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpus": 1,
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi"],
+    "parameters": {
+      "collect_power": true,
+      "collect_memory_trace": true,
+      "collect_latency_distribution": false,
+      "sample_interval_seconds": 0.05
+    }
+  },
+  "metadata": {
+    "matrix_id": "E235",
+    "template": "hardware_energy_revalidation",
+    "phase": "Hardware energy revalidation",
+    "priority": "Supplemental",
+    "gpu_hours_estimate": 0.8,
+    "energy_reference_experiment_id": "E123",
+    "objective": "Revalidate measured-region energy for the E123 L40S hardware comparison",
+    "research_questions": ["RQ5", "RQ6", "RQ7"],
+    "analysis_tasks": ["A04", "A05", "A06", "A07"],
+    "key_metrics": ["power", "energy", "measurement_samples"]
+  }
+}

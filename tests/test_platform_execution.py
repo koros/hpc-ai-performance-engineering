@@ -314,10 +314,12 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
 
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 235)}
-    l40s_only_supplemental_ids = {f"E{index:03d}" for index in range(201, 210)} | {
-        f"E{index:03d}" for index in range(215, 233)
-    }
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 239)}
+    l40s_only_supplemental_ids = (
+        {f"E{index:03d}" for index in range(201, 210)}
+        | {f"E{index:03d}" for index in range(215, 233)}
+        | {f"E{index:03d}" for index in range(235, 239)}
+    )
     shared_telemetry_ids = {f"E{index:03d}" for index in range(210, 215)}
     h100_only_supplemental_ids = {"E233", "E234"}
 
@@ -340,7 +342,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     assert l40s_planned_source_count == 180
     assert (
         sum(condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in supplemental_ids)
-        == 28
+        == 32
     )
     assert (
         sum(
@@ -348,7 +350,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
             for condition in l40s_conditions
             if condition.matrix_id in l40s_only_supplemental_ids
         )
-        == 23
+        == 27
     )
     assert sum(condition.status == "planned" for condition in h100_conditions) == 189
 
@@ -379,6 +381,30 @@ def test_energy_revalidation_wave_uses_new_immutable_condition() -> None:
     assert [condition.condition_id for condition in h100] == ["E214@h100"]
     assert all(condition.required_trials == 3 for condition in [*l40s, *h100])
     assert all(condition.comparability == "platform_specific" for condition in [*l40s, *h100])
+
+
+def test_hardware_energy_revalidation_uses_new_l40s_only_conditions() -> None:
+    conditions = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "l40s",
+        wave="hardware-energy-revalidation",
+        include_deferred=False,
+    )
+
+    assert [condition.condition_id for condition in conditions] == [
+        "E235@l40s",
+        "E236@l40s",
+        "E237@l40s",
+        "E238@l40s",
+    ]
+    assert {condition.required_trials for condition in conditions} == {3}
+    assert {condition.comparability for condition in conditions} == {"platform_specific"}
+    assert not load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "h100",
+        wave="hardware-energy-revalidation",
+        include_deferred=False,
+    )
 
 
 def test_runnable_l40s_conditions_fit_the_verified_eight_gpu_node() -> None:

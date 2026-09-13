@@ -1,0 +1,59 @@
+{
+  "experiment_id": "E238",
+  "experiment": "hardware_energy_revalidation_distilbert_inference_l40s",
+  "mode": "inference",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+    "dataset": "synthetic_token_prompts_v1",
+    "parameters": {
+      "comparison_axis": "gpu_model",
+      "hardware_label": "L40S",
+      "framework": "pytorch_eager",
+      "batch_size": 1,
+      "prompt_length": 128,
+      "max_new_tokens": 128
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpus": 1,
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "serving_latency"],
+    "parameters": {
+      "collect_power": true,
+      "collect_memory_trace": true,
+      "collect_latency_distribution": true,
+      "sample_interval_seconds": 0.05
+    }
+  },
+  "metadata": {
+    "matrix_id": "E238",
+    "template": "hardware_energy_revalidation",
+    "phase": "Hardware energy revalidation",
+    "priority": "Supplemental",
+    "gpu_hours_estimate": 0.5,
+    "energy_reference_experiment_id": "E128",
+    "objective": "Revalidate measured-region energy for the E128 L40S hardware comparison",
+    "research_questions": ["RQ5", "RQ6", "RQ7"],
+    "analysis_tasks": ["A04", "A05", "A06", "A07"],
+    "key_metrics": ["power", "energy", "measurement_samples"]
+  }
+}

@@ -201,6 +201,14 @@
     },
     {
       "platform": "l40s",
+      "wave": "hardware-energy-revalidation",
+      "name": "L40S measured-region hardware comparison energy anchors",
+      "experiment_ids": ["E235-E238"],
+      "required_trials": 3,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "l40s",
       "wave": "8gpu-pilot",
       "name": "L40S full-node NCCL and PCIe topology gate",
       "experiment_ids": ["E215"],
