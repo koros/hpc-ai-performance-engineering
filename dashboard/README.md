@@ -62,6 +62,12 @@ argument rather than a generic results explorer:
 - The **current evidence snapshot** reports active-view conditions, validated
   trials, research-question readiness, validated FP8 coverage, measured-region
   energy coverage, and the remaining legacy-telemetry boundary.
+- The **campaign synthesis** leads with seven evidence-derived conclusions
+  rather than asking readers to infer them from charts. Each card reports an
+  effect size, decision implication, changed variable, held-constant controls,
+  limitation, and clickable source conditions. It currently covers scaling,
+  distributed strategy, backend-matched FP8, checkpointing, NCCL capability,
+  matched H100/L40S performance, and the remaining hardware-energy gap.
 - **RQ1–RQ7 decision cards** condense platform-level coverage into one card per
   research question. Each card shows trial completion, platform scope, the
   remaining limitation, and a direct link to the relevant evidence view.
@@ -72,9 +78,10 @@ argument rather than a generic results explorer:
   throughput only where workload, model, precision, GPU count, sequence length,
   global batch, and accumulation settings match. The observed Pareto frontier is
   shown instead of claiming a universal best strategy.
-- **Traceable findings** link every displayed RQ1/RQ2 statement to its source
-  condition IDs and trial sufficiency. RQ3–RQ7 remain visible as coverage cards
-  until their dedicated conclusion views are added.
+- **Traceable findings** link every displayed RQ1/RQ2 statistical finding to
+  its source condition IDs and trial sufficiency. The campaign synthesis adds
+  controlled RQ3–RQ6 interpretations and a scoped RQ5 limitation without
+  replacing those underlying analysis tables.
 - **Controlled Study Map** provides the bridge from collected phases to the
   research views. It prevents workload, hardware, strategy, scaling, precision,
   and memory changes from being compressed into one confounded leaderboard.
