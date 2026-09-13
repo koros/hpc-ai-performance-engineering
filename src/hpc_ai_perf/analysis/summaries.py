@@ -242,6 +242,8 @@ ANALYSIS_TABLES = {
         "avg_latency_p50_ms",
         "avg_memory_used_gb",
         "avg_energy_joules",
+        "energy_trials",
+        "energy_evidence_source",
     ],
     "research_question_summary": [
         "research_question",
@@ -1173,6 +1175,11 @@ def build_memory_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
 def build_hardware_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     """Compare completed H100/L40S experiments using observed platform fields."""
     selected = _completed_phase(rows, "Hardware comparison")
+    energy_revalidations: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
+    for row in _completed_phase(rows, "Hardware energy revalidation"):
+        reference_id = _value(row, "energy_reference_experiment_id")
+        if reference_id:
+            energy_revalidations[(_value(row, "platform_id"), reference_id)].append(row)
     grouped = _group_rows(
         selected,
         "condition_id",
@@ -1189,6 +1196,21 @@ def build_hardware_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     )
     summaries = []
     for key, group_rows in sorted(grouped.items()):
+        direct_energy_rows = [row for row in group_rows if _float(row.get("energy_joules")) is not None]
+        reference_rows = energy_revalidations.get((key[2], key[1]), [])
+        matching_reference_rows = [
+            row
+            for row in reference_rows
+            if _hardware_energy_protocol_signature(row) == _hardware_energy_protocol_signature(group_rows[0])
+            and _float(row.get("energy_joules")) is not None
+        ]
+        energy_rows = direct_energy_rows or matching_reference_rows
+        if direct_energy_rows:
+            energy_evidence_source = "direct"
+        elif matching_reference_rows:
+            energy_evidence_source = "; ".join(sorted({_value(row, "condition_id") for row in matching_reference_rows}))
+        else:
+            energy_evidence_source = ""
         summaries.append(
             {
                 "condition_id": key[0],
@@ -1207,10 +1229,39 @@ def build_hardware_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
                 "avg_throughput_samples_sec": _mean(_metric_values(group_rows, "throughput_samples_sec")),
                 "avg_latency_p50_ms": _mean(_metric_values(group_rows, "latency_p50_ms")),
                 "avg_memory_used_gb": _mean(_metric_values(group_rows, "memory_used_gb")),
-                "avg_energy_joules": _mean(_metric_values(group_rows, "energy_joules")),
+                "avg_energy_joules": _mean(_metric_values(energy_rows, "energy_joules")),
+                "energy_trials": len(_metric_values(energy_rows, "energy_joules")),
+                "energy_evidence_source": energy_evidence_source,
             }
         )
     return summaries
+
+
+def _hardware_energy_protocol_signature(row: dict[str, str]) -> tuple[str, ...]:
+    """Identify protocol-matched energy evidence without pooling platform conditions."""
+    return tuple(
+        _value(row, field)
+        for field in (
+            "platform_id",
+            "workload",
+            "model",
+            "mode",
+            "gpus",
+            "precision",
+            "strategy",
+            "batch_size",
+            "global_batch_size",
+            "per_gpu_batch_size",
+            "parameter_sequence_length",
+            "parameter_prompt_length",
+            "parameter_max_new_tokens",
+            "parameter_framework",
+            "parameter_stack",
+            "model_revision",
+            "dataset_revision",
+            "measured_iterations",
+        )
+    )
 
 
 def _is_direct_research_evidence(row: dict[str, str]) -> bool:

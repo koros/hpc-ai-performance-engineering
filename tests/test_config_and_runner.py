@@ -2072,6 +2072,83 @@ def test_energy_efficiency_requires_measured_region_scope() -> None:
     assert by_id["E213"]["tokens_per_kwh"] is None
 
 
+def test_hardware_energy_reference_metadata_is_flattened(tmp_path: Path) -> None:
+    config = load_experiment_config(Path("configs/hardware_energy_revalidation/E235_l40s_gpt2_training_energy.json"))
+    result = ExperimentResult.from_config(
+        config,
+        status="completed",
+        started_at="2026-01-01T00:00:00Z",
+        completed_at="2026-01-01T00:00:10Z",
+        runtime_seconds=10.0,
+        metrics={
+            "energy_scope": "measured_region",
+            "energy_measurement_status": "sufficient",
+            "energy_joules_measured_region": 1200.0,
+        },
+    )
+    raw_dir = tmp_path / "raw"
+    processed_path = tmp_path / "experiments.csv"
+    result.write_json(raw_dir)
+
+    aggregate_results(raw_dir, processed_path)
+
+    with processed_path.open(encoding="utf-8", newline="") as file_obj:
+        row = next(csv.DictReader(file_obj))
+    assert row["energy_reference_experiment_id"] == "E123"
+    assert row["energy_joules"] == "1200.0"
+
+
+def test_hardware_summary_uses_only_protocol_matched_revalidation_energy() -> None:
+    source = {
+        "condition_id": "E123@l40s",
+        "experiment_id": "E123",
+        "platform_id": "l40s",
+        "comparability": "exact",
+        "phase": "Hardware comparison",
+        "workload": "gpt2_small",
+        "model": "gpt2",
+        "mode": "training",
+        "gpus": "1",
+        "precision": "bf16",
+        "strategy": "none",
+        "batch_size": "16",
+        "parameter_sequence_length": "1024",
+        "parameter_stack": "pytorch_single_gpu",
+        "model_revision": "revision-a",
+        "dataset_revision": "synthetic_tokens_v1",
+        "measured_iterations": "100",
+        "throughput_unit": "training_tokens_per_second",
+        "throughput_tokens_sec": "45000",
+        "status": "completed",
+    }
+    matched = {
+        **source,
+        "condition_id": "E235@l40s",
+        "experiment_id": "E235",
+        "comparability": "platform_specific",
+        "phase": "Hardware energy revalidation",
+        "energy_reference_experiment_id": "E123",
+        "throughput_tokens_sec": "99999",
+        "energy_joules": "12000",
+    }
+    mismatched = {
+        **matched,
+        "condition_id": "E999@l40s",
+        "experiment_id": "E999",
+        "batch_size": "8",
+        "energy_joules": "1",
+    }
+
+    summary = build_analysis_tables([source, matched, mismatched])["hardware_summary"]
+
+    assert len(summary) == 1
+    assert summary[0]["condition_id"] == "E123@l40s"
+    assert summary[0]["avg_throughput_tokens_sec"] == 45000.0
+    assert summary[0]["avg_energy_joules"] == 12000.0
+    assert summary[0]["energy_trials"] == 1
+    assert summary[0]["energy_evidence_source"] == "E235@l40s"
+
+
 def test_dashboard_static_assets_exist() -> None:
     dashboard_files = [
         Path("dashboard/index.html"),
