@@ -2218,20 +2218,20 @@ def test_dashboard_static_assets_exist() -> None:
     html = Path("dashboard/index.html").read_text(encoding="utf-8")
     script = Path("dashboard/app.js").read_text(encoding="utf-8")
 
-    assert 'id="rankingTable"' in html
     assert "../results/processed/experiments.csv" in script
-    assert "../results/analysis/phase_summary.csv" in script
-    assert "../results/processed/readiness_report.md" in script
-    assert 'id="readinessSummary"' in html
+    assert "../results/analysis/research_finding_summary.csv" in script
     assert 'id="throughputUnitFilter"' in html
     assert 'id="platformFilter"' in html
     assert 'id="comparabilityFilter"' in html
     assert 'id="trialTable"' in html
     assert 'id="studyMap"' in html
-    assert 'id="phaseDistributions"' in html
-    assert "Mixed units" in script
+    assert 'id="decisionInsightGrid"' in html
+    assert 'id="kpiMatchedProtocols"' in html
+    assert 'class="panel evidence-audit"' in html
+    assert "Top Experiments" not in html
+    assert "Submission Readiness" not in html
     assert "buildStudyCoverageEntries" in script
-    assert "buildPhaseDistributionEntries" in script
+    assert "buildBroadHardwareComparisonGroups" in script
 
 
 def test_hpc_smoke_runbook_exists() -> None:
