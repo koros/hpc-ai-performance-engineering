@@ -328,8 +328,11 @@ make serve-dashboard
 ```
 
 The dashboard exposes Platform and Comparability filters. Its “All Platforms” view keeps chart series separate and
-uses only additive counts or maxima for combined KPIs; statistical averages, confidence intervals, rankings, and
-scaling baselines remain platform-local. `make check` includes mixed-platform Python and JavaScript regression tests.
+uses additive counts plus the number of matched cross-platform protocols for combined KPIs; statistical averages,
+confidence intervals, and scaling baselines remain platform-local. Cross-study throughput rankings and operational
+submission summaries are deliberately omitted because they do not answer a controlled research question. Detailed
+trial evidence remains available in a collapsed audit panel. `make check` includes mixed-platform Python and
+JavaScript regression tests.
 The H100-versus-L40S view additionally derives campaign-wide matched pairs from exact conditions only. It currently
 spans 164 protocol matches and reports unitless per-pair throughput ratios by study, workload, and execution mode;
 it never averages raw throughput values across token definitions or unmatched configurations. Readers can filter the
