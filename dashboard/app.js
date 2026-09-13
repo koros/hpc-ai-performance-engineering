@@ -413,6 +413,7 @@ function render() {
   const rows = filteredResults();
   renderActiveFilters();
   renderResearchSnapshot(rows);
+  renderDecisionBrief();
   renderResearchQuestions();
   renderKpis(rows);
   renderReadiness();
@@ -537,6 +538,70 @@ function buildDecisionInsights({ researchFindings = [], hardware = [], communica
   ].filter(Boolean);
 }
 
+function renderDecisionBrief() {
+  const allInsights = buildDecisionInsights({
+    researchFindings: state.researchFindingSummary,
+    hardware: state.hardwareSummary,
+    communication: state.communicationSummary,
+    memory: state.memorySummary,
+    results: state.results,
+  });
+  const filters = selectedFilters();
+  const insights = allInsights.filter((insight) => {
+    if (filters.research_question && insight.researchQuestion !== filters.research_question) return false;
+    if (filters.platform_id && !insight.platforms.includes(filters.platform_id)) return false;
+    if (filters.workload && !insight.workloads.includes(filters.workload)) return false;
+    return true;
+  });
+  const container = document.getElementById("decisionInsightGrid");
+  container.replaceChildren();
+  document.getElementById("decisionBriefStatus").textContent = insights.length
+    ? insights.length + " evidence-led conclusion" + (insights.length === 1 ? "" : "s")
+    : "No conclusion matches the active scope";
+  renderDecisionBriefSummary(allInsights, insights);
+  if (!insights.length) {
+    container.append(emptyState("No campaign conclusion matches the selected platform, workload, or research question. Clear those filters to restore the complete synthesis."));
+    return;
+  }
+  insights.forEach((insight) => container.append(decisionInsightCard(insight)));
+}
+
+function renderDecisionBriefSummary(allInsights, visibleInsights) {
+  const container = document.getElementById("decisionBriefSummary");
+  const hardware = allInsights.find((insight) => insight.id === "hardware");
+  const memory = allInsights.find((insight) => insight.id === "memory");
+  const energy = allInsights.find((insight) => insight.id === "energy");
+  if (!visibleInsights.length) {
+    container.replaceChildren();
+    return;
+  }
+  const recommendations = [
+    hardware ? ["Training", "Prefer H100 for the matched training protocols"] : null,
+    hardware ? ["Inference", "Benchmark by workload; the training advantage does not transfer automatically"] : null,
+    memory ? ["Memory pressure", "Use checkpointing for capacity, accepting its measured throughput cost"] : null,
+    energy && energy.tone === "limitation" ? ["Energy", "Keep the final hardware energy conclusion open until E235–E238"] : null,
+  ].filter(Boolean);
+  container.innerHTML = '<div class="decision-thesis"><span>Current overall interpretation</span><strong>No single configuration wins every objective.</strong><p>Hardware, workload, execution mode, and memory constraints change the answer. The recommendations below are conditional on matched experimental controls.</p></div>' +
+    '<div class="decision-rules">' + recommendations.map(([label, value]) => '<div><span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(value) + '</strong></div>').join("") + "</div>";
+}
+
+function decisionInsightCard(insight) {
+  const card = document.createElement("article");
+  card.className = "decision-insight insight-" + insight.tone;
+  const evidenceButton = insight.conditionIds.length
+    ? '<button type="button" class="insight-evidence" data-condition-ids="' + escapeHtml(insight.conditionIds.join(",")) + '">Inspect ' + formatInteger(insight.conditionIds.length) + " source condition" + (insight.conditionIds.length === 1 ? "" : "s") + "</button>"
+    : '<span class="insight-evidence-note">Evidence coverage statement</span>';
+  card.innerHTML = '<div class="insight-heading"><span class="insight-rq">' + escapeHtml(insight.researchQuestion) + '</span><span class="insight-confidence">' + escapeHtml(insight.confidence) + "</span></div>" +
+    "<h3>" + escapeHtml(insight.title) + "</h3>" +
+    '<strong class="insight-metric">' + escapeHtml(insight.metric) + "</strong>" +
+    '<p class="insight-statement">' + escapeHtml(insight.statement) + "</p>" +
+    '<p class="insight-implication"><span>Decision:</span> ' + escapeHtml(insight.implication) + "</p>" +
+    '<dl class="insight-contract"><div><dt>What changed</dt><dd>' + escapeHtml(insight.changed) + "</dd></div><div><dt>What stayed fixed</dt><dd>" + escapeHtml(insight.heldConstant) + "</dd></div></dl>" +
+    '<p class="insight-limitation"><span>Boundary</span>' + escapeHtml(insight.limitation) + "</p>" +
+    '<footer>' + evidenceButton + '<a href="#' + escapeHtml(insight.target) + '">See supporting analysis <span aria-hidden="true">→</span></a></footer>';
+  return card;
+}
+
 function buildScalingDecision(rows) {
   const exact = rows.filter((row) => row.research_question === "RQ1" && row.finding_status === "sufficient" && row.comparability === "exact" && number(row.gpus) >= 4);
   if (!exact.length) return null;
@@ -549,21 +614,27 @@ function buildScalingDecision(rows) {
   const range = weakest && weakest !== best
     ? " Other matched " + best.platform_id.toUpperCase() + " series at " + formatInteger(highestGpuCount) + " GPUs ranged down to " + formatDecimal(number(weakest.scaling_efficiency) * 100, 1) + "% efficiency, so scaling is workload- and protocol-dependent."
     : "";
+  const supportingRows = exact.filter((row) => row.platform_id === "l40s");
+  const supportingGpuCount = max(supportingRows.map((row) => number(row.gpus)));
+  const supporting = supportingRows.filter((row) => number(row.gpus) === supportingGpuCount).sort((left, right) => number(right.scaling_efficiency) - number(left.scaling_efficiency))[0];
+  const supportingStatement = supporting
+    ? " The supporting L40S extension reached " + formatDecimal(number(supporting.speedup), 2) + "× at " + formatInteger(supportingGpuCount) + " GPUs with " + formatDecimal(number(supporting.scaling_efficiency) * 100, 1) + "% efficiency for " + displayWorkload(supporting.workload) + " " + supporting.scaling_type + " scaling."
+    : "";
   return {
     id: "scaling",
     researchQuestion: "RQ1",
     tone: efficiency >= 85 ? "positive" : "conditional",
     confidence: "Sufficient repeated evidence",
-    title: displayWorkload(best.workload) + " " + best.scaling_type + " scaling is the strongest " + displayPlatform(best.platform_id) + " result",
+    title: "Scaling gains are strong, but depend on workload and scaling protocol",
     metric: formatDecimal(number(best.speedup), 2) + "× speedup",
-    statement: formatInteger(highestGpuCount) + " GPUs retained " + formatDecimal(efficiency, 1) + "% parallel efficiency against the " + formatInteger(number(best.baseline_gpus)) + "-GPU baseline." + range,
+    statement: displayPlatform(best.platform_id) + " " + displayWorkload(best.workload) + " retained " + formatDecimal(efficiency, 1) + "% parallel efficiency at " + formatInteger(highestGpuCount) + " GPUs against the " + formatInteger(number(best.baseline_gpus)) + "-GPU baseline." + supportingStatement + range,
     implication: "Scale-out is valuable for this protocol, but GPU count alone is not a performance guarantee.",
     changed: "GPU count: " + formatInteger(number(best.baseline_gpus)) + " → " + formatInteger(highestGpuCount),
     heldConstant: "Platform, workload, precision, strategy, scaling protocol, throughput unit",
     limitation: best.limitation,
-    conditionIds: parseConditionIds(best.source_condition_ids),
-    platforms: [best.platform_id],
-    workloads: [best.workload],
+    conditionIds: uniqueStrings([...parseConditionIds(best.source_condition_ids), ...parseConditionIds(supporting?.source_condition_ids)]),
+    platforms: uniqueStrings([best.platform_id, supporting?.platform_id]),
+    workloads: uniqueStrings([best.workload, supporting?.workload]),
     target: "research-scaling",
   };
 }

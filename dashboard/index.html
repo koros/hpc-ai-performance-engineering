@@ -81,7 +81,7 @@
       </section>
 
       <nav class="section-nav" aria-label="Dashboard sections">
-        <a href="#research">Research evidence</a>
+        <a href="#research">Conclusions</a>
         <a href="#overview">Overview</a>
         <a href="#performance">Training performance</a>
         <a href="#memory">Memory and capacity</a>
@@ -108,6 +108,15 @@
           <div><p class="eyebrow">Research evidence</p><h2>Findings organised around the research questions</h2></div>
           <p>Claims remain within one platform and comparability class. Coverage gaps are shown explicitly rather than filled with assumptions.</p>
         </div>
+        <article class="panel decision-brief-panel" data-metrics="throughput runtime memory energy latency">
+          <div class="panel-heading decision-brief-heading">
+            <div><p class="panel-kicker">Campaign synthesis</p><h2>What the evidence says</h2><p class="panel-subtitle">Conclusions first; charts and trial records remain below as supporting evidence.</p></div>
+            <span id="decisionBriefStatus">No conclusions available</span>
+          </div>
+          <div id="decisionBriefSummary" class="decision-brief-summary" aria-live="polite"></div>
+          <div id="decisionInsightGrid" class="decision-insight-grid"></div>
+          <p class="chart-note">Every conclusion reports its effect size, the variable that changed, the controls held fixed, and the evidence boundary. Select “Inspect evidence” to open the contributing experiments.</p>
+        </article>
         <article class="panel" data-metrics="throughput runtime memory energy latency">
           <div class="panel-heading"><h2>Research-question coverage</h2><span id="researchCoverageStatus">No research evidence</span></div>
           <div id="researchQuestionCards" class="research-question-grid"></div>
