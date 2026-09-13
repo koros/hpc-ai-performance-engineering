@@ -334,8 +334,9 @@ submission summaries are deliberately omitted because they do not answer a contr
 trial evidence remains available in a collapsed audit panel. `make check` includes mixed-platform Python and
 JavaScript regression tests.
 The scaling view overlays the isolated series on one GPU-count axis, assigns every series a stable colour, and uses
-solid and dashed strokes for strong and weak scaling. Its legend preserves the platform, workload, comparability,
-strategy, precision, baseline, and source-condition boundaries behind every line.
+solid and dashed strokes for strong and weak scaling. A local selector can show all series, strong scaling only, or
+weak scaling only. Its legend preserves the platform, workload, comparability, strategy, precision, baseline, and
+source-condition boundaries behind every line.
 The H100-versus-L40S view additionally derives campaign-wide matched pairs from exact conditions only. It currently
 spans 164 protocol matches and reports unitless per-pair throughput ratios by study, workload, and execution mode;
 it never averages raw throughput values across token definitions or unmatched configurations. Readers can filter the
