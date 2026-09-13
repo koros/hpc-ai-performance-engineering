@@ -34,8 +34,9 @@ The companion [platform experiment matrix](platform_experiment_matrix.md) gives 
 | Supplemental L40S full-node conditions | 16 | `E215-E230` capture the eight-rank gate, scaling, DDP/FSDP, PCIe communication, and TinyLlama TP=8 serving. They do not alter source or H100 rows. |
 | Supplemental L40S FP8 controls | 2 | `E231-E232` hold the Transformer Engine module implementation constant while E086/E093 change BF16 to FP8. |
 | Supplemental H100 FP8 controls | 2 | `E233-E234` hold the Transformer Engine module implementation constant while H100 E086/E093 change BF16 to FP8. |
+| Supplemental L40S hardware-energy conditions | 4 | `E235-E238` repeat the exact E123/E124/E127/E128 protocols with schema-v3 measured-region telemetry and explicit reference attribution. |
 | Planned L40S source conditions | 180 | Generated as `E###@l40s`; includes the accepted vLLM scope and acceptance-gated E086/E093 Transformer Engine FP8 training. |
-| Planned L40S supplemental conditions | 28 | Five capacity-adjusted rows, five telemetry anchors, sixteen full-node rows, and two Transformer Engine BF16 controls. Do not pool capacity-adjusted or L40S-only evidence with exact H100 evidence. |
+| Planned L40S supplemental conditions | 32 | Five capacity-adjusted rows, five telemetry anchors, sixteen full-node rows, two Transformer Engine BF16 controls, and four hardware-energy anchors. Do not pool capacity-adjusted or L40S-only evidence with exact H100 evidence. |
 | Deferred L40S supplemental conditions | 4 | `E203-E204` and `E206-E207`; confirmed upper-bound OOM probes at micro-batch 26/27/28/30. |
 | Deferred L40S source conditions | 20 | TensorRT-LLM/backend/adapter gaps, H100-specific hardware rows, and exact-shape E032/E033/E044/E067/E068 L40S OOMs. |
 | Planned H100 source conditions | 182 | Generated as `E###@h100`; includes the accepted vLLM scope and the real-model-gated Transformer Engine training-FP8 treatments. |

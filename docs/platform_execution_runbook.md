@@ -122,6 +122,7 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `optional-capacity` | `E208-E209` checkpointed TinyLlama strong scaling | 3 | Both rows must complete under the same checkpointed protocol before calculating capacity-adjusted speedup. Do not pair E208 with non-checkpointed E045. |
 | `telemetry-revalidation` | `E210-E213` UUID-bound training, inference, and communication anchors | 3 | Run before final power/utilisation/energy interpretation. All records must identify the allocated GPU mapping and pass the telemetry audit. |
 | `energy-revalidation` | `E214` measured-region two-GPU communication anchor | 3 | Use for communication average power, joules, and tokens/kWh after schema-v3 boundary validation. |
+| `hardware-energy-revalidation` | `E235-E238` L40S hardware-comparison energy anchors | 3 | Supplies verified measured-region energy for E123/E124/E127/E128 while preserving the original rows' performance metrics. |
 | `8gpu-pilot` | `E215` eight-rank NCCL and PCIe topology gate | 1 | Verify all eight allocated L40S GPUs, the rank mapping, NCCL all-reduce, and the captured PCIe topology before full-node performance work. |
 | `8gpu-scaling` | `E216-E220` GPT-2, DistilBERT, and TinyLlama scaling | 3 | L40S-only full-node extension. Preserve the stated strong/weak scaling protocol; do not pool it with a differently sized H100 run. |
 | `8gpu-strategy` | `E221-E224` GPT-2 and DistilBERT DDP/FSDP | 3 | Compare strategies only within the same eight-GPU L40S allocation class. |
@@ -154,6 +155,29 @@ The exact one-GPU TinyLlama strong-scaling row E044 also exceeded L40S memory in
 preserved unchanged as an exact H100 condition and deferred only on L40S. The supplemental E208/E209 pair applies
 activation checkpointing consistently to the original one-/two-GPU workload shapes and is labelled
 `capacity_adjusted`; it must not be pooled with exact E044/E045 evidence.
+
+### L40S hardware-energy revalidation sequence
+
+The original E123/E124/E127/E128 L40S hardware-comparison records retain valid throughput, latency, and memory
+evidence, but their legacy full-window telemetry is not accepted as canonical measured-region energy. Run the four
+new immutable anchors instead of creating duplicate repetitions under the original experiment IDs:
+
+```bash
+source slurm/modules_for_hpc_ai
+source .venv/bin/activate
+
+make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=hardware-energy-revalidation
+make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=hardware-energy-revalidation
+make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=hardware-energy-revalidation
+make verify-hardware-energy-revalidation PLATFORM=l40s
+make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=hardware-energy-revalidation
+git commit -m "data: add L40S hardware energy revalidation trials"
+```
+
+The verifier requires three sufficient schema-v3 measured-region records for every anchor, positive finite energy
+and power, at least two samples per measured region, and an allocation-bound GPU mapping. After the gate passes,
+`make refresh` attributes only the validated E235-E238 energy evidence to E123/E124/E127/E128 in
+`hardware_summary.csv`; it does not substitute anchor throughput, latency, or memory for the original results.
 
 ### Transformer Engine FP8 training release sequence
 

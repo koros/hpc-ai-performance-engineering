@@ -93,3 +93,37 @@ make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=energy-revalidation
 ```
 
 Repeat with `PLATFORM=h100` before making cross-platform communication-energy claims.
+
+## L40S hardware-comparison energy anchors
+
+The L40S hardware-comparison rows E123/E124/E127/E128 were collected before measured-region energy became the
+canonical protocol. Preserve those raw records: their performance evidence remains valid, while their
+`legacy_full_window` energy must remain excluded from `hardware_summary.avg_energy_joules`.
+
+Use unique supplemental IDs so the revalidation cannot collide with existing immutable trial identities:
+
+| Anchor | Exact protocol reference | Workload and mode | GPUs |
+| --- | --- | --- | ---: |
+| `E235` | `E123` | GPT-2 Small training | 1 |
+| `E236` | `E124` | GPT-2 Small inference | 1 |
+| `E237` | `E127` | DistilBERT training | 1 |
+| `E238` | `E128` | DistilBERT inference | 1 |
+
+Each anchor records `energy_reference_experiment_id` and otherwise preserves the reference row's protocol fields.
+The profiler interval is 0.05 seconds so short inference regions can still produce multiple timestamped samples.
+The hardware summary accepts anchor energy only when the explicit reference and protocol signature both match; it
+never pools anchor throughput, latency, or memory into the source row.
+
+```bash
+make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=hardware-energy-revalidation
+make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=hardware-energy-revalidation
+make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=hardware-energy-revalidation
+make verify-hardware-energy-revalidation PLATFORM=l40s
+make stage-platform-wave PLATFORM=l40s PLATFORM_WAVE=hardware-energy-revalidation
+```
+
+Do not treat scheduler completion alone as acceptance. The dedicated verifier requires all three repetitions for all
+four anchors, schema-v3 `measured_region` energy, `sufficient` status, at least two samples, positive finite joules and
+power, an allocation-bound mapping, and the observed L40S model. If a short inference anchor fails that gate, retain
+the record for diagnosis and adjust the measurement duration through another uniquely identified protocol rather
+than filling or estimating the missing value.
