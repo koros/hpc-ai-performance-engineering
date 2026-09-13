@@ -6,6 +6,7 @@ const {
   buildCompletionEntries,
   buildEnergyEfficiencyGroups,
   buildDataMovementSeries,
+  buildDecisionInsights,
   buildEnergyPowerEntries,
   buildEnergyPowerScalingSeries,
   buildEnergyToSolutionGroups,
@@ -31,6 +32,58 @@ const {
   strategyColor,
   summarizePhases,
 } = require("./app.js");
+
+run("decision insights turn controlled evidence into scoped conclusions", () => {
+  const researchFindings = [
+    {
+      research_question: "RQ1", finding_status: "sufficient", comparability: "exact", platform_id: "h100",
+      workload: "gpt2_small", scaling_type: "weak", gpus: "4", baseline_gpus: "1", speedup: "3.8",
+      scaling_efficiency: "0.95", source_condition_ids: "E035@h100; E037@h100", limitation: "Keep scaling protocols separate.",
+    },
+    {
+      research_question: "RQ2", finding_status: "sufficient", comparability: "exact", platform_id: "h100",
+      workload: "gpt2_small", precision: "bf16", strategy: "ddp", gpus: "2", throughput_unit: "training_tokens_per_second",
+      throughput_tokens_sec: "100", max_memory_used_gb: "30", source_condition_ids: "E047@h100", limitation: "Matched conditions only.",
+    },
+    {
+      research_question: "RQ2", finding_status: "sufficient", comparability: "exact", platform_id: "h100",
+      workload: "gpt2_small", precision: "bf16", strategy: "deepspeed_zero1", gpus: "2", throughput_unit: "training_tokens_per_second",
+      throughput_tokens_sec: "120", max_memory_used_gb: "24", source_condition_ids: "E052@h100", limitation: "Matched conditions only.",
+    },
+  ];
+  const hardware = [
+    hardwareResult("E121", "h100", "training", 250),
+    hardwareResult("E123", "l40s", "training", 100),
+    hardwareResult("E122", "h100", "inference", 100),
+    hardwareResult("E124", "l40s", "inference", 110),
+  ];
+  const communication = [
+    communicationResult("E113", "h100", 100),
+    communicationResult("E113", "l40s", 20),
+  ];
+  const memory = [
+    memoryResult("E063", false, 30, 100),
+    memoryResult("E064", true, 15, 60),
+  ];
+  const results = [
+    precisionResult("E086", "fp8", 130, "E233"),
+    precisionResult("E233", "bf16", 100, ""),
+    {
+      condition_id: "E010@h100", experiment_id: "E010", platform_id: "h100", status: "completed",
+      workload: "gpt2_small", energy_scope: "measured_region", energy_measurement_status: "sufficient", energy_joules: "100",
+    },
+    { condition_id: "E123@l40s", experiment_id: "E123", platform_id: "l40s", status: "completed", energy_joules: "" },
+  ];
+
+  const insights = buildDecisionInsights({ researchFindings, hardware, communication, memory, results });
+
+  assert.deepEqual(insights.map((insight) => insight.id), ["scaling", "strategy", "precision", "memory", "communication", "hardware", "energy"]);
+  assert.match(insights.find((insight) => insight.id === "strategy").metric, /20\.0% speed/);
+  assert.match(insights.find((insight) => insight.id === "memory").metric, /50% less memory/);
+  assert.match(insights.find((insight) => insight.id === "hardware").statement, /one result where L40S was faster/);
+  assert.equal(insights.find((insight) => insight.id === "energy").tone, "limitation");
+  assert.deepEqual(insights.find((insight) => insight.id === "precision").conditionIds, ["E086@h100", "E233@h100"]);
+});
 
 const rows = [
   { ...result("l40s", "exact", "gpt2_small", 100), experiment_id: "E001", condition_id: "E001@l40s" },
@@ -709,6 +762,70 @@ function inferenceResult(platform_id, comparability, workload) {
     avg_throughput_tokens_sec: 100,
     precision: "bf16",
     gpus: 1,
+  };
+}
+
+function hardwareResult(experimentId, platformId, mode, throughput) {
+  return {
+    condition_id: experimentId + "@" + platformId,
+    experiment_id: experimentId,
+    platform_id: platformId,
+    comparability: "exact",
+    workload: "gpt2_small",
+    model: "gpt2",
+    mode,
+    precision: "bf16",
+    throughput_unit: mode === "training" ? "training_tokens_per_second" : "generated_tokens_per_second",
+    trials: "3",
+    avg_throughput_tokens_sec: String(throughput),
+    avg_memory_used_gb: mode === "training" ? "28" : "1",
+    avg_latency_p50_ms: mode === "inference" ? "10" : "",
+  };
+}
+
+function communicationResult(experimentId, platformId, bandwidth) {
+  return {
+    condition_id: experimentId + "@" + platformId,
+    experiment_id: experimentId,
+    platform_id: platformId,
+    workload: "gpt2_small",
+    strategy: "ddp",
+    gpus: "2",
+    avg_nccl_bandwidth_gbps: String(bandwidth),
+  };
+}
+
+function memoryResult(experimentId, checkpointing, memory, throughput) {
+  return {
+    condition_id: experimentId + "@h100",
+    experiment_id: experimentId,
+    platform_id: "h100",
+    comparability: "exact",
+    workload: "gpt2_small",
+    throughput_unit: "training_tokens_per_second",
+    study_type: "checkpointing",
+    activation_checkpointing: String(checkpointing),
+    micro_batch_size: "16",
+    gradient_accumulation_steps: "1",
+    trials: "3",
+    avg_throughput_tokens_sec: String(throughput),
+    max_memory_used_gb: String(memory),
+  };
+}
+
+function precisionResult(experimentId, precision, throughput, controlId) {
+  return {
+    condition_id: experimentId + "@h100",
+    experiment_id: experimentId,
+    platform_id: "h100",
+    status: "completed",
+    phase: "Precision study",
+    mode: "training",
+    workload: "gpt2_small",
+    precision,
+    throughput_tokens_sec: String(throughput),
+    parameter_comparison_control_id: controlId,
+    metric_nvidia_smi_memory_used_gb_measured_region: precision === "fp8" ? "20" : "25",
   };
 }
 

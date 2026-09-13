@@ -525,6 +525,252 @@ function buildResearchQuestionOverview(rows) {
   }).sort((left, right) => left.researchQuestion.localeCompare(right.researchQuestion));
 }
 
+function buildDecisionInsights({ researchFindings = [], hardware = [], communication = [], memory = [], results = [] }) {
+  return [
+    buildScalingDecision(researchFindings),
+    buildStrategyDecision(researchFindings),
+    buildPrecisionDecision(results),
+    buildMemoryDecision(memory),
+    buildCommunicationDecision(communication),
+    buildHardwareDecision(hardware),
+    buildEnergyDecision(results),
+  ].filter(Boolean);
+}
+
+function buildScalingDecision(rows) {
+  const exact = rows.filter((row) => row.research_question === "RQ1" && row.finding_status === "sufficient" && row.comparability === "exact" && number(row.gpus) >= 4);
+  if (!exact.length) return null;
+  const target = exact.some((row) => row.platform_id === "h100") ? exact.filter((row) => row.platform_id === "h100") : exact;
+  const highestGpuCount = max(target.map((row) => number(row.gpus)));
+  const candidates = target.filter((row) => number(row.gpus) === highestGpuCount).sort((left, right) => number(right.scaling_efficiency) - number(left.scaling_efficiency));
+  const best = candidates[0];
+  const weakest = candidates[candidates.length - 1];
+  const efficiency = number(best.scaling_efficiency) * 100;
+  const range = weakest && weakest !== best
+    ? " Other matched " + best.platform_id.toUpperCase() + " series at " + formatInteger(highestGpuCount) + " GPUs ranged down to " + formatDecimal(number(weakest.scaling_efficiency) * 100, 1) + "% efficiency, so scaling is workload- and protocol-dependent."
+    : "";
+  return {
+    id: "scaling",
+    researchQuestion: "RQ1",
+    tone: efficiency >= 85 ? "positive" : "conditional",
+    confidence: "Sufficient repeated evidence",
+    title: displayWorkload(best.workload) + " " + best.scaling_type + " scaling is the strongest " + displayPlatform(best.platform_id) + " result",
+    metric: formatDecimal(number(best.speedup), 2) + "× speedup",
+    statement: formatInteger(highestGpuCount) + " GPUs retained " + formatDecimal(efficiency, 1) + "% parallel efficiency against the " + formatInteger(number(best.baseline_gpus)) + "-GPU baseline." + range,
+    implication: "Scale-out is valuable for this protocol, but GPU count alone is not a performance guarantee.",
+    changed: "GPU count: " + formatInteger(number(best.baseline_gpus)) + " → " + formatInteger(highestGpuCount),
+    heldConstant: "Platform, workload, precision, strategy, scaling protocol, throughput unit",
+    limitation: best.limitation,
+    conditionIds: parseConditionIds(best.source_condition_ids),
+    platforms: [best.platform_id],
+    workloads: [best.workload],
+    target: "research-scaling",
+  };
+}
+
+function buildStrategyDecision(rows) {
+  const eligible = rows.filter((row) => row.research_question === "RQ2" && row.finding_status === "sufficient" && row.comparability === "exact" && number(row.throughput_tokens_sec) > 0 && number(row.max_memory_used_gb) > 0);
+  const preferred = eligible.some((row) => row.platform_id === "h100") ? eligible.filter((row) => row.platform_id === "h100") : eligible;
+  const candidates = [];
+  Object.values(groupRows(preferred, (row) => [row.platform_id, row.workload, row.precision, row.gpus, row.throughput_unit])).forEach((group) => {
+    const baseline = group.find((row) => row.strategy === "ddp");
+    if (!baseline) return;
+    group.filter((row) => row !== baseline).forEach((row) => {
+      const throughputGain = (number(row.throughput_tokens_sec) / number(baseline.throughput_tokens_sec) - 1) * 100;
+      const memorySaving = (1 - number(row.max_memory_used_gb) / number(baseline.max_memory_used_gb)) * 100;
+      if (throughputGain >= 0 && memorySaving >= 0) candidates.push({ row, baseline, throughputGain, memorySaving, score: throughputGain + memorySaving });
+    });
+  });
+  if (!candidates.length) return null;
+  const best = candidates.sort((left, right) => right.score - left.score)[0];
+  return {
+    id: "strategy",
+    researchQuestion: "RQ2",
+    tone: "positive",
+    confidence: "Matched Pareto comparison",
+    title: displayStrategy(best.row.strategy) + " gives the clearest speed–memory improvement over DDP",
+    metric: signedPercent(best.throughputGain) + " speed · " + formatDecimal(best.memorySaving, 1) + "% less memory",
+    statement: "Within the matched " + displayPlatform(best.row.platform_id) + " " + displayWorkload(best.row.workload) + " " + formatInteger(number(best.row.gpus)) + "-GPU comparison, this strategy improved throughput while reducing maximum GPU memory.",
+    implication: "Treat this as a context-specific winner, not a universal strategy ranking.",
+    changed: "Distributed strategy: DDP → " + displayStrategy(best.row.strategy),
+    heldConstant: "Platform, workload, precision, GPU count, batch semantics, throughput unit",
+    limitation: best.row.limitation,
+    conditionIds: uniqueStrings([...parseConditionIds(best.baseline.source_condition_ids), ...parseConditionIds(best.row.source_condition_ids)]),
+    platforms: [best.row.platform_id],
+    workloads: [best.row.workload],
+    target: "research-strategy",
+  };
+}
+
+function buildPrecisionDecision(rows) {
+  const completed = rows.filter((row) => row.status === "completed" && row.mode === "training" && row.phase === "Precision study");
+  const conditions = groupRows(completed, (row) => [conditionId(row)]);
+  const pairs = [];
+  Object.entries(conditions).forEach(([treatmentId, treatmentRows]) => {
+    const sample = treatmentRows[0];
+    if (sample.precision !== "fp8" || !sample.parameter_comparison_control_id) return;
+    const controlId = sample.parameter_comparison_control_id + "@" + sample.platform_id;
+    const controlRows = conditions[controlId];
+    if (!controlRows) return;
+    const treatmentThroughput = average(treatmentRows.map(throughput).filter((value) => value > 0));
+    const controlThroughput = average(controlRows.map(throughput).filter((value) => value > 0));
+    if (!treatmentThroughput || !controlThroughput) return;
+    const treatmentMemory = conditionMetricAverage(completed, treatmentId, ["metric_nvidia_smi_memory_used_gb_measured_region", "metric_memory_used_gb", "memory_used_gb"]);
+    const controlMemory = conditionMetricAverage(completed, controlId, ["metric_nvidia_smi_memory_used_gb_measured_region", "metric_memory_used_gb", "memory_used_gb"]);
+    pairs.push({
+      treatmentId,
+      controlId,
+      platform: sample.platform_id,
+      workload: sample.workload,
+      throughputGain: (treatmentThroughput / controlThroughput - 1) * 100,
+      memorySaving: treatmentMemory !== null && controlMemory ? (1 - treatmentMemory / controlMemory) * 100 : null,
+    });
+  });
+  if (!pairs.length) return null;
+  const gains = pairs.map((pair) => pair.throughputGain);
+  const savings = pairs.map((pair) => pair.memorySaving).filter((value) => value !== null);
+  return {
+    id: "precision",
+    researchQuestion: "RQ3",
+    tone: gains.every((value) => value > 0) ? "positive" : "conditional",
+    confidence: "Backend-matched FP8 controls",
+    title: "Validated training FP8 improved every backend-matched comparison",
+    metric: formatDecimal(Math.min(...gains), 1) + "–" + formatDecimal(Math.max(...gains), 1) + "% faster",
+    statement: pairs.length + " Transformer Engine FP8/BF16 pairs cover " + uniqueStrings(pairs.map((pair) => displayWorkload(pair.workload))).join(" and ") + " on " + uniqueStrings(pairs.map((pair) => displayPlatform(pair.platform))).join(" and ") + "." + (savings.length ? " FP8 also used " + formatDecimal(Math.min(...savings), 1) + "–" + formatDecimal(Math.max(...savings), 1) + "% less measured GPU memory." : ""),
+    implication: "FP8 is the strongest observed training format where the validated Transformer Engine path is available.",
+    changed: "Numeric format: backend-matched BF16 → FP8",
+    heldConstant: "Transformer Engine backend, platform, workload, model, batch and sequence length",
+    limitation: "Short-run loss is a stability check; it does not establish downstream application quality.",
+    conditionIds: uniqueStrings(pairs.flatMap((pair) => [pair.treatmentId, pair.controlId])),
+    platforms: uniqueStrings(pairs.map((pair) => pair.platform)),
+    workloads: uniqueStrings(pairs.map((pair) => pair.workload)),
+    target: "precisionBars",
+  };
+}
+
+function buildMemoryDecision(rows) {
+  const pairs = buildCheckpointingGroups(rows).flatMap((group) => {
+    const enabled = group.entries.find((entry) => entry.label === "Checkpointing on");
+    const disabled = group.entries.find((entry) => entry.label === "Checkpointing off");
+    if (!enabled || !disabled || !disabled.value || !disabled.throughput) return [];
+    return [{
+      group,
+      memorySaving: (1 - enabled.value / disabled.value) * 100,
+      throughputCost: (1 - enabled.throughput / disabled.throughput) * 100,
+      conditionIds: [disabled.conditionId, enabled.conditionId],
+    }];
+  });
+  if (!pairs.length) return null;
+  const memorySavings = pairs.map((pair) => pair.memorySaving);
+  const throughputCosts = pairs.map((pair) => pair.throughputCost);
+  return {
+    id: "memory",
+    researchQuestion: "RQ2",
+    tone: "conditional",
+    confidence: pairs.length + " controlled comparison" + (pairs.length === 1 ? "" : "s"),
+    title: "Activation checkpointing buys capacity at a substantial speed cost",
+    metric: formatDecimal(Math.min(...memorySavings), 0) + "–" + formatDecimal(Math.max(...memorySavings), 0) + "% less memory",
+    statement: "Across the separate matched comparisons, checkpointing reduced peak memory while lowering throughput by " + formatDecimal(Math.min(...throughputCosts), 0) + "–" + formatDecimal(Math.max(...throughputCosts), 0) + "%.",
+    implication: "Enable checkpointing when memory capacity is the blocker, not as a default throughput optimisation.",
+    changed: "Activation checkpointing: off → on",
+    heldConstant: "Platform, workload, micro-batch size, accumulation and throughput unit within each pair",
+    limitation: "The displayed ranges summarise separate controlled pairs; their absolute values are not pooled.",
+    conditionIds: uniqueStrings(pairs.flatMap((pair) => pair.conditionIds)),
+    platforms: uniqueStrings(pairs.map((pair) => pair.group.platform)),
+    workloads: uniqueStrings(pairs.map((pair) => pair.group.workload)),
+    target: "memory",
+  };
+}
+
+function buildCommunicationDecision(rows) {
+  const matched = [];
+  Object.values(groupRows(rows.filter((row) => number(row.gpus) === 2 && number(row.avg_nccl_bandwidth_gbps) > 0), (row) => [row.workload, row.strategy, row.gpus])).forEach((group) => {
+    const h100 = group.find((row) => row.platform_id === "h100");
+    const l40s = group.find((row) => row.platform_id === "l40s");
+    if (!h100 || !l40s) return;
+    matched.push({ ratio: number(h100.avg_nccl_bandwidth_gbps) / number(l40s.avg_nccl_bandwidth_gbps), h100, l40s });
+  });
+  if (!matched.length) return null;
+  const ratios = matched.map((entry) => entry.ratio);
+  return {
+    id: "communication",
+    researchQuestion: "RQ4",
+    tone: "conditional",
+    confidence: "Matched two-GPU microbenchmarks",
+    title: "Interconnect capability differs much more than end-to-end throughput alone suggests",
+    metric: formatDecimal(Math.min(...ratios), 1) + "–" + formatDecimal(Math.max(...ratios), 1) + "× bandwidth",
+    statement: "H100 delivered this multiple of L40S NCCL bandwidth across " + matched.length + " matched two-GPU workload/strategy protocols.",
+    implication: "Communication-heavy scale-out is more likely to benefit from H100, but the microbenchmark does not prove the fraction of application time spent communicating.",
+    changed: "GPU platform and installed interconnect",
+    heldConstant: "Two GPUs, workload, distributed strategy and communication protocol within each pair",
+    limitation: "Standalone NCCL measurements establish capability, not in-loop causal attribution.",
+    conditionIds: uniqueStrings(matched.flatMap((entry) => [conditionId(entry.h100), conditionId(entry.l40s)])),
+    platforms: ["h100", "l40s"],
+    workloads: uniqueStrings(matched.map((entry) => entry.h100.workload)),
+    target: "scaling",
+  };
+}
+
+function buildHardwareDecision(rows) {
+  const groups = buildHardwareComparisonGroups(rows);
+  const training = groups.filter((group) => group.mode === "training").map(hardwareThroughputRatio).filter(Boolean);
+  const inference = groups.filter((group) => group.mode === "inference").map(hardwareThroughputRatio).filter(Boolean);
+  if (!training.length || !inference.length) return null;
+  const trainingRatios = training.map((entry) => entry.ratio);
+  const inferenceRatios = inference.map((entry) => entry.ratio);
+  return {
+    id: "hardware",
+    researchQuestion: "RQ6",
+    tone: "positive",
+    confidence: "Four matched exact protocols",
+    title: "H100's advantage is strong for training, not universal for inference",
+    metric: formatDecimal(Math.min(...trainingRatios), 2) + "–" + formatDecimal(Math.max(...trainingRatios), 2) + "× training throughput",
+    statement: "H100 led both matched training workloads. Inference ranged from " + formatDecimal(Math.min(...inferenceRatios), 2) + "× to " + formatDecimal(Math.max(...inferenceRatios), 2) + "× H100/L40S throughput, including one result where L40S was faster.",
+    implication: "Prefer H100 for these training protocols; benchmark the actual inference workload before assuming the same advantage.",
+    changed: "GPU platform: L40S ↔ H100",
+    heldConstant: "One GPU, exact workload, model, mode, precision, batch and throughput unit",
+    limitation: "Energy-to-solution remains pending for the four L40S hardware energy anchors.",
+    conditionIds: uniqueStrings(groups.flatMap((group) => group.entries.map((entry) => entry.conditionId))),
+    platforms: ["h100", "l40s"],
+    workloads: uniqueStrings(groups.map((group) => group.workload)),
+    target: "hardware",
+  };
+}
+
+function hardwareThroughputRatio(group) {
+  const h100 = group.entries.find((entry) => entry.key === "h100");
+  const l40s = group.entries.find((entry) => entry.key === "l40s");
+  return h100 && l40s && l40s.value ? { ratio: h100.value / l40s.value, h100, l40s } : null;
+}
+
+function buildEnergyDecision(rows) {
+  const eligible = rows.filter((row) => row.status === "completed" && row.energy_scope === "measured_region" && row.energy_measurement_status === "sufficient" && number(row.energy_joules) > 0);
+  if (!eligible.length) return null;
+  const conditions = uniqueConditionIds(eligible);
+  const pendingHardware = ["E123@l40s", "E124@l40s", "E127@l40s", "E128@l40s"].filter((id) => rows.some((row) => conditionId(row) === id && !number(row.energy_joules)));
+  return {
+    id: "energy",
+    researchQuestion: "RQ5",
+    tone: pendingHardware.length ? "limitation" : "positive",
+    confidence: pendingHardware.length ? "Partial cross-platform coverage" : "Measured-region evidence",
+    title: pendingHardware.length ? "Energy analysis is broad, but the hardware comparison is not yet complete" : "Measured-region energy evidence is available",
+    metric: formatInteger(conditions.length) + " measured conditions",
+    statement: formatInteger(eligible.length) + " completed trials have sufficient measured-region energy." + (pendingHardware.length ? " The four original L40S hardware-comparison rows remain excluded from energy-to-solution conclusions until E235–E238 run." : ""),
+    implication: pendingHardware.length ? "Continue analysing scoped energy studies, but defer the final H100-versus-L40S energy conclusion." : "Energy comparisons may proceed only within matched protocols.",
+    changed: "Depends on the selected controlled energy study",
+    heldConstant: "Only schema-v3, sufficient, measured-region records are admitted",
+    limitation: "Legacy full-window telemetry is retained for provenance but excluded from canonical joules and tokens/kWh.",
+    conditionIds: [],
+    platforms: uniqueValues(eligible, "platform_id"),
+    workloads: uniqueValues(eligible, "workload"),
+    target: "energyCoverage",
+  };
+}
+
+function uniqueStrings(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
 function renderResearchQuestions() {
   const coverage = filteredAnalysisRows(state.researchQuestionSummary, ["platform_id", "comparability", "research_question"]);
   renderResearchCoverage(coverage.rows, coverage.message);
@@ -1868,6 +2114,7 @@ function buildHardwareComparisonGroups(rows) {
       selectorLabel: displayWorkload(sample.workload) + " · " + (sample.mode === "training" ? "Training" : "Inference"),
       subtitle: String(sample.precision || "").toUpperCase() + " · " + displayComparability(sample.comparability) + " · " + humanizeThroughputUnit(sample.throughput_unit),
       comparison: comparisonContext(group, ["GPU platform"], ["comparability", "workload", "model", "mode", "precision", "throughput_unit"]),
+      workload: sample.workload,
       mode: sample.mode,
       unit: sample.throughput_unit,
       entries,
@@ -3097,6 +3344,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildInferenceGroups,
     buildMemorySeries,
     buildDataMovementSeries,
+    buildDecisionInsights,
     buildPhaseDistributionEntries,
     buildPinnedMemoryGroups,
     buildRq1ScalingSeries,
