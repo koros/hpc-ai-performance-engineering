@@ -79,6 +79,10 @@ The trial summary reports completed and failed counts, mean, median, sample stan
   latency, memory, energy, or runtime across platforms.
 - A deliberate hardware comparison first computes independent per-platform condition statistics, then calculates a
   matched-pair difference or ratio. Raw H100 and L40S trials are never pooled before that comparison.
+- The campaign-wide hardware synthesis pairs only `exact` conditions with the same workload, model, mode, GPU count,
+  strategy, precision, framework, batch semantics, and study-specific parameters. Each protocol contributes one
+  unitless H100/L40S throughput ratio. Study-level medians and ranges may summarize those ratios, but raw throughput
+  values with different units are never pooled. Ratios within two percent of parity are labelled near parity.
 
 Legacy matrix JSON that predates the platform fields is not rewritten. It is accepted only when embedded requested
 and observed hardware identify exactly one of L40S or H100. Aggregation synthesizes `E###@<platform>` and assigns the
