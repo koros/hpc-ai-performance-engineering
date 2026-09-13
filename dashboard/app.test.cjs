@@ -32,6 +32,7 @@ const {
   parseCsv,
   pointAxisTicks,
   precisionColor,
+  scalingColors,
   strategyColor,
   summarizePhases,
 } = require("./app.js");
@@ -199,6 +200,17 @@ run("dashboard prioritizes research insights over administrative summaries", () 
 run("line charts label every discrete x value when the study is compact", () => {
   assert.deepEqual(pointAxisTicks([16, 2, 8, 4, 8], [2, 16]), [2, 4, 8, 16]);
   assert.deepEqual(pointAxisTicks([1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 9]), [1, 5, 9]);
+});
+
+run("scaling studies share one chart with distinct stable series colours", () => {
+  const html = fs.readFileSync("dashboard/index.html", "utf8");
+  const source = fs.readFileSync("dashboard/app.js", "utf8");
+
+  assert.match(html, /id="scalingCharts" class="combined-scaling-chart"/);
+  assert.match(source, /renderCombinedScalingChart\("scalingCharts"/);
+  assert.doesNotMatch(source, /renderLineCharts\("scalingCharts"/);
+  assert.ok(scalingColors.length >= 13);
+  assert.equal(new Set(scalingColors).size, scalingColors.length);
 });
 
 run("strategy chart does not reference another chart's series variable", () => {
