@@ -275,7 +275,16 @@
         </div>
         <div class="content-grid">
           <article class="panel chart-panel panel-wide scaling-overview-panel" data-metrics="throughput runtime">
-            <div class="panel-heading"><h2>Scaling Speedup</h2><span id="scalingStatus">No scaling evidence</span></div>
+            <div class="panel-heading scaling-panel-heading">
+              <div><h2>Scaling Speedup</h2><span id="scalingStatus" class="scaling-status">No scaling evidence</span></div>
+              <label class="scaling-type-control">Series shown
+                <select id="scalingTypeFilter" aria-label="Scaling series shown">
+                  <option value="">All — strong and weak scaling</option>
+                  <option value="strong">Strong scaling only</option>
+                  <option value="weak">Weak scaling only</option>
+                </select>
+              </label>
+            </div>
             <div id="scalingCharts" class="combined-scaling-chart"></div>
             <p class="chart-note">Each colour is a separate controlled scaling series. Solid lines show strong scaling and dashed lines show weak scaling; no values are pooled across platforms, workloads, or comparability classes.</p>
           </article>

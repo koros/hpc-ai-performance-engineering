@@ -181,6 +181,7 @@ function bindInputs() {
   document.getElementById("hardwareWorkloadFilter").addEventListener("change", safeRender);
   document.getElementById("hardwareModeFilter").addEventListener("change", safeRender);
   document.getElementById("hardwareComparisonFilter").addEventListener("change", safeRender);
+  document.getElementById("scalingTypeFilter").addEventListener("change", safeRender);
   document.getElementById("resetFilters").addEventListener("click", resetFilters);
   document.getElementById("resultsFile").addEventListener("change", (event) => {
     readFile(event.target.files[0]).then((text) => {
@@ -1044,6 +1045,7 @@ function resetFilters() {
   document.getElementById("evidenceFilter").value = "";
   document.getElementById("metricFilter").value = "";
   document.getElementById("strategyMetricFilter").value = "throughput";
+  document.getElementById("scalingTypeFilter").value = "";
   safeRender();
 }
 
@@ -2651,7 +2653,8 @@ function checkpointingChartCard(group) {
 
 function renderScaling() {
   const result = filteredAnalysisRows(state.scalingSummary, ["platform_id", "comparability", "phase", "workload", "throughput_unit", "strategy", "precision", "gpus"]);
-  const series = buildScalingSeries(result.rows);
+  const scalingType = document.getElementById("scalingTypeFilter").value;
+  const series = filterScalingSeries(buildScalingSeries(result.rows), scalingType);
   const allSeriesKeys = buildScalingSeries(state.scalingSummary).map((item) => item.key);
   series.forEach((item) => item.points.forEach((point) => {
     point.conditionIds = matchingConditionIds({ platform_id: item.platform, comparability: item.comparability, workload: item.workload, strategy: item.strategy, precision: item.precision, scaling_type: item.scalingType, gpus: point.x, throughput_unit: item.unit });
@@ -2660,10 +2663,18 @@ function renderScaling() {
     item.conditionIds = [...new Set(item.points.flatMap((point) => point.conditionIds || []))];
     item.color = scalingColors[Math.max(0, allSeriesKeys.indexOf(item.key)) % scalingColors.length];
   });
-  renderCombinedScalingChart("scalingCharts", series, { empty: result.message || "No completed scaling-study evidence." });
+  const emptyMessage = scalingType
+    ? "No completed " + scalingType + "-scaling evidence matches the active filters."
+    : "No completed scaling-study evidence matches the active filters.";
+  renderCombinedScalingChart("scalingCharts", series, { empty: result.message || emptyMessage });
   const pointCount = sum(series.map((item) => item.points.length));
-  document.getElementById("scalingStatus").textContent = result.message || series.length + " colour-coded series · " + pointCount + " points";
+  const scope = scalingType ? scalingType + " scaling" : "strong and weak scaling";
+  document.getElementById("scalingStatus").textContent = result.message || series.length + " colour-coded series · " + pointCount + " points · " + scope;
   markPanel("scalingCharts", series.length > 0, buildScalingSeries(state.scalingSummary).length > 0, "Scaling speedup", "scaling_summary.csv", true);
+}
+
+function filterScalingSeries(series, scalingType) {
+  return scalingType ? series.filter((item) => item.scalingType === scalingType) : [...series];
 }
 
 function buildScalingSeries(rows) {
@@ -3608,6 +3619,7 @@ if (typeof module !== "undefined" && module.exports) {
     buildEnergyPowerScalingSeries,
     buildEnergyToSolutionGroups,
     buildExperimentDetail,
+    filterScalingSeries,
     buildGradientAccumulationSeries,
     buildBroadHardwareComparisonGroups,
     buildHardwareComparisonGroups,

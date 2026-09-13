@@ -368,7 +368,12 @@ select {
   align-items: flex-end;
 }
 
-.training-panel-heading > div {
+.scaling-panel-heading {
+  align-items: flex-end;
+}
+
+.training-panel-heading > div,
+.scaling-panel-heading > div {
   min-width: 0;
 }
 
@@ -391,7 +396,15 @@ select {
   font-size: 0.72rem;
 }
 
-.training-study-control {
+.panel-heading .scaling-status {
+  display: block;
+  margin-top: 7px;
+  color: var(--accent-strong);
+  font-size: 0.72rem;
+}
+
+.training-study-control,
+.scaling-type-control {
   display: grid;
   flex: 0 1 280px;
   gap: 4px;
@@ -403,7 +416,8 @@ select {
   text-transform: uppercase;
 }
 
-.training-study-control select {
+.training-study-control select,
+.scaling-type-control select {
   min-height: 40px;
   padding-inline: 10px;
   color: var(--text);
@@ -411,7 +425,8 @@ select {
   text-transform: none;
 }
 
-.training-study-control select:disabled {
+.training-study-control select:disabled,
+.scaling-type-control select:disabled {
   cursor: not-allowed;
   background: #f1f5f9;
 }
@@ -3703,12 +3718,14 @@ td.numeric {
     flex-direction: column;
   }
 
-  .training-panel-heading {
+  .training-panel-heading,
+  .scaling-panel-heading {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .training-study-control {
+  .training-study-control,
+  .scaling-type-control {
     flex-basis: auto;
     min-width: 0;
     width: 100%;
