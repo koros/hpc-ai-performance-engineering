@@ -183,6 +183,9 @@ function bindInputs() {
   document.getElementById("strategyComparisonFilter").addEventListener("change", safeRender);
   document.getElementById("strategyMetricFilter").addEventListener("change", safeRender);
   document.getElementById("precisionComparisonFilter").addEventListener("change", safeRender);
+  document.getElementById("hardwarePhaseFilter").addEventListener("change", safeRender);
+  document.getElementById("hardwareWorkloadFilter").addEventListener("change", safeRender);
+  document.getElementById("hardwareModeFilter").addEventListener("change", safeRender);
   document.getElementById("hardwareComparisonFilter").addEventListener("change", safeRender);
   document.getElementById("resetFilters").addEventListener("click", resetFilters);
   document.getElementById("resultsFile").addEventListener("change", (event) => {
@@ -2156,7 +2159,7 @@ function buildControlledTrainingGroups(rows, evidenceRows, predicate, groupKey, 
       entry.isBaseline = entry === baseline;
     });
     return {
-      id: groupId.split("\u0000").map((part) => encodeURIComponent(part)).join("::"),
+      id: group.map(conditionId).sort().join("::"),
       title: displayPlatform(sample.platform_id) + " · " + displayWorkload(sample.workload) + " · " + sample.gpus + " GPU" + (number(sample.gpus) === 1 ? "" : "s"),
       selectorLabel: displayPlatform(sample.platform_id) + " · " + displayWorkload(sample.workload) + " · " + sample.gpus + " GPU" + (number(sample.gpus) === 1 ? "" : "s"),
       subtitle: displayComparability(sample.comparability) + " · " + (variableKey === "strategy" ? String(sample.precision || "").toUpperCase() : "Training") + " · " + humanizeThroughputUnit(sample.throughput_unit),
@@ -2169,13 +2172,35 @@ function buildControlledTrainingGroups(rows, evidenceRows, predicate, groupKey, 
 }
 
 function renderHardware() {
-  const filtered = filteredAnalysisRows(state.hardwareSummary, ["platform_id", "comparability", "workload", "mode", "precision"]);
-  const groups = buildHardwareComparisonGroups(filtered.rows);
+  const allGroups = buildBroadHardwareComparisonGroups(filteredTrialRowsWithEvidence(), state.results);
+  setHardwareScopeOptions("hardwarePhaseFilter", uniqueStrings(allGroups.map((group) => group.phase)), "All studies");
+  setHardwareScopeOptions("hardwareWorkloadFilter", uniqueStrings(allGroups.map((group) => group.workload)), "All workloads", displayWorkload);
+  setHardwareScopeOptions("hardwareModeFilter", uniqueStrings(allGroups.map((group) => group.mode)), "Training and inference", displayHardwareMode);
+  const phase = document.getElementById("hardwarePhaseFilter").value;
+  const workload = document.getElementById("hardwareWorkloadFilter").value;
+  const mode = document.getElementById("hardwareModeFilter").value;
+  const groups = allGroups.filter((group) =>
+    (!phase || group.phase === phase) &&
+    (!workload || group.workload === workload) &&
+    (!mode || group.mode === mode)
+  );
+  const landscape = buildHardwareLandscape(groups);
+  renderHardwareLandscape("hardwareLandscape", landscape, "No exact H100/L40S protocol pair matches the active filters.");
   const selectedGroup = syncComparisonControl("hardwareComparisonFilter", groups);
-  renderHardwareComparison("hardwareComparison", selectedGroup, filtered.message || "No matched H100 and L40S hardware comparison is available for the active filters.");
-  const conditions = sum(groups.map((group) => group.entries.length));
-  document.getElementById("hardwareStatus").textContent = filtered.message || (groups.length ? groups.length + " matched protocols · " + conditions + " platform conditions" : "No matched hardware evidence");
-  markPanel("hardwareComparison", groups.length > 0, buildHardwareComparisonGroups(state.hardwareSummary).length > 0, "Hardware comparison", "hardware_summary.csv", true);
+  renderHardwareComparison("hardwareComparison", selectedGroup, "No matched H100 and L40S hardware comparison is available for the active filters.");
+  const scope = groups.length === allGroups.length ? "" : " shown of " + allGroups.length;
+  document.getElementById("hardwareStatus").textContent = groups.length
+    ? groups.length + scope + " matched protocols · " + sum(groups.map((group) => sum(group.entries.map((entry) => entry.trials)))) + " trial observations"
+    : "No matched hardware evidence";
+  markPanel("hardwareComparison", groups.length > 0, buildBroadHardwareComparisonGroups(state.trialSummary, state.results).length > 0, "Hardware comparison", "trial_summary.csv", true);
+}
+
+function setHardwareScopeOptions(selectId, values, allLabel, display = (value) => value) {
+  const select = document.getElementById(selectId);
+  const current = select.value;
+  select.replaceChildren(option(allLabel, ""));
+  values.forEach((value) => select.append(option(display(value), value)));
+  select.value = values.includes(current) ? current : "";
 }
 
 function buildHardwareComparisonGroups(rows) {
@@ -2214,7 +2239,7 @@ function buildBroadHardwareComparisonGroups(trialRows, evidenceRows = []) {
     .filter((row) => row.comparability === "exact" && number(row.completed_trials) > 0 && number(row.throughput_tokens_mean) > 0)
     .map((row) => ({ ...(metadata.get(conditionId(row)) || {}), ...row }));
   const grouped = groupRows(eligible, hardwareProtocolSignature);
-  return Object.entries(grouped).map(([groupId, group]) => {
+  return Object.values(grouped).map((group) => {
     const platformRows = Object.fromEntries(group.map((row) => [row.platform_id, row]));
     if (group.length !== 2 || !platformRows.h100 || !platformRows.l40s) return null;
     const sample = group[0];
@@ -2232,7 +2257,7 @@ function buildBroadHardwareComparisonGroups(trialRows, evidenceRows = []) {
       conditionId: conditionId(row),
     })).sort((left, right) => right.value - left.value);
     return {
-      id: groupId.split("\u0000").map((part) => encodeURIComponent(part)).join("::"),
+      id: group.map(conditionId).sort().join("::"),
       title: displayWorkload(sample.workload) + " · " + displayHardwareMode(sample.mode),
       selectorLabel: sample.phase + " · " + displayWorkload(sample.workload) + " · " + hardwareConfigurationLabel(sample) + " · " + experimentIds.join("/") ,
       subtitle: sample.phase + " · " + hardwareConfigurationLabel(sample) + " · " + humanizeThroughputUnit(sample.throughput_unit),
@@ -2313,9 +2338,113 @@ function buildHardwareLandscape(groups) {
     items: comparisons,
     phases,
     modes,
-    strongestH100: [...comparisons].sort((left, right) => right.ratio - left.ratio).slice(0, 3),
-    strongestL40S: [...comparisons].sort((left, right) => left.ratio - right.ratio).slice(0, 3),
+    strongestH100: comparisons.filter((item) => item.ratio > 1.02).sort((left, right) => right.ratio - left.ratio).slice(0, 3),
+    strongestL40S: comparisons.filter((item) => item.ratio < 0.98).sort((left, right) => left.ratio - right.ratio).slice(0, 3),
   };
+}
+
+function renderHardwareLandscape(containerId, landscape, emptyMessage) {
+  const container = document.getElementById(containerId);
+  container.replaceChildren();
+  if (!landscape) {
+    container.append(emptyState(emptyMessage));
+    return;
+  }
+  const summary = document.createElement("div");
+  summary.className = "hardware-campaign-summary";
+  const cards = [
+    ["Matched protocols", formatInteger(landscape.comparisons), formatInteger(landscape.trials) + " completed trial observations"],
+    ["Typical H100/L40S ratio", formatDecimal(landscape.medianRatio, 2) + "×", "Median of controlled, unitless throughput ratios"],
+    ["H100 leads", formatInteger(landscape.h100Leads), formatDecimal(landscape.h100Leads / landscape.comparisons * 100, 0) + "% of matched protocols"],
+    ["L40S leads", formatInteger(landscape.l40sLeads), formatInteger(landscape.parity) + " additional protocol" + (landscape.parity === 1 ? "" : "s") + " near parity"],
+  ];
+  cards.forEach(([label, value, detail]) => {
+    const card = document.createElement("article");
+    card.innerHTML = "<span>" + escapeHtml(label) + "</span><strong>" + escapeHtml(value) + "</strong><small>" + escapeHtml(detail) + "</small>";
+    summary.append(card);
+  });
+  container.append(summary);
+
+  const modeSummary = document.createElement("div");
+  modeSummary.className = "hardware-mode-summary";
+  landscape.modes.forEach((mode) => {
+    const item = document.createElement("article");
+    item.innerHTML = "<div><span>" + escapeHtml(mode.label) + "</span><strong>" + escapeHtml(formatDecimal(mode.medianRatio, 2) + "× median") + "</strong></div><p>H100 led " + formatInteger(mode.h100Leads) + ", L40S led " + formatInteger(mode.l40sLeads) + ", and " + formatInteger(mode.parity) + " were near parity across " + formatInteger(mode.comparisons) + " matched protocols.</p>";
+    modeSummary.append(item);
+  });
+  container.append(modeSummary);
+
+  const body = document.createElement("div");
+  body.className = "hardware-landscape-grid";
+  body.append(hardwarePhaseLandscape(landscape.phases));
+  body.append(hardwareContrastList(landscape));
+  container.append(body);
+}
+
+function hardwarePhaseLandscape(phases) {
+  const card = document.createElement("article");
+  card.className = "hardware-landscape-card";
+  card.innerHTML = '<div class="hardware-landscape-heading"><div><span>Study-level synthesis</span><h3>Where does each platform lead?</h3></div><div class="ratio-direction"><span>L40S faster</span><i></i><span>H100 faster</span></div></div>';
+  const ratios = phases.flatMap((phase) => [phase.minimumRatio, phase.maximumRatio]);
+  const extent = Math.max(1, ...ratios.map((ratio) => Math.abs(Math.log2(ratio))));
+  const rows = document.createElement("div");
+  rows.className = "hardware-ratio-rows";
+  phases.forEach((phase) => {
+    const row = document.createElement("div");
+    row.className = "hardware-ratio-row";
+    const low = hardwareRatioPosition(phase.minimumRatio, extent);
+    const high = hardwareRatioPosition(phase.maximumRatio, extent);
+    const middle = hardwareRatioPosition(phase.medianRatio, extent);
+    row.innerHTML = '<div class="hardware-ratio-label"><strong>' + escapeHtml(phase.label) + '</strong><span>' + formatInteger(phase.comparisons) + " protocol" + (phase.comparisons === 1 ? "" : "s") + " · " + formatInteger(phase.trials) + ' trials</span></div><div class="hardware-ratio-track"><i class="ratio-parity"></i><i class="ratio-range" style="left:' + low + "%;width:" + Math.max(1, high - low) + '%"></i><i class="ratio-median" style="left:' + middle + '%"></i></div><div class="hardware-ratio-value"><strong>' + formatDecimal(phase.medianRatio, 2) + '×</strong><span>' + formatDecimal(phase.minimumRatio, 2) + "–" + formatDecimal(phase.maximumRatio, 2) + "× range</span></div>";
+    rows.append(row);
+  });
+  card.append(rows);
+  const note = document.createElement("p");
+  note.className = "hardware-landscape-note";
+  note.textContent = "Dots are median H100/L40S throughput ratios; lines show the full range of matched conditions in each study. The logarithmic axis gives equal visual weight to reciprocal advantages around 1× parity.";
+  card.append(note);
+  return card;
+}
+
+function hardwareRatioPosition(ratio, extent) {
+  return Math.max(0, Math.min(100, 50 + Math.log2(ratio) / (2 * extent) * 100));
+}
+
+function hardwareContrastList(landscape) {
+  const card = document.createElement("article");
+  card.className = "hardware-landscape-card hardware-contrast-card";
+  card.innerHTML = "<div class=\"hardware-landscape-heading\"><div><span>Largest observed differences</span><h3>Protocols worth inspecting</h3></div></div>";
+  const sections = [
+    ["Strongest H100 advantages", landscape.strongestH100],
+    ["Strongest L40S advantages", landscape.strongestL40S],
+  ];
+  sections.forEach(([title, items]) => {
+    const section = document.createElement("section");
+    const heading = document.createElement("h4");
+    heading.textContent = title;
+    section.append(heading);
+    if (!items.length) {
+      const note = document.createElement("p");
+      note.className = "hardware-contrast-empty";
+      note.textContent = "No matched protocol in this filtered view crossed the 2% lead threshold.";
+      section.append(note);
+    }
+    items.forEach((item) => {
+      const row = document.createElement("article");
+      row.className = "hardware-contrast-row";
+      setConditionTarget(row, "", item.group.entries.map((entry) => entry.conditionId));
+      row.innerHTML = "<div><strong>" + escapeHtml(item.group.experimentIds.join(" / ") + " · " + item.group.phase) + "</strong><span>" + escapeHtml(displayWorkload(item.group.workload) + " · " + displayHardwareMode(item.group.mode) + " · " + hardwareGroupConfigurationLabel(item.group)) + "</span></div><b>" + escapeHtml(formatDecimal(item.ratio, 2) + "×") + "</b>";
+      section.append(row);
+    });
+    card.append(section);
+  });
+  return card;
+}
+
+function hardwareGroupConfigurationLabel(group) {
+  const parts = [group.gpus + " GPU" + (group.gpus === 1 ? "" : "s"), String(group.precision || "").toUpperCase()];
+  if (group.strategy && group.strategy !== "none") parts.push(displayStrategy(group.strategy));
+  return parts.filter(Boolean).join(" · ");
 }
 
 function renderHardwareComparison(containerId, group, emptyMessage) {
@@ -2341,8 +2470,12 @@ function renderHardwareComparison(containerId, group, emptyMessage) {
   container.append(legend);
   const charts = document.createElement("div");
   charts.className = "hardware-chart-grid";
-  charts.append(hardwareMetricChart(group, "throughput"));
-  charts.append(hardwareMetricChart(group, group.mode === "inference" ? "latency" : "memory"));
+  const metrics = ["throughput", "runtime", "memory"];
+  if (group.mode === "inference") metrics.push("latency");
+  if (group.entries.every((entry) => entry.energy !== null)) metrics.push("energy");
+  metrics.filter((metric) => metric === "throughput" || group.entries.every((entry) => entry[metric] !== null)).forEach((metric) => {
+    charts.append(hardwareMetricChart(group, metric));
+  });
   container.append(charts);
 }
 
@@ -2374,8 +2507,10 @@ function hardwareMetricChart(group, metric) {
   card.className = "hardware-metric-card";
   const labels = {
     throughput: ["Performance", "Average throughput", "Higher is better"],
+    runtime: ["Completion time", "Average runtime", "Lower is better"],
     memory: ["Memory footprint", "Average measured GPU memory", "Lower is better"],
     latency: ["Responsiveness", "Median request latency", "Lower is better"],
+    energy: ["Energy to complete", "Measured-region energy", "Lower is better for this fixed protocol"],
   }[metric];
   card.innerHTML = "<div><span>" + labels[0] + "</span><h3>" + labels[1] + "</h3><p>" + labels[2] + "</p></div>";
   const key = metric === "throughput" ? "value" : metric;
@@ -2388,7 +2523,9 @@ function hardwareMetricChart(group, metric) {
     const row = document.createElement("article");
     row.className = "hardware-bar-row";
     setConditionTarget(row, entry.conditionId);
-    const formatted = metric === "throughput" ? formatInteger(value) : formatDecimal(value, 2) + (metric === "memory" ? " GB" : " ms");
+    const formatted = metric === "throughput"
+      ? formatInteger(value)
+      : formatDecimal(value, 2) + ({ memory: " GB", latency: " ms", runtime: " s", energy: " J" }[metric] || "");
     row.innerHTML = '<div><strong>' + escapeHtml(entry.label) + "</strong><span>" + escapeHtml(formatted) + '</span></div><div class="hardware-bar-track"><i style="width:' + Math.max(3, value / maximum * 100) + "%;--hardware-color:" + hardwareColor(entry.key) + '"></i></div>';
     bars.append(row);
   });

@@ -234,13 +234,20 @@
       <section id="hardware" class="dashboard-section">
         <div class="section-heading">
           <div><p class="eyebrow">RQ6 · Hardware comparison</p><h2>What changes when the GPU platform changes?</h2></div>
-          <p>Only matched one-GPU protocols are compared. Workload, mode, precision, batch settings, and throughput units remain fixed.</p>
+          <p>Every exact protocol completed on both platforms is paired before comparison. Absolute throughput units remain separate; the overview summarizes only within-pair H100/L40S ratios.</p>
         </div>
         <article class="panel chart-panel hardware-analysis-panel" data-metrics="throughput memory latency">
-          <div class="panel-heading"><div><h2>H100 versus L40S</h2><p class="panel-subtitle">Select one controlled workload and execution mode.</p></div><span id="hardwareStatus">No matched hardware evidence</span></div>
-          <div class="hardware-controls"><label>Comparison<select id="hardwareComparisonFilter" aria-label="Hardware comparison"></select></label></div>
+          <div class="panel-heading"><div><h2>H100 versus L40S across the campaign</h2><p class="panel-subtitle">Start with the full evidence landscape, narrow it by study, workload, or mode, then inspect one controlled protocol.</p></div><span id="hardwareStatus">No matched hardware evidence</span></div>
+          <div class="hardware-controls" aria-label="Cross-platform comparison controls">
+            <label>Study<select id="hardwarePhaseFilter" aria-label="Hardware comparison study"></select></label>
+            <label>Workload<select id="hardwareWorkloadFilter" aria-label="Hardware comparison workload"></select></label>
+            <label>Execution mode<select id="hardwareModeFilter" aria-label="Hardware comparison execution mode"></select></label>
+            <label>Protocol detail<select id="hardwareComparisonFilter" aria-label="Hardware comparison protocol"></select></label>
+          </div>
+          <div id="hardwareLandscape" class="hardware-landscape"></div>
+          <div class="hardware-detail-heading"><div><span>Protocol drill-down</span><h3>Compare the recorded metrics for one matched setup</h3></div><p>Click any contrast below or choose a protocol above to inspect its immutable trial evidence.</p></div>
           <div id="hardwareComparison" class="hardware-visualization"></div>
-          <p class="chart-note">Energy is omitted because the original L40S hardware-comparison rows predate measured-region telemetry. Throughput, latency, and memory remain valid for this comparison.</p>
+          <p class="chart-note">A ratio above 1× favours H100; below 1× favours L40S. “Near parity” means within ±2%. Study medians combine unitless ratios only after each H100 result is paired with an L40S result using the same workload, mode, precision, GPU count, strategy, batch shape, framework, and study parameters. Energy appears in drill-down only when both platforms have sufficient measured-region telemetry.</p>
         </article>
       </section>
 
