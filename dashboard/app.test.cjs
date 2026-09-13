@@ -12,7 +12,9 @@ const {
   buildEnergyToSolutionGroups,
   buildExperimentDetail,
   buildGradientAccumulationSeries,
+  buildBroadHardwareComparisonGroups,
   buildHardwareComparisonGroups,
+  buildHardwareLandscape,
   buildInferenceGroups,
   buildMemorySeries,
   buildPhaseDistributionEntries,
@@ -417,6 +419,70 @@ run("hardware comparisons require matched exact evidence from both platforms", (
   assert.equal(groups.length, 1);
   assert.equal(groups[0].entries.length, 2);
   assert.deepEqual(groups[0].entries.map((entry) => entry.key), ["h100", "l40s"]);
+});
+
+run("broad hardware comparisons match the full protocol and reject unlike conditions", () => {
+  const summary = (condition_id, experiment_id, platform_id, throughput, overrides = {}) => ({
+    condition_id, experiment_id, platform_id, comparability: "exact", phase: "Weak scaling",
+    workload: "gpt2_small", model: "gpt2", mode: "training", gpus: "2", strategy: "ddp",
+    precision: "bf16", throughput_unit: "training_tokens_per_second", completed_trials: "3",
+    throughput_tokens_mean: String(throughput), global_batch_size: "32", ...overrides,
+  });
+  const rows = [
+    summary("E036@h100", "E036", "h100", 240),
+    summary("E036@l40s", "E036", "l40s", 100),
+    summary("E999@h100", "E999", "h100", 300, { workload: "distilbert", global_batch_size: "64" }),
+    summary("E999@l40s", "E999", "l40s", 120, { workload: "distilbert", global_batch_size: "32" }),
+    summary("E201@h100", "E201", "h100", 200, { comparability: "capacity_adjusted" }),
+    summary("E201@l40s", "E201", "l40s", 100, { comparability: "capacity_adjusted" }),
+  ];
+  const evidence = rows.map((row) => ({ ...row, status: "completed", memory_used_gb: row.platform_id === "h100" ? "20" : "18" }));
+
+  const groups = buildBroadHardwareComparisonGroups(rows, evidence);
+
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].experimentIds, ["E036"]);
+  assert.deepEqual(groups[0].entries.map((entry) => entry.key), ["h100", "l40s"]);
+  assert.equal(groups[0].entries.find((entry) => entry.key === "h100").memory, 20);
+});
+
+run("hardware landscape summarizes pair ratios without pooling throughput units", () => {
+  const group = (id, phase, mode, ratio) => ({
+    id, phase, mode, unit: mode === "training" ? "training_tokens_per_second" : "generated_tokens_per_second",
+    entries: [
+      { key: "h100", value: ratio * 100, trials: 3, conditionId: id + "@h100" },
+      { key: "l40s", value: 100, trials: 3, conditionId: id + "@l40s" },
+    ],
+  });
+  const landscape = buildHardwareLandscape([
+    group("E001", "Training study", "training", 2.5),
+    group("E002", "Training study", "training", 1.01),
+    group("E003", "Inference study", "inference", 0.8),
+  ]);
+
+  assert.equal(landscape.comparisons, 3);
+  assert.equal(landscape.trials, 18);
+  assert.equal(landscape.h100Leads, 1);
+  assert.equal(landscape.l40sLeads, 1);
+  assert.equal(landscape.parity, 1);
+  assert.equal(landscape.phases.length, 2);
+  assert.equal(landscape.medianRatio, 1.01);
+});
+
+run("repository evidence supports a broad controlled H100 and L40S comparison", () => {
+  const rows = parseCsv(fs.readFileSync("results/analysis/trial_summary.csv", "utf8"));
+  const evidence = parseCsv(fs.readFileSync("results/processed/experiments.csv", "utf8"));
+  const groups = buildBroadHardwareComparisonGroups(rows, evidence);
+  const landscape = buildHardwareLandscape(groups);
+
+  assert.ok(groups.length >= 160, `expected at least 160 matched protocols, observed ${groups.length}`);
+  assert.ok(landscape.trials >= 900, `expected at least 900 trial observations, observed ${landscape.trials}`);
+  assert.ok(landscape.phases.length >= 12);
+  groups.forEach((group) => {
+    assert.equal(group.comparability, "exact");
+    assert.deepEqual(new Set(group.entries.map((entry) => entry.key)), new Set(["h100", "l40s"]));
+    assert.equal(new Set(group.entries.map((entry) => entry.trials)).size, 1);
+  });
 });
 
 run("training analysis uses plain-language labels without encoded uncertainty text", () => {

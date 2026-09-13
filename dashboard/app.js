@@ -93,6 +93,21 @@ const hardwareColors = {
   h100: "#7c3aed",
   l40s: "#0f766e",
 };
+const hardwareProtocolFields = [
+  "phase", "workload", "model", "mode", "gpus", "strategy", "scaling_type", "framework",
+  "batch_size", "global_batch_size", "per_gpu_batch_size", "precision", "throughput_unit",
+  "parameter_activation_checkpointing", "parameter_allreduce_bytes", "parameter_base_compute_dtype",
+  "parameter_baseline_kind", "parameter_batch_size", "parameter_comparison_axis",
+  "parameter_concurrent_requests", "parameter_data_movement_study_type", "parameter_data_parallel_size",
+  "parameter_distributed_strategy", "parameter_effective_batch_size", "parameter_framework",
+  "parameter_framework_label", "parameter_gradient_accumulation_steps", "parameter_inference_study_type",
+  "parameter_max_new_tokens", "parameter_memory_study_type", "parameter_micro_batch_size",
+  "parameter_num_workers", "parameter_per_gpu_batch_size", "parameter_pinned_memory",
+  "parameter_precision_backend", "parameter_prefetch_factor", "parameter_profile_target",
+  "parameter_prompt_length", "parameter_quantization_method", "parameter_repeat_index",
+  "parameter_scaling_type", "parameter_sequence_length", "parameter_stack", "parameter_strategy_detail",
+  "parameter_tensor_parallel_size",
+];
 const researchTargets = {
   RQ1: "research-scaling",
   RQ2: "research-strategy",
@@ -2193,6 +2208,116 @@ function buildHardwareComparisonGroups(rows) {
   }).filter(Boolean).sort((left, right) => left.title.localeCompare(right.title));
 }
 
+function buildBroadHardwareComparisonGroups(trialRows, evidenceRows = []) {
+  const metadata = conditionMetadata(evidenceRows);
+  const eligible = trialRows
+    .filter((row) => row.comparability === "exact" && number(row.completed_trials) > 0 && number(row.throughput_tokens_mean) > 0)
+    .map((row) => ({ ...(metadata.get(conditionId(row)) || {}), ...row }));
+  const grouped = groupRows(eligible, hardwareProtocolSignature);
+  return Object.entries(grouped).map(([groupId, group]) => {
+    const platformRows = Object.fromEntries(group.map((row) => [row.platform_id, row]));
+    if (group.length !== 2 || !platformRows.h100 || !platformRows.l40s) return null;
+    const sample = group[0];
+    const experimentIds = uniqueStrings(group.map((row) => row.experiment_id));
+    const entries = group.map((row) => ({
+      key: row.platform_id,
+      label: displayPlatform(row.platform_id),
+      value: number(row.throughput_tokens_mean),
+      runtime: isNumeric(row.runtime_mean_seconds) ? number(row.runtime_mean_seconds) : null,
+      memory: conditionMetricAverage(evidenceRows, conditionId(row), ["metric_nvidia_smi_memory_used_gb_measured_region", "metric_memory_used_gb", "memory_used_gb"]),
+      latency: conditionMetricAverage(evidenceRows, conditionId(row), ["metric_latency_p50_ms", "latency_p50_ms"]),
+      latencyP95: conditionMetricAverage(evidenceRows, conditionId(row), ["metric_latency_p95_ms", "latency_p95_ms"]),
+      energy: conditionEnergyAverage(evidenceRows, conditionId(row)),
+      trials: number(row.completed_trials),
+      conditionId: conditionId(row),
+    })).sort((left, right) => right.value - left.value);
+    return {
+      id: groupId.split("\u0000").map((part) => encodeURIComponent(part)).join("::"),
+      title: displayWorkload(sample.workload) + " · " + displayHardwareMode(sample.mode),
+      selectorLabel: sample.phase + " · " + displayWorkload(sample.workload) + " · " + hardwareConfigurationLabel(sample) + " · " + experimentIds.join("/") ,
+      subtitle: sample.phase + " · " + hardwareConfigurationLabel(sample) + " · " + humanizeThroughputUnit(sample.throughput_unit),
+      comparison: comparisonContext(group, ["GPU platform"], ["comparability", "workload", "model", "mode", "precision", "gpus", "strategy", "framework", "throughput_unit"]),
+      comparability: sample.comparability,
+      experimentIds,
+      phase: sample.phase,
+      workload: sample.workload,
+      mode: sample.mode,
+      precision: sample.precision,
+      strategy: sample.strategy,
+      gpus: number(sample.gpus),
+      unit: sample.throughput_unit,
+      entries,
+    };
+  }).filter(Boolean).sort((left, right) => (left.phase + left.selectorLabel).localeCompare(right.phase + right.selectorLabel));
+}
+
+function hardwareProtocolSignature(row) {
+  return hardwareProtocolFields.map((key) => String(row[key] || "").trim());
+}
+
+function hardwareConfigurationLabel(row) {
+  const parts = [
+    number(row.gpus) + " GPU" + (number(row.gpus) === 1 ? "" : "s"),
+    String(row.precision || "unspecified precision").toUpperCase(),
+  ];
+  if (row.strategy && row.strategy !== "none") parts.push(displayStrategy(row.strategy));
+  const framework = row.parameter_framework_label || row.parameter_framework || row.framework;
+  if (framework && framework !== "none") parts.push(String(framework).replaceAll("_", " "));
+  return parts.join(" · ");
+}
+
+function displayHardwareMode(mode) {
+  return mode === "training" ? "Training" : mode === "inference" ? "Inference" : String(mode || "Unspecified mode");
+}
+
+function conditionEnergyAverage(rows, id) {
+  const values = rows.filter((row) =>
+    row.status === "completed" &&
+    conditionId(row) === id &&
+    row.energy_scope === "measured_region" &&
+    row.energy_measurement_status === "sufficient" &&
+    number(row.energy_joules) > 0
+  ).map((row) => number(row.energy_joules));
+  return values.length ? average(values) : null;
+}
+
+function buildHardwareLandscape(groups) {
+  const comparisons = groups.map((group) => {
+    const ratio = hardwareThroughputRatio(group);
+    return ratio ? { ...ratio, group } : null;
+  }).filter(Boolean);
+  if (!comparisons.length) return null;
+  const classify = (ratio) => ratio > 1.02 ? "h100" : ratio < 0.98 ? "l40s" : "parity";
+  const summarize = (items, label) => {
+    const ratios = items.map((item) => item.ratio);
+    return {
+      label,
+      comparisons: items.length,
+      trials: sum(items.flatMap((item) => item.group.entries.map((entry) => entry.trials))),
+      medianRatio: median(ratios),
+      minimumRatio: Math.min(...ratios),
+      maximumRatio: Math.max(...ratios),
+      h100Leads: items.filter((item) => classify(item.ratio) === "h100").length,
+      l40sLeads: items.filter((item) => classify(item.ratio) === "l40s").length,
+      parity: items.filter((item) => classify(item.ratio) === "parity").length,
+      conditionIds: uniqueStrings(items.flatMap((item) => item.group.entries.map((entry) => entry.conditionId))),
+    };
+  };
+  const phases = Object.entries(groupRows(comparisons, (item) => [item.group.phase || "Unclassified study"]))
+    .map(([phase, items]) => summarize(items, phase))
+    .sort((left, right) => right.comparisons - left.comparisons || left.label.localeCompare(right.label));
+  const modes = Object.entries(groupRows(comparisons, (item) => [displayHardwareMode(item.group.mode)]))
+    .map(([mode, items]) => summarize(items, mode));
+  return {
+    ...summarize(comparisons, "All matched protocols"),
+    items: comparisons,
+    phases,
+    modes,
+    strongestH100: [...comparisons].sort((left, right) => right.ratio - left.ratio).slice(0, 3),
+    strongestL40S: [...comparisons].sort((left, right) => left.ratio - right.ratio).slice(0, 3),
+  };
+}
+
 function renderHardwareComparison(containerId, group, emptyMessage) {
   const container = document.getElementById(containerId);
   container.replaceChildren();
@@ -3411,7 +3536,9 @@ if (typeof module !== "undefined" && module.exports) {
     buildEnergyToSolutionGroups,
     buildExperimentDetail,
     buildGradientAccumulationSeries,
+    buildBroadHardwareComparisonGroups,
     buildHardwareComparisonGroups,
+    buildHardwareLandscape,
     buildInferenceGroups,
     buildMemorySeries,
     buildDataMovementSeries,
