@@ -1,8 +1,6 @@
 const state = {
   results: [],
-  phaseSummary: [],
   trialSummary: [],
-  rankingSummary: [],
   scalingSummary: [],
   precisionSummary: [],
   strategySummary: [],
@@ -13,18 +11,15 @@ const state = {
   hardwareSummary: [],
   researchQuestionSummary: [],
   researchFindingSummary: [],
-  readinessReport: "",
   loading: true,
   loadErrors: [],
   runtimeError: "",
-  sort: { table: "rankingTable", key: "throughput_tokens_sec", direction: -1 },
+  sort: { table: "trialTable", key: "experiment_id", direction: 1 },
 };
 
 const paths = {
   results: "../results/processed/experiments.csv",
-  phaseSummary: "../results/analysis/phase_summary.csv",
   trialSummary: "../results/analysis/trial_summary.csv",
-  rankingSummary: "../results/analysis/experiment_rankings.csv",
   scalingSummary: "../results/analysis/scaling_summary.csv",
   precisionSummary: "../results/analysis/precision_summary.csv",
   strategySummary: "../results/analysis/strategy_summary.csv",
@@ -35,13 +30,10 @@ const paths = {
   hardwareSummary: "../results/analysis/hardware_summary.csv",
   researchQuestionSummary: "../results/analysis/research_question_summary.csv",
   researchFindingSummary: "../results/analysis/research_finding_summary.csv",
-  readinessReport: "../results/processed/readiness_report.md",
 };
 
 const analysisFileKeys = {
-  "phase_summary.csv": "phaseSummary",
   "trial_summary.csv": "trialSummary",
-  "experiment_rankings.csv": "rankingSummary",
   "scaling_summary.csv": "scalingSummary",
   "precision_summary.csv": "precisionSummary",
   "strategy_summary.csv": "strategySummary",
@@ -70,8 +62,6 @@ const filterDefinitions = [
   ["researchQuestionFilter", "research_question"],
 ];
 
-const rankingColumns = ["experiment_id", "platform_id", "comparability", "workload", "status", "throughput_tokens_sec", "throughput_unit", "runtime_seconds"];
-const phaseColumns = ["platform_id", "comparability", "phase", "workload", "throughput_unit", "experiments", "completed", "failed"];
 const trialColumns = ["experiment_id", "platform_id", "comparability", "workload", "completed_trials", "failed_trials", "evidence_status", "throughput_tokens_mean", "throughput_tokens_ci95_low", "throughput_tokens_ci95_high"];
 const colors = ["#0f766e", "#2563eb", "#7c3aed", "#b45309", "#be123c", "#0891b2", "#4d7c0f"];
 const strategyColors = {
@@ -207,12 +197,6 @@ function bindInputs() {
     rebuildFilters();
     safeRender();
   });
-  document.getElementById("readinessFile").addEventListener("change", (event) => {
-    readFile(event.target.files[0]).then((text) => {
-      state.readinessReport = text;
-      safeRender();
-    });
-  });
   document.getElementById("experimentDialogClose").addEventListener("click", closeExperimentDialog);
   document.getElementById("experimentDialog").addEventListener("click", (event) => {
     if (event.target === event.currentTarget) closeExperimentDialog();
@@ -232,12 +216,11 @@ function bindInputs() {
 
 async function loadDefaultData() {
   state.loadErrors = [];
-  const entries = Object.entries(paths).filter(([key]) => key !== "readinessReport");
+  const entries = Object.entries(paths);
   const loaded = await Promise.all(entries.map(async ([key, path]) => [key, await fetchCsv(path, key)]));
   loaded.forEach(([key, rows]) => {
     state[key] = rows;
   });
-  state.readinessReport = await fetchText(paths.readinessReport, "readinessReport");
   state.loading = false;
   rebuildFilters();
   safeRender();
@@ -252,17 +235,6 @@ async function fetchCsv(path, label) {
     state.loadErrors.push(label + ": " + errorMessage(error));
   }
   return [];
-}
-
-async function fetchText(path, label) {
-  try {
-    const response = await fetch(path, { cache: "no-store" });
-    if (response.ok) return response.text();
-    state.loadErrors.push(label + ": HTTP " + response.status);
-  } catch (error) {
-    state.loadErrors.push(label + ": " + errorMessage(error));
-  }
-  return "";
 }
 
 function errorMessage(error) {
@@ -434,12 +406,9 @@ function render() {
   renderDecisionBrief();
   renderResearchQuestions();
   renderKpis(rows);
-  renderReadiness();
   renderProgress(rows);
   renderStudyMap(rows);
-  renderPhaseDistributions(rows);
   renderEnergy(rows);
-  renderRankingTable();
   renderUncertainty();
   renderStrategy();
   renderPrecision();
@@ -449,7 +418,6 @@ function render() {
   renderCommunication();
   renderDataMovement();
   renderInference();
-  renderPhaseTable();
   renderTrialTable();
   organizeSections();
 }
@@ -1025,12 +993,11 @@ function renderKpis(rows) {
   const completed = rows.filter((row) => row.status === "completed").length;
   const conditions = new Set(rows.map(conditionId).filter(Boolean)).size;
   const gpuHours = sum(rows.map((row) => number(row.actual_gpu_hours || row.gpu_hours_estimate)));
-  const bestThroughput = max(rows.map(throughput));
-  const units = uniqueValues(rows.filter((row) => throughput(row) > 0), "throughput_unit");
+  const matchedProtocols = buildBroadHardwareComparisonGroups(filteredTrialRowsWithEvidence(), state.results).length;
   document.getElementById("kpiExperiments").textContent = formatInteger(conditions);
   document.getElementById("kpiCompleted").textContent = formatInteger(completed);
   document.getElementById("kpiGpuHours").textContent = formatDecimal(gpuHours, 2);
-  document.getElementById("kpiBestThroughput").textContent = units.length === 1 ? formatInteger(bestThroughput) : bestThroughput ? "Mixed units" : "—";
+  document.getElementById("kpiMatchedProtocols").textContent = formatInteger(matchedProtocols);
 }
 
 function renderActiveFilters() {
@@ -1074,40 +1041,6 @@ function resetFilters() {
   document.getElementById("metricFilter").value = "";
   document.getElementById("strategyMetricFilter").value = "throughput";
   safeRender();
-}
-
-function renderReadiness() {
-  const container = document.getElementById("readinessSummary");
-  const status = document.getElementById("readinessStatus");
-  const summary = parseReadinessSummary(state.readinessReport);
-  container.replaceChildren();
-  if (!summary.length) {
-    status.textContent = "No report loaded";
-    container.append(emptyState("Run python -m hpc_ai_perf.cli refresh, then reload the dashboard."));
-    return;
-  }
-  status.textContent = summary.length + " checks";
-  summary.forEach((item) => {
-    const card = document.createElement("article");
-    card.className = "readiness-item";
-    card.innerHTML = "<span>" + escapeHtml(item.label) + "</span><strong>" + escapeHtml(item.value) + "</strong>";
-    container.append(card);
-  });
-}
-
-function parseReadinessSummary(markdown) {
-  const lines = markdown.split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === "## Summary");
-  if (start === -1) return [];
-  const items = [];
-  for (let index = start + 1; index < lines.length; index += 1) {
-    const line = lines[index].trim();
-    if (line.startsWith("## ") && index > start + 1) break;
-    if (!line.startsWith("- ")) continue;
-    const [label, ...rest] = line.slice(2).split(":");
-    items.push({ label: label.trim(), value: rest.join(":").trim() });
-  }
-  return items;
 }
 
 function renderProgress(rows) {
@@ -1283,85 +1216,6 @@ function buildPhaseDistributionEntries(rows) {
     const rightKey = [right.platform, right.comparability, right.workload, right.unit, right.phase].join("|");
     return leftKey.localeCompare(rightKey);
   });
-}
-
-function renderPhaseDistributions(rows) {
-  const container = document.getElementById("phaseDistributions");
-  const entries = buildPhaseDistributionEntries(rows);
-  const groups = groupRows(entries, (entry) => [entry.platform, entry.comparability, entry.workload, entry.unit]);
-  container.replaceChildren();
-  if (!entries.length) {
-    container.append(emptyState("No completed throughput evidence matches the active filters."));
-  } else {
-    Object.entries(groups).forEach(([key, group], index) => {
-      const [platform, comparability, workload, unit] = key.split("\u0000");
-      const section = document.createElement("details");
-      section.className = "distribution-card";
-      section.open = index === 0;
-      const summary = document.createElement("summary");
-      summary.innerHTML = '<span>' + escapeHtml(platform + " · " + comparability + " · " + workload) + '</span><strong>' + group.length + " phases · " + formatInteger(sum(group.map((entry) => entry.conditions))) + " conditions</strong>";
-      section.append(summary);
-      const body = document.createElement("div");
-      body.className = "distribution-body";
-      body.append(comparisonContract({
-        changing: ["Recorded condition settings within each phase"],
-        constants: [
-          { label: "platform", value: platform },
-          { label: "comparability", value: comparability },
-          { label: "workload", value: workload },
-          { label: "unit", value: unit },
-        ],
-      }));
-      const scaleMaximum = max(group.map((entry) => entry.maximum)) || 1;
-      group.forEach((entry) => body.append(phaseDistributionRow(entry, scaleMaximum)));
-      section.append(body);
-      container.append(section);
-    });
-  }
-  const conditionCount = sum(entries.map((entry) => entry.conditions));
-  document.getElementById("dataStatus").textContent = entries.length
-    ? entries.length + " distributions · " + formatInteger(conditionCount) + " completed conditions"
-    : "No phase evidence";
-  markPanel("phaseDistributions", entries.length > 0, buildPhaseDistributionEntries(state.results).length > 0, "Descriptive phase distributions", "experiments.csv");
-}
-
-function phaseDistributionRow(entry, scaleMaximum) {
-  const row = document.createElement("div");
-  row.className = "distribution-row";
-  const heading = document.createElement("div");
-  heading.className = "distribution-heading";
-  heading.innerHTML = '<strong>' + escapeHtml(entry.phase) + '</strong><span>median ' + formatCompact(entry.median) + " · range " + formatCompact(entry.minimum) + "–" + formatCompact(entry.maximum) + "</span>";
-  row.append(heading);
-  const track = document.createElement("div");
-  track.className = "distribution-track";
-  track.setAttribute("aria-label", entry.phase + ": median " + entry.median + ", range " + entry.minimum + " to " + entry.maximum + " " + entry.unit);
-  const range = document.createElement("span");
-  range.className = "distribution-range";
-  range.style.left = (entry.minimum / scaleMaximum) * 100 + "%";
-  range.style.width = Math.max(1, ((entry.maximum - entry.minimum) / scaleMaximum) * 100) + "%";
-  const marker = document.createElement("span");
-  marker.className = "distribution-median";
-  marker.style.left = (entry.median / scaleMaximum) * 100 + "%";
-  track.append(range, marker);
-  row.append(track);
-  const evidence = document.createElement("details");
-  evidence.className = "distribution-evidence";
-  const evidenceSummary = document.createElement("summary");
-  evidenceSummary.textContent = entry.conditions + " condition" + (entry.conditions === 1 ? "" : "s") + " · " + entry.trials + " trials";
-  evidence.append(evidenceSummary);
-  const conditions = document.createElement("div");
-  conditions.className = "condition-chip-list";
-  entry.conditionIds.forEach((id) => {
-    const chip = document.createElement("button");
-    chip.className = "condition-chip";
-    chip.type = "button";
-    chip.textContent = id;
-    setConditionTarget(chip, id);
-    conditions.append(chip);
-  });
-  evidence.append(conditions);
-  row.append(evidence);
-  return row;
 }
 
 function renderEnergy(rows) {
@@ -1689,13 +1543,6 @@ function renderSeparatedBars(containerId, entries, options) {
       container.append(row);
     });
   });
-}
-
-function renderRankingTable() {
-  const result = filteredAnalysisRows(state.rankingSummary, ["platform_id", "comparability", "phase", "workload", "throughput_unit", "priority", "status", "mode", "strategy", "precision", "gpus"]);
-  renderTable("rankingTable", result.rows, rankingColumns, result.message);
-  document.getElementById("rankingCount").textContent = result.message || result.rows.length + " rows · select one for details";
-  markPanel("rankingTable", result.rows.length > 0, state.rankingSummary.length > 0, "Experiment rankings", "experiment_rankings.csv");
 }
 
 function renderUncertainty() {
@@ -3053,13 +2900,6 @@ function scatterChartCard(group) {
   const labels = '<text class="svg-label" x="' + width / 2 + '" y="' + (height - 3) + '" text-anchor="middle">p95 latency (ms)</text><text class="svg-label" transform="translate(11 ' + height / 2 + ') rotate(-90)" text-anchor="middle">throughput</text>';
   card.append(svgElement(width, height, grids + points + labels));
   return card;
-}
-
-function renderPhaseTable() {
-  const result = filteredAnalysisRows(state.phaseSummary, ["platform_id", "comparability", "phase", "workload", "throughput_unit", "priority", "mode"]);
-  renderTable("phaseTable", result.rows, phaseColumns, result.message);
-  document.getElementById("phaseCount").textContent = result.message || result.rows.length + " rows";
-  markPanel("phaseTable", result.rows.length > 0, state.phaseSummary.length > 0, "Phase evidence inventory", "phase_summary.csv");
 }
 
 function renderTrialTable() {

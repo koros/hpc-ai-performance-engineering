@@ -921,109 +921,6 @@ select {
   outline-offset: 1px;
 }
 
-.distribution-list {
-  display: grid;
-  gap: 10px;
-  padding: 16px;
-}
-
-.distribution-card {
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: #fff;
-}
-
-.distribution-card > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  color: #344054;
-  font-size: 0.78rem;
-  cursor: pointer;
-  list-style-position: inside;
-}
-
-.distribution-card > summary strong {
-  flex: 0 0 auto;
-  color: var(--muted);
-  font-size: 0.7rem;
-}
-
-.distribution-body {
-  display: grid;
-  gap: 14px;
-  padding: 2px 14px 14px;
-  border-top: 1px solid var(--line);
-}
-
-.distribution-body > .comparison-contract {
-  margin-top: 12px;
-}
-
-.distribution-row {
-  display: grid;
-  grid-template-columns: minmax(180px, 0.9fr) minmax(220px, 1.4fr) minmax(130px, 0.7fr);
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-}
-
-.distribution-heading {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.distribution-heading strong {
-  color: #344054;
-  font-size: 0.77rem;
-}
-
-.distribution-heading span {
-  color: var(--muted);
-  font-size: 0.68rem;
-}
-
-.distribution-track {
-  position: relative;
-  height: 9px;
-  border-radius: 999px;
-  background: #e8edf3;
-}
-
-.distribution-range {
-  position: absolute;
-  top: 2px;
-  height: 5px;
-  border-radius: 999px;
-  background: #5eead4;
-}
-
-.distribution-median {
-  position: absolute;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  border: 2px solid #fff;
-  border-radius: 50%;
-  background: var(--accent-strong);
-  box-shadow: 0 0 0 1px var(--accent-strong);
-  transform: translate(-50%, -50%);
-}
-
-.distribution-evidence {
-  min-width: 0;
-  color: var(--muted);
-  font-size: 0.7rem;
-}
-
-.distribution-evidence > summary {
-  cursor: pointer;
-}
-
 .condition-chip-list {
   display: flex;
   flex-wrap: wrap;
@@ -1040,13 +937,6 @@ select {
   font: inherit;
   font-size: 0.67rem;
   font-weight: 800;
-}
-
-.readiness-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  padding: 16px;
 }
 
 .research-question-grid,
@@ -1525,27 +1415,6 @@ select {
   color: var(--muted);
   font-size: 0.75rem;
   line-height: 1.45;
-}
-
-.readiness-item {
-  display: grid;
-  gap: 8px;
-  min-height: 82px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface-strong);
-}
-
-.readiness-item span {
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.readiness-item strong {
-  font-size: 1.08rem;
-  line-height: 1.25;
 }
 
 .bar-row {
@@ -2087,6 +1956,39 @@ select {
   overflow: auto;
   max-height: 460px;
   border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.evidence-audit {
+  overflow: hidden;
+}
+
+.evidence-audit > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  color: #344054;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.evidence-audit > summary::marker {
+  color: var(--accent-strong);
+}
+
+.evidence-audit > summary span {
+  font-weight: 800;
+}
+
+.evidence-audit > summary strong {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.evidence-audit[open] > summary {
+  border-bottom: 1px solid var(--line);
+  background: #f8fafc;
 }
 
 table {
@@ -3367,7 +3269,6 @@ td.numeric {
 
   .kpi-grid,
   .content-grid,
-  .readiness-grid,
   .study-panel-grid {
     grid-template-columns: 1fr;
   }
@@ -3375,14 +3276,6 @@ td.numeric {
   .section-heading {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .distribution-row {
-    grid-template-columns: minmax(160px, 0.8fr) minmax(200px, 1.2fr);
-  }
-
-  .distribution-evidence {
-    grid-column: 1 / -1;
   }
 
   .energy-coverage-summary {
@@ -3622,20 +3515,6 @@ td.numeric {
   .study-map {
     grid-template-columns: minmax(0, 1fr);
     padding: 12px;
-  }
-
-  .distribution-card > summary,
-  .distribution-row {
-    align-items: flex-start;
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .distribution-card > summary {
-    flex-direction: column;
-  }
-
-  .distribution-track {
-    width: 100%;
   }
 
   .bar-meta {

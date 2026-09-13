@@ -22,7 +22,6 @@
         <div class="header-actions">
           <label class="file-button">Results CSV<input id="resultsFile" type="file" accept=".csv" /></label>
           <label class="file-button">Analysis CSVs<input id="analysisFiles" type="file" accept=".csv" multiple /></label>
-          <label class="file-button">Readiness MD<input id="readinessFile" type="file" accept=".md,text/markdown,text/plain" /></label>
         </div>
       </details>
     </header>
@@ -95,12 +94,7 @@
         <article><span>Conditions in view</span><strong id="kpiExperiments">0</strong></article>
         <article><span>Completed trials</span><strong id="kpiCompleted">0</strong></article>
         <article><span>Recorded GPU-hours</span><strong id="kpiGpuHours">0.0</strong></article>
-        <article><span>Peak throughput</span><strong id="kpiBestThroughput">0</strong></article>
-      </section>
-
-      <section class="panel">
-        <div class="panel-heading"><h2>Submission Readiness</h2><span id="readinessStatus">No report loaded</span></div>
-        <div id="readinessSummary" class="readiness-grid"></div>
+        <article><span>Matched H100/L40S protocols</span><strong id="kpiMatchedProtocols">0</strong></article>
       </section>
 
       <section id="research" class="dashboard-section">
@@ -157,8 +151,7 @@
             <p class="chart-note">Navigate by the variable being tested. Counts show evidence coverage only; they are not performance rankings.</p>
           </article>
         </div>
-        <div class="content-grid">
-          <article class="panel chart-panel panel-wide" data-metrics="energy">
+        <article class="panel chart-panel panel-wide" data-metrics="energy">
             <div class="panel-heading"><div><p class="panel-kicker">RQ5 · Useful work efficiency</p><h2>Energy Efficiency and Power</h2></div><span id="energyStatus">No energy evidence</span></div>
             <div id="energyCoverage" class="energy-coverage"></div>
             <section class="energy-study-section">
@@ -178,12 +171,7 @@
               <div id="energyBars" class="bar-list"></div>
             </details>
             <p class="chart-note">Only corrected measured-region telemetry is included. Select any point or bar to inspect its trial metrics and provenance.</p>
-          </article>
-          <article class="panel panel-wide" data-metrics="throughput runtime energy">
-            <div class="panel-heading"><h2>Top Experiments</h2><span id="rankingCount">0 rows · select one for details</span></div>
-            <div class="table-wrap"><table id="rankingTable"><thead></thead><tbody></tbody></table></div>
-          </article>
-        </div>
+        </article>
       </section>
 
       <section id="performance" class="dashboard-section">
@@ -331,21 +319,12 @@
       <section id="evidence" class="dashboard-section">
         <div class="section-heading">
           <div><p class="eyebrow">Evidence quality</p><h2>Traceable completed trials</h2></div>
-          <p>Check trial count, failures, outlier handling, and confidence intervals.</p>
+          <p>The audit table remains available for provenance checks without competing with the research findings above.</p>
         </div>
-        <article class="panel" data-metrics="throughput runtime">
-          <div class="panel-heading"><h2>Trial Evidence and Uncertainty</h2><span id="trialCount">No trial evidence</span></div>
+        <details class="panel evidence-audit" data-metrics="throughput runtime">
+          <summary><span>Open trial evidence and confidence intervals</span><strong id="trialCount">No trial evidence</strong></summary>
           <div class="table-wrap"><table id="trialTable"><thead></thead><tbody></tbody></table></div>
-        </article>
-        <article class="panel chart-panel" data-metrics="throughput">
-          <div class="panel-heading"><h2>Descriptive Phase Distributions</h2><span id="dataStatus">No phase evidence</span></div>
-          <div id="phaseDistributions" class="distribution-list"></div>
-          <p class="chart-note">Each condition contributes once. The marker is the condition-weighted median and the line is the minimum–maximum range. These distributions describe coverage; use the controlled study panels above to infer effects.</p>
-        </article>
-        <article class="panel" data-metrics="throughput runtime memory energy latency">
-          <div class="panel-heading"><h2>Phase Evidence Inventory</h2><span id="phaseCount">0 rows</span></div>
-          <div class="table-wrap"><table id="phaseTable"><thead></thead><tbody></tbody></table></div>
-        </article>
+        </details>
       </section>
 
       <section id="pendingStudies" class="dashboard-section pending-section" hidden>
