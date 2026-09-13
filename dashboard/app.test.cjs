@@ -29,6 +29,7 @@ const {
   buildUncertaintyGroups,
   comparisonContext,
   dashboardAlertMessage,
+  filterScalingSeries,
   parseCsv,
   pointAxisTicks,
   precisionColor,
@@ -211,6 +212,19 @@ run("scaling studies share one chart with distinct stable series colours", () =>
   assert.doesNotMatch(source, /renderLineCharts\("scalingCharts"/);
   assert.ok(scalingColors.length >= 13);
   assert.equal(new Set(scalingColors).size, scalingColors.length);
+});
+
+run("scaling type control isolates strong or weak series without changing them", () => {
+  const series = [
+    { key: "strong-a", scalingType: "strong", points: [{ x: 1, y: 1 }] },
+    { key: "weak-a", scalingType: "weak", points: [{ x: 1, y: 1 }] },
+    { key: "strong-b", scalingType: "strong", points: [{ x: 2, y: 1.8 }] },
+  ];
+
+  assert.deepEqual(filterScalingSeries(series, "").map((item) => item.key), ["strong-a", "weak-a", "strong-b"]);
+  assert.deepEqual(filterScalingSeries(series, "strong").map((item) => item.key), ["strong-a", "strong-b"]);
+  assert.deepEqual(filterScalingSeries(series, "weak").map((item) => item.key), ["weak-a"]);
+  assert.deepEqual(series.map((item) => item.key), ["strong-a", "weak-a", "strong-b"]);
 });
 
 run("strategy chart does not reference another chart's series variable", () => {
