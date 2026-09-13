@@ -27,6 +27,7 @@ const {
   buildUncertaintyGroups,
   comparisonContext,
   dashboardAlertMessage,
+  parseCsv,
   pointAxisTicks,
   precisionColor,
   strategyColor,
@@ -83,6 +84,24 @@ run("decision insights turn controlled evidence into scoped conclusions", () => 
   assert.match(insights.find((insight) => insight.id === "hardware").statement, /one result where L40S was faster/);
   assert.equal(insights.find((insight) => insight.id === "energy").tone, "limitation");
   assert.deepEqual(insights.find((insight) => insight.id === "precision").conditionIds, ["E086@h100", "E233@h100"]);
+});
+
+run("refreshed repository evidence produces the complete conclusion brief", () => {
+  const readCsv = (path) => parseCsv(fs.readFileSync(path, "utf8"));
+  const results = readCsv("results/processed/experiments.csv");
+  const insights = buildDecisionInsights({
+    researchFindings: readCsv("results/analysis/research_finding_summary.csv"),
+    hardware: readCsv("results/analysis/hardware_summary.csv"),
+    communication: readCsv("results/analysis/communication_summary.csv"),
+    memory: readCsv("results/analysis/memory_summary.csv"),
+    results,
+  });
+  const recordedConditions = new Set(results.map((row) => row.condition_id));
+
+  assert.deepEqual(insights.map((insight) => insight.id), ["scaling", "strategy", "precision", "memory", "communication", "hardware", "energy"]);
+  insights.flatMap((insight) => insight.conditionIds).forEach((conditionId) => assert.ok(recordedConditions.has(conditionId), conditionId));
+  assert.match(insights.find((insight) => insight.id === "hardware").metric, /training throughput/);
+  assert.equal(insights.find((insight) => insight.id === "energy").tone, "limitation");
 });
 
 const rows = [
