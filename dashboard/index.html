@@ -274,12 +274,12 @@
           <p>Scaling, NCCL, and data-loader measurements appear as each study completes.</p>
         </div>
         <div class="content-grid">
-          <article class="panel chart-panel" data-metrics="throughput runtime">
+          <article class="panel chart-panel panel-wide scaling-overview-panel" data-metrics="throughput runtime">
             <div class="panel-heading"><h2>Scaling Speedup</h2><span id="scalingStatus">No scaling evidence</span></div>
-            <div id="scalingCharts" class="svg-chart-grid"></div>
-            <p class="chart-note">Speedup is plotted against GPU count; labels retain strategy and precision.</p>
+            <div id="scalingCharts" class="combined-scaling-chart"></div>
+            <p class="chart-note">Each colour is a separate controlled scaling series. Solid lines show strong scaling and dashed lines show weak scaling; no values are pooled across platforms, workloads, or comparability classes.</p>
           </article>
-          <article class="panel chart-panel" data-metrics="throughput runtime">
+          <article class="panel chart-panel panel-wide" data-metrics="throughput runtime">
             <div class="panel-heading"><h2>NCCL Communication</h2><span id="communicationStatus">No communication evidence</span></div>
             <div id="communicationBars" class="bar-list"></div>
             <p class="chart-note">Bandwidth and communication-to-compute ratio are meaningful only on the recorded platform/interconnect.</p>

@@ -64,6 +64,10 @@ const filterDefinitions = [
 
 const trialColumns = ["experiment_id", "platform_id", "comparability", "workload", "completed_trials", "failed_trials", "evidence_status", "throughput_tokens_mean", "throughput_tokens_ci95_low", "throughput_tokens_ci95_high"];
 const colors = ["#0f766e", "#2563eb", "#7c3aed", "#b45309", "#be123c", "#0891b2", "#4d7c0f"];
+const scalingColors = [
+  "#2563eb", "#7c3aed", "#be123c", "#c2410c", "#a16207", "#4d7c0f", "#047857",
+  "#0f766e", "#0e7490", "#0369a1", "#4338ca", "#a21caf", "#9f1239", "#475569",
+];
 const strategyColors = {
   ddp: "#2563eb",
   fsdp: "#0f766e",
@@ -2648,11 +2652,17 @@ function checkpointingChartCard(group) {
 function renderScaling() {
   const result = filteredAnalysisRows(state.scalingSummary, ["platform_id", "comparability", "phase", "workload", "throughput_unit", "strategy", "precision", "gpus"]);
   const series = buildScalingSeries(result.rows);
+  const allSeriesKeys = buildScalingSeries(state.scalingSummary).map((item) => item.key);
   series.forEach((item) => item.points.forEach((point) => {
     point.conditionIds = matchingConditionIds({ platform_id: item.platform, comparability: item.comparability, workload: item.workload, strategy: item.strategy, precision: item.precision, scaling_type: item.scalingType, gpus: point.x, throughput_unit: item.unit });
   }));
-  renderLineCharts("scalingCharts", series, { empty: result.message || "No completed scaling-study evidence.", xLabel: "GPU count", yLabel: "speedup" });
-  document.getElementById("scalingStatus").textContent = result.message || series.length + " isolated series";
+  series.forEach((item) => {
+    item.conditionIds = [...new Set(item.points.flatMap((point) => point.conditionIds || []))];
+    item.color = scalingColors[Math.max(0, allSeriesKeys.indexOf(item.key)) % scalingColors.length];
+  });
+  renderCombinedScalingChart("scalingCharts", series, { empty: result.message || "No completed scaling-study evidence." });
+  const pointCount = sum(series.map((item) => item.points.length));
+  document.getElementById("scalingStatus").textContent = result.message || series.length + " colour-coded series · " + pointCount + " points";
   markPanel("scalingCharts", series.length > 0, buildScalingSeries(state.scalingSummary).length > 0, "Scaling speedup", "scaling_summary.csv", true);
 }
 
@@ -2661,6 +2671,7 @@ function buildScalingSeries(rows) {
   return Object.entries(grouped).map(([key, group]) => {
     const [platform, comparability, workload, strategy, precision, unit, scalingType] = key.split("\u0000");
     return {
+      key,
       title: platform + " · " + comparability + " · " + workload,
       subtitle: strategy + "; " + precision + "; " + scalingType + "; " + unit,
       platform, comparability, workload, strategy, precision, unit, scalingType,
@@ -2668,6 +2679,91 @@ function buildScalingSeries(rows) {
       points: group.map((row) => ({ x: number(row.gpus), y: number(row.speedup), label: row.gpus + " GPU: " + formatDecimal(number(row.speedup), 2) + "× speedup; " + formatDecimal(number(row.scaling_efficiency) * 100, 1) + "% efficiency", conditionId: conditionId(row) })).sort((left, right) => left.x - right.x),
     };
   }).sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function renderCombinedScalingChart(containerId, series, options) {
+  const container = document.getElementById(containerId);
+  container.replaceChildren();
+  if (!series.length) {
+    container.append(emptyState(options.empty));
+    return;
+  }
+  container.append(combinedScalingChartCard(series));
+}
+
+function combinedScalingChartCard(series) {
+  const card = document.createElement("article");
+  card.className = "combined-scaling-card";
+  const heading = document.createElement("div");
+  heading.className = "combined-scaling-heading";
+  heading.innerHTML = "<div><h3>Scaling trajectories across recorded studies</h3><p>Speedup is relative to the smallest GPU-count baseline within each coloured series.</p></div>";
+  heading.append(comparisonContract({
+    changing: ["GPU count within each line"],
+    constants: [{ label: "within a line", value: "platform, workload, precision, strategy, scaling type, and throughput unit" }],
+  }));
+  card.append(heading);
+
+  const legend = document.createElement("div");
+  legend.className = "scaling-series-legend";
+  series.forEach((item) => legend.append(scalingLegendItem(item)));
+  card.append(legend);
+  card.append(combinedScalingSvg(series));
+  return card;
+}
+
+function scalingLegendItem(series) {
+  const item = document.createElement("button");
+  item.type = "button";
+  item.className = "scaling-legend-item";
+  item.style.setProperty("--series-color", series.color);
+  if (series.scalingType === "weak") item.classList.add("is-weak");
+  setConditionTarget(item, "", series.conditionIds);
+  const experimentIds = [...new Set(series.conditionIds.map((id) => id.split("@")[0]))];
+  const baseline = series.points[0]?.x;
+  item.innerHTML = '<i aria-hidden="true"></i><span><strong>' + escapeHtml([
+    series.platform.toUpperCase(), displayWorkload(series.workload), series.scalingType + " scaling",
+  ].join(" · ")) + '</strong><small>' + escapeHtml([
+    experimentIds.join(" / ") || "Recorded series", series.comparability, displayStrategy(series.strategy), series.precision.toUpperCase(),
+    baseline ? "baseline " + baseline + " GPU" + (baseline === 1 ? "" : "s") : "",
+  ].filter(Boolean).join(" · ")) + "</small></span>";
+  return item;
+}
+
+function combinedScalingSvg(series) {
+  const width = 920;
+  const height = 400;
+  const left = 64;
+  const right = 28;
+  const top = 24;
+  const bottom = 48;
+  const xValues = [...new Set(series.flatMap((item) => item.points.map((point) => point.x)))].sort((a, b) => a - b);
+  const xPosition = new Map(xValues.map((value, index) => [
+    value,
+    xValues.length === 1 ? (left + width - right) / 2 : left + index * ((width - right - left) / (xValues.length - 1)),
+  ]));
+  const observedMaximum = max(series.flatMap((item) => item.points.map((point) => point.y)));
+  const yMaximum = Math.max(2, Math.ceil(observedMaximum));
+  const y = linearScale(0, yMaximum, height - bottom, top);
+  const yTicks = Array.from({ length: 5 }, (_, index) => index * yMaximum / 4);
+  const verticalGrid = xValues.map((value) => '<line class="svg-grid" x1="' + xPosition.get(value) + '" y1="' + top + '" x2="' + xPosition.get(value) + '" y2="' + (height - bottom) + '"/><text class="svg-label" x="' + xPosition.get(value) + '" y="' + (height - 23) + '" text-anchor="middle">' + escapeSvg(value) + "</text>").join("");
+  const horizontalGrid = yTicks.map((value) => '<line class="svg-grid" x1="' + left + '" y1="' + y(value) + '" x2="' + (width - right) + '" y2="' + y(value) + '"/><text class="svg-label" x="' + (left - 8) + '" y="' + (y(value) + 3) + '" text-anchor="end">' + formatDecimal(value, value % 1 ? 1 : 0) + "×</text>").join("");
+  const baseline = '<line class="scaling-baseline" x1="' + left + '" y1="' + y(1) + '" x2="' + (width - right) + '" y2="' + y(1) + '"/><text class="scaling-baseline-label" x="' + (width - right) + '" y="' + (y(1) - 6) + '" text-anchor="end">1× series baseline</text>';
+  const marks = series.map((item) => {
+    const path = item.points.map((point, index) => (index ? "L" : "M") + xPosition.get(point.x) + "," + y(point.y)).join(" ");
+    const dash = item.scalingType === "weak" ? ' stroke-dasharray="8 5"' : "";
+    const label = scalingSeriesAccessibleLabel(item);
+    const points = item.points.map((point) => '<circle class="scaling-series-point" ' + conditionTargetAttributes(point) + ' cx="' + xPosition.get(point.x) + '" cy="' + y(point.y) + '" r="5"><title>' + escapeSvg(label + "; " + point.label) + "</title></circle>").join("");
+    return '<g class="scaling-series" style="color:' + item.color + '"><path class="scaling-series-line" d="' + path + '"' + dash + "/><title>" + escapeSvg(label) + "</title>" + points + "</g>";
+  }).join("");
+  const labels = '<text class="svg-label svg-axis-title" x="' + width / 2 + '" y="' + (height - 4) + '" text-anchor="middle">Allocated GPUs</text><text class="svg-label svg-axis-title" transform="translate(15 ' + height / 2 + ') rotate(-90)" text-anchor="middle">Speedup relative to series baseline</text>';
+  const svg = svgElement(width, height, verticalGrid + horizontalGrid + baseline + marks + labels);
+  svg.classList.add("combined-scaling-svg");
+  svg.setAttribute("aria-label", series.length + " isolated scaling series plotted together by GPU count and relative speedup");
+  return svg;
+}
+
+function scalingSeriesAccessibleLabel(series) {
+  return [series.platform, series.comparability, series.workload, series.strategy, series.precision, series.scalingType + " scaling"].join(" · ");
 }
 
 function renderLineCharts(containerId, series, options) {
@@ -3535,6 +3631,7 @@ if (typeof module !== "undefined" && module.exports) {
     parseCsv,
     pointAxisTicks,
     precisionColor,
+    scalingColors,
     strategyColor,
     summarizePhases,
   };
