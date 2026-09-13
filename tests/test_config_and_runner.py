@@ -9,6 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from scripts.verify_hardware_energy_revalidation import verify_results as verify_hardware_energy_results
 
 from hpc_ai_perf.analysis import analyze_results, build_analysis_tables
 from hpc_ai_perf.analysis.summaries import (
@@ -2147,6 +2148,61 @@ def test_hardware_summary_uses_only_protocol_matched_revalidation_energy() -> No
     assert summary[0]["avg_energy_joules"] == 12000.0
     assert summary[0]["energy_trials"] == 1
     assert summary[0]["energy_evidence_source"] == "E235@l40s"
+
+
+def test_hardware_energy_revalidation_gate_requires_three_sufficient_trials(tmp_path: Path) -> None:
+    result_root = tmp_path / "raw" / "l40s"
+    references = {"E235": "E123", "E236": "E124", "E237": "E127", "E238": "E128"}
+    for experiment_id, reference_id in references.items():
+        experiment_dir = result_root / experiment_id
+        experiment_dir.mkdir(parents=True)
+        for repetition in range(1, 4):
+            record = {
+                "status": "completed",
+                "repetition_number": repetition,
+                "config": {"metadata": {"energy_reference_experiment_id": reference_id}},
+                "metrics": {
+                    "energy_scope": "measured_region",
+                    "energy_measurement_status": "sufficient",
+                    "energy_joules_measured_region": 100.0 + repetition,
+                    "power_draw_watts": 200.0,
+                    "nvidia_smi.measurement_samples": 4,
+                    "nvidia_smi.gpu_mapping_method": "cuda_uuid",
+                    "nvidia_smi.telemetry_schema_version": "3",
+                },
+                "environment": {"observed_gpu_model": "NVIDIA L40S"},
+            }
+            (experiment_dir / f"trial-{repetition}.json").write_text(json.dumps(record), encoding="utf-8")
+
+    issues, accepted = verify_hardware_energy_results(result_root)
+
+    assert not issues
+    assert set(accepted) == set(references)
+    assert all(result["trials"] == 3 for result in accepted.values())
+
+
+def test_hardware_energy_revalidation_gate_rejects_insufficient_samples(tmp_path: Path) -> None:
+    result_root = tmp_path / "raw" / "l40s"
+    experiment_dir = result_root / "E235"
+    experiment_dir.mkdir(parents=True)
+    record = {
+        "status": "completed",
+        "repetition_number": 1,
+        "config": {"metadata": {"energy_reference_experiment_id": "E123"}},
+        "metrics": {
+            "energy_scope": "full_window",
+            "energy_measurement_status": "insufficient_samples",
+            "nvidia_smi.measurement_samples": 1,
+            "nvidia_smi.gpu_mapping_method": "cuda_uuid",
+            "nvidia_smi.telemetry_schema_version": "3",
+        },
+        "environment": {"observed_gpu_model": "NVIDIA L40S"},
+    }
+    (experiment_dir / "trial-1.json").write_text(json.dumps(record), encoding="utf-8")
+
+    issues, _ = verify_hardware_energy_results(result_root)
+
+    assert any("insufficient samples" in issue for issue in issues)
 
 
 def test_dashboard_static_assets_exist() -> None:
