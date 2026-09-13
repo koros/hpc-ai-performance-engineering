@@ -186,6 +186,16 @@ run("every statically referenced dashboard element exists", () => {
   assert.deepEqual([...new Set(referenced.filter((id) => !ids.has(id)))], []);
 });
 
+run("dashboard prioritizes research insights over administrative summaries", () => {
+  const html = fs.readFileSync("dashboard/index.html", "utf8");
+  const source = fs.readFileSync("dashboard/app.js", "utf8");
+
+  assert.doesNotMatch(html, /Top Experiments|Submission Readiness|Descriptive Phase Distributions|Phase Evidence Inventory/);
+  assert.doesNotMatch(source, /function render(?:Readiness|PhaseDistributions|RankingTable|PhaseTable)\b/);
+  assert.match(html, /Matched H100\/L40S protocols/);
+  assert.match(html, /<details class="panel evidence-audit"/);
+});
+
 run("line charts label every discrete x value when the study is compact", () => {
   assert.deepEqual(pointAxisTicks([16, 2, 8, 4, 8], [2, 16]), [2, 4, 8, 16]);
   assert.deepEqual(pointAxisTicks([1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 9]), [1, 5, 9]);
