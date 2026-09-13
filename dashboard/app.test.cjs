@@ -485,6 +485,18 @@ run("repository evidence supports a broad controlled H100 and L40S comparison", 
   });
 });
 
+run("hardware dashboard exposes campaign filters and explains its ratio boundary", () => {
+  const html = fs.readFileSync("dashboard/index.html", "utf8");
+
+  assert.match(html, /Every exact protocol completed on both platforms is paired/);
+  assert.match(html, /id="hardwarePhaseFilter"/);
+  assert.match(html, /id="hardwareWorkloadFilter"/);
+  assert.match(html, /id="hardwareModeFilter"/);
+  assert.match(html, /within-pair H100\/L40S ratios/);
+  assert.match(html, /Study medians combine unitless ratios/);
+  assert.doesNotMatch(html, /Only matched one-GPU protocols/);
+});
+
 run("training analysis uses plain-language labels without encoded uncertainty text", () => {
   const html = fs.readFileSync("dashboard/index.html", "utf8");
   const source = fs.readFileSync("dashboard/app.js", "utf8");
