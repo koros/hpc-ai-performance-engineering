@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from hpc_ai_perf.config import ExperimentConfig
+from hpc_ai_perf.config.lowbit import PARAMETERS as LOWBIT_PARAMETERS
+from hpc_ai_perf.config.lowbit import lowbit_issues
 from hpc_ai_perf.profiling import SUPPORTED_PROFILERS
 
-SUPPORTED_WORKLOADS = {"distilbert", "environment_validation", "gpt2_small", "synthetic", "tinyllama"}
+SUPPORTED_WORKLOADS = {"distilbert", "environment_validation", "gpt2_small", "synthetic", "tinyllama", "qwen2_5_7b"}
 SUPPORTED_ENVIRONMENT_TARGETS = {
     "cuda_pytorch",
     "ddp_nccl_allreduce",
@@ -81,6 +83,7 @@ TRANSFORMER_PARAMETER_KEYS = {
     "warmup_steps",
 }
 WORKLOAD_PARAMETER_KEYS = {
+    "qwen2_5_7b": LOWBIT_PARAMETERS,
     "distilbert": TRANSFORMER_PARAMETER_KEYS,
     "gpt2_small": TRANSFORMER_PARAMETER_KEYS,
     "tinyllama": TRANSFORMER_PARAMETER_KEYS,
@@ -138,6 +141,8 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
         return issues
     parameters = config.workload.parameters
     workload = config.workload.name
+    if workload == "qwen2_5_7b":
+        issues.extend(lowbit_issues(config))
     strategy = config.distributed.strategy
     expected_gpus = config.distributed.nodes * config.distributed.gpus_per_node
 

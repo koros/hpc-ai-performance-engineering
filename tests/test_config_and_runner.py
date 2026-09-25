@@ -554,7 +554,14 @@ def test_preserved_trials_get_unique_paths(tmp_path: Path) -> None:
 def test_default_registry_includes_transformer_workload_skeletons() -> None:
     registry = default_registry()
 
-    assert registry.names() == ["distilbert", "environment_validation", "gpt2_small", "synthetic", "tinyllama"]
+    assert registry.names() == [
+        "distilbert",
+        "environment_validation",
+        "gpt2_small",
+        "qwen2_5_7b",
+        "synthetic",
+        "tinyllama",
+    ]
 
 
 def test_transformer_workload_skeleton_fails_gracefully() -> None:
