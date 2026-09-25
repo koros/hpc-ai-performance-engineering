@@ -3,6 +3,46 @@
   "waves": [
     {
       "platform": "l40s",
+      "wave": "lowbit-serving",
+      "name": "L40S Qwen2.5-7B BF16 AWQ and GPTQ (acceptance required)",
+      "experiment_ids": [
+        "E239-E244"
+      ],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "lowbit-bnb",
+      "name": "L40S Qwen2.5-7B bitsandbytes NF4 (acceptance required)",
+      "experiment_ids": [
+        "E245-E246"
+      ],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "lowbit-serving",
+      "name": "H100 Qwen2.5-7B BF16 AWQ and GPTQ (acceptance required)",
+      "experiment_ids": [
+        "E239-E244"
+      ],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "lowbit-bnb",
+      "name": "H100 Qwen2.5-7B bitsandbytes NF4 (acceptance required)",
+      "experiment_ids": [
+        "E245-E246"
+      ],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
       "wave": "0",
       "name": "L40S core environment gate",
       "experiment_ids": ["E001-E006"],

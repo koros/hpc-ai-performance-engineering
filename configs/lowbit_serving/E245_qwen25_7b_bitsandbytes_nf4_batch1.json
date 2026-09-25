@@ -1,0 +1,97 @@
+{
+  "experiment_id": "E245",
+  "experiment": "qwen25_7b_bitsandbytes_nf4_batch_1_lowbit_v1",
+  "mode": "inference",
+  "workload": {
+    "name": "qwen2_5_7b",
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "model_revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+    "dataset": "Salesforce/wikitext",
+    "parameters": {
+      "study_protocol": "qwen25_7b_lowbit_v1",
+      "quantization_method": "bitsandbytes_nf4",
+      "framework": "vllm",
+      "base_compute_dtype": "bf16",
+      "batch_size": 1,
+      "prompt_length": 512,
+      "max_new_tokens": 128,
+      "warmup_steps": 3,
+      "min_measured_seconds": 30,
+      "prompt_samples": 64,
+      "quality_samples": 32,
+      "quality_sequence_length": 256,
+      "quality_max_relative_ppl_increase": 0.1,
+      "dataset_revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+      "dataset_subset": "wikitext-2-raw-v1",
+      "performance_split": "validation",
+      "quality_split": "test",
+      "max_model_len": 1024,
+      "kv_cache_blocks": 1024,
+      "kv_cache_block_size": 16,
+      "gpu_memory_utilization": 0.8,
+      "comparison_control_id": "E239"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "int4",
+    "max_steps": 300,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi"
+    ],
+    "parameters": {
+      "sample_interval_seconds": 0.1
+    }
+  },
+  "metadata": {
+    "matrix_id": "E245",
+    "phase": "Inference precision/quantization",
+    "priority": "Should Have",
+    "template": "inference_serving",
+    "study_family": "qwen25_7b_lowbit_v1",
+    "objective": "Compare released low-bit artifacts against fresh BF16 controls at fixed request shape and KV cache",
+    "research_questions": [
+      "RQ3",
+      "RQ5",
+      "RQ6",
+      "RQ7"
+    ],
+    "analysis_tasks": [
+      "A02",
+      "A04",
+      "A05",
+      "A06",
+      "A07"
+    ],
+    "gpu_hours_estimate": 0.5,
+    "matrix_stack_strategy": "vLLM V0 eager",
+    "matrix_precision_config": "bitsandbytes_nf4",
+    "key_metrics": [
+      "throughput_tokens_sec",
+      "latency_p95_ms",
+      "time_to_first_token_p95_ms",
+      "memory_model_weights_gb",
+      "quality_perplexity",
+      "energy_joules_measured_region"
+    ],
+    "acceptance_required": "lowbit-serving",
+    "comparison_scope": "publisher_artifact_deployment",
+    "limitation": "AWQ/GPTQ upstream calibration and exact pre-quantization base revision are not fully disclosed; not a pure quantizer-algorithm comparison"
+  }
+}

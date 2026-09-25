@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import subprocess
 from pathlib import Path
 from shlex import quote
@@ -1165,6 +1166,19 @@ def _submit_platform_wave(args: argparse.Namespace):
     if not args.wave:
         raise ValueError("submit-platform-wave requires --wave")
     profile = load_platform_profile(args.platform_profile)
+    if args.wave in {"lowbit-serving", "lowbit-bnb"}:
+        from hpc_ai_perf.validation.lowbit import probe_packages, verify_acceptance
+
+        acceptance_dir = os.environ.get("HPC_AI_LOWBIT_ACCEPTANCE_DIR")
+        if not acceptance_dir or not args.venv_activate:
+            raise ValueError("Low-bit waves require make submit-lowbit-wave and a platform-specific acceptance job")
+        runtime_python = str(Path(args.venv_activate).expanduser().parent / "python")
+        verify_acceptance(
+            Path(acceptance_dir),
+            profile.platform_id,
+            probe_packages(runtime_python),
+            include_bnb=args.wave == "lowbit-bnb",
+        )
     state_path = _wave_state_path_for_args(args, profile.platform_id)
     bundle = _create_platform_submission_bundle(args)
     manifest = json.loads(bundle.manifest_path.read_text(encoding="utf-8"))
