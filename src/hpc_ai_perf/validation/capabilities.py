@@ -228,7 +228,7 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
                 issues.append("vLLM FP8 inference requires base_compute_dtype=bf16")
             if not parameters.get("comparison_control_id"):
                 issues.append("vLLM FP8 inference requires a comparison_control_id")
-        elif config.runtime.precision in {"fp8", "int8", "int4"}:
+        elif config.runtime.precision in {"fp8", "int8", "int4", "nf4"}:
             issues.append(
                 f"precision {config.runtime.precision} requires a backend/model-specific implementation "
                 "not selected by this config"

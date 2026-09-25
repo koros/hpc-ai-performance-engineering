@@ -8,7 +8,7 @@ from typing import Any, Literal
 from hpc_ai_perf.config.traceability import enrich_matrix_metadata
 
 ExperimentMode = Literal["training", "inference", "profiling"]
-Precision = Literal["fp32", "fp16", "bf16", "fp8", "int8", "int4"]
+Precision = Literal["fp32", "fp16", "bf16", "fp8", "int8", "int4", "nf4"]
 DistributedStrategy = Literal["none", "ddp", "fsdp", "deepspeed_zero1", "deepspeed_zero2", "deepspeed_zero3"]
 
 

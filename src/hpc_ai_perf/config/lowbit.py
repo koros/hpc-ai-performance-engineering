@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -77,8 +78,9 @@ def lowbit_issues(config: Any) -> list[str]:
     model, revision, _ = ARTIFACTS[method]
     if (config.workload.model, config.workload.model_revision) != (model, revision):
         issues.append("low-bit model artifact must match its pinned publisher revision")
-    if config.runtime.precision != ("bf16" if method == "bf16" else "int4"):
-        issues.append("low-bit precision must be BF16 for the control or INT4 for treatments")
+    expected_precision = {"bf16": "bf16", "bitsandbytes_nf4": "nf4"}.get(method, "int4")
+    if config.runtime.precision != expected_precision:
+        issues.append("low-bit precision must distinguish BF16, integer INT4, and bitsandbytes NF4")
     if p.get("base_compute_dtype") != "bf16":
         issues.append("low-bit serving holds activation/compute dtype at BF16")
     if (config.workload.dataset, p.get("dataset_revision")) != (DATASET, DATASET_REVISION):
@@ -104,7 +106,13 @@ def lowbit_issues(config: Any) -> list[str]:
     )
     for key in positive:
         value = p.get(key)
-        if not isinstance(value, int | float) or isinstance(value, bool) or value <= 0:
+        if (
+            not isinstance(value, int | float)
+            or isinstance(value, bool)
+            or not math.isfinite(value)
+            or value <= 0
+            or (key != "min_measured_seconds" and not isinstance(value, int))
+        ):
             issues.append(f"low-bit {key} must be positive")
     if issues:
         return issues

@@ -45,7 +45,7 @@
     "backend": "nccl"
   },
   "runtime": {
-    "precision": "int4",
+    "precision": "nf4",
     "max_steps": 300,
     "seed": 1337,
     "output_dir": "results/raw"

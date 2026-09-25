@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -16,6 +17,7 @@ from hpc_ai_perf.config.lowbit import (
 )
 from hpc_ai_perf.validation.capabilities import capability_issues
 from hpc_ai_perf.workloads.lowbit import (
+    LowBitServingWorkload,
     engine_kwargs,
     quality_metrics,
     request_measurements,
@@ -65,7 +67,7 @@ def example_config(method="bf16", batch=1):
             },
             "hardware": {"platform": "lovelace_h100", "gpus": 1, "gpu_model": "NVIDIA H100"},
             "distributed": {"strategy": "none", "nodes": 1, "gpus_per_node": 1},
-            "runtime": {"precision": "bf16" if method == "bf16" else "int4", "max_steps": 300},
+            "runtime": {"precision": {"bf16": "bf16", "bitsandbytes_nf4": "nf4"}.get(method, "int4"), "max_steps": 300},
         }
     )
 
@@ -133,9 +135,9 @@ def test_artifact_and_observed_module_checks_reject_silent_fallback():
         )
 
 
-def test_real_text_windows_are_deterministic_and_do_not_cross_documents():
-    tokenizer = SimpleNamespace(encode=lambda text, **kw: list(map(int, text.split())))
-    assert text_windows(["", "1 2 3 4 5", "6 7 8 9"], tokenizer, 2, 4) == [[1, 2], [3, 4], [6, 7], [8, 9]]
+def test_real_text_windows_are_deterministic_with_explicit_row_separators():
+    tokenizer = SimpleNamespace(encode=lambda text, **kw: list(map(int, text.split())), eos_token_id=0)
+    assert text_windows(["", "1 2 3 4 5", "6 7 8 9"], tokenizer, 2, 4) == [[1, 2], [3, 4], [5, 0], [6, 7]]
     with pytest.raises(RuntimeError, match="fewer"):
         text_windows(["1 2"], tokenizer, 2, 2)
     assert select_prompts([[1], [2], [3]], 1, 2) == [{"prompt_token_ids": [3]}, {"prompt_token_ids": [1]}]
@@ -166,3 +168,77 @@ def test_missing_latency_or_short_generation_is_not_relabelled_successful():
     output.metrics.first_token_time = None
     with pytest.raises(RuntimeError, match="no batch-time fallback"):
         request_measurements([output], 1, 2)
+
+
+def test_adapter_runs_quality_outside_measured_region_and_reads_worker_memory(monkeypatch):
+    from contextlib import contextmanager
+
+    from hpc_ai_perf.workloads import lowbit
+
+    events = []
+    clock = iter([0, 40, 40])
+    monkeypatch.setattr(lowbit.time, "perf_counter", lambda: next(clock))
+    monkeypatch.setattr(lowbit, "_prepare_runtime", lambda *args: None)
+    monkeypatch.setattr(lowbit, "load_artifact_config", lambda config: {"model_type": "qwen2", "num_hidden_layers": 28})
+
+    @contextmanager
+    def region():
+        events.append("start_measurement")
+        yield
+        events.append("stop_measurement")
+
+    monkeypatch.setattr(lowbit, "measured_region", region)
+    tokenizer = SimpleNamespace(eos_token_id=0, encode=lambda *args, **kw: list(range(1024)))
+    cuda = SimpleNamespace(is_available=lambda: True, get_device_capability=lambda _: (8, 9), synchronize=lambda: None)
+    monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(cuda=cuda))
+    monkeypatch.setitem(
+        sys.modules, "datasets", SimpleNamespace(load_dataset=lambda *a, **kw: {"text": ["real text"] * 64})
+    )
+    hf_config = SimpleNamespace(to_dict=lambda: {"model_type": "qwen2", "num_hidden_layers": 28})
+    monkeypatch.setitem(
+        sys.modules,
+        "transformers",
+        SimpleNamespace(
+            AutoConfig=SimpleNamespace(from_pretrained=lambda *a, **kw: hf_config),
+            AutoTokenizer=SimpleNamespace(from_pretrained=lambda *a, **kw: tokenizer),
+        ),
+    )
+
+    class FakeLLM:
+        def __init__(self, **kwargs):
+            assert kwargs["quantization"] is None
+            self.llm_engine = SimpleNamespace(
+                model_config=SimpleNamespace(quantization=None, dtype="torch.bfloat16"),
+                cache_config=SimpleNamespace(num_gpu_blocks=1024, block_size=16),
+                model_executor=SimpleNamespace(collective_rpc=self.rpc),
+            )
+
+        def rpc(self, method, **kwargs):
+            if method.__name__ == "_worker_quantization":
+                return [{"quantized_module_count": 0, "quantized_module_types": [], "bnb_quant_types": []}]
+            events.append("worker_memory")
+            return [{"model_weights_bytes": 2**30, "peak_allocated_bytes": 2**31, "peak_reserved_bytes": 2**31}]
+
+        def generate(self, prompts, sampling, **kwargs):
+            if hasattr(sampling, "prompt_logprobs"):
+                events.append("quality")
+                ids = prompts[0]["prompt_token_ids"]
+                return [SimpleNamespace(prompt_logprobs=[None] + [{t: SimpleNamespace(logprob=-1)} for t in ids[1:]])]
+            events.append("performance")
+            return [
+                SimpleNamespace(
+                    outputs=[SimpleNamespace(token_ids=[1] * sampling.max_tokens)],
+                    metrics=SimpleNamespace(arrival_time=1, first_token_time=2, finished_time=3),
+                )
+                for _ in prompts
+            ]
+
+    monkeypatch.setitem(sys.modules, "vllm", SimpleNamespace(LLM=FakeLLM, SamplingParams=SimpleNamespace))
+    result = LowBitServingWorkload().run(example_config())
+    assert result.metrics["quality_tokens"] == 32 * 255
+    assert result.metrics["requests"] == 2
+    assert result.metrics["generated_tokens"] == 256
+    assert result.metrics["memory_model_weights_gb"] == 1
+    assert result.metrics["memory_worker_peak_allocated_gb"] == 2
+    assert max(i for i, e in enumerate(events) if e == "quality") < events.index("start_measurement")
+    assert events[-2:] == ["stop_measurement", "worker_memory"]

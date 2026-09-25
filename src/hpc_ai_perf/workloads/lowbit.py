@@ -8,6 +8,7 @@ import math
 import os
 import time
 from importlib.metadata import version
+from pathlib import Path
 from typing import Any
 
 from hpc_ai_perf.config import ExperimentConfig
@@ -50,7 +51,7 @@ class LowBitServingWorkload(Workload):
     def run(self, config: ExperimentConfig) -> WorkloadRunOutput:
         import torch
         from datasets import load_dataset
-        from transformers import AutoConfig, AutoTokenizer
+        from transformers import AutoTokenizer
         from vllm import LLM, SamplingParams
 
         _prepare_runtime(torch, config)
@@ -58,8 +59,7 @@ class LowBitServingWorkload(Workload):
             raise RuntimeError("Low-bit study requires an allocated L40S/H100-class CUDA GPU")
         p = config.workload.parameters
         method = str(p["quantization_method"])
-        hf_config = AutoConfig.from_pretrained(config.workload.model, revision=config.workload.model_revision)
-        artifact_config = hf_config.to_dict()
+        artifact_config = load_artifact_config(config)
         validate_artifact(method, artifact_config)
         tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, revision=BASE_REVISION)
         perf_data = load_dataset(
@@ -210,15 +210,31 @@ def validate_artifact(method: str, config: dict[str, Any]) -> None:
         raise RuntimeError("BF16 and in-flight NF4 require the unquantized base artifact")
 
 
+def load_artifact_config(config: ExperimentConfig) -> dict[str, Any]:
+    from huggingface_hub import hf_hub_download
+
+    path = hf_hub_download(config.workload.model, "config.json", revision=config.workload.model_revision)
+    return json.loads(Path(path).read_text())
+
+
 def text_windows(texts: Any, tokenizer: Any, length: int, count: int) -> list[list[int]]:
-    """Deterministic, non-overlapping windows within documents; no random token noise."""
+    """Non-overlapping token-stream windows with EOS separators between corpus rows.
+
+    WikiText rows are short paragraphs, not documents. Concatenation is explicit
+    and identical for every artifact; quality and performance splits stay apart.
+    """
     windows = []
+    pending: list[int] = []
+    if not isinstance(tokenizer.eos_token_id, int):
+        raise RuntimeError("Pinned tokenizer must provide an EOS row separator")
     for text in texts:
         if not text.strip():
             continue
-        tokens = tokenizer.encode(text, add_special_tokens=False)
-        for start in range(0, len(tokens) - length + 1, length):
-            windows.append(tokens[start : start + length])
+        pending.extend(tokenizer.encode(text, add_special_tokens=False))
+        pending.append(tokenizer.eos_token_id)
+        while len(pending) >= length:
+            windows.append(pending[:length])
+            pending = pending[length:]
             if len(windows) == count:
                 return windows
     raise RuntimeError(f"Dataset yielded {len(windows)} windows, fewer than the required {count}")
@@ -249,7 +265,7 @@ def quality_metrics(llm: Any, sampling_class: Any, tokens: list[list[int]]) -> d
     if not math.isfinite(ppl):
         raise RuntimeError("Quality perplexity is not finite")
     return {
-        "quality_protocol": "wikitext_test_nonoverlapping_token_nll_v1",
+        "quality_protocol": "wikitext_test_eos_separated_stream_token_nll_v1",
         "quality_loss": loss,
         "quality_perplexity": ppl,
         "quality_tokens": scored,
