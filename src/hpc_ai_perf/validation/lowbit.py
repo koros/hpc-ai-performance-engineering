@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -44,7 +45,10 @@ for name in ('torch', 'vllm', 'transformers', 'tokenizers', 'datasets', 'hugging
         packages[name] = None
 print(json.dumps(packages))
 """
-    result = subprocess.run([python, "-c", code], text=True, capture_output=True, check=True, timeout=30)
+    environment = {key: value for key, value in os.environ.items() if key not in {"PYTHONPATH", "PYTHONHOME"}}
+    result = subprocess.run(
+        [python, "-c", code], text=True, capture_output=True, check=True, timeout=30, env=environment
+    )
     return json.loads(result.stdout)
 
 

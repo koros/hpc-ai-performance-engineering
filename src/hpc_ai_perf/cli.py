@@ -1085,7 +1085,10 @@ def _create_platform_submission_bundle(args: argparse.Namespace):
                 "execution_matrix": source_matrix,
                 "slurm_profile": effective_profile,
             },
-            environment_contract=capture_environment_contract(python_executable=venv_python),
+            environment_contract=capture_environment_contract(
+                python_executable=venv_python,
+                isolate_python_environment=venv_activate.resolve() != (repository / ".venv/bin/activate").resolve(),
+            ),
         )
         manifest_hash = manifest_sha256(bundle.manifest_path)
         base_options = _resolve_slurm_options(

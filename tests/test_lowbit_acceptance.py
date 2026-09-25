@@ -9,7 +9,7 @@ from hpc_ai_perf.cli import _submit_platform_wave
 from hpc_ai_perf.config.lowbit import ARTIFACTS, METHOD_IDS, digest, runtime_fingerprint
 from hpc_ai_perf.config.platform import load_platform_conditions
 from hpc_ai_perf.validation.capabilities import capability_issues
-from hpc_ai_perf.validation.lowbit import matrix_fingerprint, resolved_lowbit_config, verify_acceptance
+from hpc_ai_perf.validation.lowbit import matrix_fingerprint, probe_packages, resolved_lowbit_config, verify_acceptance
 
 
 def write_acceptance(root, platform="l40s", **metric_overrides):
@@ -104,3 +104,27 @@ def test_missing_gate_prevents_generic_submit_before_any_sbatch(monkeypatch):
     args = SimpleNamespace(wave="lowbit-serving", platform_profile="platforms/l40s.json", venv_activate=None)
     with pytest.raises(ValueError, match="platform-specific acceptance"):
         _submit_platform_wave(args)
+
+
+def test_private_dependency_probes_remove_module_python_paths(monkeypatch, tmp_path):
+    from hpc_ai_perf.slurm.bundle import capture_environment_contract
+
+    calls = []
+    monkeypatch.setenv("PYTHONPATH", "/module/torch")
+    monkeypatch.setenv("PYTHONHOME", "/module/python")
+
+    def run(command, **kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(stdout='{"packages": {}}')
+
+    monkeypatch.setattr("subprocess.run", run)
+    python = tmp_path / "python"
+    python.touch()
+    probe_packages(str(python))
+    capture_environment_contract(python_executable=python, isolate_python_environment=True)
+    assert len(calls) == 2
+    for call in calls:
+        assert "PYTHONPATH" not in call["env"]
+        assert "PYTHONHOME" not in call["env"]
+    capture_environment_contract(python_executable=python)
+    assert calls[-1]["env"] is None  # project .venv intentionally uses site modules

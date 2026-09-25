@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import platform
 import re
 import shutil
@@ -177,7 +178,9 @@ def manifest_sha256(path: str | Path) -> str:
     return _sha256_path(Path(path))
 
 
-def capture_environment_contract(*, python_executable: str | Path | None = None) -> dict[str, Any]:
+def capture_environment_contract(
+    *, python_executable: str | Path | None = None, isolate_python_environment: bool = False
+) -> dict[str, Any]:
     """Capture dependency and module identities that must not silently drift in a queued wave.
 
     Bundles normally use the Python process creating them. A serving wave can
@@ -225,6 +228,11 @@ print(json.dumps({
             capture_output=True,
             text=True,
             timeout=30,
+            # Match _bundle_setup_commands: private runtimes must not inherit
+            # the module stack's Python packages during contract capture either.
+            env={key: value for key, value in os.environ.items() if key not in {"PYTHONPATH", "PYTHONHOME"}}
+            if isolate_python_environment
+            else None,
         )
         contract = json.loads(completed.stdout)
         if not isinstance(contract, dict):  # pragma: no cover - defensive subprocess guard
