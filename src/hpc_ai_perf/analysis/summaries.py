@@ -7,10 +7,12 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from hpc_ai_perf.analysis.lowbit import LOWBIT_COLUMNS, build_lowbit_summary
 from hpc_ai_perf.config.traceability import PHASE_TRACEABILITY, RESEARCH_QUESTIONS
 from hpc_ai_perf.result_identity import COMPARABILITY_VALUES, MATRIX_PLATFORMS, is_matrix_experiment_id
 
 ANALYSIS_TABLES = {
+    "lowbit_summary": LOWBIT_COLUMNS,
     "phase_summary": [
         "platform_id",
         "comparability",
@@ -383,7 +385,7 @@ def load_processed_results(input_csv: str | Path) -> list[dict[str, str]]:
 def build_analysis_tables(rows: list[dict[str, str]]) -> dict[str, list[dict[str, Any]]]:
     """Build every named analysis table from processed result rows."""
     _validate_analysis_identities(rows)
-    return {
+    tables = {
         "phase_summary": build_phase_summary(rows),
         "experiment_rankings": build_experiment_rankings(rows),
         "scaling_summary": build_scaling_summary(rows),
@@ -398,6 +400,10 @@ def build_analysis_tables(rows: list[dict[str, str]]) -> dict[str, list[dict[str
         "research_question_summary": build_research_question_summary(rows),
         "research_finding_summary": build_research_finding_summary(rows),
     }
+    lowbit_rows = build_lowbit_summary(rows)
+    if lowbit_rows:
+        tables["lowbit_summary"] = lowbit_rows
+    return tables
 
 
 def build_research_question_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
@@ -867,6 +873,10 @@ def build_precision_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     grouped: dict[tuple[str, ...], list[dict[str, str]]] = defaultdict(list)
     for row in rows:
         if row.get("status") != "completed":
+            continue
+        if row.get("parameter_study_protocol") == "qwen25_7b_lowbit_v1":
+            # Method- and load-specific comparisons live in lowbit_summary.
+            # Do not average different request loads under a generic INT4 label.
             continue
         grouped[
             (

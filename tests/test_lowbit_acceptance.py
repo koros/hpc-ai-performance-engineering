@@ -39,6 +39,12 @@ def write_acceptance(root, platform="l40s", **metric_overrides):
                 "time_to_first_token_p95_ms": 50,
                 "memory_model_weights_gb": 5,
                 "measured_seconds": 30,
+                "energy_scope": "measured_region",
+                "energy_measurement_status": "sufficient",
+                "energy_joules_measured_region": 1000,
+                "nvidia_smi.gpu_mapping_method": "cuda_uuid",
+                "nvidia_smi.measurement_interior_samples": 100,
+                "nvidia_smi.measurement_max_gap_seconds": 0.3,
                 **metric_overrides,
             },
         }
@@ -83,6 +89,8 @@ def test_gate_checks_all_methods_and_rejects_stale_platform_or_dependency_eviden
         ("measured_seconds", 0.1),
         ("latency_sample_count", 0),
         ("lowbit_matrix_sha256", "old"),
+        ("nvidia_smi.measurement_interior_samples", 0),
+        ("nvidia_smi.measurement_max_gap_seconds", 12),
     ],
 )
 def test_gate_does_not_accept_partial_or_invalid_measurements(tmp_path, metric, value):

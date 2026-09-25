@@ -193,6 +193,10 @@ class NvidiaSmiProfiler(Profiler):
                 self._measurement_stopped_at - self._measurement_started_at, 0.0
             )
             metrics["measurement_samples"] = measured["source_samples"]
+            # Coverage diagnostics are additive: historical evidence is not
+            # rewritten, and stricter studies can reject sparse interpolation.
+            metrics["measurement_interior_samples"] = measured["interior_samples"]
+            metrics["measurement_max_gap_seconds"] = measured["max_gap_seconds"]
             if measured["sufficient"]:
                 metrics.update(
                     {
@@ -298,6 +302,11 @@ def _summarize_nvidia_smi_window(
         projected.append((stopped_at, end_value))
 
     observation_count = len({sample.timestamp for sample in anchors})
+    interior_times = sorted({sample.timestamp for sample in source})
+    coverage_times = [started_at, *interior_times, stopped_at]
+    max_gap = max(
+        (right - left for left, right in zip(coverage_times, coverage_times[1:], strict=False)), default=duration
+    )
     sufficient = bool(projected) and duration > 0 and (not require_two_observations or observation_count >= 2)
     relevant = source or anchors
     if not relevant:
@@ -308,6 +317,8 @@ def _summarize_nvidia_smi_window(
     return {
         "sufficient": sufficient,
         "source_samples": observation_count,
+        "interior_samples": len(interior_times),
+        "max_gap_seconds": max_gap,
         "duration_seconds": duration,
         "gpu_utilization": sum(sample.utilization for sample in relevant) / len(relevant),
         "gpu_utilization_max": max(sample.utilization for sample in relevant),

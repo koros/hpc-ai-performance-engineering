@@ -78,6 +78,7 @@ def verify_acceptance(root: Path, platform: str, packages: dict[str, Any], *, in
             == p["quality_samples"] * (p["quality_sequence_length"] - 1),
             "KV-cache allocation": metrics.get("kv_cache_blocks_observed") == p["kv_cache_blocks"],
             "per-request timing coverage": metrics.get("latency_sample_count", 0) == metrics.get("requests", -1),
+            "energy sampling coverage": energy_coverage_valid(metrics),
         }
         for metric in (
             "throughput_tokens_sec",
@@ -93,3 +94,25 @@ def verify_acceptance(root: Path, platform: str, packages: dict[str, Any], *, in
         issues.extend(f"{method}: {label} failed" for label, passed in checks.items() if not passed)
     if issues:
         raise ValueError("Low-bit acceptance failed:\n- " + "\n- ".join(issues))
+
+
+def energy_coverage_valid(metrics: dict[str, Any]) -> bool:
+    """New studies require interior observations, bounded gaps and verified GPUs."""
+    values = {
+        name: metrics.get(name)
+        for name in (
+            "energy_joules_measured_region",
+            "nvidia_smi.measurement_interior_samples",
+            "nvidia_smi.measurement_max_gap_seconds",
+        )
+    }
+    if not all(isinstance(v, int | float) and math.isfinite(v) for v in values.values()):
+        return False
+    return (
+        metrics.get("energy_scope") == "measured_region"
+        and metrics.get("energy_measurement_status") == "sufficient"
+        and metrics.get("nvidia_smi.gpu_mapping_method") in {"cuda_uuid", "cgroup_visible_rows"}
+        and values["energy_joules_measured_region"] > 0
+        and values["nvidia_smi.measurement_interior_samples"] >= 10
+        and 0 <= values["nvidia_smi.measurement_max_gap_seconds"] <= 1.0
+    )
