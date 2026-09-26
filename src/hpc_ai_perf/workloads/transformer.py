@@ -93,8 +93,26 @@ class TinyLlamaWorkload(TransformerWorkload):
         return super().run(config)
 
 
+class Qwen25SevenBTrainingWorkload(TransformerWorkload):
+    """Causal-LM training adapter for the H100-only Qwen sharding study.
+
+    This is deliberately distinct from the vLLM serving adapters for the same
+    model family.  The matrix uses it only for controlled BF16 FSDP/ZeRO-3
+    training comparisons and never pools those rows with the smaller-model
+    strategy studies.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(name="qwen2_5_7b_training", display_name="Qwen2.5-7B training")
+
+    def run(self, config: ExperimentConfig) -> WorkloadRunOutput:
+        if config.mode in {"training", "profiling"}:
+            return _run_causal_training(config)
+        return super().run(config)
+
+
 def transformer_workloads() -> list[TransformerWorkload]:
-    return [GPT2SmallWorkload(), DistilBERTWorkload(), TinyLlamaWorkload()]
+    return [GPT2SmallWorkload(), DistilBERTWorkload(), TinyLlamaWorkload(), Qwen25SevenBTrainingWorkload()]
 
 
 def _run_causal_training(config: ExperimentConfig) -> WorkloadRunOutput:
@@ -102,7 +120,7 @@ def _run_causal_training(config: ExperimentConfig) -> WorkloadRunOutput:
     runtime = _prepare_runtime(torch, config)
     parameters = config.workload.parameters
     model_name = str(parameters.get("hf_model_name", config.workload.model))
-    model_dtype = torch.bfloat16 if _uses_transformer_engine(config) else torch.float32
+    model_dtype = _training_model_dtype(torch, config)
     model = auto_model.from_pretrained(
         model_name,
         revision=_selected_model_revision(config, model_name),
@@ -117,7 +135,7 @@ def _run_classification_training(config: ExperimentConfig) -> WorkloadRunOutput:
     parameters = config.workload.parameters
     model_name = str(parameters.get("hf_model_name", config.workload.model))
     num_labels = int(parameters.get("num_labels", 2))
-    model_dtype = torch.bfloat16 if _uses_transformer_engine(config) else torch.float32
+    model_dtype = _training_model_dtype(torch, config)
     model = auto_model.from_pretrained(
         model_name,
         revision=_selected_model_revision(config, model_name),
@@ -134,6 +152,25 @@ def _run_classification_training(config: ExperimentConfig) -> WorkloadRunOutput:
         model_name=model_name,
         num_labels=num_labels,
     )
+
+
+def _training_model_dtype(torch: Any, config: ExperimentConfig) -> Any:
+    """Return the checkpoint loading dtype without changing legacy defaults.
+
+    Earlier experiments loaded ordinary training checkpoints in FP32 unless
+    they used Transformer Engine.  Large-model BF16 sharding trials must load
+    BF16 parameters before wrapping, so they opt in through an explicit,
+    validated parameter instead of silently changing historical conditions.
+    """
+
+    requested = str(config.workload.parameters.get("model_load_dtype", "")).lower()
+    if requested in {"", "fp32"}:
+        return torch.bfloat16 if _uses_transformer_engine(config) else torch.float32
+    if requested == "bf16":
+        return torch.bfloat16
+    if requested == "fp16":
+        return torch.float16
+    raise ValueError("model_load_dtype must be one of fp32, bf16, or fp16")
 
 
 def _run_training_loop(

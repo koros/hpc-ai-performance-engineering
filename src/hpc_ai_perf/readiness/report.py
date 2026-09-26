@@ -14,6 +14,9 @@ WORKLOAD_STATUS = {
     "gpt2_small": "PyTorch training/inference and vLLM routing implemented",
     "distilbert": "PyTorch training/inference implemented",
     "tinyllama": "PyTorch training/inference and vLLM routing implemented",
+    "qwen2_5_7b": "vLLM low-bit serving implemented",
+    "qwen2_5_7b_long_context": "vLLM long-context serving implemented",
+    "qwen2_5_7b_training": "H100-only BF16 FSDP/ZeRO-3 sharding study; canary gated",
 }
 CORE_ENVIRONMENT_IDS = {"E001", "E002", "E003", "E004", "E006"}
 DEEPSPEED_ENVIRONMENT_ID = "E005"

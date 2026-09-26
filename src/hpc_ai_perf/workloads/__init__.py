@@ -7,6 +7,7 @@ from hpc_ai_perf.workloads.registry import WorkloadRegistry, default_registry
 from hpc_ai_perf.workloads.transformer import (
     DistilBERTWorkload,
     GPT2SmallWorkload,
+    Qwen25SevenBTrainingWorkload,
     TinyLlamaWorkload,
     TransformerWorkload,
     transformer_workloads,
@@ -17,6 +18,7 @@ __all__ = [
     "EnvironmentValidationWorkload",
     "GPT2SmallWorkload",
     "QwenLongContextWorkload",
+    "Qwen25SevenBTrainingWorkload",
     "TinyLlamaWorkload",
     "TransformerWorkload",
     "Workload",

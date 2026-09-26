@@ -560,6 +560,7 @@ def test_default_registry_includes_transformer_workload_skeletons() -> None:
         "gpt2_small",
         "qwen2_5_7b",
         "qwen2_5_7b_long_context",
+        "qwen2_5_7b_training",
         "synthetic",
         "tinyllama",
     ]

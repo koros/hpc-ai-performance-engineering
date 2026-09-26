@@ -15,6 +15,7 @@ SUPPORTED_WORKLOADS = {
     "tinyllama",
     "qwen2_5_7b",
     "qwen2_5_7b_long_context",
+    "qwen2_5_7b_training",
 }
 SUPPORTED_ENVIRONMENT_TARGETS = {
     "cuda_pytorch",
@@ -61,6 +62,7 @@ TRANSFORMER_PARAMETER_KEYS = {
     "hf_model_revision",
     "inference_study_type",
     "learning_rate",
+    "model_load_dtype",
     "max_new_tokens",
     "memory_study_type",
     "micro_batch_size",
@@ -95,6 +97,7 @@ TRANSFORMER_PARAMETER_KEYS = {
 WORKLOAD_PARAMETER_KEYS = {
     "qwen2_5_7b_long_context": LONG_CONTEXT_PARAMETERS,
     "qwen2_5_7b": LOWBIT_PARAMETERS,
+    "qwen2_5_7b_training": TRANSFORMER_PARAMETER_KEYS,
     "distilbert": TRANSFORMER_PARAMETER_KEYS,
     "gpt2_small": TRANSFORMER_PARAMETER_KEYS,
     "tinyllama": TRANSFORMER_PARAMETER_KEYS,
@@ -197,7 +200,13 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
         if target == "tensorrt_llm":
             _extend_tensorrt_llm_environment_issues(issues, parameters, config.hardware.gpus)
 
-    if workload in {"gpt2_small", "distilbert", "tinyllama", "qwen2_5_7b_long_context"}:
+    if workload in {
+        "gpt2_small",
+        "distilbert",
+        "tinyllama",
+        "qwen2_5_7b_long_context",
+        "qwen2_5_7b_training",
+    }:
         if config.experiment_id.startswith("E") and not config.workload.model_revision:
             issues.append("matrix transformer config must pin workload.model_revision")
         model_override = parameters.get("hf_model_name")
