@@ -82,6 +82,16 @@
       "comparability": "platform_specific"
     },
     {
+      "platform": "h100",
+      "wave": "h100-capacity",
+      "name": "H100 GPT-2 capacity-adjusted scaling and memory probes",
+      "experiment_ids": [
+        "E256-E257"
+      ],
+      "required_trials": 3,
+      "comparability": "capacity_adjusted"
+    },
+    {
       "platform": "l40s",
       "wave": "0",
       "name": "L40S core environment gate",

@@ -1,0 +1,76 @@
+{
+  "experiment_id": "E256",
+  "experiment": "capacity_adjusted_h100_gpt2_small_strong_1gpu_batch32_accum2",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "scaling_type": "strong",
+      "per_gpu_batch_size": 32,
+      "global_batch_size": 64,
+      "effective_batch_size": 64,
+      "gradient_accumulation_steps": 2,
+      "sequence_length": 1024,
+      "activation_checkpointing": false,
+      "fixed_workload": true,
+      "stack": "ddp"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw/h100"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory",
+      "nccl"
+    ],
+    "parameters": {
+      "collect_scaling_metrics": true,
+      "collect_gpu_utilisation": true,
+      "collect_memory_trace": true,
+      "collect_oom_risk": true,
+      "collect_effective_batch_metrics": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E256",
+    "template": "h100_capacity_adjusted_strong_scaling",
+    "phase": "Strong scaling",
+    "priority": "Supplemental",
+    "gpu_hours_estimate": 0.6,
+    "objective": "Establish a feasible one-GPU H100 GPT-2 strong-scaling reference while preserving global batch 64 and sequence length 1024",
+    "source_experiment_ids": [
+      "E032",
+      "E033",
+      "E034"
+    ],
+    "capacity_adjusted_reason": "The exact E032 shape (per-GPU batch 64) OOMed in all three H100 trials. Reducing the per-GPU micro-batch to 32 and applying two accumulation steps preserves the global batch of 64, but changes execution semantics; this evidence is capacity-adjusted and must not be pooled with the exact E032-E034 scaling series.",
+    "key_metrics": [
+      "runtime",
+      "throughput",
+      "memory",
+      "gpu_util",
+      "oom"
+    ]
+  }
+}
