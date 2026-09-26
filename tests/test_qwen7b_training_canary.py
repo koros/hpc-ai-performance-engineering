@@ -1,0 +1,78 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from hpc_ai_perf.config import config_sha256
+from hpc_ai_perf.validation import qwen7b_training
+
+
+def _record(experiment_id: str, config_hash: str, strategy: str, detail: str) -> dict[str, object]:
+    return {
+        "status": "completed",
+        "error": None,
+        "condition_id": f"{experiment_id}@h100",
+        "workload": "qwen2_5_7b_training",
+        "precision": "bf16",
+        "gpus": 2,
+        "config_sha256": config_hash,
+        "environment": {"observed_gpu_model": "NVIDIA H100 80GB HBM3", "git_dirty": False},
+        "metrics": {
+            "strategy_observed": strategy,
+            "strategy_detail_observed": detail,
+            "effective_global_batch_size": 16,
+            "sequence_length": 512,
+            "activation_checkpointing": True,
+            "throughput_tokens_sec": 100.0,
+            "loss": 1.0,
+            "quality_finite": True,
+            "quality_loss": 1.1,
+            "memory_used_gb": 20.0,
+        },
+    }
+
+
+def test_verify_qwen7b_canaries_accepts_current_controlled_records(tmp_path: Path) -> None:
+    expected = qwen7b_training.resolved_canary_configs("h100")
+    for experiment_id, expectation in qwen7b_training.EXPECTATIONS.items():
+        root = tmp_path / experiment_id
+        root.mkdir()
+        root.joinpath("trial.json").write_text(
+            json.dumps(
+                _record(
+                    experiment_id,
+                    config_sha256(expected[experiment_id]),
+                    expectation["strategy"],
+                    expectation["detail"],
+                )
+            ),
+            encoding="utf-8",
+        )
+
+    accepted = qwen7b_training.verify_canaries(tmp_path)
+
+    assert set(accepted) == {"E250", "E251"}
+
+
+def test_verify_qwen7b_canaries_rejects_wrong_runtime_strategy(tmp_path: Path) -> None:
+    expected = qwen7b_training.resolved_canary_configs("h100")
+    for experiment_id, expectation in qwen7b_training.EXPECTATIONS.items():
+        root = tmp_path / experiment_id
+        root.mkdir()
+        strategy = "ddp" if experiment_id == "E250" else expectation["strategy"]
+        root.joinpath("trial.json").write_text(
+            json.dumps(
+                _record(
+                    experiment_id,
+                    config_sha256(expected[experiment_id]),
+                    strategy,
+                    expectation["detail"],
+                )
+            ),
+            encoding="utf-8",
+        )
+
+    with pytest.raises(ValueError, match="E250: strategy failed"):
+        qwen7b_training.verify_canaries(tmp_path)

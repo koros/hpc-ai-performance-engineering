@@ -4,7 +4,9 @@ This snapshot describes repository capabilities. Archived result files and the g
 
 ## Long-context serving extension — 26 September 2026
 
-E247–E249 add fresh one-GPU Qwen2.5-7B BF16 serving conditions at 4,096, 6,144 and 8,192 real-text prompt tokens on both platforms. The separate continuation exists because the original GPT-2/TinyLlama prompt-length curves cannot validly reach those contexts. Its pinned real-text inputs, fixed cache/model context, strict request timestamps, content-fingerprinted maximum-shape acceptance gate and submission wrappers are implemented and locally tested. GPU acceptance and canonical trials remain pending; no historical prompt evidence is replaced. See the [launch and interpretation runbook](long_context_serving_runbook.md).
+E247–E249 add fresh one-GPU Qwen2.5-7B BF16 serving conditions at 4,096, 6,144 and 8,192 real-text prompt tokens on both platforms. The separate continuation exists because the original GPT-2/TinyLlama prompt-length curves cannot validly reach those contexts. Its pinned real-text inputs, fixed cache/model context, strict request timestamps, content-fingerprinted maximum-shape acceptance gate and submission wrappers are implemented and locally tested. No historical prompt evidence is replaced. See the [launch and interpretation runbook](long_context_serving_runbook.md).
+
+E250–E255 are a planned H100-only Qwen2.5-7B BF16 training extension. They are intentionally isolated from the small-model strategy series: E250–E251 are one-trial two-GPU FSDP/ZeRO-3 execution canaries, while E252–E255 provide the controlled two- and four-GPU three-trial strategy evidence after the canary verifier passes. See the [sharding study runbook](qwen7b_training_sharding_runbook.md).
 
 The study isolates one-request prefill/latency effects, not long-context batching, concurrent arrivals, HTTP traffic, RAG retrieval or agent behaviour. Its Qwen points must not be pooled with prior small-model prompt sweeps or the separate Qwen low-bit deployment-artifact study.
 

@@ -43,3 +43,5 @@ make track-h100-progress
 Use [the platform execution runbook](../docs/platform_execution_runbook.md) for gating, submission, and result import.
 
 The `lowbit-serving` (E239–E244), optional `lowbit-bnb` (E245–E246), and `vllm-long-context` (E247–E249) waves each use one GPU per trial, three trials per condition, on both platforms. Use their dedicated `submit-lowbit-wave` or `submit-long-context-wave` wrapper after same-platform acceptance rather than the generic submission command. These are fresh controlled trials, not replacements for legacy FP8, deferred INT8 evidence, or the smaller-model prompt sweep. See the [low-bit runbook](../docs/lowbit_serving_runbook.md) and [long-context runbook](../docs/long_context_serving_runbook.md).
+
+The H100-only `qwen7b-training-canary` (E250–E251) and `qwen7b-training` (E252–E255) waves add a separately labelled BF16 Qwen2.5-7B FSDP/ZeRO-3 study. The one-trial two-GPU canaries must be collected and certified before the three-trial two- and four-GPU evidence wave is submitted. See the [Qwen2.5-7B sharding runbook](../docs/qwen7b_training_sharding_runbook.md).

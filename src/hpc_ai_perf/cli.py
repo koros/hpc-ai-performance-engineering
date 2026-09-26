@@ -1193,6 +1193,12 @@ def _submit_platform_wave(args: argparse.Namespace):
             )
         runtime_python = str(Path(args.venv_activate).expanduser().parent / "python")
         verify_acceptance(Path(acceptance_dir), profile.platform_id, probe_packages(runtime_python))
+    if args.wave == "qwen7b-training":
+        if profile.platform_id != "h100":
+            raise ValueError("Qwen2.5-7B training is currently H100-only")
+        from hpc_ai_perf.validation.qwen7b_training import verify_canaries
+
+        verify_canaries(Path("results/raw/h100"), profile.platform_id)
     state_path = _wave_state_path_for_args(args, profile.platform_id)
     bundle = _create_platform_submission_bundle(args)
     manifest = json.loads(bundle.manifest_path.read_text(encoding="utf-8"))
