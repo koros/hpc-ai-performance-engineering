@@ -62,6 +62,26 @@
       "comparability": "exact"
     },
     {
+      "platform": "h100",
+      "wave": "qwen7b-training-canary",
+      "name": "H100 Qwen2.5-7B BF16 sharding execution canaries",
+      "experiment_ids": [
+        "E250-E251"
+      ],
+      "required_trials": 1,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "h100",
+      "wave": "qwen7b-training",
+      "name": "H100 Qwen2.5-7B BF16 FSDP and ZeRO-3 strategy study",
+      "experiment_ids": [
+        "E252-E255"
+      ],
+      "required_trials": 3,
+      "comparability": "platform_specific"
+    },
+    {
       "platform": "l40s",
       "wave": "0",
       "name": "L40S core environment gate",

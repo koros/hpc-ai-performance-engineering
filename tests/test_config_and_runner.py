@@ -2295,9 +2295,9 @@ def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
     report = report_path.read_text(encoding="utf-8")
 
     assert "Source matrix configs discovered: 200" in report
-    assert "Supplemental platform probes discovered: 44" in report
+    assert "Supplemental platform probes discovered: 50" in report
     assert "Cross-platform telemetry anchors discovered: 5" in report
-    assert "Total E-number configs discovered: 249" in report
+    assert "Total E-number configs discovered: 255" in report
     assert "`gpt2_small`" in report
     assert "slurm/smoke/gpt2_small_smoke.sbatch" in report
     assert "Submission Gate" in report

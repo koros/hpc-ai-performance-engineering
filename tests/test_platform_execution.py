@@ -314,14 +314,14 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
 
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 250)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 256)}
     l40s_only_supplemental_ids = (
         {f"E{index:03d}" for index in range(201, 210)}
         | {f"E{index:03d}" for index in range(215, 233)}
         | {f"E{index:03d}" for index in range(235, 239)}
     )
     shared_telemetry_ids = {f"E{index:03d}" for index in range(210, 215)}
-    h100_only_supplemental_ids = {"E233", "E234"}
+    h100_only_supplemental_ids = {"E233", "E234"} | {f"E{index:03d}" for index in range(250, 256)}
     shared_lowbit_ids = {f"E{index:03d}" for index in range(239, 247)}
     shared_long_context_ids = {f"E{index:03d}" for index in range(247, 250)}
 
@@ -333,7 +333,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     assert {
         condition.matrix_id for condition in l40s_conditions if condition.matrix_id not in source_ids
     } == l40s_only_supplemental_ids | shared_telemetry_ids | shared_lowbit_ids | shared_long_context_ids
-    assert len(h100_conditions) == 218
+    assert len(h100_conditions) == 224
     assert {
         condition.matrix_id for condition in h100_conditions
     } == source_ids | shared_telemetry_ids | h100_only_supplemental_ids | shared_lowbit_ids | shared_long_context_ids
@@ -354,7 +354,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         )
         == 27
     )
-    assert sum(condition.status == "planned" for condition in h100_conditions) == 201
+    assert sum(condition.status == "planned" for condition in h100_conditions) == 207
 
 
 def test_telemetry_revalidation_wave_is_shared_but_platform_separated() -> None:
@@ -680,6 +680,44 @@ def test_h100_e172_returns_to_wave_five_when_full_node_is_available() -> None:
     e172 = next(condition for condition in wave_five if condition.matrix_id == "E172")
     assert e172.status == "planned"
     assert e172.required_trials == 3
+
+
+def test_h100_qwen7b_sharding_study_has_a_separate_canary_and_controlled_pairs() -> None:
+    canaries = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "h100",
+        wave="qwen7b-training-canary",
+        include_deferred=False,
+    )
+    canonical = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "h100",
+        wave="qwen7b-training",
+        include_deferred=False,
+    )
+    entries = {entry.config.experiment_id: entry.config for entry in discover_experiment_configs()}
+
+    assert {condition.matrix_id for condition in canaries} == {"E250", "E251"}
+    assert {condition.required_trials for condition in canaries} == {1}
+    assert {condition.matrix_id for condition in canonical} == {"E252", "E253", "E254", "E255"}
+    assert {condition.required_trials for condition in canonical} == {3}
+    assert {condition.comparability for condition in [*canaries, *canonical]} == {"platform_specific"}
+
+    for experiment_id in {"E250", "E251", "E252", "E253", "E254", "E255"}:
+        config = entries[experiment_id]
+        assert config.workload.name == "qwen2_5_7b_training"
+        assert config.runtime.precision == "bf16"
+        assert config.workload.parameters["model_load_dtype"] == "bf16"
+        assert config.workload.parameters["effective_batch_size"] == 16
+        assert config.workload.parameters["activation_checkpointing"] is True
+
+    for fsdp_id, zero_id, gpu_count, accumulation in (("E252", "E253", 2, 8), ("E254", "E255", 4, 4)):
+        fsdp, zero = entries[fsdp_id], entries[zero_id]
+        assert fsdp.hardware.gpus == zero.hardware.gpus == gpu_count
+        assert fsdp.workload.parameters["gradient_accumulation_steps"] == accumulation
+        assert zero.workload.parameters["gradient_accumulation_steps"] == accumulation
+        assert fsdp.distributed.strategy == "fsdp"
+        assert zero.distributed.strategy == "deepspeed_zero3"
 
 
 def test_retry_scope_includes_new_policy_conditions_missing_from_prior_attempt(monkeypatch, tmp_path: Path) -> None:

@@ -1,0 +1,71 @@
+{
+  "experiment_id": "E255",
+  "experiment": "qwen25_7b_h100_zero3_4gpu",
+  "mode": "training",
+  "workload": {
+    "name": "qwen2_5_7b_training",
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "model_revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "study_protocol": "qwen25_7b_h100_sharding_v1",
+      "model_load_dtype": "bf16",
+      "batch_size": 1,
+      "sequence_length": 512,
+      "gradient_accumulation_steps": 4,
+      "effective_batch_size": 16,
+      "global_batch_size": 16,
+      "learning_rate": 0.00001,
+      "warmup_steps": 2,
+      "activation_checkpointing": true,
+      "distributed_strategy": "DeepSpeed ZeRO-3",
+      "strategy_detail": "zero_stage_3",
+      "deepspeed_config": {
+        "zero_optimization_stage": 3,
+        "bf16_enabled": true
+      },
+      "quality_sanity_check": true
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 4,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "deepspeed_zero3",
+    "nodes": 1,
+    "gpus_per_node": 4,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 12,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "nccl"],
+    "parameters": {
+      "sample_interval_seconds": 0.1,
+      "collect_communication_overhead": true,
+      "collect_memory_trace": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E255",
+    "phase": "Large-model distributed strategy",
+    "priority": "Must Have",
+    "template": "distributed_strategy",
+    "study_family": "qwen25_7b_h100_sharding_v1",
+    "objective": "Measure BF16 Qwen2.5-7B DeepSpeed ZeRO-3 throughput, memory, and communication on four H100 GPUs",
+    "research_questions": ["RQ2", "RQ4"],
+    "analysis_tasks": ["A03", "A05"],
+    "gpu_hours_estimate": 1.0,
+    "key_metrics": ["throughput", "memory", "communication_overhead", "gpu_hours", "quality_loss"],
+    "comparison_scope": "within_platform_four_gpu_strategy_comparison",
+    "limitation": "The two- versus four-GPU view preserves effective global batch by changing accumulation; report it as a controlled scaling sensitivity, not a fixed-accumulation speedup curve."
+  }
+}

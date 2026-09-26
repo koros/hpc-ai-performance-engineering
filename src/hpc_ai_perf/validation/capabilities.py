@@ -90,6 +90,7 @@ TRANSFORMER_PARAMETER_KEYS = {
     "stack",
     "steps",
     "strategy_detail",
+    "study_protocol",
     "tensor_parallel_size",
     "text",
     "warmup_steps",
