@@ -17,7 +17,8 @@ EXPECTATIONS = {
     "E251": {"strategy": "deepspeed_zero3", "detail": "zero_stage_3"},
 }
 
-UPDATE_EXPECTATIONS = {"E261": "ddp", "E262": "fsdp", "E263": "deepspeed_zero3"}
+UPDATE_EXPECTATIONS = {"E262": "fsdp", "E263": "deepspeed_zero3"}
+UPDATE_DDP_IDS = {"E261", "E264", "E267"}
 
 
 def update_runtime_sha256() -> str:
@@ -25,14 +26,19 @@ def update_runtime_sha256() -> str:
     return hashlib.sha256((root / "workloads/transformer.py").read_bytes()).hexdigest()
 
 
-def verify_update_canaries(result_root: Path) -> dict[str, dict[str, Any]]:
+def verify_update_canaries(
+    result_root: Path, *, execution_matrix: str | Path = "platforms/execution_matrix.json"
+) -> dict[str, dict[str, Any]]:
     """Certify execution/accounting, not numerical equivalence of optimizer states."""
     entries = {
         entry.config.experiment_id: entry for entry in discover_experiment_configs("configs/large_model_training")
     }
-    conditions = load_platform_conditions("platforms/execution_matrix.json", "h100", wave="qwen7b-update-canary")
+    conditions = load_platform_conditions(execution_matrix, "h100", wave="qwen7b-update-canary")
     if {c.matrix_id for c in conditions} != set(UPDATE_EXPECTATIONS):
-        raise ValueError("Qwen update canary policy does not contain the three required controls")
+        raise ValueError("Qwen update canary policy must contain the two required sharded controls")
+    deferred_ids = {c.matrix_id for c in load_platform_conditions(execution_matrix, "h100", wave="deferred")}
+    if not UPDATE_DDP_IDS.issubset(deferred_ids):
+        raise ValueError("Qwen DDP controls require a separate feasibility gate before their deferrals can be removed")
     profile = load_platform_profile("platforms/h100.json")
     issues, accepted, initial_losses = [], {}, []
     for condition in conditions:
@@ -80,7 +86,10 @@ def verify_update_canaries(result_root: Path) -> dict[str, dict[str, Any]]:
             "initial_loss": m.get("initial_training_loss"),
             "optimizer_state_dtypes": m.get("optimizer_state_dtypes_observed"),
         }
-    if len(initial_losses) == 3 and (max(initial_losses) - min(initial_losses)) / min(initial_losses) > 0.05:
+    if (
+        len(initial_losses) == len(UPDATE_EXPECTATIONS)
+        and (max(initial_losses) - min(initial_losses)) / min(initial_losses) > 0.05
+    ):
         issues.append("Initial losses differ by more than the preregistered 5% runtime sanity tolerance")
     if issues:
         raise ValueError("Qwen training update canary failed:\n- " + "\n- ".join(issues))

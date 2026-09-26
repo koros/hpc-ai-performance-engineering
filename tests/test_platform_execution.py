@@ -354,7 +354,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         )
         == 27
     )
-    assert sum(condition.status == "planned" for condition in h100_conditions) == len(h100_conditions) - 18
+    assert sum(condition.status == "planned" for condition in h100_conditions) == len(h100_conditions) - 21
 
 
 def test_telemetry_revalidation_wave_is_shared_but_platform_separated() -> None:

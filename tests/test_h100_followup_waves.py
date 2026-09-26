@@ -16,9 +16,9 @@ from hpc_ai_perf.config.platform import (
 from hpc_ai_perf.validation.capabilities import capability_issues
 
 WAVES = {
-    "qwen7b-update-canary": ({"E261", "E262", "E263"}, 2, 1),
-    "qwen7b-update-controls-2gpu": ({"E264", "E265", "E266"}, 2, 3),
-    "qwen7b-update-controls-4gpu": ({"E267", "E268", "E269"}, 4, 3),
+    "qwen7b-update-canary": ({"E262", "E263"}, 2, 1),
+    "qwen7b-update-controls-2gpu": ({"E265", "E266"}, 2, 3),
+    "qwen7b-update-controls-4gpu": ({"E268", "E269"}, 4, 3),
     "h100-capacity-allocator-validation": ({"E260"}, 1, 3),
     "lowbit-quality": ({"E270", "E271", "E272", "E273"}, 1, 3),
     "h100-inference-energy-anchors": ({"E274", "E275", "E276"}, 1, 3),

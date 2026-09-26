@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -47,7 +48,27 @@ def write_canaries(root):
 
 def test_update_gate_accepts_current_accounting(tmp_path):
     write_canaries(tmp_path)
-    assert set(verify_update_canaries(tmp_path)) == {"E261", "E262", "E263"}
+    assert set(verify_update_canaries(tmp_path)) == {"E262", "E263"}
+
+
+def test_update_gate_requires_both_sharded_canaries(tmp_path):
+    write_canaries(tmp_path)
+    (tmp_path / "E262" / "trial.json").unlink()
+    with pytest.raises(ValueError, match="E262: no collected record matches"):
+        verify_update_canaries(tmp_path)
+
+
+@pytest.mark.parametrize("experiment_id", ["E261", "E264", "E267"])
+def test_update_gate_cannot_release_unvalidated_ddp_via_custom_policy(tmp_path, experiment_id):
+    write_canaries(tmp_path)
+    policy = json.loads(Path("platforms/execution_matrix.json").read_text())
+    for entry in policy["deferred"]:
+        if experiment_id in entry["experiment_ids"]:
+            entry["experiment_ids"].remove(experiment_id)
+    matrix = tmp_path / "matrix.json"
+    matrix.write_text(json.dumps(policy))
+    with pytest.raises(ValueError, match="Qwen (update canary policy|DDP controls)"):
+        verify_update_canaries(tmp_path, execution_matrix=matrix)
 
 
 @pytest.mark.parametrize(

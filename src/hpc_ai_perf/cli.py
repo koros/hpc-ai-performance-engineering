@@ -1174,7 +1174,10 @@ def _submit_platform_wave(args: argparse.Namespace):
 
         if profile.platform_id != "h100":
             raise ValueError("Qwen update controls are H100-only")
-        verify_update_canaries(Path(os.environ.get("HPC_AI_QWEN_UPDATE_RESULT_ROOT", "results/raw/h100")))
+        verify_update_canaries(
+            Path(os.environ.get("HPC_AI_QWEN_UPDATE_RESULT_ROOT", "results/raw/h100")),
+            execution_matrix=args.execution_matrix,
+        )
     if args.wave in {"lowbit-serving", "lowbit-bnb", "lowbit-quality"}:
         from hpc_ai_perf.validation.lowbit import probe_packages, verify_acceptance
 

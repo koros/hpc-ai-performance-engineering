@@ -36,7 +36,7 @@
     {
       "platform": "h100",
       "wave": "qwen7b-update-controls-2gpu",
-      "name": "H100 Qwen two-GPU DDP FSDP and explicit-boundary ZeRO-3 controls",
+      "name": "H100 Qwen two-GPU FSDP and explicit-boundary ZeRO-3 controls",
       "experiment_ids": ["E264-E266"],
       "required_trials": 3,
       "comparability": "platform_specific"
@@ -44,7 +44,7 @@
     {
       "platform": "h100",
       "wave": "qwen7b-update-controls-4gpu",
-      "name": "H100 Qwen four-GPU DDP FSDP and explicit-boundary ZeRO-3 controls",
+      "name": "H100 Qwen four-GPU FSDP and explicit-boundary ZeRO-3 controls",
       "experiment_ids": ["E267-E269"],
       "required_trials": 3,
       "comparability": "platform_specific"
@@ -591,6 +591,20 @@
     }
   ],
   "deferred": [
+    {
+      "platforms": ["h100"],
+      "name": "H100 Qwen two-GPU DDP capacity failure",
+      "experiment_ids": ["E261", "E264"],
+      "comparability": "platform_specific",
+      "reason": "E261 failed with CUDA OOM in job 1781885, bundle h100-wave-qwen7b-update-canary-2537fe9f-20260926t184439z: 77.41 GiB was allocated by PyTorch, the process used 79.07 GiB of the observed 79.19 GiB device, and a 130 MiB allocation failed with 115.50 MiB free. E264 repeats the same two-GPU DDP model, micro-batch, sequence length, and optimizer settings for more updates. Preserve the failed bundle and both original configs; schedule the independently validated E262/E263 sharded runtimes. This records failure under the tested configuration, not proof that every allocator or DDP deployment is infeasible. Any tuning requires a separately identified feasibility condition."
+    },
+    {
+      "platforms": ["h100"],
+      "name": "H100 Qwen four-GPU DDP awaits independent feasibility validation",
+      "experiment_ids": ["E267"],
+      "comparability": "platform_specific",
+      "reason": "Four-GPU DDP E267 has no successful independent feasibility canary. The observed two-GPU E261 OOM does not establish a four-GPU failure, and successful FSDP/ZeRO-3 canaries do not certify DDP. Keep E267 intact but defer it pending its own feasibility gate; E268/E269 remain scheduled as the validated sharded runtime comparison."
+    },
     {
       "platforms": ["l40s", "h100"],
       "name": "CUDA-toolkit-dependent TensorRT-LLM validation",
