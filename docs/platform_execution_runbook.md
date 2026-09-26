@@ -397,10 +397,13 @@ observed 79.19 GiB H100, with a further 9.20 GiB request and only 6.65 GiB free.
 E258 is the independently collectable three-trial micro-batch-40 probe:
 
 ```bash
-make submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-boundary
+make retry-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-boundary
 make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-boundary
 make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-boundary
 ```
+
+Use recovery here because it retains E257's failed immutable bundle while materialising only the newly planned E258
+condition. For a fresh checkout with no E257 attempt state, use `submit-platform-wave` instead.
 
 E259 is an optional one-trial diagnostic that changes only the recorded PyTorch allocator setting to
 `expandable_segments:True`. It cannot replace E257, and its performance numbers must not be pooled with E258 or the
