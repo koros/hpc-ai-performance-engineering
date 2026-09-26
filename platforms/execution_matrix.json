@@ -94,11 +94,21 @@
     {
       "platform": "h100",
       "wave": "h100-capacity-boundary",
-      "name": "H100 GPT-2 capacity-adjusted micro-batch boundary probe",
+      "name": "H100 GPT-2 capacity-adjusted feasible micro-batch boundary probe",
       "experiment_ids": [
-        "E257"
+        "E258"
       ],
       "required_trials": 3,
+      "comparability": "capacity_adjusted"
+    },
+    {
+      "platform": "h100",
+      "wave": "h100-capacity-allocator-canary",
+      "name": "H100 GPT-2 micro-batch 48 allocator-fragmentation canary",
+      "experiment_ids": [
+        "E259"
+      ],
+      "required_trials": 1,
       "comparability": "capacity_adjusted"
     },
     {
@@ -574,6 +584,13 @@
       "experiment_ids": ["E068"],
       "comparability": "platform_specific",
       "reason": "All three exact H100 E068 trials OOMed at GPT-2 Small BF16, sequence length 1024, and micro-batch 64. PyTorch had 70.34 GiB allocated with 7.65 GiB free on the observed 79.19 GiB H100 when a further 12.27 GiB allocation failed; only 544 MiB was reserved but unallocated. Preserve E068 and its failed bundle unchanged. Any lower micro-batch investigation must use a new H100-only capacity-adjusted condition and must not be pooled with exact E068."
+    },
+    {
+      "platforms": ["h100"],
+      "name": "H100 capacity-adjusted GPT-2 micro-batch 48 exceeds available memory",
+      "experiment_ids": ["E257"],
+      "comparability": "capacity_adjusted",
+      "reason": "All three E257 H100 micro-batch-48 trials OOMed identically. The process used 72.53 GiB of the observed 79.19 GiB H100 and had 6.65 GiB free when a further 9.20 GiB allocation failed. PyTorch had 62.96 GiB allocated and 8.84 GiB reserved but unallocated, so E257 establishes an infeasible default-allocator boundary but does not rule out a separately labelled allocator diagnostic. Preserve the failed bundle unchanged; E258 tests micro-batch 40 and E259 tests the same 48 shape with expandable segments. Neither replaces or pools with exact E067/E068."
     },
     {
       "platforms": ["l40s"],

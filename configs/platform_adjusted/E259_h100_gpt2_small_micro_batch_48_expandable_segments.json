@@ -1,0 +1,72 @@
+{
+  "experiment_id": "E259",
+  "experiment": "capacity_adjusted_h100_gpt2_small_micro_batch_48_expandable_segments",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "memory_study_type": "micro_batch",
+      "batch_size": 48,
+      "micro_batch_size": 48,
+      "sequence_length": 1024,
+      "activation_checkpointing": false,
+      "gradient_accumulation_steps": 1,
+      "effective_batch_size": 48
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw/h100",
+    "environment": {
+      "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+    }
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory"
+    ],
+    "parameters": {
+      "collect_memory_trace": true,
+      "collect_oom_risk": true,
+      "collect_effective_batch_metrics": false
+    }
+  },
+  "metadata": {
+    "matrix_id": "E259",
+    "template": "h100_allocator_fragmentation_canary",
+    "phase": "Memory optimisation",
+    "priority": "Supplemental",
+    "gpu_hours_estimate": 0.2,
+    "objective": "Test whether expandable CUDA allocator segments alter the observed H100 GPT-2 micro-batch-48 OOM outcome",
+    "source_experiment_ids": [
+      "E068",
+      "E257"
+    ],
+    "capacity_adjusted_reason": "E257 OOMed at micro-batch 48 with 8.84 GiB reserved but unallocated. E259 changes only the recorded PyTorch allocator policy to test fragmentation. It is a one-trial diagnostic and must not be pooled with E257, E258, or exact E067/E068 performance evidence.",
+    "key_metrics": [
+      "oom",
+      "memory",
+      "throughput",
+      "loss_stability"
+    ]
+  }
+}

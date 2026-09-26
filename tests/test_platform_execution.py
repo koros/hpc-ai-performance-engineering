@@ -314,14 +314,14 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
 
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 258)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 260)}
     l40s_only_supplemental_ids = (
         {f"E{index:03d}" for index in range(201, 210)}
         | {f"E{index:03d}" for index in range(215, 233)}
         | {f"E{index:03d}" for index in range(235, 239)}
     )
     shared_telemetry_ids = {f"E{index:03d}" for index in range(210, 215)}
-    h100_only_supplemental_ids = {"E233", "E234"} | {f"E{index:03d}" for index in range(250, 258)}
+    h100_only_supplemental_ids = {"E233", "E234"} | {f"E{index:03d}" for index in range(250, 260)}
     shared_lowbit_ids = {f"E{index:03d}" for index in range(239, 247)}
     shared_long_context_ids = {f"E{index:03d}" for index in range(247, 250)}
 
@@ -333,7 +333,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     assert {
         condition.matrix_id for condition in l40s_conditions if condition.matrix_id not in source_ids
     } == l40s_only_supplemental_ids | shared_telemetry_ids | shared_lowbit_ids | shared_long_context_ids
-    assert len(h100_conditions) == 226
+    assert len(h100_conditions) == 228
     assert {
         condition.matrix_id for condition in h100_conditions
     } == source_ids | shared_telemetry_ids | h100_only_supplemental_ids | shared_lowbit_ids | shared_long_context_ids
@@ -354,7 +354,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         )
         == 27
     )
-    assert sum(condition.status == "planned" for condition in h100_conditions) == 209
+    assert sum(condition.status == "planned" for condition in h100_conditions) == 210
 
 
 def test_telemetry_revalidation_wave_is_shared_but_platform_separated() -> None:
@@ -619,23 +619,34 @@ def test_h100_capacity_adjusted_wave_preserves_the_global_workload(tmp_path: Pat
         wave="h100-capacity-boundary",
         include_deferred=False,
     )
+    allocator_conditions = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "h100",
+        wave="h100-capacity-allocator-canary",
+        include_deferred=False,
+    )
 
     scaling_path = materialize_platform_configs(profile, scaling_conditions, tmp_path / "scaling")[0]
     boundary_path = materialize_platform_configs(profile, boundary_conditions, tmp_path / "boundary")[0]
+    allocator_path = materialize_platform_configs(profile, allocator_conditions, tmp_path / "allocator")[0]
 
     assert scaling_path.name == "E256.json"
-    assert boundary_path.name == "E257.json"
+    assert boundary_path.name == "E258.json"
+    assert allocator_path.name == "E259.json"
     scaling = load_experiment_config(scaling_path)
     memory = load_experiment_config(boundary_path)
+    allocator = load_experiment_config(allocator_path)
     assert scaling.metadata["condition_id"] == "E256@h100"
     assert scaling.metadata["comparability"] == "capacity_adjusted"
     assert scaling.workload.parameters["per_gpu_batch_size"] == 32
     assert scaling.workload.parameters["gradient_accumulation_steps"] == 2
     assert scaling.workload.parameters["global_batch_size"] == 64
-    assert memory.metadata["condition_id"] == "E257@h100"
+    assert memory.metadata["condition_id"] == "E258@h100"
     assert memory.metadata["comparability"] == "capacity_adjusted"
-    assert memory.workload.parameters["micro_batch_size"] == 48
-    assert all(config.runtime.output_dir == "results/raw/h100" for config in [scaling, memory])
+    assert memory.workload.parameters["micro_batch_size"] == 40
+    assert allocator.metadata["condition_id"] == "E259@h100"
+    assert allocator.runtime.environment == {"PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"}
+    assert all(config.runtime.output_dir == "results/raw/h100" for config in [scaling, memory, allocator])
 
 
 def test_l40s_checkpointed_scaling_wave_preserves_original_h100_protocol(tmp_path: Path) -> None:
@@ -843,7 +854,7 @@ def test_execution_matrix_defers_only_unaccepted_or_unsupported_backend_and_plat
                 }
             )
         else:
-            expected_ids.update({"E032", "E068"})
+            expected_ids.update({"E032", "E068", "E257"})
         conditions = load_platform_conditions(
             "platforms/execution_matrix.json",
             platform_id,
