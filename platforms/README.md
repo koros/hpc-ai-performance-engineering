@@ -41,3 +41,5 @@ make track-h100-progress
 ```
 
 Use [the platform execution runbook](../docs/platform_execution_runbook.md) for gating, submission, and result import.
+
+The new `lowbit-serving` (E239–E244) and optional `lowbit-bnb` (E245–E246) waves each use one GPU per trial, three trials per condition, on both platforms. Use their dedicated `submit-lowbit-wave` wrapper after same-platform acceptance rather than the generic submission command. These are fresh controlled trials, not replacements for legacy FP8 or deferred INT8 evidence. See the [low-bit runbook](../docs/lowbit_serving_runbook.md).

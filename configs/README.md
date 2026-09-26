@@ -13,6 +13,7 @@ This directory contains runnable experiment configs and reusable templates.
 | `hardware_comparison/` | Concrete `E121-E128` H100 and L40S training/inference comparison configs |
 | `inference/` | Concrete `E129-E200` inference configs, including framework, batching, concurrency, prompt length, multi-GPU, and precision studies |
 | `local/` | Local smoke-test configs that do not require HPC GPUs |
+| `lowbit_serving/` | Fresh E239–E246 BF16/AWQ/GPTQ/NF4 one-GPU comparisons on both platforms; acceptance required |
 | `memory_optimisation/` | Concrete `E063-E082` checkpointing, micro-batch, and gradient accumulation configs |
 | `precision_studies/` | Concrete `E083-E096` training precision configs |
 | `profiling/` | Profiling-focused configs and generated variants |
@@ -23,6 +24,8 @@ This directory contains runnable experiment configs and reusable templates.
 
 Concrete matrix experiment configs should preserve the matrix ID in both `experiment_id` and `metadata.matrix_id`. Local dev configs use readable `dev_` IDs and `metadata.profile: dev` so they stay separate from the `E001-E200` HPC tracker.
 
-Matrix transformer configs pin `workload.model_revision` to a 40-character Hugging Face commit. Performance runs use deterministic `synthetic_tokens_v1`, `synthetic_classification_v1`, or `synthetic_token_prompts_v1` inputs so exact work is comparable across GPU counts and backends; DataLoader experiments use CPU-resident deterministic samples to isolate movement costs. These performance protocols must not be described as real-corpus convergence training.
+Matrix transformer configs pin `workload.model_revision` to a 40-character Hugging Face commit. The original transformer performance runs use deterministic `synthetic_tokens_v1`, `synthetic_classification_v1`, or `synthetic_token_prompts_v1` inputs so exact work is comparable across GPU counts and backends; DataLoader experiments use CPU-resident deterministic samples to isolate movement costs. These performance protocols must not be described as real-corpus convergence training.
+
+The new `lowbit_serving/` protocol instead uses pinned real WikiText validation text for performance and a separate test sample for token-likelihood evaluation. It is not pooled with the original synthetic studies. See the [low-bit runbook](../docs/lowbit_serving_runbook.md) for fixed controls, quality limitations, fresh IDs and launch commands.
 
 Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` before rendering. A backend-dependent config is intentionally rejected until it declares an executable precision/framework path and any required engine or quantized model artefact.

@@ -1,12 +1,18 @@
 # Current Project Status
 
-This snapshot summarises the repository state before full HPC submission. It should be updated after major workflow or experiment changes.
+This snapshot describes repository capabilities. Archived result files and the generated platform tracker remain authoritative for completed trial coverage; a configured wave is not evidence that it has run.
+
+## Low-bit extension — 25 September 2026
+
+E239–E246 add fresh one-GPU Qwen2.5-7B BF16, AWQ, GPTQ and optional bitsandbytes NF4 conditions on both platforms. The adapter, real-text inputs, content-fingerprinted acceptance gate, submission wrappers and controlled analysis summary are implemented and locally tested. GPU acceptance and canonical trials are still pending. No historical raw evidence or original E001–E238 config is replaced. See the [launch and interpretation runbook](lowbit_serving_runbook.md).
+
+This addresses the deployment-format gap once validated and run. It does not yet address larger-model sharded training, a repaired scaling baseline, consumer/non-NVIDIA GPUs or multi-node generalization.
 
 ## Ready Now
 
 | Area | Status |
 | --- | --- |
-| Experiment matrix | 200 source matrix configs, 9 L40S capacity-adjusted conditions, 5 cross-platform telemetry revalidation anchors, 16 L40S full-node conditions, 4 backend-matched FP8 controls, and 4 L40S hardware-energy anchors are present and load successfully. |
+| Experiment matrix | 200 source matrix configs, 9 L40S capacity-adjusted conditions, 5 cross-platform telemetry revalidation anchors, 16 L40S full-node conditions, 4 backend-matched FP8 controls, 4 L40S hardware-energy anchors, and 8 controlled low-bit inference conditions are present and load successfully (246 total). |
 | Validation | `python -m hpc_ai_perf.cli validate --skip-results` passes with 0 config issues. |
 | Local smoke runner | CPU-only synthetic workload is ready and covered by tests. |
 | Semantic launch gate | `validate --research-ready` blocks unsupported precision/backend/framework combinations before Slurm rendering or execution. |
@@ -38,11 +44,14 @@ This snapshot summarises the repository state before full HPC submission. It sho
 | L40S full-node extension | 16 |
 | Backend-matched FP8 controls | 4 |
 | L40S hardware-energy revalidation anchors | 4 |
+| Controlled low-bit inference extension | 8 |
 | Must Have | 116 |
 | Should Have | 71 |
 | Optional | 13 |
 | Training configs | 107 |
 | Inference configs | 93 |
+
+The priority and training/inference counts above describe the original 200 source configs only. The eight new low-bit conditions are supplemental inference trials; their independent `lowbit-serving`/`lowbit-bnb` waves add eight planned conditions to each platform without changing the earlier policy.
 
 ## Current HPC State
 
