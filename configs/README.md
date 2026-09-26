@@ -13,6 +13,7 @@ This directory contains runnable experiment configs and reusable templates.
 | `hardware_comparison/` | Concrete `E121-E128` H100 and L40S training/inference comparison configs |
 | `inference/` | Concrete `E129-E200` inference configs, including framework, batching, concurrency, prompt length, multi-GPU, and precision studies |
 | `local/` | Local smoke-test configs that do not require HPC GPUs |
+| `long_context_serving/` | Fresh E247–E249 Qwen2.5-7B BF16 4,096/6,144/8,192-token one-request context study; acceptance required |
 | `lowbit_serving/` | Fresh E239–E246 BF16/AWQ/GPTQ/NF4 one-GPU comparisons on both platforms; acceptance required |
 | `memory_optimisation/` | Concrete `E063-E082` checkpointing, micro-batch, and gradient accumulation configs |
 | `precision_studies/` | Concrete `E083-E096` training precision configs |
@@ -26,6 +27,6 @@ Concrete matrix experiment configs should preserve the matrix ID in both `experi
 
 Matrix transformer configs pin `workload.model_revision` to a 40-character Hugging Face commit. The original transformer performance runs use deterministic `synthetic_tokens_v1`, `synthetic_classification_v1`, or `synthetic_token_prompts_v1` inputs so exact work is comparable across GPU counts and backends; DataLoader experiments use CPU-resident deterministic samples to isolate movement costs. These performance protocols must not be described as real-corpus convergence training.
 
-The new `lowbit_serving/` protocol instead uses pinned real WikiText validation text for performance and a separate test sample for token-likelihood evaluation. It is not pooled with the original synthetic studies. See the [low-bit runbook](../docs/lowbit_serving_runbook.md) for fixed controls, quality limitations, fresh IDs and launch commands.
+The `lowbit_serving/` protocol uses pinned real WikiText validation text for performance and a separate test sample for token-likelihood evaluation. The separate `long_context_serving/` protocol uses real WikiText validation windows to isolate 4k–8k prefill/latency effects with a fixed Qwen BF16 model and cache. Neither protocol is pooled with the original synthetic studies or with each other. See the [low-bit runbook](../docs/lowbit_serving_runbook.md) and [long-context runbook](../docs/long_context_serving_runbook.md) for controls, limitations, IDs and launch commands.
 
 Run `python -m hpc_ai_perf.cli validate --skip-results --research-ready` before rendering. A backend-dependent config is intentionally rejected until it declares an executable precision/framework path and any required engine or quantized model artefact.

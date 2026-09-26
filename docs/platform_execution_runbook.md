@@ -113,6 +113,7 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `vllm-batching` | `E132-E137`, `E180-E185` | 3 | Batch-size sweep completes with request and generated-token metrics. |
 | `vllm-concurrency` | `E138-E142`, `E186-E190` | 3 | Concurrency sweep completes with latency and throughput metrics. |
 | `vllm-prompt` | `E143-E146`, `E191-E194` | 3 | Prompt-length sweep completes with TTFT and generation metrics. |
+| `vllm-long-context` | `E247-E249` | 3 | Separate Qwen BF16 4,096/6,144/8,192-token one-request prefill/latency curve; run only through its maximum-shape acceptance gate. |
 | `vllm-tp2` | `E147`, `E195` | 3 | Two-GPU tensor-parallel rows run on both visible L40S devices. |
 | `4gpu-pilot` | `E003` | 1 | Four-rank NCCL initialization and all-reduce pass before any four-GPU performance wave. |
 | `4gpu-core` | `E034`, `E037`, `E040`, `E043`, `E046`, `E048`, `E050`, `E056`, `E058`, `E172` | 3 | Exact four-GPU scaling, strategy, and PyTorch classification inference conditions complete after E003. |
@@ -149,6 +150,11 @@ E205 succeeded at micro-batch 25, and E206/E207/E203/E204 OOMed at 26/27/28/30. 
 micro-batch 25 as the largest passing integer probe. The L40S node exposes eight GPUs, and a four-GPU allocation has
 been verified. `8gpu-pilot` is the canonical full-node allocation and topology gate; only its accepted evidence releases
 the eight-GPU supplemental waves. Those L40S-only rows do not alter the original H100 source configurations.
+
+E247-E249 are a supplemental Qwen BF16 long-context continuation, not additional TinyLlama/GPT-2 points. They need
+the private vLLM environment and the E249 8,192-token target-platform acceptance gate before `vllm-long-context` is
+submitted. Use `make submit-long-context-wave`, not the generic vLLM wrapper; see the
+[long-context runbook](long_context_serving_runbook.md). They are one-GPU jobs and are not released by any TP gate.
 
 The exact one-GPU TinyLlama strong-scaling row E044 also exceeded L40S memory in all three trials. Each run had
 43.30 GiB allocated by PyTorch with 592.25 MiB free before a further 1000 MiB allocation failed. E044 is therefore
@@ -348,6 +354,9 @@ make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-pilot
 
 Then use `make submit-vllm-wave PLATFORM=h100 PLATFORM_WAVE=<wave>` in this order: `vllm-framework`,
 `vllm-fp8`, `vllm-batching`, `vllm-concurrency`, `vllm-prompt`, `vllm-tp2`, and canary-gated `vllm-tp4`.
+Run the separate Qwen `vllm-long-context` continuation through `make submit-long-context-acceptance` and
+`make submit-long-context-wave`; its 8,192-token prefill gate is not interchangeable with E006 or the smaller-model
+prompt sweep.
 
 ### H100 resource-homogeneous waves
 

@@ -218,6 +218,7 @@ After the pilot reports one provenance-valid completed trial, run the performanc
 | `vllm-batching` | `E132-E137`, `E180-E185` | 3 | Serving batch-size sweeps. |
 | `vllm-concurrency` | `E138-E142`, `E186-E190` | 3 | Concurrent-request sweeps. |
 | `vllm-prompt` | `E143-E146`, `E191-E194` | 3 | Prompt-length sweeps. |
+| `vllm-long-context` | `E247-E249` | 3 | Separate Qwen BF16 4,096/6,144/8,192-token, one-request context-length study; own E249 acceptance required. |
 | `vllm-tp2` | `E147`, `E195` | 3 | Two-GPU tensor-parallel serving. |
 | `vllm-tp4` | `E148`, `E196` | 3 | Four-GPU tensor-parallel serving after E003 and a TP=4 canary pass. |
 | `vllm-tp8-canary` | `E230` | 1 | L40S-only TinyLlama engine-start and served-request gate with eight visible GPUs. |

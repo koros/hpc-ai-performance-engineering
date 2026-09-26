@@ -22,6 +22,7 @@ Primary planning documents:
 - [Measurement and trial protocol](docs/measurement_protocol.md): repetition, warm-up, timing, provenance, uncertainty, and outlier rules for research evidence.
 - [GPU telemetry revalidation](docs/gpu_telemetry_revalidation.md): UUID-bound device attribution, legacy evidence treatment, telemetry audit, and cross-platform anchor waves.
 - [Controlled low-bit inference](docs/lowbit_serving_runbook.md): fresh Qwen2.5-7B BF16/AWQ/GPTQ/NF4 comparisons, real-text quality, measured-region energy, and platform-specific acceptance gates.
+- [Controlled long-context serving](docs/long_context_serving_runbook.md): fresh Qwen2.5-7B BF16 4k/6k/8k real-text prompt points, strict prefill/latency timing, and platform-specific acceptance gates.
 - [Comprehensive experiment matrix](docs/experiment_matrix.md): full source-of-truth matrix with `E001` to `E200`, priority levels, metrics, and GPU-hour estimates.
 - [Local dev runbook](docs/local_dev_runbook.md): Mac/local baseline-style runs for development while HPC access is unavailable.
 - [Dev experiment matrix](docs/dev_experiment_matrix.md): rationale, parameters, and local-dev versus HPC-only experiment boundaries.
@@ -70,7 +71,7 @@ The repository now mirrors the project proposal structure:
 | GPT-2 Small | Decoder transformer | Training and inference baseline |
 | DistilBERT | Encoder transformer | Training and inference comparison |
 | TinyLlama | Small modern LLM | Primarily inference; optional training |
-| Qwen2.5-7B-Instruct | Larger decoder LLM | New controlled low-bit inference extension; GPU acceptance pending |
+| Qwen2.5-7B-Instruct | Larger decoder LLM | Controlled low-bit and 4k–8k context serving extensions; GPU acceptance pending |
 
 Current adapter implementation status is tracked in [workload catalog](docs/workload_catalog.md).
 
@@ -99,6 +100,7 @@ hpc-ai-performance-engineering/
 │   ├── hardware_comparison/
 │   ├── inference/
 │   ├── local/
+│   ├── long_context_serving/
 │   ├── lowbit_serving/
 │   ├── memory_optimisation/
 │   ├── precision_studies/

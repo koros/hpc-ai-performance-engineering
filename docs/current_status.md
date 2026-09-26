@@ -2,6 +2,12 @@
 
 This snapshot describes repository capabilities. Archived result files and the generated platform tracker remain authoritative for completed trial coverage; a configured wave is not evidence that it has run.
 
+## Long-context serving extension — 26 September 2026
+
+E247–E249 add fresh one-GPU Qwen2.5-7B BF16 serving conditions at 4,096, 6,144 and 8,192 real-text prompt tokens on both platforms. The separate continuation exists because the original GPT-2/TinyLlama prompt-length curves cannot validly reach those contexts. Its pinned real-text inputs, fixed cache/model context, strict request timestamps, content-fingerprinted maximum-shape acceptance gate and submission wrappers are implemented and locally tested. GPU acceptance and canonical trials remain pending; no historical prompt evidence is replaced. See the [launch and interpretation runbook](long_context_serving_runbook.md).
+
+The study isolates one-request prefill/latency effects, not long-context batching, concurrent arrivals, HTTP traffic, RAG retrieval or agent behaviour. Its Qwen points must not be pooled with prior small-model prompt sweeps or the separate Qwen low-bit deployment-artifact study.
+
 ## Low-bit extension — 25 September 2026
 
 E239–E246 add fresh one-GPU Qwen2.5-7B BF16, AWQ, GPTQ and optional bitsandbytes NF4 conditions on both platforms. The adapter, real-text inputs, content-fingerprinted acceptance gate, submission wrappers and controlled analysis summary are implemented and locally tested. GPU acceptance and canonical trials are still pending. No historical raw evidence or original E001–E238 config is replaced. See the [launch and interpretation runbook](lowbit_serving_runbook.md).
@@ -12,7 +18,7 @@ This addresses the deployment-format gap once validated and run. It does not yet
 
 | Area | Status |
 | --- | --- |
-| Experiment matrix | 200 source matrix configs, 9 L40S capacity-adjusted conditions, 5 cross-platform telemetry revalidation anchors, 16 L40S full-node conditions, 4 backend-matched FP8 controls, 4 L40S hardware-energy anchors, and 8 controlled low-bit inference conditions are present and load successfully (246 total). |
+| Experiment matrix | 200 source matrix configs, 9 L40S capacity-adjusted conditions, 5 cross-platform telemetry revalidation anchors, 16 L40S full-node conditions, 4 backend-matched FP8 controls, 4 L40S hardware-energy anchors, 8 controlled low-bit inference conditions, and 3 controlled long-context serving conditions are present and load successfully (249 total). |
 | Validation | `python -m hpc_ai_perf.cli validate --skip-results` passes with 0 config issues. |
 | Local smoke runner | CPU-only synthetic workload is ready and covered by tests. |
 | Semantic launch gate | `validate --research-ready` blocks unsupported precision/backend/framework combinations before Slurm rendering or execution. |
@@ -20,7 +26,7 @@ This addresses the deployment-format gap once validated and run. It does not yet
 | Distributed execution | One-process-per-GPU `python -m torch.distributed.run`, DDP, FSDP, DeepSpeed ZeRO, rank binding, global work accounting, and rank-safe result writing are implemented. |
 | Profiling | Timestamped, allocation-bound nvidia-smi telemetry now separates the post-warm-up measured region from warm-up and profiler finalization. Historical samples remain immutable and are labelled by mapping and energy scope; only sufficient measured-region energy may feed tokens/kWh. |
 | Slurm support | Semantic-gated single/bulk rendering, H100/L40S profile matching, CPU allocation checks, and three transformer smoke presets are available. |
-| Platform execution | All 200 source rows route exactly once per platform. There are 180 planned L40S source conditions, 32 planned L40S supplemental conditions, 182 planned H100 source conditions, five planned H100 telemetry anchors, and two H100-only Transformer Engine BF16 controls. The 16 L40S-only full-node conditions require E215's eight-rank NCCL/topology gate before scaling, strategy, communication, or TP=8 results are collected. E235-E238 provide immutable measured-region energy anchors for L40S E123/E124/E127/E128 without replacing their original performance evidence. The private PyTorch 2.8.0/CUDA 12.4 stack has passed E006 acceptance on both L40S and H100; each platform routes 39 source vLLM conditions, including E151/E199 online FP8 W8A8. Transformer Engine FP8 is acceptance-gated on both platforms: L40S E086/E093 use E231/E232, while H100 E086/E093 use E233/E234. Exact H100 E032 and E068 capacity failures, known L40S OOM shapes, TensorRT-LLM, INT8, and classification-adapter rows remain deferred. |
+| Platform execution | All 200 source rows route exactly once per platform. There are 180 planned L40S source conditions, 35 planned L40S supplemental conditions, 182 planned H100 source conditions, five planned H100 telemetry anchors, and two H100-only Transformer Engine BF16 controls. The 16 L40S-only full-node conditions require E215's eight-rank NCCL/topology gate before scaling, strategy, communication, or TP=8 results are collected. E235-E238 provide immutable measured-region energy anchors for L40S E123/E124/E127/E128 without replacing their original performance evidence. The private PyTorch 2.8.0/CUDA 12.4 stack has passed E006 acceptance on both L40S and H100; each platform routes 39 source vLLM conditions, including E151/E199 online FP8 W8A8, plus three gated Qwen long-context conditions (E247-E249). Transformer Engine FP8 is acceptance-gated on both platforms: L40S E086/E093 use E231/E232, while H100 E086/E093 use E233/E234. Exact H100 E032 and E068 capacity failures, known L40S OOM shapes, TensorRT-LLM, INT8, and classification-adapter rows remain deferred. |
 | Evidence retention | L40S/H100 JSON is imported non-destructively into separate roots, scanned for sensitive keys, validated, and covered by tracked SHA-256 manifests. |
 | Dashboard | Static dashboard reads processed results and objective-specific analysis summaries. It leads with seven evidence-derived conclusions that state effect sizes, decisions, changed variables, controls, limitations, and traceable source conditions before showing supporting charts. Low-value cross-study rankings, operational submission readiness, and duplicate phase inventories have been removed from the presentation; detailed trial evidence remains in a collapsed audit panel. Its research-evidence section retains RQ1–RQ7 coverage, a compact colour-coded scaling chart with all/strong/weak selectors that preserves all 13 isolated series, and matched throughput-memory findings. The hardware view expands the four dedicated RQ6 rows into 164 exact campaign-wide H100/L40S protocol pairs, with filters, study-level ratio ranges, lead counts, strongest contrasts, and metric drill-downs. Training, precision, memory, hardware, communication, inference, and measured-region energy views remain controlled and unit-separated. |
 | Quality gates | `pytest`, `ruff`, and `pre-commit` are configured and passing. |
@@ -45,13 +51,14 @@ This addresses the deployment-format gap once validated and run. It does not yet
 | Backend-matched FP8 controls | 4 |
 | L40S hardware-energy revalidation anchors | 4 |
 | Controlled low-bit inference extension | 8 |
+| Controlled long-context serving extension | 3 |
 | Must Have | 116 |
 | Should Have | 71 |
 | Optional | 13 |
 | Training configs | 107 |
 | Inference configs | 93 |
 
-The priority and training/inference counts above describe the original 200 source configs only. The eight new low-bit conditions are supplemental inference trials; their independent `lowbit-serving`/`lowbit-bnb` waves add eight planned conditions to each platform without changing the earlier policy.
+The priority and training/inference counts above describe the original 200 source configs only. The eight low-bit and three long-context conditions are supplemental inference trials; their independent `lowbit-serving`/`lowbit-bnb` and `vllm-long-context` waves add planned conditions to each platform without changing the earlier policy.
 
 ## Current HPC State
 
