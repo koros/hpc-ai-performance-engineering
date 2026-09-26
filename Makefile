@@ -55,7 +55,7 @@ DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
 # Dev targets run local Mac/workstation checks; matrix tracking stays separate.
 .PHONY: check-cuda-toolchain
 .PHONY: submit-lowbit-acceptance verify-lowbit-acceptance submit-lowbit-wave retry-lowbit-wave
-.PHONY: prefetch-lowbit-assets
+.PHONY: prefetch-lowbit-assets prefetch-long-context-assets
 .PHONY: submit-long-context-acceptance verify-long-context-acceptance submit-long-context-wave retry-long-context-wave
 .PHONY: setup-fp8-training-environment submit-fp8-training-build submit-fp8-training-acceptance verify-fp8-training-acceptance submit-fp8-training-wave retry-fp8-training-wave verify-hardware-energy-revalidation
 .PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile check-platform-runtime check-l40s-runtime check-h100-runtime check-cuda-toolchain setup-pytorch-gloo-environment submit-pytorch-gloo-build setup-vllm-environment submit-vllm-build submit-vllm-acceptance submit-vllm-pilot submit-vllm-wave retry-vllm-wave materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-rendered-platform-wave submit-rendered-platform-wave submit-platform-wave status-platform-wave collect-platform-wave retry-platform-wave stage-platform-wave create-platform-wave-bundle plan-platform-wave-bundle init-platform-wave-bundle-status dry-run-submit-platform-wave-bundle submit-platform-wave-bundle import-platform-wave-bundle track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results audit-telemetry track-progress track-dev-progress validate validate-result-evidence readiness-report refresh build-dashboard-site serve-dashboard
@@ -135,6 +135,9 @@ submit-vllm-pilot:
 # One-GPU gates are platform-specific and tied to runtime/config content, not HEAD.
 prefetch-lowbit-assets:
 	PYTHONPATH="$(CURDIR)/src" "$(LOWBIT_ENV)/bin/python" scripts/prefetch_lowbit_assets.py
+
+prefetch-long-context-assets:
+	PYTHONPATH="$(CURDIR)/src" "$(LONG_CONTEXT_ENV)/bin/python" scripts/prefetch_long_context_assets.py
 
 submit-lowbit-acceptance:
 	@case "$(PLATFORM)" in l40s|h100) ;; *) echo "PLATFORM must be l40s or h100"; exit 1;; esac
