@@ -39,9 +39,9 @@ The companion [platform experiment matrix](platform_experiment_matrix.md) gives 
 | Planned L40S supplemental conditions | 32 | Five capacity-adjusted rows, five telemetry anchors, sixteen full-node rows, two Transformer Engine BF16 controls, and four hardware-energy anchors. Do not pool capacity-adjusted or L40S-only evidence with exact H100 evidence. |
 | Deferred L40S supplemental conditions | 4 | `E203-E204` and `E206-E207`; confirmed upper-bound OOM probes at micro-batch 26/27/28/30. |
 | Deferred L40S source conditions | 20 | TensorRT-LLM/backend/adapter gaps, H100-specific hardware rows, and exact-shape E032/E033/E044/E067/E068 L40S OOMs. |
-| Planned H100 source conditions | 182 | Generated as `E###@h100`; includes the accepted vLLM scope and the real-model-gated Transformer Engine training-FP8 treatments. |
+| Planned H100 source conditions | 183 | Generated as `E###@h100`; includes the accepted vLLM scope, E172 restored for full-node recovery, and the real-model-gated Transformer Engine training-FP8 treatments. |
 | Planned H100 telemetry conditions | 5 | E210-E214 remain platform-specific revalidation evidence. |
-| Deferred H100 source conditions | 18 | E032/E068 exact-shape capacity limits, remaining backend/adapter rows, TensorRT-LLM `E007`, four L40S-specific hardware rows, and E172 pending a full-node allocation. |
+| Deferred H100 source conditions | 17 | E032/E068 exact-shape capacity limits, remaining backend/adapter rows, TensorRT-LLM `E007`, and four L40S-specific hardware rows. |
 | Mac M1 smoke configs | 4 | `configs/local/*`; minimal workflow checks. |
 | Mac M1 dev configs | 15 | `configs/dev/*`; lightweight MPS/CPU development checks. |
 

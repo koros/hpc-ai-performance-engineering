@@ -379,7 +379,13 @@ make submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=optional-1to2gpu
 ```
 
 When a full four-GPU/64-CPU node allocation is available, submit `4b-4gpu`, `optional-4gpu`, and the private-vLLM
-`vllm-tp4` wave. E172 remains separately deferred until that same full-node allocation is explicitly available.
+`vllm-tp4` wave. It also restores E172 to H100 Wave `5`; use recovery rather than creating a new Wave 5 bundle:
+
+```bash
+make retry-platform-wave PLATFORM=h100 PLATFORM_WAVE=5
+```
+
+This submits only the missing three E172 trials with its preserved exact four-GPU/64-CPU configuration.
 
 ## 6. Recovery Rules
 
