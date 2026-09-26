@@ -1,11 +1,21 @@
 from __future__ import annotations
 
 from hpc_ai_perf.config import ExperimentConfig
+from hpc_ai_perf.config.long_context import PARAMETERS as LONG_CONTEXT_PARAMETERS
+from hpc_ai_perf.config.long_context import long_context_issues
 from hpc_ai_perf.config.lowbit import PARAMETERS as LOWBIT_PARAMETERS
 from hpc_ai_perf.config.lowbit import lowbit_issues
 from hpc_ai_perf.profiling import SUPPORTED_PROFILERS
 
-SUPPORTED_WORKLOADS = {"distilbert", "environment_validation", "gpt2_small", "synthetic", "tinyllama", "qwen2_5_7b"}
+SUPPORTED_WORKLOADS = {
+    "distilbert",
+    "environment_validation",
+    "gpt2_small",
+    "synthetic",
+    "tinyllama",
+    "qwen2_5_7b",
+    "qwen2_5_7b_long_context",
+}
 SUPPORTED_ENVIRONMENT_TARGETS = {
     "cuda_pytorch",
     "ddp_nccl_allreduce",
@@ -83,6 +93,7 @@ TRANSFORMER_PARAMETER_KEYS = {
     "warmup_steps",
 }
 WORKLOAD_PARAMETER_KEYS = {
+    "qwen2_5_7b_long_context": LONG_CONTEXT_PARAMETERS,
     "qwen2_5_7b": LOWBIT_PARAMETERS,
     "distilbert": TRANSFORMER_PARAMETER_KEYS,
     "gpt2_small": TRANSFORMER_PARAMETER_KEYS,
@@ -143,6 +154,8 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
     workload = config.workload.name
     if workload == "qwen2_5_7b":
         issues.extend(lowbit_issues(config))
+    if workload == "qwen2_5_7b_long_context":
+        issues.extend(long_context_issues(config))
     strategy = config.distributed.strategy
     expected_gpus = config.distributed.nodes * config.distributed.gpus_per_node
 
@@ -184,7 +197,7 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
         if target == "tensorrt_llm":
             _extend_tensorrt_llm_environment_issues(issues, parameters, config.hardware.gpus)
 
-    if workload in {"gpt2_small", "distilbert", "tinyllama"}:
+    if workload in {"gpt2_small", "distilbert", "tinyllama", "qwen2_5_7b_long_context"}:
         if config.experiment_id.startswith("E") and not config.workload.model_revision:
             issues.append("matrix transformer config must pin workload.model_revision")
         model_override = parameters.get("hf_model_name")
@@ -289,7 +302,12 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
 
         input_length = int(parameters.get("prompt_length", parameters.get("sequence_length", 128)))
         generated_length = 0 if workload == "distilbert" else int(parameters.get("max_new_tokens", 32))
-        context_limits = {"distilbert": 512, "gpt2_small": 1024, "tinyllama": 2048}
+        context_limits = {
+            "distilbert": 512,
+            "gpt2_small": 1024,
+            "tinyllama": 2048,
+            "qwen2_5_7b_long_context": 32768,
+        }
         context_limit = context_limits.get(workload)
         if context_limit is not None and input_length + generated_length > context_limit:
             issues.append(

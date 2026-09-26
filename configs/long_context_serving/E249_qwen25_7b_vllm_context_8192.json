@@ -1,0 +1,76 @@
+{
+  "experiment_id": "E249",
+  "experiment": "qwen25_7b_vllm_long_context_8192",
+  "mode": "inference",
+  "workload": {
+    "name": "qwen2_5_7b_long_context",
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "model_revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+    "dataset": "Salesforce/wikitext",
+    "parameters": {
+      "study_protocol": "qwen25_7b_long_context_v1",
+      "framework": "vllm",
+      "base_compute_dtype": "bf16",
+      "batch_size": 1,
+      "concurrent_requests": 1,
+      "prompt_length": 8192,
+      "max_new_tokens": 128,
+      "warmup_steps": 3,
+      "min_measured_seconds": 30,
+      "prompt_samples": 8,
+      "dataset_revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+      "dataset_subset": "wikitext-2-raw-v1",
+      "performance_split": "validation",
+      "max_model_len": 9216,
+      "kv_cache_blocks": 1024,
+      "kv_cache_block_size": 16,
+      "gpu_memory_utilization": 0.8
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 200,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": ["nvidia_smi", "serving_latency"],
+    "parameters": {
+      "sample_interval_seconds": 0.1,
+      "collect_time_to_first_token": true,
+      "collect_generation_rate": true,
+      "collect_latency_distribution": true,
+      "collect_memory_trace": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E249",
+    "phase": "Inference long-context prompt length",
+    "priority": "Must Have",
+    "template": "inference_serving",
+    "study_family": "qwen25_7b_long_context_v1",
+    "objective": "Measure 8,192-token vLLM BF16 prefill and generation with a fixed cache on real text",
+    "research_questions": ["RQ5", "RQ6", "RQ7"],
+    "analysis_tasks": ["A04", "A05", "A06", "A07"],
+    "gpu_hours_estimate": 0.8,
+    "matrix_stack_strategy": "vLLM V0 eager",
+    "matrix_precision_config": "bf16",
+    "key_metrics": ["time_to_first_token", "generation_rate", "memory", "p95_latency", "energy_joules_measured_region"],
+    "acceptance_required": "vllm-long-context",
+    "comparison_scope": "within_platform_context_length_curve",
+    "limitation": "Offline closed-batch WikiText prompts represent controlled context pressure, not open-loop RAG or agent traffic"
+  }
+}

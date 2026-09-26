@@ -43,6 +43,26 @@
     },
     {
       "platform": "l40s",
+      "wave": "vllm-long-context",
+      "name": "L40S Qwen2.5-7B long-context vLLM continuation (acceptance required)",
+      "experiment_ids": [
+        "E247-E249"
+      ],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "vllm-long-context",
+      "name": "H100 Qwen2.5-7B long-context vLLM continuation (acceptance required)",
+      "experiment_ids": [
+        "E247-E249"
+      ],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
       "wave": "0",
       "name": "L40S core environment gate",
       "experiment_ids": ["E001-E006"],

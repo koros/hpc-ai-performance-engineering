@@ -2,6 +2,7 @@
 
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
 from hpc_ai_perf.workloads.environment import EnvironmentValidationWorkload
+from hpc_ai_perf.workloads.long_context import QwenLongContextWorkload
 from hpc_ai_perf.workloads.registry import WorkloadRegistry, default_registry
 from hpc_ai_perf.workloads.transformer import (
     DistilBERTWorkload,
@@ -15,6 +16,7 @@ __all__ = [
     "DistilBERTWorkload",
     "EnvironmentValidationWorkload",
     "GPT2SmallWorkload",
+    "QwenLongContextWorkload",
     "TinyLlamaWorkload",
     "TransformerWorkload",
     "Workload",

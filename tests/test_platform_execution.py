@@ -314,7 +314,7 @@ def test_execution_matrix_expands_ranges_and_keeps_platforms_separate() -> None:
 
 def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 247)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 250)}
     l40s_only_supplemental_ids = (
         {f"E{index:03d}" for index in range(201, 210)}
         | {f"E{index:03d}" for index in range(215, 233)}
@@ -323,6 +323,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     shared_telemetry_ids = {f"E{index:03d}" for index in range(210, 215)}
     h100_only_supplemental_ids = {"E233", "E234"}
     shared_lowbit_ids = {f"E{index:03d}" for index in range(239, 247)}
+    shared_long_context_ids = {f"E{index:03d}" for index in range(247, 250)}
 
     l40s_conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s")
     h100_conditions = load_platform_conditions("platforms/execution_matrix.json", "h100")
@@ -331,11 +332,11 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     assert {condition.matrix_id for condition in l40s_conditions if condition.matrix_id in source_ids} == source_ids
     assert {
         condition.matrix_id for condition in l40s_conditions if condition.matrix_id not in source_ids
-    } == l40s_only_supplemental_ids | shared_telemetry_ids | shared_lowbit_ids
-    assert len(h100_conditions) == 215
+    } == l40s_only_supplemental_ids | shared_telemetry_ids | shared_lowbit_ids | shared_long_context_ids
+    assert len(h100_conditions) == 218
     assert {
         condition.matrix_id for condition in h100_conditions
-    } == source_ids | shared_telemetry_ids | h100_only_supplemental_ids | shared_lowbit_ids
+    } == source_ids | shared_telemetry_ids | h100_only_supplemental_ids | shared_lowbit_ids | shared_long_context_ids
     l40s_planned_source_count = sum(
         condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in source_ids
     )
@@ -343,7 +344,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     assert l40s_planned_source_count == 180
     assert (
         sum(condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in supplemental_ids)
-        == 40
+        == 43
     )
     assert (
         sum(
@@ -353,7 +354,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         )
         == 27
     )
-    assert sum(condition.status == "planned" for condition in h100_conditions) == 197
+    assert sum(condition.status == "planned" for condition in h100_conditions) == 200
 
 
 def test_telemetry_revalidation_wave_is_shared_but_platform_separated() -> None:
