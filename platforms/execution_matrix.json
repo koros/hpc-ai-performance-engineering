@@ -84,9 +84,19 @@
     {
       "platform": "h100",
       "wave": "h100-capacity",
-      "name": "H100 GPT-2 capacity-adjusted scaling and memory probes",
+      "name": "H100 GPT-2 capacity-adjusted strong-scaling baseline",
       "experiment_ids": [
-        "E256-E257"
+        "E256"
+      ],
+      "required_trials": 3,
+      "comparability": "capacity_adjusted"
+    },
+    {
+      "platform": "h100",
+      "wave": "h100-capacity-boundary",
+      "name": "H100 GPT-2 capacity-adjusted micro-batch boundary probe",
+      "experiment_ids": [
+        "E257"
       ],
       "required_trials": 3,
       "comparability": "capacity_adjusted"

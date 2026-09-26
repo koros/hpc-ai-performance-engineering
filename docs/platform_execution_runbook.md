@@ -369,7 +369,8 @@ one-/two-GPU work from full-node work; do not submit a full-node wave while only
 | --- | --- | ---: | ---: |
 | `4b-2gpu` | `E113`, `E114`, `E117`, `E118` | 2 | 3 each |
 | `optional-1to2gpu` | `E016`, `E017`, `E044`, `E045` | 1 or 2 | 3 each |
-| `h100-capacity` | `E256`, `E257` H100-only capacity-adjusted GPT-2 probes | 1 | 3 each |
+| `h100-capacity` | `E256` H100-only capacity-adjusted GPT-2 strong-scaling baseline | 1 | 3 |
+| `h100-capacity-boundary` | `E257` H100-only capacity-adjusted GPT-2 micro-batch boundary probe | 1 | 3 |
 | `4b-4gpu` | `E115`, `E116`, `E119`, `E120` | 4 | 3 each |
 | `optional-4gpu` | `E046` | 4 | 3 |
 | `vllm-tp4` | `E148`, `E196` | 4 | 3 each |
@@ -381,7 +382,7 @@ make submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=4b-2gpu
 make submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=optional-1to2gpu
 ```
 
-The `h100-capacity` wave also uses one GPU and is independently collectable:
+The `h100-capacity` baseline uses one GPU and is independently collectable:
 
 ```bash
 make submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity
@@ -389,8 +390,17 @@ make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity
 make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity
 ```
 
-E256 retains the original strong-scaling global batch of 64 through two accumulation steps, while E257 is a
-micro-batch-48 boundary probe. Both are explicitly `capacity_adjusted`; neither may be pooled with exact E032/E068.
+E256 retains the original strong-scaling global batch of 64 through two accumulation steps. After it has been
+collected, submit the independent boundary probe:
+
+```bash
+make submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-boundary
+make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-boundary
+make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-boundary
+```
+
+E257 is intentionally a micro-batch-48 boundary probe and may OOM. Its separate wave means that outcome cannot block
+E256 collection. Both are explicitly `capacity_adjusted`; neither may be pooled with exact E032/E068.
 
 When a full four-GPU/64-CPU node allocation is available, submit `4b-4gpu`, `optional-4gpu`, and the private-vLLM
 `vllm-tp4` wave. It also restores E172 to H100 Wave `5`; use recovery rather than creating a new Wave 5 bundle:

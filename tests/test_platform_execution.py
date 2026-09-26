@@ -607,17 +607,26 @@ def test_l40s_capacity_adjusted_wave_materializes_boundary_probes(tmp_path: Path
 
 def test_h100_capacity_adjusted_wave_preserves_the_global_workload(tmp_path: Path) -> None:
     profile = load_platform_profile("platforms/h100.json")
-    conditions = load_platform_conditions(
+    scaling_conditions = load_platform_conditions(
         "platforms/execution_matrix.json",
         "h100",
         wave="h100-capacity",
         include_deferred=False,
     )
+    boundary_conditions = load_platform_conditions(
+        "platforms/execution_matrix.json",
+        "h100",
+        wave="h100-capacity-boundary",
+        include_deferred=False,
+    )
 
-    paths = materialize_platform_configs(profile, conditions, tmp_path)
+    scaling_path = materialize_platform_configs(profile, scaling_conditions, tmp_path / "scaling")[0]
+    boundary_path = materialize_platform_configs(profile, boundary_conditions, tmp_path / "boundary")[0]
 
-    assert [path.name for path in paths] == ["E256.json", "E257.json"]
-    scaling, memory = [load_experiment_config(path) for path in paths]
+    assert scaling_path.name == "E256.json"
+    assert boundary_path.name == "E257.json"
+    scaling = load_experiment_config(scaling_path)
+    memory = load_experiment_config(boundary_path)
     assert scaling.metadata["condition_id"] == "E256@h100"
     assert scaling.metadata["comparability"] == "capacity_adjusted"
     assert scaling.workload.parameters["per_gpu_batch_size"] == 32
