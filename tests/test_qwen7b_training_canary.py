@@ -22,6 +22,7 @@ def _record(experiment_id: str, config_hash: str, strategy: str, detail: str) ->
         "metrics": {
             "strategy_observed": strategy,
             "strategy_detail_observed": detail,
+            "model_load_dtype_requested": "bf16",
             "effective_global_batch_size": 16,
             "sequence_length": 512,
             "activation_checkpointing": True,

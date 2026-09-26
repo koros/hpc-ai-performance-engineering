@@ -45,6 +45,7 @@ def verify_canaries(result_root: Path, platform: str = "h100") -> dict[str, dict
             "clean repository": environment.get("git_dirty") is False,
             "strategy": metrics.get("strategy_observed") == expectation["strategy"],
             "strategy detail": metrics.get("strategy_detail_observed") == expectation["detail"],
+            "BF16 checkpoint load": metrics.get("model_load_dtype_requested") == "bf16",
             "effective batch": metrics.get("effective_global_batch_size") == 16,
             "sequence length": metrics.get("sequence_length") == 512,
             "activation checkpointing": metrics.get("activation_checkpointing") is True,

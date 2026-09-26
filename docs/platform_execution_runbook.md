@@ -114,6 +114,8 @@ Keep the HPC originals until the commits are pushed and independently backed up.
 | `vllm-concurrency` | `E138-E142`, `E186-E190` | 3 | Concurrency sweep completes with latency and throughput metrics. |
 | `vllm-prompt` | `E143-E146`, `E191-E194` | 3 | Prompt-length sweep completes with TTFT and generation metrics. |
 | `vllm-long-context` | `E247-E249` | 3 | Separate Qwen BF16 4,096/6,144/8,192-token one-request prefill/latency curve; run only through its maximum-shape acceptance gate. |
+| `qwen7b-training-canary` | `E250-E251` | 1 | H100-only Qwen2.5-7B BF16 FSDP/ZeRO-3 runtime gate; collect and verify before canonical scheduling. |
+| `qwen7b-training` | `E252-E255` | 3 | H100-only Qwen2.5-7B BF16 FSDP/ZeRO-3 strategy study; contains separate controlled two- and four-GPU pairs. |
 | `vllm-tp2` | `E147`, `E195` | 3 | Two-GPU tensor-parallel rows run on both visible L40S devices. |
 | `4gpu-pilot` | `E003` | 1 | Four-rank NCCL initialization and all-reduce pass before any four-GPU performance wave. |
 | `4gpu-core` | `E034`, `E037`, `E040`, `E043`, `E046`, `E048`, `E050`, `E056`, `E058`, `E172` | 3 | Exact four-GPU scaling, strategy, and PyTorch classification inference conditions complete after E003. |

@@ -360,6 +360,9 @@ def _run_training_loop(
         "device": str(device),
         "hf_model_name": model_name,
         "hf_model_revision": _selected_model_revision(config, model_name),
+        "model_load_dtype_requested": str(
+            parameters.get("model_load_dtype", "bf16" if _uses_transformer_engine(config) else "fp32")
+        ),
         "strategy_observed": config.distributed.strategy,
         "strategy_detail_observed": _strategy_detail(config),
         "world_size": runtime.world_size,
