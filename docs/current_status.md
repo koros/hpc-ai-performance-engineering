@@ -6,13 +6,13 @@ This snapshot describes repository capabilities. Archived result files and the g
 
 E247–E249 add fresh one-GPU Qwen2.5-7B BF16 serving conditions at 4,096, 6,144 and 8,192 real-text prompt tokens on both platforms. The separate continuation exists because the original GPT-2/TinyLlama prompt-length curves cannot validly reach those contexts. Its pinned real-text inputs, fixed cache/model context, strict request timestamps, content-fingerprinted maximum-shape acceptance gate and submission wrappers are implemented and locally tested. No historical prompt evidence is replaced. See the [launch and interpretation runbook](long_context_serving_runbook.md).
 
-E250–E255 are a planned H100-only Qwen2.5-7B BF16 training extension. They are intentionally isolated from the small-model strategy series: E250–E251 are one-trial two-GPU FSDP/ZeRO-3 execution canaries, while E252–E255 provide the controlled two- and four-GPU three-trial strategy evidence after the canary verifier passes. See the [sharding study runbook](qwen7b_training_sharding_runbook.md).
+E250–E255 are an H100-only Qwen2.5-7B BF16 training extension. They are intentionally isolated from the small-model strategy series: E250–E251 are one-trial two-GPU FSDP/ZeRO-3 execution canaries, while E252–E255 provide the controlled two- and four-GPU three-trial strategy evidence after the canary verifier passes. E256–E257 are separate H100-only GPT-2 capacity-adjusted probes; they preserve the failed exact E032/E068 records and must not be pooled with the original exact series. See the [sharding study runbook](qwen7b_training_sharding_runbook.md).
 
 The study isolates one-request prefill/latency effects, not long-context batching, concurrent arrivals, HTTP traffic, RAG retrieval or agent behaviour. Its Qwen points must not be pooled with prior small-model prompt sweeps or the separate Qwen low-bit deployment-artifact study.
 
 ## Low-bit extension — 25 September 2026
 
-E239–E246 add fresh one-GPU Qwen2.5-7B BF16, AWQ, GPTQ and optional bitsandbytes NF4 conditions on both platforms. The adapter, real-text inputs, content-fingerprinted acceptance gate, submission wrappers and controlled analysis summary are implemented and locally tested. GPU acceptance and canonical trials are still pending. No historical raw evidence or original E001–E238 config is replaced. See the [launch and interpretation runbook](lowbit_serving_runbook.md).
+E239–E246 add fresh one-GPU Qwen2.5-7B BF16, AWQ, GPTQ and optional bitsandbytes NF4 conditions on both platforms. The adapter, real-text inputs, content-fingerprinted acceptance gate, submission wrappers and controlled analysis summary are implemented and locally tested. The H100 acceptance and canonical trials are collected; every platform remains a separate evidence stream. No historical raw evidence or original E001–E238 config is replaced. See the [launch and interpretation runbook](lowbit_serving_runbook.md).
 
 This addresses the deployment-format gap once validated and run. It does not yet address larger-model sharded training, a repaired scaling baseline, consumer/non-NVIDIA GPUs or multi-node generalization.
 
@@ -20,7 +20,7 @@ This addresses the deployment-format gap once validated and run. It does not yet
 
 | Area | Status |
 | --- | --- |
-| Experiment matrix | 200 source matrix configs, 9 L40S capacity-adjusted conditions, 5 cross-platform telemetry revalidation anchors, 16 L40S full-node conditions, 4 backend-matched FP8 controls, 4 L40S hardware-energy anchors, 8 controlled low-bit inference conditions, 3 controlled long-context serving conditions, and 6 H100-only Qwen2.5-7B sharding conditions are present and load successfully (255 total). |
+| Experiment matrix | 200 source matrix configs, 9 L40S capacity-adjusted conditions, 2 H100 capacity-adjusted conditions, 5 cross-platform telemetry revalidation anchors, 16 L40S full-node conditions, 4 backend-matched FP8 controls, 4 L40S hardware-energy anchors, 8 controlled low-bit inference conditions, 3 controlled long-context serving conditions, and 6 H100-only Qwen2.5-7B sharding conditions are present and load successfully (257 total). |
 | Validation | `python -m hpc_ai_perf.cli validate --skip-results` passes with 0 config issues. |
 | Local smoke runner | CPU-only synthetic workload is ready and covered by tests. |
 | Semantic launch gate | `validate --research-ready` blocks unsupported precision/backend/framework combinations before Slurm rendering or execution. |
@@ -48,6 +48,7 @@ This addresses the deployment-format gap once validated and run. It does not yet
 | --- | ---: |
 | Source matrix configs | 200 |
 | L40S supplemental capacity probes | 9 |
+| H100 supplemental capacity probes | 2 |
 | Cross-platform telemetry revalidation anchors | 5 |
 | L40S full-node extension | 16 |
 | Backend-matched FP8 controls | 4 |
