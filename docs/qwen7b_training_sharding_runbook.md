@@ -114,24 +114,42 @@ loop already scales the loss. Legacy configurations keep the old external-accumu
 
 | Wave | IDs | GPUs | Repetitions |
 | --- | --- | ---: | ---: |
-| `qwen7b-update-canary` | E261 DDP, E262 FSDP, E263 ZeRO-3 | 2 | 1 |
-| `qwen7b-update-controls-2gpu` | E264 DDP, E265 FSDP, E266 ZeRO-3 | 2 | 3 |
-| `qwen7b-update-controls-4gpu` | E267 DDP, E268 FSDP, E269 ZeRO-3 | 4 | 3 |
+| `qwen7b-update-canary` | E262 FSDP, E263 ZeRO-3 | 2 | 1 each |
+| `qwen7b-update-controls-2gpu` | E265 FSDP, E266 ZeRO-3 | 2 | 3 each |
+| `qwen7b-update-controls-4gpu` | E268 FSDP, E269 ZeRO-3 | 4 | 3 each |
+
+E261's two-GPU DDP canary failed in job 1781885, bundle
+`h100-wave-qwen7b-update-canary-2537fe9f-20260926t184439z`. PyTorch reported 77.41 GiB allocated,
+79.07 GiB used by the process, and a failed 130 MiB allocation with 115.50 MiB free. E261 and its
+matching three-trial DDP condition E264 are now deferred on H100. E267 is separately deferred because
+four-GPU DDP has no independent successful feasibility gate; the two-GPU failure does not establish
+four-GPU infeasibility. All three source configurations remain available for a future separately
+validated investigation. This finding describes the tested deployment, not every possible DDP or
+allocator configuration.
+
+Collected E262/E263 each recorded six optimizer updates and 48 backward calls. Their initial losses
+were 14.00871 and 14.01416 (a 0.039% difference). These current-contract canaries certify the sharded
+update waves, which now contain six trials each. Their one-trial timings are diagnostic; the new
+three-trial conditions supply the performance evidence. Native optimizer states were BF16 and
+DeepSpeed states FP32, so the comparison remains between configured runtime stacks.
 
 ```bash
-make submit-qwen7b-update-canary PLATFORM=h100
+# Submit canaries only if current E262/E263 evidence has not already been collected.
+# make submit-qwen7b-update-canary PLATFORM=h100
 make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=qwen7b-update-canary
 make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=qwen7b-update-canary
 make verify-qwen7b-update-canary PLATFORM=h100
 make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=qwen7b-update-canary
 git diff --cached --stat
 git commit -m "data: add H100 Qwen training update canaries"
-make submit-qwen7b-update-wave PLATFORM=h100
-make submit-qwen7b-update-wave PLATFORM=h100 QWEN7B_UPDATE_WAVE=qwen7b-update-controls-4gpu
+make submit-qwen7b-update-wave PLATFORM=h100 QWEN7B_UPDATE_WAVE=qwen7b-update-controls-4gpu PLATFORM_TIME_LIMIT=00:15:00
+make submit-qwen7b-update-wave PLATFORM=h100 QWEN7B_UPDATE_WAVE=qwen7b-update-controls-2gpu PLATFORM_TIME_LIMIT=00:15:00
 ```
 
-The gate checks contract/content hashes (not HEAD), update/sample counts, finite losses, and initial loss agreement
-within 5%. It does **not** claim matching final loss or optimizer precision. If DDP OOMs, retain the failed bundle
-as feasibility evidence, import successful siblings separately, and do not repeatedly retry unchanged shapes or
-bypass the gate. Four-GPU DDP still requires its own feasibility assessment; the two-GPU gate is not a capacity
-guarantee. Native BF16 Adam states versus DeepSpeed FP32 states must remain visible in conclusions.
+The gate requires both current FSDP/ZeRO-3 canaries, contract/content hashes (not HEAD), update/sample
+counts, finite losses, and initial loss agreement within 5%. It also requires the unvalidated DDP
+conditions to remain deferred, including when submission selects an alternative execution matrix.
+It does **not** claim matching final loss or optimizer precision. Retain E261's failed bundle as
+feasibility evidence for the report. After the explicit policy deferral, normal canary collection can
+collect the two successful siblings without retrying E261. Native BF16 Adam states versus DeepSpeed
+FP32 states must remain visible in conclusions.

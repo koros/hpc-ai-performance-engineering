@@ -6,6 +6,9 @@ The H100 follow-up waves are documented in [the targeted execution runbook](h100
 E260 repeats the successful allocator shape; E261–E269 introduce DDP/update validation and separate two-/four-GPU
 Qwen controls; E270–E273 broaden the low-bit quality corpus with a fresh BF16 reference; E274–E276 are
 duration-controlled inference energy anchors. None changes existing source configurations or collected evidence.
+H100 E261/E264 are now deferred after the two-GPU Qwen DDP OOM; E267 awaits independent four-GPU DDP
+feasibility validation. The update gate accepts current E262/E263 evidence and schedules E265/E266
+or E268/E269 only, with three repetitions per strategy.
 
 **Legend:** <br/>
 **`Direct`** means the logical row already represents that platform's hardware-comparison half. <br/>
