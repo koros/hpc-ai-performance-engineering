@@ -20,7 +20,7 @@ This addresses the deployment-format gap once validated and run. It does not yet
 
 | Area | Status |
 | --- | --- |
-| Experiment matrix | 200 source matrix configs, 9 L40S capacity-adjusted conditions, 5 cross-platform telemetry revalidation anchors, 16 L40S full-node conditions, 4 backend-matched FP8 controls, 4 L40S hardware-energy anchors, 8 controlled low-bit inference conditions, and 3 controlled long-context serving conditions are present and load successfully (249 total). |
+| Experiment matrix | 200 source matrix configs, 9 L40S capacity-adjusted conditions, 5 cross-platform telemetry revalidation anchors, 16 L40S full-node conditions, 4 backend-matched FP8 controls, 4 L40S hardware-energy anchors, 8 controlled low-bit inference conditions, 3 controlled long-context serving conditions, and 6 H100-only Qwen2.5-7B sharding conditions are present and load successfully (255 total). |
 | Validation | `python -m hpc_ai_perf.cli validate --skip-results` passes with 0 config issues. |
 | Local smoke runner | CPU-only synthetic workload is ready and covered by tests. |
 | Semantic launch gate | `validate --research-ready` blocks unsupported precision/backend/framework combinations before Slurm rendering or execution. |

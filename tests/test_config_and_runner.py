@@ -95,9 +95,9 @@ def test_discover_matrix_configs() -> None:
     entries = discover_experiment_configs()
     experiment_ids = {entry.config.experiment_id for entry in entries}
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 250)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 256)}
 
-    assert len(entries) == 249
+    assert len(entries) == 255
     assert experiment_ids == source_ids | supplemental_ids
 
 
@@ -2343,7 +2343,7 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
 
     assert csv_path == output_csv
     assert markdown_path == output_markdown
-    assert len(rows) == 249
+    assert len(rows) == 255
     assert e033["status"] == "Completed"
     assert e033["runtime_seconds"] == "600.0"
     assert e034["status"] == "Configured"
