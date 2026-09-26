@@ -354,7 +354,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         )
         == 27
     )
-    assert sum(condition.status == "planned" for condition in h100_conditions) == 200
+    assert sum(condition.status == "planned" for condition in h100_conditions) == 201
 
 
 def test_telemetry_revalidation_wave_is_shared_but_platform_separated() -> None:
@@ -670,21 +670,16 @@ def test_wave_status_stops_retrying_conditions_deferred_after_submission() -> No
     assert [experiment.experiment_id for experiment in current.experiments] == ["E016", "E017", "E045"]
 
 
-def test_explicit_h100_deferral_overrides_historical_wave_membership() -> None:
+def test_h100_e172_returns_to_wave_five_when_full_node_is_available() -> None:
     wave_five = load_platform_conditions(
         "platforms/execution_matrix.json",
         "h100",
         wave="5",
         include_deferred=False,
     )
-    assert "E172" not in {condition.matrix_id for condition in wave_five}
-
-    deferred = load_platform_conditions(
-        "platforms/execution_matrix.json",
-        "h100",
-        experiment_ids={"E172"},
-    )
-    assert [(condition.condition_id, condition.status) for condition in deferred] == [("E172@h100", "deferred")]
+    e172 = next(condition for condition in wave_five if condition.matrix_id == "E172")
+    assert e172.status == "planned"
+    assert e172.required_trials == 3
 
 
 def test_retry_scope_includes_new_policy_conditions_missing_from_prior_attempt(monkeypatch, tmp_path: Path) -> None:
@@ -777,7 +772,7 @@ def test_execution_matrix_defers_only_unaccepted_or_unsupported_backend_and_plat
                 }
             )
         else:
-            expected_ids.update({"E032", "E068", "E172"})
+            expected_ids.update({"E032", "E068"})
         conditions = load_platform_conditions(
             "platforms/execution_matrix.json",
             platform_id,
