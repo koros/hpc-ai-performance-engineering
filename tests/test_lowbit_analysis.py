@@ -66,6 +66,18 @@ def trials(experiment="E239", platform="l40s", throughput=100, quality=10, memor
     return rows
 
 
+def test_broader_quality_study_uses_its_own_control_and_never_pools_v1():
+    rows = trials("E239", "h100", quality=10) + trials("E241", "h100", quality=11)
+    rows += trials("E270", "h100", quality=20) + trials("E271", "h100", quality=25)
+    summaries = {row["experiment_id"]: row for row in build_lowbit_summary(rows)}
+    assert summaries["E241"]["control_id"] == "E239"
+    assert summaries["E241"]["perplexity_change_pct"] == pytest.approx(10)
+    assert summaries["E271"]["control_id"] == "E270"
+    assert summaries["E271"]["perplexity_change_pct"] == pytest.approx(25)
+    assert summaries["E271"]["quality_status"] == "outside_tolerance"
+    assert summaries["E271"]["study_protocol"] != summaries["E241"]["study_protocol"]
+
+
 def test_analysis_compares_matched_controls_with_quality_and_energy_per_token():
     rows = trials() + trials("E241", throughput=120, quality=10.5, memory=5)
     output = {r["experiment_id"]: r for r in build_lowbit_summary(rows)}

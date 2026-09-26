@@ -3,6 +3,30 @@
 Status: implemented and locally tested; GPU acceptance and canonical trials are **not yet run**.
 The protocol is `qwen25_7b_lowbit_v1`. Existing E001–E238 configs and raw evidence are unchanged.
 
+## Broader quality study: H100 E270–E273
+
+`lowbit-quality` uses the separate `qwen25_7b_lowbit_quality_v2` protocol. Its BF16/AWQ/GPTQ/NF4 arms each
+score 128 non-overlapping 512-token WikiText test windows (65,408 predicted tokens), versus 32 × 256 in v1.
+E270 is a fresh BF16 control; E271–E273 never borrow E239's shorter quality evaluation. Publisher artifacts,
+BF16 compute, request batch 1, 512-token performance prompts, 128 generated tokens, fixed KV cache and the
+preregistered 10% relative perplexity tolerance stay constant. This measures broader text likelihood, not
+instruction/task accuracy or a pure quantizer effect. Repetitions reuse the same held-out windows; they do
+not multiply the number of distinct quality examples.
+
+```bash
+make prefetch-lowbit-assets LOWBIT_WAVE=lowbit-quality
+make submit-lowbit-acceptance PLATFORM=h100 LOWBIT_WAVE=lowbit-quality
+# Wait for the printed diagnostic job ID to finish, then replace <job-id> below.
+make verify-lowbit-acceptance PLATFORM=h100 LOWBIT_WAVE=lowbit-quality LOWBIT_ACCEPTANCE_JOB=<job-id>
+make submit-lowbit-wave PLATFORM=h100 LOWBIT_WAVE=lowbit-quality LOWBIT_ACCEPTANCE_JOB=<job-id>
+make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=lowbit-quality
+make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=lowbit-quality
+```
+
+This gate automatically checks all four methods, including NF4, and the full new evaluation shape. Do not
+reuse an older acceptance result. Runtime changes invalidate the earlier gate even when package versions
+match. The generated low-bit summary carries `study_protocol` and uses independent controls for v1/v2.
+
 ## Research purpose and comparison boundary
 
 This extension addresses RQ3 (precision and quality), RQ5 (useful work and GPU energy), and RQ6

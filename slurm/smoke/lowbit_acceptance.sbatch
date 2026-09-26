@@ -22,5 +22,6 @@ if [[ "${HPC_AI_LOWBIT_INCLUDE_BNB:-0}" == "1" ]]; then
 fi
 python scripts/lowbit_acceptance.py run \
     --platform "${HPC_AI_LOWBIT_PLATFORM:?}" \
+    --wave "${HPC_AI_LOWBIT_WAVE:-lowbit-serving}" \
     --result-root "build/lowbit_acceptance/${HPC_AI_LOWBIT_PLATFORM}/${SLURM_JOB_ID}" \
     "${LOWBIT_EXTRA[@]}"

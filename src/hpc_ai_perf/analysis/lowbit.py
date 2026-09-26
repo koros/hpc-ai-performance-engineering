@@ -7,10 +7,11 @@ import statistics
 from collections import defaultdict
 from typing import Any
 
-from hpc_ai_perf.config.lowbit import METHOD_IDS, PARAMETERS, PROTOCOL
+from hpc_ai_perf.config.lowbit import METHOD_IDS, PARAMETERS, PROTOCOL, QUALITY_METHOD_IDS, QUALITY_PROTOCOL
 from hpc_ai_perf.validation.lowbit import energy_coverage_valid
 
 LOWBIT_COLUMNS = [
+    "study_protocol",
     "platform_id",
     "comparability",
     "experiment_id",
@@ -44,15 +45,21 @@ LOWBIT_COLUMNS = [
 
 
 def build_lowbit_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    selected = [r for r in rows if r.get("parameter_study_protocol") == PROTOCOL]
+    return _build_protocol_summary(rows, PROTOCOL, METHOD_IDS) + _build_protocol_summary(
+        rows, QUALITY_PROTOCOL, {method: (eid,) for method, eid in QUALITY_METHOD_IDS.items()}
+    )
+
+
+def _build_protocol_summary(rows: list[dict[str, Any]], protocol: str, method_ids: dict) -> list[dict[str, Any]]:
+    selected = [r for r in rows if r.get("parameter_study_protocol") == protocol]
     groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in selected:
         groups[(str(row.get("platform_id")), str(row.get("experiment_id")))].append(row)
     results = []
     for platform in sorted({key[0] for key in groups} & {"l40s", "h100"}):
-        for method, ids in METHOD_IDS.items():
-            for experiment_id, batch in zip(ids, (1, 8), strict=True):
-                control_id = METHOD_IDS["bf16"][0 if batch == 1 else 1]
+        for method, ids in method_ids.items():
+            for experiment_id, batch in zip(ids, (1, 8)[: len(ids)], strict=True):
+                control_id = method_ids["bf16"][0 if batch == 1 else 1]
                 own = groups[(platform, experiment_id)]
                 controls = groups[(platform, control_id)]
                 completed = [r for r in own if r.get("status") == "completed"]
@@ -112,6 +119,7 @@ def build_lowbit_summary(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     )
                 results.append(
                     {
+                        "study_protocol": protocol,
                         "platform_id": platform,
                         "comparability": "exact",
                         "experiment_id": experiment_id,

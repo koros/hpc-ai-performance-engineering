@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 PROTOCOL = "qwen25_7b_lowbit_v1"
+QUALITY_PROTOCOL = "qwen25_7b_lowbit_quality_v2"
+QUALITY_METHOD_IDS = {"bf16": "E270", "awq": "E271", "gptq": "E272", "bitsandbytes_nf4": "E273"}
 BASE_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 BASE_REVISION = "a09a35458c702b33eeacc393d103063234e8bc28"
 DATASET = "Salesforce/wikitext"
@@ -70,7 +72,7 @@ def lowbit_issues(config: Any) -> list[str]:
         issues.append("low-bit serving requires single-GPU inference with strategy=none")
     if config.distributed.nodes != 1 or config.distributed.gpus_per_node != 1:
         issues.append("low-bit serving requires one node and one GPU per node")
-    if p.get("study_protocol") != PROTOCOL or p.get("framework") != "vllm":
+    if p.get("study_protocol") not in {PROTOCOL, QUALITY_PROTOCOL} or p.get("framework") != "vllm":
         issues.append("low-bit serving requires the versioned vLLM study protocol")
     method = p.get("quantization_method")
     if method not in ARTIFACTS:
@@ -128,7 +130,11 @@ def lowbit_issues(config: Any) -> list[str]:
         issues.append("low-bit lengths exceed the model contract or cannot produce quality logprobs")
     if p["batch_size"] * (p["prompt_length"] + p["max_new_tokens"]) > p["kv_cache_blocks"] * p["kv_cache_block_size"]:
         issues.append("low-bit fixed KV cache is too small for this request batch")
-    if p.get("comparison_control_id") != ("E239" if p["batch_size"] == 1 else "E240"):
+    quality_extension = p.get("study_protocol") == QUALITY_PROTOCOL
+    if quality_extension and (p["batch_size"], p["quality_samples"], p["quality_sequence_length"]) != (1, 128, 512):
+        issues.append("quality v2 requires batch 1 and 128 distinct 512-token test windows")
+    control = "E270" if quality_extension else ("E239" if p["batch_size"] == 1 else "E240")
+    if p.get("comparison_control_id") != control:
         issues.append("low-bit comparison must reference the BF16 control at the same batch size")
     if not config.runtime.max_steps or config.runtime.max_steps < 2:
         issues.append("low-bit max_steps must allow at least two measured rounds")

@@ -138,7 +138,7 @@ submit-vllm-pilot:
 
 # One-GPU gates are platform-specific and tied to runtime/config content, not HEAD.
 prefetch-lowbit-assets:
-	PYTHONPATH="$(CURDIR)/src" "$(LOWBIT_ENV)/bin/python" scripts/prefetch_lowbit_assets.py
+	PYTHONPATH="$(CURDIR)/src" "$(LOWBIT_ENV)/bin/python" scripts/prefetch_lowbit_assets.py $(if $(filter lowbit-quality,$(LOWBIT_WAVE)),--quality-extension,)
 
 prefetch-long-context-assets:
 	PYTHONPATH="$(CURDIR)/src" "$(LONG_CONTEXT_ENV)/bin/python" scripts/prefetch_long_context_assets.py
@@ -146,18 +146,18 @@ prefetch-long-context-assets:
 submit-lowbit-acceptance:
 	@case "$(PLATFORM)" in l40s|h100) ;; *) echo "PLATFORM must be l40s or h100"; exit 1;; esac
 	test -r "$(LOWBIT_ENV)/bin/activate"
-	sbatch --partition=gpu_$(PLATFORM) --export=ALL,HPC_AI_LOWBIT_ENV="$(LOWBIT_ENV)",HPC_AI_LOWBIT_PLATFORM="$(PLATFORM)",HPC_AI_LOWBIT_INCLUDE_BNB="$(LOWBIT_INCLUDE_BNB)" slurm/smoke/lowbit_acceptance.sbatch
+	sbatch --partition=gpu_$(PLATFORM) --export=ALL,HPC_AI_LOWBIT_ENV="$(LOWBIT_ENV)",HPC_AI_LOWBIT_PLATFORM="$(PLATFORM)",HPC_AI_LOWBIT_INCLUDE_BNB="$(LOWBIT_INCLUDE_BNB)",HPC_AI_LOWBIT_WAVE="$(LOWBIT_WAVE)" slurm/smoke/lowbit_acceptance.sbatch
 
 verify-lowbit-acceptance:
 	test -n "$(LOWBIT_ACCEPTANCE_JOB)" || (echo "Set LOWBIT_ACCEPTANCE_JOB to the finished diagnostic job ID" && exit 1)
-	PYTHONPATH="$(CURDIR)/src" "$(LOWBIT_ENV)/bin/python" scripts/lowbit_acceptance.py verify --platform "$(PLATFORM)" --result-root "$(LOWBIT_ACCEPTANCE_ROOT)" $(if $(filter lowbit-bnb,$(LOWBIT_WAVE)),--include-bnb,)
+	PYTHONPATH="$(CURDIR)/src" "$(LOWBIT_ENV)/bin/python" scripts/lowbit_acceptance.py verify --platform "$(PLATFORM)" --result-root "$(LOWBIT_ACCEPTANCE_ROOT)" --wave "$(LOWBIT_WAVE)" $(if $(filter lowbit-bnb,$(LOWBIT_WAVE)),--include-bnb,)
 
 submit-lowbit-wave: verify-lowbit-acceptance
-	@case "$(LOWBIT_WAVE)" in lowbit-serving|lowbit-bnb) ;; *) echo "Unknown low-bit wave"; exit 1;; esac
+	@case "$(LOWBIT_WAVE)" in lowbit-serving|lowbit-bnb|lowbit-quality) ;; *) echo "Unknown low-bit wave"; exit 1;; esac
 	HPC_AI_LOWBIT_ACCEPTANCE_DIR="$(abspath $(LOWBIT_ACCEPTANCE_ROOT))" $(MAKE) submit-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=$(LOWBIT_WAVE) VENV_ACTIVATE="$(LOWBIT_ENV)/bin/activate"
 
 retry-lowbit-wave: verify-lowbit-acceptance
-	@case "$(LOWBIT_WAVE)" in lowbit-serving|lowbit-bnb) ;; *) echo "Unknown low-bit wave"; exit 1;; esac
+	@case "$(LOWBIT_WAVE)" in lowbit-serving|lowbit-bnb|lowbit-quality) ;; *) echo "Unknown low-bit wave"; exit 1;; esac
 	HPC_AI_LOWBIT_ACCEPTANCE_DIR="$(abspath $(LOWBIT_ACCEPTANCE_ROOT))" $(MAKE) retry-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=$(LOWBIT_WAVE) VENV_ACTIVATE="$(LOWBIT_ENV)/bin/activate"
 
 # The 8k diagnostic validates the new model/context/cache shape. It is separate

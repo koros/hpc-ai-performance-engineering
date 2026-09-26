@@ -1175,7 +1175,7 @@ def _submit_platform_wave(args: argparse.Namespace):
         if profile.platform_id != "h100":
             raise ValueError("Qwen update controls are H100-only")
         verify_update_canaries(Path(os.environ.get("HPC_AI_QWEN_UPDATE_RESULT_ROOT", "results/raw/h100")))
-    if args.wave in {"lowbit-serving", "lowbit-bnb"}:
+    if args.wave in {"lowbit-serving", "lowbit-bnb", "lowbit-quality"}:
         from hpc_ai_perf.validation.lowbit import probe_packages, verify_acceptance
 
         acceptance_dir = os.environ.get("HPC_AI_LOWBIT_ACCEPTANCE_DIR")
@@ -1187,6 +1187,7 @@ def _submit_platform_wave(args: argparse.Namespace):
             profile.platform_id,
             probe_packages(runtime_python),
             include_bnb=args.wave == "lowbit-bnb",
+            wave=args.wave,
         )
     if args.wave == "vllm-long-context":
         from hpc_ai_perf.validation.long_context import verify_acceptance

@@ -15,6 +15,7 @@ def main() -> None:
     parser.add_argument(
         "--metadata-only", action="store_true", help="Validate inputs without downloading model weights"
     )
+    parser.add_argument("--quality-extension", action="store_true", help="Validate the 128-window quality study inputs")
     args = parser.parse_args()
     from datasets import load_dataset
     from huggingface_hub import hf_hub_download, snapshot_download
@@ -31,7 +32,8 @@ def main() -> None:
         artifacts[method] = {"model": model, "revision": revision, "config_sha256": digest(config)}
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, revision=BASE_REVISION)
     inputs = {}
-    for split, length, count in (("validation", 512, 64), ("test", 256, 32)):
+    quality_shape = ("test", 512, 128) if args.quality_extension else ("test", 256, 32)
+    for split, length, count in (("validation", 512, 64), quality_shape):
         data = load_dataset(DATASET, "wikitext-2-raw-v1", revision=DATASET_REVISION, split=split)
         windows = text_windows(data["text"], tokenizer, length, count)
         inputs[split] = {"windows": len(windows), "tokens_per_window": length, "tokens_sha256": digest(windows)}

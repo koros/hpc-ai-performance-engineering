@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from hpc_ai_perf.config.catalog import discover_experiment_configs
-from hpc_ai_perf.config.lowbit import ARTIFACTS, METHOD_IDS, digest, runtime_fingerprint
+from hpc_ai_perf.config.lowbit import ARTIFACTS, METHOD_IDS, QUALITY_METHOD_IDS, digest, runtime_fingerprint
 from hpc_ai_perf.config.platform import load_platform_conditions, load_platform_profile, resolve_platform_config
 
 
@@ -26,9 +26,18 @@ def resolved_lowbit_config(experiment_id: str, platform: str):
     return resolve_platform_config(entry, load_platform_profile(f"platforms/{platform}.json"), condition)
 
 
-def matrix_fingerprint() -> str:
+def matrix_fingerprint(wave: str = "lowbit-serving") -> str:
+    ids = (
+        set(QUALITY_METHOD_IDS.values())
+        if wave == "lowbit-quality"
+        else {eid for pair in METHOD_IDS.values() for eid in pair}
+    )
     return digest(
-        {e.config.experiment_id: e.config.to_dict() for e in discover_experiment_configs("configs/lowbit_serving")}
+        {
+            e.config.experiment_id: e.config.to_dict()
+            for e in discover_experiment_configs("configs/lowbit_serving")
+            if e.config.experiment_id in ids
+        }
     )
 
 
@@ -52,9 +61,13 @@ print(json.dumps(packages))
     return json.loads(result.stdout)
 
 
-def verify_acceptance(root: Path, platform: str, packages: dict[str, Any], *, include_bnb: bool = False) -> None:
+def verify_acceptance(
+    root: Path, platform: str, packages: dict[str, Any], *, include_bnb: bool = False, wave: str = "lowbit-serving"
+) -> None:
+    if wave not in {"lowbit-serving", "lowbit-bnb", "lowbit-quality"}:
+        raise ValueError("Unknown low-bit acceptance wave")
     issues = []
-    methods = ["bf16", "awq", "gptq"] + (["bitsandbytes_nf4"] if include_bnb else [])
+    methods = ["bf16", "awq", "gptq"] + (["bitsandbytes_nf4"] if include_bnb or wave == "lowbit-quality" else [])
     for method in methods:
         path = root / f"{method}.json"
         if not path.is_file():
@@ -63,7 +76,9 @@ def verify_acceptance(root: Path, platform: str, packages: dict[str, Any], *, in
         record = json.loads(path.read_text())
         metrics = record.get("metrics", {})
         env = record.get("environment", {})
-        config = resolved_lowbit_config(METHOD_IDS[method][1], platform)
+        config = resolved_lowbit_config(
+            QUALITY_METHOD_IDS[method] if wave == "lowbit-quality" else METHOD_IDS[method][1], platform
+        )
         p = config.workload.parameters
         checks = {
             "completed request and quality evaluation": record.get("status") == "completed"
@@ -71,7 +86,7 @@ def verify_acceptance(root: Path, platform: str, packages: dict[str, Any], *, in
             "platform": platform in str(env.get("observed_gpu_model", "")).lower(),
             "one GPU": record.get("gpus") == 1,
             "runtime fingerprint": metrics.get("study_runtime_sha256") == runtime_fingerprint(),
-            "matrix fingerprint": metrics.get("lowbit_matrix_sha256") == matrix_fingerprint(),
+            "matrix fingerprint": metrics.get("lowbit_matrix_sha256") == matrix_fingerprint(wave),
             "parameter fingerprint": metrics.get("study_parameters_sha256") == digest(p),
             "artifact revision": metrics.get("hf_model_revision") == config.workload.model_revision,
             "backend": metrics.get("precision_backend") == (ARTIFACTS[method][2] or "vllm_bf16"),
