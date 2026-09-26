@@ -5,6 +5,8 @@ PLATFORM ?= l40s
 PLATFORM_WAVE ?= 0
 PLATFORM_TIME_LIMIT ?=
 PLATFORM_TIME_LIMIT_ARG := $(if $(PLATFORM_TIME_LIMIT),--time $(PLATFORM_TIME_LIMIT),)
+PLATFORM_ALLOW_INCOMPLETE ?= 0
+PLATFORM_ALLOW_INCOMPLETE_ARG := $(if $(filter 1,$(PLATFORM_ALLOW_INCOMPLETE)),--allow-incomplete,)
 PLATFORM_PROFILE ?= platforms/$(PLATFORM).json
 PLATFORM_CONFIG_DIR ?= build/platform_configs/$(PLATFORM)
 PLATFORM_SLURM_DIR ?= slurm/generated/$(PLATFORM)/wave_$(PLATFORM_WAVE)
@@ -301,7 +303,7 @@ status-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli status-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE)
 
 collect-platform-wave:
-	$(PYTHON) -m hpc_ai_perf.cli collect-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE) --result-root results/raw
+	$(PYTHON) -m hpc_ai_perf.cli collect-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE) --result-root results/raw $(PLATFORM_ALLOW_INCOMPLETE_ARG)
 
 verify-hardware-energy-revalidation:
 	test "$(PLATFORM)" = "l40s" || (echo "Hardware energy revalidation currently targets PLATFORM=l40s" && exit 1)

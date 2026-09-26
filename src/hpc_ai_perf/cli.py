@@ -170,6 +170,11 @@ def main() -> None:
     if args.command == "collect-platform-wave":
         imported_paths = _collect_platform_wave(args)
         LOGGER.info("Collected %d immutable evidence file(s)", len(imported_paths))
+        profile = load_platform_profile(args.platform_profile)
+        state = load_wave_state(_wave_state_path_for_args(args, profile.platform_id))
+        pending = state.get("incomplete_experiment_ids", [])
+        if pending:
+            LOGGER.warning("Partial collection; wave remains incomplete for: %s", ", ".join(pending))
         return
 
     if args.command == "retry-platform-wave":
@@ -555,6 +560,11 @@ def _build_parser() -> argparse.ArgumentParser:
         if command == "collect-platform-wave":
             lifecycle_parser.add_argument(
                 "--result-root", default="results/raw", help="Canonical raw evidence directory."
+            )
+            lifecycle_parser.add_argument(
+                "--allow-incomplete",
+                action="store_true",
+                help="Collect validated completed trials while retaining incomplete wave status.",
             )
         if command == "retry-platform-wave":
             _add_bundle_submission_options(lifecycle_parser)
@@ -1277,7 +1287,7 @@ def _apply_current_wave_policy(
 
 
 def _collect_platform_wave(args: argparse.Namespace) -> list[str]:
-    """Import complete current-policy experiments, combining retries safely."""
+    """Import current-policy evidence, optionally preserving partial trial coverage."""
     profile = load_platform_profile(args.platform_profile)
     state_path = _wave_state_path_for_args(args, profile.platform_id)
     state = load_wave_state(state_path)
@@ -1302,17 +1312,33 @@ def _collect_platform_wave(args: argparse.Namespace) -> list[str]:
             if experiment.experiment_id in expected_ids and experiment.complete:
                 selected[experiment.experiment_id] = (attempt, experiment)
     missing = sorted(expected_ids - completed_evidence_ids - set(selected))
-    if missing:
+    allow_incomplete = getattr(args, "allow_incomplete", False)
+    if missing and not allow_incomplete:
         raise ValueError(
-            "Wave evidence is incomplete; run retry-platform-wave before collection for: " + ", ".join(missing)
+            "Wave evidence is incomplete for: "
+            + ", ".join(missing)
+            + "; use --allow-incomplete to preserve completed trials or retry-platform-wave to recover"
         )
 
     imported_paths: list[str] = []
     result_root = Path(args.result_root)
     repository = Path.cwd().resolve()
-    for experiment_id in sorted(selected):
-        attempt, _ = selected[experiment_id]
-        source = Path(attempt["bundle_dir"]) / "results" / experiment_id
+    if allow_incomplete:
+        sources = sorted(
+            {
+                path
+                for _, status in summaries
+                for experiment in status.experiments
+                if experiment.experiment_id in expected_ids
+                for path in experiment.completed_result_paths
+            }
+        )
+    else:
+        sources = [
+            Path(selected[experiment_id][0]["bundle_dir"]) / "results" / experiment_id
+            for experiment_id in sorted(selected)
+        ]
+    for source in sources:
         summary = import_result_evidence(source, result_root)
         for path in (*summary.imported, *summary.unchanged):
             resolved = path.resolve()
@@ -1324,7 +1350,10 @@ def _collect_platform_wave(args: argparse.Namespace) -> list[str]:
     if problems:
         raise ValueError("Evidence verification failed after collection: " + "; ".join(problems))
     track_platform_progress(args.platform_profile, result_dir=result_root)
-    mark_wave_collected(state_path, imported_paths)
+    pending = sorted(
+        expected_ids - _completed_planned_wave_evidence_ids(profile.platform_id, str(args.wave), result_dir=result_root)
+    )
+    mark_wave_collected(state_path, imported_paths, incomplete_experiment_ids=pending)
     return sorted(set(imported_paths))
 
 

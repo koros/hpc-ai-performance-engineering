@@ -23,6 +23,7 @@ class ExperimentResultStatus:
     completed_trials: tuple[int, ...]
     failed_trials: tuple[int, ...]
     invalid_records: int
+    completed_result_paths: tuple[Path, ...] = ()
 
     @property
     def missing_trials(self) -> tuple[int, ...]:
@@ -131,12 +132,21 @@ def mark_current_attempt_collected(state_path: str | Path, imported_paths: list[
     return state
 
 
-def mark_wave_collected(state_path: str | Path, imported_paths: list[str]) -> dict[str, Any]:
+def mark_wave_collected(
+    state_path: str | Path,
+    imported_paths: list[str],
+    *,
+    incomplete_experiment_ids: list[str] | None = None,
+) -> dict[str, Any]:
     """Record all evidence imported across attempts for this logical wave."""
     path = Path(state_path)
     state = load_wave_state(path)
-    state["collected_at"] = _utc_now()
-    state["imported_paths"] = sorted(set(imported_paths))
+    pending = sorted(set(incomplete_experiment_ids or []))
+    state["last_collection_at"] = _utc_now()
+    state["collected_at"] = None if pending else state["last_collection_at"]
+    state["collection_status"] = "partial" if pending else "complete"
+    state["incomplete_experiment_ids"] = pending
+    state["imported_paths"] = sorted(set(state.get("imported_paths", [])) | set(imported_paths))
     _write_json(path, state)
     return state
 
@@ -156,6 +166,7 @@ def summarize_bundle_results(bundle_dir: str | Path) -> BundleResultStatus:
             raise ValueError(f"Bundle manifest config entry is invalid: {experiment_id}")
         required_trials = int(entry.get("required_trials", 1))
         completed: set[int] = set()
+        completed_paths: dict[int, Path] = {}
         failed: set[int] = set()
         invalid = 0
         for result_path in sorted((root / "results" / experiment_id).glob("*.json")):
@@ -170,14 +181,16 @@ def summarize_bundle_results(bundle_dir: str | Path) -> BundleResultStatus:
             issues = validate_result_file(result_path)
             issues.extend(_bundle_validation_issues(result, result_path))
             repetition = result.get("repetition_number")
-            if issues or not isinstance(repetition, int) or repetition < 1:
+            if issues or not isinstance(repetition, int) or not 1 <= repetition <= required_trials:
                 invalid += 1
                 continue
             if result.get("status") == "completed" and result.get("error") is None:
                 if repetition in completed:
                     invalid += 1
+                    completed_paths.pop(repetition, None)
                 else:
                     completed.add(repetition)
+                    completed_paths[repetition] = result_path
             else:
                 failed.add(repetition)
         statuses.append(
@@ -187,6 +200,9 @@ def summarize_bundle_results(bundle_dir: str | Path) -> BundleResultStatus:
                 completed_trials=tuple(sorted(completed)),
                 failed_trials=tuple(sorted(failed)),
                 invalid_records=invalid,
+                completed_result_paths=tuple(
+                    path for repetition, path in sorted(completed_paths.items()) if repetition not in failed
+                ),
             )
         )
     return BundleResultStatus(root, tuple(statuses))
