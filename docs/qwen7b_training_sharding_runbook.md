@@ -20,6 +20,7 @@ evidence. Never pool it with the earlier small-model strategy rankings.
 | Sequence length | 512 tokens |
 | Effective global batch | 16 sequences |
 | Optimisation controls | AdamW, learning rate `1e-5`, activation checkpointing enabled |
+| FSDP wrapping | One Qwen decoder layer per FSDP unit, `limit_all_gathers=True`, no forward prefetch |
 | Telemetry | UUID-mapped `nvidia-smi`, memory trace, and NCCL all-reduce probe |
 
 Within a GPU-count pair, FSDP full-shard and ZeRO-3 differ only in distributed strategy. The two- and four-GPU
@@ -70,10 +71,33 @@ git diff --cached --stat
 git commit -m "data: add H100 Qwen 7B sharding study trials"
 ```
 
+## Collecting a completed canary while its paired canary is repaired
+
+If one canary completes and the other fails, preserve the completed immutable result immediately rather than rerunning
+it. For example, if E251 completed while E250 needs a runtime repair:
+
+```bash
+export BUNDLE=../hpc-ai-submissions/<qwen7b-canary-bundle>
+make import-result-evidence SOURCE="$BUNDLE/results/E251"
+make validate-result-evidence
+git add results/raw/h100/E251 results/raw/h100/SHA256SUMS
+git commit -m "data: add H100 Qwen 7B ZeRO-3 canary trial"
+```
+
+After pulling the runtime repair, use recovery for the missing condition only:
+
+```bash
+make retry-platform-wave PLATFORM=h100 PLATFORM_WAVE=qwen7b-training-canary
+```
+
+The retry logic recognises E251's collected evidence and schedules only E250. Once E250 completes, run the normal
+wave collection command; the canary verifier requires evidence for both conditions.
+
 ## Failure handling
 
 Do not retry a deterministic OOM or silently lower the sequence length, model size, or effective batch. Preserve the
-failed immutable result. If a capacity investigation is warranted, add a new H100-only `capacity_adjusted` condition
-with an explicit objective and do not combine it with E252–E255. If only the four-GPU jobs remain unschedulable,
-collect the completed two-GPU evidence and record the four-GPU allocation constraint rather than treating it as a
-model or strategy failure.
+failed immutable result. The initial E250 canary showed that root-only FSDP wrapping attempts a model-scale all-gather;
+the runtime now uses decoder-layer wrapping before it is retried. If that layer-wise path still reaches a capacity limit,
+add a new H100-only `capacity_adjusted` condition with an explicit objective and do not combine it with E252–E255. If
+only the four-GPU jobs remain unschedulable, collect the completed two-GPU evidence and record the four-GPU allocation
+constraint rather than treating it as a model or strategy failure.

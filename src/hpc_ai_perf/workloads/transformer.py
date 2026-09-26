@@ -8,6 +8,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
 from hpc_ai_perf.config import ExperimentConfig
@@ -214,15 +215,17 @@ def _run_training_loop(
             device,
         )
 
-    model, optimizer, engine, deepspeed_nvtx_annotations_disabled = _configure_training_strategy(
-        torch,
-        config,
-        runtime,
-        model,
-        device,
-        learning_rate,
-        batch_size,
-        accumulation_steps,
+    model, optimizer, engine, deepspeed_nvtx_annotations_disabled, strategy_runtime_metadata = (
+        _configure_training_strategy(
+            torch,
+            config,
+            runtime,
+            model,
+            device,
+            learning_rate,
+            batch_size,
+            accumulation_steps,
+        )
     )
     deepspeed_managed_precision = engine is not None
     amp_context, scaler = _training_precision(
@@ -377,6 +380,7 @@ def _run_training_loop(
         "parameter_dtype_observed": str(next(model.parameters()).dtype),
         "dataset_execution": "cpu_dataloader" if data_iterator is not None else "synthetic_device_tensors",
         "deepspeed_nvtx_annotations_disabled": deepspeed_nvtx_annotations_disabled,
+        **strategy_runtime_metadata,
         **transformer_engine_metadata,
     }
     if cuda_event_seconds is not None:
@@ -1002,7 +1006,7 @@ def _configure_training_strategy(
     learning_rate: float,
     batch_size: int,
     accumulation_steps: int,
-) -> tuple[Any, Any, Any | None, bool]:
+) -> tuple[Any, Any, Any | None, bool, dict[str, int | float | str | bool | None]]:
     strategy = config.distributed.strategy
     parameters = config.workload.parameters
     if strategy.startswith("deepspeed"):
@@ -1042,9 +1046,10 @@ def _configure_training_strategy(
             optimizer=optimizer,
             config=ds_config,
         )
-        return engine, optimizer, engine, deepspeed_nvtx_annotations_disabled
+        return engine, optimizer, engine, deepspeed_nvtx_annotations_disabled, {}
 
     model = model.to(device)
+    strategy_metadata: dict[str, int | float | str | bool | None] = {}
     if strategy == "ddp" and runtime.world_size > 1:
         from torch.nn.parallel import DistributedDataParallel
 
@@ -1063,17 +1068,57 @@ def _configure_training_strategy(
         if config.runtime.precision in {"fp16", "bf16"}:
             dtype = torch.float16 if config.runtime.precision == "fp16" else torch.bfloat16
             mixed_precision = MixedPrecision(param_dtype=dtype, reduce_dtype=dtype, buffer_dtype=dtype)
+        fsdp_kwargs: dict[str, Any] = {
+            "device_id": device,
+            "sharding_strategy": sharding,
+            "mixed_precision": mixed_precision,
+            "use_orig_params": True,
+        }
+        if config.workload.name == "qwen2_5_7b_training":
+            # A root-only FSDP wrapper all-gathers the entire 7B parameter
+            # tree at once. On two H100 GPUs that creates a ~14 GiB transient
+            # BF16 allocation on top of optimizer/gradient state. Wrap each
+            # decoder layer so only one block is materialised at a time.
+            from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+
+            decoder_layer = _qwen_decoder_layer_class(model)
+            fsdp_kwargs.update(
+                {
+                    "auto_wrap_policy": partial(
+                        transformer_auto_wrap_policy,
+                        transformer_layer_cls={decoder_layer},
+                    ),
+                    "limit_all_gathers": True,
+                    "forward_prefetch": False,
+                }
+            )
+            strategy_metadata = {
+                "fsdp_auto_wrap_policy": "qwen_decoder_layer",
+                "fsdp_limit_all_gathers": True,
+                "fsdp_forward_prefetch": False,
+            }
         model = FullyShardedDataParallel(
             model,
-            device_id=device,
-            sharding_strategy=sharding,
-            mixed_precision=mixed_precision,
-            use_orig_params=True,
+            **fsdp_kwargs,
         )
     elif strategy not in {"none", "ddp", "fsdp"}:
         raise ValueError(f"Unsupported training strategy: {strategy}")
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-    return model, optimizer, None, False
+    return model, optimizer, None, False, strategy_metadata if strategy == "fsdp" else {}
+
+
+def _qwen_decoder_layer_class(model: Any) -> type[Any]:
+    """Locate the concrete decoder-layer type for Qwen's FSDP auto-wrap.
+
+    The model family is pinned by the matrix, but deriving the class from the
+    loaded model avoids importing a Transformers-internal implementation path
+    whose module location can vary across compatible releases.
+    """
+
+    layers = getattr(getattr(model, "model", None), "layers", None)
+    if layers is None or len(layers) == 0:
+        raise RuntimeError("Qwen2.5-7B FSDP requires a non-empty model.layers decoder stack")
+    return type(layers[0])
 
 
 def _training_precision(

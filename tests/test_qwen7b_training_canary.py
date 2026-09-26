@@ -7,6 +7,7 @@ import pytest
 
 from hpc_ai_perf.config import config_sha256
 from hpc_ai_perf.validation import qwen7b_training
+from hpc_ai_perf.workloads import transformer as transformer_workload
 
 
 def _record(experiment_id: str, config_hash: str, strategy: str, detail: str) -> dict[str, object]:
@@ -31,8 +32,30 @@ def _record(experiment_id: str, config_hash: str, strategy: str, detail: str) ->
             "quality_finite": True,
             "quality_loss": 1.1,
             "memory_used_gb": 20.0,
+            **(
+                {
+                    "fsdp_auto_wrap_policy": "qwen_decoder_layer",
+                    "fsdp_limit_all_gathers": True,
+                    "fsdp_forward_prefetch": False,
+                }
+                if experiment_id == "E250"
+                else {}
+            ),
         },
     }
+
+
+def test_qwen_fsdp_decoder_layer_is_derived_from_the_loaded_model() -> None:
+    class Qwen2DecoderLayer:
+        pass
+
+    class Model:
+        class Core:
+            layers = [Qwen2DecoderLayer()]
+
+        model = Core()
+
+    assert transformer_workload._qwen_decoder_layer_class(Model()) is Qwen2DecoderLayer
 
 
 def test_verify_qwen7b_canaries_accepts_current_controlled_records(tmp_path: Path) -> None:

@@ -54,6 +54,12 @@ def verify_canaries(result_root: Path, platform: str = "h100") -> dict[str, dict
             "finite held-out loss": metrics.get("quality_finite") is True and finite(metrics.get("quality_loss")),
             "memory measurement": positive_finite(metrics.get("memory_used_gb")),
         }
+        if experiment_id == "E250":
+            checks["layer-wise FSDP wrapping"] = (
+                metrics.get("fsdp_auto_wrap_policy") == "qwen_decoder_layer"
+                and metrics.get("fsdp_limit_all_gathers") is True
+                and metrics.get("fsdp_forward_prefetch") is False
+            )
         issues.extend(prefix + label + " failed" for label, passed in checks.items() if not passed)
         accepted[experiment_id] = {
             "result": str(record_path),
