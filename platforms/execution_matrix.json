@@ -3,6 +3,14 @@
   "waves": [
     {
       "platform": "h100",
+      "wave": "h100-inference-energy-anchors",
+      "name": "H100 duration-controlled DistilBERT FP16 BF16 and context energy anchors",
+      "experiment_ids": ["E274-E276"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
       "wave": "lowbit-quality",
       "name": "H100 128-window BF16 AWQ GPTQ and NF4 quality robustness",
       "experiment_ids": ["E270-E273"],

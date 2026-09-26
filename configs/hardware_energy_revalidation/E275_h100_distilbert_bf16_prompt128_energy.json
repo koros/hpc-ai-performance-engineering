@@ -1,0 +1,85 @@
+{
+  "experiment_id": "E275",
+  "experiment": "h100_distilbert_bf16_prompt128_energy_anchor_v2",
+  "mode": "inference",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+    "dataset": "synthetic_token_prompts_v1",
+    "parameters": {
+      "comparison_axis": "gpu_model",
+      "hardware_label": "H100",
+      "framework": "pytorch_eager",
+      "batch_size": 1,
+      "prompt_length": 128,
+      "max_new_tokens": 128,
+      "warmup_steps": 10,
+      "min_measured_seconds": 30,
+      "study_protocol": "distilbert_h100_energy_anchor_v2"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100000,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "serving_latency"
+    ],
+    "parameters": {
+      "collect_power": true,
+      "collect_memory_trace": true,
+      "collect_latency_distribution": true,
+      "sample_interval_seconds": 0.1
+    }
+  },
+  "metadata": {
+    "matrix_id": "E275",
+    "template": "h100_inference_energy_anchor",
+    "phase": "Inference energy anchors",
+    "priority": "Supplemental",
+    "gpu_hours_estimate": 0.05,
+    "energy_reference_experiment_id": "E095",
+    "objective": "Measure steady repeated inference with at least 30 seconds of UUID-resolved GPU energy telemetry",
+    "research_questions": [
+      "RQ5",
+      "RQ6",
+      "RQ7"
+    ],
+    "analysis_tasks": [
+      "A04",
+      "A05",
+      "A06",
+      "A07"
+    ],
+    "key_metrics": [
+      "power",
+      "energy",
+      "measurement_samples"
+    ],
+    "study_family": "distilbert_h100_energy_anchor_v2",
+    "source_experiment_ids": [
+      "E095",
+      "E126",
+      "E156"
+    ],
+    "limitation": "Repeated deterministic synthetic requests measure this request shape, not real serving traffic or downstream quality. Preserve the earlier sub-second trials and do not pool measurement windows."
+  }
+}
