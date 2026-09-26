@@ -1182,6 +1182,17 @@ def _submit_platform_wave(args: argparse.Namespace):
             probe_packages(runtime_python),
             include_bnb=args.wave == "lowbit-bnb",
         )
+    if args.wave == "vllm-long-context":
+        from hpc_ai_perf.validation.long_context import verify_acceptance
+        from hpc_ai_perf.validation.lowbit import probe_packages
+
+        acceptance_dir = os.environ.get("HPC_AI_LONG_CONTEXT_ACCEPTANCE_DIR")
+        if not acceptance_dir or not args.venv_activate:
+            raise ValueError(
+                "Long-context wave requires make submit-long-context-wave and a platform-specific acceptance job"
+            )
+        runtime_python = str(Path(args.venv_activate).expanduser().parent / "python")
+        verify_acceptance(Path(acceptance_dir), profile.platform_id, probe_packages(runtime_python))
     state_path = _wave_state_path_for_args(args, profile.platform_id)
     bundle = _create_platform_submission_bundle(args)
     manifest = json.loads(bundle.manifest_path.read_text(encoding="utf-8"))

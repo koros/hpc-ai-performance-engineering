@@ -44,6 +44,9 @@ LOWBIT_ACCEPTANCE_JOB ?=
 LOWBIT_ACCEPTANCE_ROOT ?= build/lowbit_acceptance/$(PLATFORM)/$(LOWBIT_ACCEPTANCE_JOB)
 LOWBIT_INCLUDE_BNB ?= 0
 LOWBIT_WAVE ?= lowbit-serving
+LONG_CONTEXT_ENV ?= $(VLLM_ENV)
+LONG_CONTEXT_ACCEPTANCE_JOB ?=
+LONG_CONTEXT_ACCEPTANCE_ROOT ?= build/long_context_acceptance/$(PLATFORM)/$(LONG_CONTEXT_ACCEPTANCE_JOB)
 NCCL_HOME ?=
 
 DEV_CONFIGS := $(sort $(wildcard configs/dev/*.json))
@@ -53,6 +56,7 @@ DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
 .PHONY: check-cuda-toolchain
 .PHONY: submit-lowbit-acceptance verify-lowbit-acceptance submit-lowbit-wave retry-lowbit-wave
 .PHONY: prefetch-lowbit-assets
+.PHONY: submit-long-context-acceptance verify-long-context-acceptance submit-long-context-wave retry-long-context-wave
 .PHONY: setup-fp8-training-environment submit-fp8-training-build submit-fp8-training-acceptance verify-fp8-training-acceptance submit-fp8-training-wave retry-fp8-training-wave verify-hardware-energy-revalidation
 .PHONY: install-dev lint format test test-dashboard check hooks list-configs run-dev-baselines run-dev-experiments run-dev-refresh check-slurm-profile check-platform-runtime check-l40s-runtime check-h100-runtime check-cuda-toolchain setup-pytorch-gloo-environment submit-pytorch-gloo-build setup-vllm-environment submit-vllm-build submit-vllm-acceptance submit-vllm-pilot submit-vllm-wave retry-vllm-wave materialize-platform-wave render-platform-wave render-l40s-wave render-h100-wave plan-platform-wave init-platform-wave-status dry-run-submit-rendered-platform-wave submit-rendered-platform-wave submit-platform-wave status-platform-wave collect-platform-wave retry-platform-wave stage-platform-wave create-platform-wave-bundle plan-platform-wave-bundle init-platform-wave-bundle-status dry-run-submit-platform-wave-bundle submit-platform-wave-bundle import-platform-wave-bundle track-platform-progress track-l40s-progress track-h100-progress import-result-evidence render-slurm-example render-slurm-must-have render-slurm-env-validation render-slurm-tensorrt-llm render-slurm-baseline-must-have render-slurm-first-batches plan-slurm-env-validation plan-slurm-baseline-must-have plan-slurm-first-batches init-slurm-env-status init-slurm-baseline-status init-slurm-first-status dry-run-submit-slurm-env dry-run-submit-slurm-baseline dry-run-submit-slurm-first report-slurm-env-status report-slurm-baseline-status report-slurm-first-status list-slurm-smoke aggregate-results analyze-results audit-telemetry track-progress track-dev-progress validate validate-result-evidence readiness-report refresh build-dashboard-site serve-dashboard
 
@@ -148,6 +152,23 @@ submit-lowbit-wave: verify-lowbit-acceptance
 retry-lowbit-wave: verify-lowbit-acceptance
 	@case "$(LOWBIT_WAVE)" in lowbit-serving|lowbit-bnb) ;; *) echo "Unknown low-bit wave"; exit 1;; esac
 	HPC_AI_LOWBIT_ACCEPTANCE_DIR="$(abspath $(LOWBIT_ACCEPTANCE_ROOT))" $(MAKE) retry-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=$(LOWBIT_WAVE) VENV_ACTIVATE="$(LOWBIT_ENV)/bin/activate"
+
+# The 8k diagnostic validates the new model/context/cache shape. It is separate
+# from E006 because passing a small-model import does not prove an 8k prefill.
+submit-long-context-acceptance:
+	@case "$(PLATFORM)" in l40s|h100) ;; *) echo "PLATFORM must be l40s or h100"; exit 1;; esac
+	test -r "$(LONG_CONTEXT_ENV)/bin/activate"
+	sbatch --partition=gpu_$(PLATFORM) --export=ALL,HPC_AI_LONG_CONTEXT_ENV="$(LONG_CONTEXT_ENV)",HPC_AI_LONG_CONTEXT_PLATFORM="$(PLATFORM)" slurm/smoke/long_context_acceptance.sbatch
+
+verify-long-context-acceptance:
+	test -n "$(LONG_CONTEXT_ACCEPTANCE_JOB)" || (echo "Set LONG_CONTEXT_ACCEPTANCE_JOB to the finished diagnostic job ID" && exit 1)
+	PYTHONPATH="$(CURDIR)/src" "$(LONG_CONTEXT_ENV)/bin/python" scripts/long_context_acceptance.py verify --platform "$(PLATFORM)" --result-root "$(LONG_CONTEXT_ACCEPTANCE_ROOT)"
+
+submit-long-context-wave: verify-long-context-acceptance
+	HPC_AI_LONG_CONTEXT_ACCEPTANCE_DIR="$(abspath $(LONG_CONTEXT_ACCEPTANCE_ROOT))" $(MAKE) submit-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=vllm-long-context VENV_ACTIVATE="$(LONG_CONTEXT_ENV)/bin/activate"
+
+retry-long-context-wave: verify-long-context-acceptance
+	HPC_AI_LONG_CONTEXT_ACCEPTANCE_DIR="$(abspath $(LONG_CONTEXT_ACCEPTANCE_ROOT))" $(MAKE) retry-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=vllm-long-context VENV_ACTIVATE="$(LONG_CONTEXT_ENV)/bin/activate"
 
 submit-vllm-wave:
 	test -r "$(VLLM_ENV)/bin/activate" || (echo "Run make submit-vllm-build and make submit-vllm-acceptance first" && exit 1)
