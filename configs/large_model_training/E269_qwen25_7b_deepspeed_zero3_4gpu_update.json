@@ -1,0 +1,93 @@
+{
+  "experiment_id": "E269",
+  "experiment": "qwen25_7b_update_v2_deepspeed_zero3_4gpu",
+  "mode": "training",
+  "workload": {
+    "name": "qwen2_5_7b_training",
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "model_revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "study_protocol": "qwen25_7b_h100_update_v2",
+      "model_load_dtype": "bf16",
+      "batch_size": 1,
+      "sequence_length": 512,
+      "gradient_accumulation_steps": 4,
+      "effective_batch_size": 16,
+      "global_batch_size": 16,
+      "learning_rate": 0.00001,
+      "warmup_steps": 2,
+      "activation_checkpointing": true,
+      "distributed_strategy": "deepspeed_zero3",
+      "strategy_detail": "zero_stage_3",
+      "quality_sanity_check": true,
+      "training_update_diagnostics": true,
+      "deepspeed_config": {
+        "zero_optimization_stage": 3,
+        "bf16_enabled": true
+      },
+      "deepspeed_accumulation_mode": "explicit_boundary_v1"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 4,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "deepspeed_zero3",
+    "nodes": 1,
+    "gpus_per_node": 4,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 12,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "nccl"
+    ],
+    "parameters": {
+      "sample_interval_seconds": 0.1,
+      "collect_communication_overhead": true,
+      "collect_memory_trace": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E269",
+    "phase": "Large-model training update controls",
+    "priority": "Must Have",
+    "template": "qwen_update_controls",
+    "study_family": "qwen25_7b_h100_update_v2",
+    "objective": "Compare Qwen deployment strategies with explicit update accounting and observed optimizer state dtype",
+    "research_questions": [
+      "RQ2",
+      "RQ4"
+    ],
+    "analysis_tasks": [
+      "A03",
+      "A05"
+    ],
+    "gpu_hours_estimate": 0.1,
+    "key_metrics": [
+      "throughput",
+      "memory",
+      "communication_overhead",
+      "gpu_hours",
+      "quality_loss"
+    ],
+    "comparison_scope": "within_h100_4gpu_update_v2",
+    "limitation": "Synthetic-token mechanics, not downstream quality. BF16-loaded native AdamW and DeepSpeed FP32 master/state optimizers are observed deployment choices, not numerically identical optimizers.",
+    "source_experiment_ids": [
+      "E254",
+      "E255"
+    ],
+    "acceptance_required": "qwen7b-update-canary"
+  }
+}

@@ -45,6 +45,7 @@ TRANSFORMER_PARAMETER_KEYS = {
     "data_movement_study_type",
     "data_parallel_size",
     "deepspeed_config",
+    "deepspeed_accumulation_mode",
     "device",
     "distributed_strategy",
     "effective_batch_size",
@@ -66,6 +67,7 @@ TRANSFORMER_PARAMETER_KEYS = {
     "max_new_tokens",
     "memory_study_type",
     "micro_batch_size",
+    "min_measured_seconds",
     "num_labels",
     "num_workers",
     "per_gpu_batch_size",
@@ -92,6 +94,7 @@ TRANSFORMER_PARAMETER_KEYS = {
     "strategy_detail",
     "study_protocol",
     "tensor_parallel_size",
+    "training_update_diagnostics",
     "text",
     "warmup_steps",
 }

@@ -2,6 +2,30 @@
   "schema_version": "1.0",
   "waves": [
     {
+      "platform": "h100",
+      "wave": "qwen7b-update-canary",
+      "name": "H100 Qwen DDP feasibility and explicit update accounting gate",
+      "experiment_ids": ["E261-E263"],
+      "required_trials": 1,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "h100",
+      "wave": "qwen7b-update-controls-2gpu",
+      "name": "H100 Qwen two-GPU DDP FSDP and explicit-boundary ZeRO-3 controls",
+      "experiment_ids": ["E264-E266"],
+      "required_trials": 3,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "h100",
+      "wave": "qwen7b-update-controls-4gpu",
+      "name": "H100 Qwen four-GPU DDP FSDP and explicit-boundary ZeRO-3 controls",
+      "experiment_ids": ["E267-E269"],
+      "required_trials": 3,
+      "comparability": "platform_specific"
+    },
+    {
       "platform": "l40s",
       "wave": "lowbit-serving",
       "name": "L40S Qwen2.5-7B BF16 AWQ and GPTQ (acceptance required)",

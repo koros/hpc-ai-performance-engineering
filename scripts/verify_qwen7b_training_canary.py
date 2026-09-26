@@ -13,16 +13,21 @@ import argparse
 import json
 from pathlib import Path
 
-from hpc_ai_perf.validation.qwen7b_training import verify_canaries
+from hpc_ai_perf.validation.qwen7b_training import verify_canaries, verify_update_canaries
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--result-root", type=Path, required=True)
     parser.add_argument("--platform", choices=("h100",), default="h100")
+    parser.add_argument("--update-controls", action="store_true")
     args = parser.parse_args()
 
-    accepted = verify_canaries(args.result_root, args.platform)
+    accepted = (
+        verify_update_canaries(args.result_root)
+        if args.update_controls
+        else verify_canaries(args.result_root, args.platform)
+    )
     print(json.dumps({"status": "completed", "platform": args.platform, "results": accepted}, indent=2))
 
 

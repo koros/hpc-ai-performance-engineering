@@ -1169,6 +1169,12 @@ def _submit_platform_wave(args: argparse.Namespace):
     if not args.wave:
         raise ValueError("submit-platform-wave requires --wave")
     profile = load_platform_profile(args.platform_profile)
+    if args.wave in {"qwen7b-update-controls-2gpu", "qwen7b-update-controls-4gpu"}:
+        from hpc_ai_perf.validation.qwen7b_training import verify_update_canaries
+
+        if profile.platform_id != "h100":
+            raise ValueError("Qwen update controls are H100-only")
+        verify_update_canaries(Path(os.environ.get("HPC_AI_QWEN_UPDATE_RESULT_ROOT", "results/raw/h100")))
     if args.wave in {"lowbit-serving", "lowbit-bnb"}:
         from hpc_ai_perf.validation.lowbit import probe_packages, verify_acceptance
 

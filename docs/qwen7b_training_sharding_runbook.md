@@ -2,8 +2,8 @@
 
 This H100-only extension addresses the study's principal distributed-training external-validity gap: the earlier
 strategy rows use models small enough that sharding is often optional. It introduces a separately labelled
-Qwen2.5-7B BF16 causal-LM study in which FSDP full sharding and DeepSpeed ZeRO-3 are necessary, meaningful
-alternatives.
+Qwen2.5-7B BF16 causal-LM study of FSDP full sharding and DeepSpeed ZeRO-3. Whether sharding is necessary
+at this particular load/optimizer shape must be measured with a matching DDP control, not assumed.
 
 It is a new study family (`qwen25_7b_h100_sharding_v1`), not a replacement for GPT-2, DistilBERT, or TinyLlama
 evidence. Never pool it with the earlier small-model strategy rankings.
@@ -23,7 +23,8 @@ evidence. Never pool it with the earlier small-model strategy rankings.
 | FSDP wrapping | One Qwen decoder layer per FSDP unit, `limit_all_gathers=True`, no forward prefetch |
 | Telemetry | UUID-mapped `nvidia-smi`, memory trace, and NCCL all-reduce probe |
 
-Within a GPU-count pair, FSDP full-shard and ZeRO-3 differ only in distributed strategy. The two- and four-GPU
+Within a GPU-count pair, FSDP full-shard and ZeRO-3 share requested workload settings, but their optimizer-state
+precision and internal accumulation behavior are not necessarily identical. The two- and four-GPU
 conditions preserve the effective global batch by changing accumulation from 8 to 4 steps; treat that as a
 controlled scaling sensitivity, not a fixed-accumulation speedup curve.
 
@@ -101,3 +102,33 @@ the runtime now uses decoder-layer wrapping before it is retried. If that layer-
 add a new H100-only `capacity_adjusted` condition with an explicit objective and do not combine it with E252–E255. If
 only the four-GPU jobs remain unschedulable, collect the completed two-GPU evidence and record the four-GPU allocation
 constraint rather than treating it as a model or strategy failure.
+
+## Fresh update controls (E261–E269)
+
+The September 26 evidence reports different final losses between native FSDP and ZeRO-3. This is not proof of
+a defect, but prevents assuming numerically equivalent optimization. Preserve E250–E255 unchanged.
+The new `qwen25_7b_h100_update_v2` family adds DDP feasibility and records initial loss, backward/update
+counts, engine sample accounting, and actual Adam-state dtypes. ZeRO-3 uses explicit accumulation boundaries,
+configured GAS 8 (two GPUs) or 4 (four GPUs), and disables DeepSpeed's second loss division because the common
+loop already scales the loss. Legacy configurations keep the old external-accumulation behavior.
+
+| Wave | IDs | GPUs | Repetitions |
+| --- | --- | ---: | ---: |
+| `qwen7b-update-canary` | E261 DDP, E262 FSDP, E263 ZeRO-3 | 2 | 1 |
+| `qwen7b-update-controls-2gpu` | E264 DDP, E265 FSDP, E266 ZeRO-3 | 2 | 3 |
+| `qwen7b-update-controls-4gpu` | E267 DDP, E268 FSDP, E269 ZeRO-3 | 4 | 3 |
+
+```bash
+make submit-qwen7b-update-canary PLATFORM=h100
+make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=qwen7b-update-canary
+make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=qwen7b-update-canary
+make verify-qwen7b-update-canary PLATFORM=h100
+make submit-qwen7b-update-wave PLATFORM=h100
+make submit-qwen7b-update-wave PLATFORM=h100 QWEN7B_UPDATE_WAVE=qwen7b-update-controls-4gpu
+```
+
+The gate checks contract/content hashes (not HEAD), update/sample counts, finite losses, and initial loss agreement
+within 5%. It does **not** claim matching final loss or optimizer precision. If DDP OOMs, retain the failed bundle
+as feasibility evidence, import successful siblings separately, and do not repeatedly retry unchanged shapes or
+bypass the gate. Four-GPU DDP still requires its own feasibility assessment; the two-GPU gate is not a capacity
+guarantee. Native BF16 Adam states versus DeepSpeed FP32 states must remain visible in conclusions.

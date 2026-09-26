@@ -194,6 +194,10 @@ def _run_training_loop(
         raise ValueError("gradient_accumulation_steps must be at least 1")
     _validate_batch_semantics(config, runtime, batch_size, accumulation_steps)
     learning_rate = float(parameters.get("learning_rate", 5e-5))
+    update_diagnostics = bool(parameters.get("training_update_diagnostics", False))
+    accumulation_mode = str(parameters.get("deepspeed_accumulation_mode", "legacy_external"))
+    if accumulation_mode not in {"legacy_external", "explicit_boundary_v1"}:
+        raise ValueError("Unknown deepspeed_accumulation_mode")
     device = torch.device("cuda", runtime.local_rank) if torch.cuda.is_available() else torch.device("cpu")
 
     activation_checkpointing_backend = "disabled"
@@ -265,9 +269,15 @@ def _run_training_loop(
     data_loading_seconds = 0.0
     transfer_seconds = 0.0
     final_loss = 0.0
+    initial_loss: float | None = None
+    optimizer_step_calls = 0
+    backward_calls = 0
+    engine_steps_before = getattr(engine, "global_steps", None)
+    engine_samples_before = getattr(engine, "global_samples", None)
 
     def one_optimizer_step(measured: bool) -> float:
         nonlocal data_loading_seconds, transfer_seconds
+        nonlocal initial_loss, optimizer_step_calls, backward_calls
         if engine is not None:
             engine.zero_grad()
         else:
@@ -276,6 +286,8 @@ def _run_training_loop(
         step_load = 0.0
         step_transfer = 0.0
         for accumulation_index in range(accumulation_steps):
+            if engine is not None and accumulation_mode == "explicit_boundary_v1":
+                engine.set_gradient_accumulation_boundary(accumulation_index == accumulation_steps - 1)
             if data_iterator is None:
                 batch = static_batch
             else:
@@ -296,14 +308,21 @@ def _run_training_loop(
             with sync_context:
                 with amp_context():
                     outputs = model(**batch)
+                    if update_diagnostics and initial_loss is None:
+                        initial_loss = float(outputs.loss.detach().cpu())
                     loss = outputs.loss / accumulation_steps
                 if engine is not None:
-                    engine.backward(loss)
+                    if accumulation_mode == "explicit_boundary_v1":
+                        # The shared loop already divided the loss by GAS.
+                        engine.backward(loss, scale_wrt_gas=False)
+                    else:
+                        engine.backward(loss)
                 elif scaler is not None:
                     scaler.scale(loss).backward()
                 else:
                     loss.backward()
                 step_loss += float(loss.detach().cpu())
+                backward_calls += 1
 
         if engine is not None:
             engine.step()
@@ -312,6 +331,7 @@ def _run_training_loop(
             scaler.update()
         else:
             optimizer.step()
+        optimizer_step_calls += 1
         if measured:
             data_loading_seconds += step_load
             transfer_seconds += step_transfer
@@ -385,6 +405,28 @@ def _run_training_loop(
     }
     if cuda_event_seconds is not None:
         metrics["cuda_event_seconds"] = cuda_event_seconds
+    if update_diagnostics:
+        from hpc_ai_perf.validation.qwen7b_training import update_runtime_sha256
+
+        metrics.update(
+            {
+                "training_update_protocol": "explicit_accumulation_audit_v1",
+                "training_update_runtime_sha256": update_runtime_sha256(),
+                "initial_training_loss": _distributed_mean(torch, float(initial_loss), device, runtime),
+                "optimizer_step_calls": optimizer_step_calls,
+                "backward_calls": backward_calls,
+                "expected_optimizer_step_calls": warmup_steps + steps,
+                "expected_backward_calls": (warmup_steps + steps) * accumulation_steps,
+                "optimizer_state_dtypes_observed": _optimizer_state_dtypes(optimizer),
+                "deepspeed_accumulation_mode": accumulation_mode if engine is not None else "common_loop",
+                "deepspeed_optimizer_updates": (
+                    engine.global_steps - engine_steps_before if engine_steps_before is not None else None
+                ),
+                "deepspeed_samples_accounted": (
+                    engine.global_samples - engine_samples_before if engine_samples_before is not None else None
+                ),
+            }
+        )
     if torch.cuda.is_available():
         allocated_gb = torch.cuda.max_memory_allocated(device) / (1024**3)
         reserved_gb = torch.cuda.max_memory_reserved(device) / (1024**3)
@@ -421,6 +463,20 @@ def _run_training_loop(
                 runtime,
             )
     return WorkloadRunOutput(metrics=metrics)
+
+
+def _optimizer_state_dtypes(optimizer: Any) -> str:
+    """Observe actual optimizer state without assuming BF16 implies BF16 Adam states."""
+    visited: set[int] = set()
+    dtypes: set[str] = set()
+    while optimizer is not None and id(optimizer) not in visited:
+        visited.add(id(optimizer))
+        for state in getattr(optimizer, "state", {}).values():
+            for name, value in state.items():
+                if name != "step" and hasattr(value, "dtype"):
+                    dtypes.add(str(value.dtype))
+        optimizer = getattr(optimizer, "optimizer", None)
+    return ",".join(sorted(dtypes)) or "unavailable"
 
 
 def _run_causal_inference(config: ExperimentConfig) -> WorkloadRunOutput:
@@ -584,6 +640,9 @@ def _run_classification_inference(config: ExperimentConfig) -> WorkloadRunOutput
     elif data_parallel_size != 1:
         raise RuntimeError("data_parallel_size greater than one requires a multi-GPU allocation")
     measured_batches = int(config.runtime.max_steps or 10)
+    minimum_seconds = float(parameters.get("min_measured_seconds", 0))
+    if not math.isfinite(minimum_seconds) or minimum_seconds < 0:
+        raise ValueError("min_measured_seconds must be finite and non-negative")
     warmup_batches = _warmup_steps(parameters, measured_batches)
     generator = torch.Generator(device=device).manual_seed(config.runtime.seed)
     inputs = torch.randint(
@@ -599,6 +658,7 @@ def _run_classification_inference(config: ExperimentConfig) -> WorkloadRunOutput
     _sync(torch, device)
     latencies: list[float] = []
     logits = None
+    completed_batches = 0
     with measured_region():
         cuda_timer = _start_cuda_timer(torch)
         start_all = time.perf_counter()
@@ -613,15 +673,20 @@ def _run_classification_inference(config: ExperimentConfig) -> WorkloadRunOutput
             )
             logits = round_logits[-1]
             latencies.extend(round_latencies)
+            completed_batches += 1
+            if minimum_seconds and completed_batches >= 2 and time.perf_counter() - start_all >= minimum_seconds:
+                break
         cuda_event_seconds = _stop_cuda_timer(torch, cuda_timer)
         _sync(torch, device)
         measured_seconds = max(time.perf_counter() - start_all, 1e-12)
-    total_samples = measured_batches * batch_size * concurrency
+    if measured_seconds < minimum_seconds:
+        raise RuntimeError("Measured interval too short; increase max_steps for the energy anchor")
+    total_samples = completed_batches * batch_size * concurrency
     total_tokens = total_samples * sequence_length
     metrics: dict[str, int | float | str | bool | None] = {
         "requests": total_samples,
         "samples": total_samples,
-        "batches": measured_batches,
+        "batches": completed_batches,
         "warmup_batches": warmup_batches,
         "batch_size": batch_size,
         "concurrent_requests": concurrency,
@@ -1038,6 +1103,8 @@ def _configure_training_strategy(
             "bf16": {"enabled": config.runtime.precision == "bf16"},
             "fp16": {"enabled": config.runtime.precision == "fp16"},
         }
+        if parameters.get("deepspeed_accumulation_mode") == "explicit_boundary_v1":
+            ds_config["gradient_accumulation_steps"] = accumulation_steps
         model = model.to(device)
         optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
         engine, optimizer, _, _ = deepspeed.initialize(

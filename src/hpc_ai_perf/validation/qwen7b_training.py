@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from copy import deepcopy
@@ -15,6 +16,71 @@ EXPECTATIONS = {
     "E250": {"strategy": "fsdp", "detail": "full_shard"},
     "E251": {"strategy": "deepspeed_zero3", "detail": "zero_stage_3"},
 }
+
+UPDATE_EXPECTATIONS = {"E261": "ddp", "E262": "fsdp", "E263": "deepspeed_zero3"}
+
+
+def update_runtime_sha256() -> str:
+    root = Path(__file__).resolve().parents[1]
+    return hashlib.sha256((root / "workloads/transformer.py").read_bytes()).hexdigest()
+
+
+def verify_update_canaries(result_root: Path) -> dict[str, dict[str, Any]]:
+    """Certify execution/accounting, not numerical equivalence of optimizer states."""
+    entries = {
+        entry.config.experiment_id: entry for entry in discover_experiment_configs("configs/large_model_training")
+    }
+    conditions = load_platform_conditions("platforms/execution_matrix.json", "h100", wave="qwen7b-update-canary")
+    profile = load_platform_profile("platforms/h100.json")
+    issues, accepted, initial_losses = [], {}, []
+    for condition in conditions:
+        eid = condition.matrix_id
+        config = resolve_platform_config(entries[eid], profile, condition)
+        matches = matching_records(result_root / eid, canary_contract_sha256(config))
+        if not matches:
+            issues.append(f"{eid}: no collected record matches the update canary contract")
+            continue
+        path, record = matches[-1]
+        m, env = record.get("metrics", {}), record.get("environment", {})
+        p = config.workload.parameters
+        updates = config.runtime.max_steps + p["warmup_steps"]
+        checks = {
+            "completed": record.get("status") == "completed" and record.get("error") is None,
+            "H100 runtime": "h100" in str(env.get("observed_gpu_model", "")).lower(),
+            "clean source": env.get("git_dirty") is False,
+            "current runtime": m.get("training_update_runtime_sha256") == update_runtime_sha256(),
+            "strategy": m.get("strategy_observed") == UPDATE_EXPECTATIONS[eid],
+            "initial loss": positive_finite(m.get("initial_training_loss")),
+            "finite final loss": finite(m.get("loss")),
+            "finite synthetic held-out loss": m.get("quality_finite") is True and finite(m.get("quality_loss")),
+            "positive throughput": positive_finite(m.get("throughput_tokens_sec")),
+            "update calls": m.get("optimizer_step_calls") == updates,
+            "backward calls": m.get("backward_calls") == updates * p["gradient_accumulation_steps"],
+            "optimizer dtype evidence": m.get("optimizer_state_dtypes_observed") not in (None, "", "unavailable"),
+            "batch accounting": m.get("effective_global_batch_size") == 16,
+        }
+        if UPDATE_EXPECTATIONS[eid] == "deepspeed_zero3":
+            checks.update(
+                {
+                    "explicit boundary": m.get("deepspeed_accumulation_mode") == "explicit_boundary_v1",
+                    "engine updates": m.get("deepspeed_optimizer_updates") == updates,
+                    "engine samples": m.get("deepspeed_samples_accounted") == updates * 16,
+                }
+            )
+        if positive_finite(m.get("initial_training_loss")):
+            initial_losses.append(m["initial_training_loss"])
+        issues.extend(f"{eid}: {label} failed" for label, passed in checks.items() if not passed)
+        accepted[eid] = {
+            "result": str(path),
+            "strategy": UPDATE_EXPECTATIONS[eid],
+            "initial_loss": m.get("initial_training_loss"),
+            "optimizer_state_dtypes": m.get("optimizer_state_dtypes_observed"),
+        }
+    if len(initial_losses) == 3 and (max(initial_losses) - min(initial_losses)) / min(initial_losses) > 0.05:
+        issues.append("Initial losses differ by more than the preregistered 5% runtime sanity tolerance")
+    if issues:
+        raise ValueError("Qwen training update canary failed:\n- " + "\n- ".join(issues))
+    return accepted
 
 
 def verify_canaries(result_root: Path, platform: str = "h100") -> dict[str, dict[str, Any]]:
