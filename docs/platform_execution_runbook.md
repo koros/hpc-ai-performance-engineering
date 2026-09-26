@@ -392,6 +392,20 @@ make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity
 ```
 
 E256 retains the original strong-scaling global batch of 64 through two accumulation steps. E257 is the preserved
+default-allocator failure. After E259 completed once, E260 adds an independent three-trial validation of the
+same micro-batch-48/expandable-segment execution shape:
+
+```bash
+make submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-allocator-validation
+make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-allocator-validation
+make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-allocator-validation
+```
+
+Keep E260 separate from E259 and the default-allocator E257 failure. Repeated success validates this runtime,
+not a universal maximum batch or proof that every earlier OOM was fragmentation. Batch 48 consumed approximately
+77 GiB in E259 and improved throughput only about 1.3% over batch 40; reliability/headroom are part of the outcome.
+
+E257 is the preserved
 default-allocator micro-batch-48 failure: all three trials OOMed after using 72.53 GiB of the
 observed 79.19 GiB H100, with a further 9.20 GiB request and only 6.65 GiB free. It is deferred rather than retried.
 E258 is the independently collectable three-trial micro-batch-40 probe:

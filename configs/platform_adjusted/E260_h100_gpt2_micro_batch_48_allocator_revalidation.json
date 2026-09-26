@@ -1,0 +1,78 @@
+{
+  "experiment_id": "E260",
+  "experiment": "capacity_adjusted_h100_gpt2_micro_batch_48_expandable_segments_revalidation",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "memory_study_type": "micro_batch",
+      "batch_size": 48,
+      "micro_batch_size": 48,
+      "sequence_length": 1024,
+      "activation_checkpointing": false,
+      "gradient_accumulation_steps": 1,
+      "effective_batch_size": 48
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw/h100",
+    "environment": {
+      "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+    }
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory"
+    ],
+    "parameters": {
+      "collect_memory_trace": true,
+      "collect_oom_risk": true,
+      "collect_effective_batch_metrics": false,
+      "sample_interval_seconds": 0.1
+    }
+  },
+  "metadata": {
+    "matrix_id": "E260",
+    "template": "h100_allocator_revalidation",
+    "phase": "Memory optimisation",
+    "priority": "Supplemental",
+    "gpu_hours_estimate": 0.2,
+    "objective": "Repeat the successful micro-batch 48 expandable-segment condition in three independent trials",
+    "source_experiment_ids": [
+      "E257",
+      "E259"
+    ],
+    "capacity_adjusted_reason": "E257 failed under the default allocator and E259 completed once with expandable segments. E260 validates repeatability without changing the immutable default failure or one-trial canary.",
+    "key_metrics": [
+      "throughput_tokens_sec",
+      "memory_used_gb",
+      "energy_joules_measured_region",
+      "loss"
+    ],
+    "study_family": "h100_gpt2_allocator_revalidation_v1",
+    "research_questions": [
+      "RQ3",
+      "RQ4"
+    ]
+  }
+}
