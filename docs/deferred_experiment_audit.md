@@ -61,7 +61,7 @@ numeric precision rather than precision and backend together.
 | L40S | 2 | `E032-E033` | Exact GPT-2 strong-scaling shapes repeatedly exceeded 44.52 GiB. | Preserve for a platform with sufficient memory; do not relabel smaller shapes as exact evidence. |
 | H100 | 1 | `E032` | All three preserved exact trials OOMed: 70.34 GiB allocated, 7.65 GiB free, then a 12.27 GiB allocation failed on the observed 79.19 GiB H100. The 544 MiB unallocated reserve is far below the shortfall. | Preserve the original exact row and failure evidence. Any smaller H100 shape must be a separately registered `capacity_adjusted` probe. |
 | H100 | 1 | `E068` | All three exact micro-batch-64 trials reached the same capacity failure: 70.34 GiB allocated, 7.65 GiB free, then a further 12.27 GiB request failed. Only 544 MiB was reserved but unallocated. | Preserve E068 and its failed bundle. Register any smaller H100 micro-batch as a new `capacity_adjusted` condition. |
-| H100 | 2 supplemental | `E256-E257` | H100-only capacity-adjusted probes derived from the E032/E068 failures. | Run E256 with micro-batch 32 and accumulation 2 to preserve global batch 64; run E257 at micro-batch 48 to narrow the E067/E068 boundary. Do not use either as an exact replacement. |
+| H100 | 1 supplemental | `E257` | The default-allocator H100 GPT-2 micro-batch-48 probe OOMed identically in all three trials. | Preserve the failed boundary evidence. Run E258 at micro-batch 40 for the practical operating point; E259 is a separately labelled expandable-segments diagnostic. Do not use any as an exact replacement. |
 | L40S | 1 | `E044` | The exact one-GPU TinyLlama batch-16 shape OOMed identically in all three trials: 43.30 GiB allocated, 592.25 MiB free, then a 1000 MiB allocation failed. | Preserve E044 unchanged for H100; use checkpointed E208/E209 as a separately labelled L40S pair. |
 | L40S | 2 | `E067-E068` | Exact GPT-2 micro-batch 32/64 shapes repeatedly exceeded 44.52 GiB. | Run exact rows on H100; use the separately labelled L40S capacity probes. |
 | L40S | 4 supplemental | `E203-E204`, `E206-E207` | Capacity probes at micro-batch 28/30/26/27 OOMed; E205 at 25 is the largest passing integer probe. | Retain as measured capacity-limit deferrals. |
@@ -71,9 +71,9 @@ numeric precision rather than precision and backend together.
 | Platform | Planned source conditions | Deferred source conditions | Planned supplemental probes | Deferred supplemental probes |
 | --- | ---: | ---: | ---: | ---: |
 | L40S | 180 | 20 | 43 | 4 |
-| H100 | 183 | 17 | 26 | 0 |
+| H100 | 183 | 17 | 27 | 1 |
 
 Every `E001-E200` source row still routes exactly once per platform. The supplemental `E201-E207` rows remain L40S-only
-capacity probes, E208/E209 form an L40S-only checkpointed strong-scaling pair, E256/E257 are H100-only capacity probes,
+capacity probes, E208/E209 form an L40S-only checkpointed strong-scaling pair, E256-E259 are H100-only capacity probes,
 E231/E232 are L40S backend-matched FP8 controls, and E233/E234 are the corresponding H100-only controls. None is silently
 substituted across platforms.

@@ -370,7 +370,8 @@ one-/two-GPU work from full-node work; do not submit a full-node wave while only
 | `4b-2gpu` | `E113`, `E114`, `E117`, `E118` | 2 | 3 each |
 | `optional-1to2gpu` | `E016`, `E017`, `E044`, `E045` | 1 or 2 | 3 each |
 | `h100-capacity` | `E256` H100-only capacity-adjusted GPT-2 strong-scaling baseline | 1 | 3 |
-| `h100-capacity-boundary` | `E257` H100-only capacity-adjusted GPT-2 micro-batch boundary probe | 1 | 3 |
+| `h100-capacity-boundary` | `E258` H100-only capacity-adjusted GPT-2 micro-batch-40 boundary probe | 1 | 3 |
+| `h100-capacity-allocator-canary` | `E259` H100-only micro-batch-48 expandable-segments diagnostic | 1 | 1 |
 | `4b-4gpu` | `E115`, `E116`, `E119`, `E120` | 4 | 3 each |
 | `optional-4gpu` | `E046` | 4 | 3 |
 | `vllm-tp4` | `E148`, `E196` | 4 | 3 each |
@@ -390,8 +391,10 @@ make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity
 make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity
 ```
 
-E256 retains the original strong-scaling global batch of 64 through two accumulation steps. After it has been
-collected, submit the independent boundary probe:
+E256 retains the original strong-scaling global batch of 64 through two accumulation steps. E257 is the preserved
+default-allocator micro-batch-48 failure: all three trials OOMed after using 72.53 GiB of the
+observed 79.19 GiB H100, with a further 9.20 GiB request and only 6.65 GiB free. It is deferred rather than retried.
+E258 is the independently collectable three-trial micro-batch-40 probe:
 
 ```bash
 make submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-boundary
@@ -399,8 +402,16 @@ make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-boundary
 make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-boundary
 ```
 
-E257 is intentionally a micro-batch-48 boundary probe and may OOM. Its separate wave means that outcome cannot block
-E256 collection. Both are explicitly `capacity_adjusted`; neither may be pooled with exact E032/E068.
+E259 is an optional one-trial diagnostic that changes only the recorded PyTorch allocator setting to
+`expandable_segments:True`. It cannot replace E257, and its performance numbers must not be pooled with E258 or the
+exact E067/E068 series:
+
+```bash
+make submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-allocator-canary
+make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=h100-capacity-allocator-canary
+```
+
+All capacity probes are explicitly `capacity_adjusted`; none may be pooled with exact E032/E068.
 
 When a full four-GPU/64-CPU node allocation is available, submit `4b-4gpu`, `optional-4gpu`, and the private-vLLM
 `vllm-tp4` wave. It also restores E172 to H100 Wave `5`; use recovery rather than creating a new Wave 5 bundle:
