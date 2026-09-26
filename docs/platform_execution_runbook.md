@@ -323,6 +323,41 @@ evidence for part of the wave is already committed under `results/raw`, `retry-p
 conditions from that evidence and submits only the missing conditions. Collection then combines the recovery bundle
 with existing accepted evidence without rerunning or duplicating completed trials.
 
+### Collect completed trials after a reservation ends
+
+Whole-wave collection remains the default. If a reservation, timeout, or cancellation interrupted some
+repetitions, explicitly collect the available successful trials:
+
+```bash
+make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=qwen7b-update-controls-4gpu PLATFORM_ALLOW_INCOMPLETE=1
+make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=qwen7b-update-controls-2gpu PLATFORM_ALLOW_INCOMPLETE=1
+make validate-result-evidence
+```
+
+`PLATFORM_ALLOW_INCOMPLETE=1` passes `--allow-incomplete` to the collector. It reads all saved attempts,
+imports only completed records with valid schema and bundle provenance, and updates the normal checksum
+manifest. Failed, invalid, ambiguous duplicate, or absent trials remain in their bundles or missing state;
+the collector does not synthesize results. If a wave was never submitted, its missing state file is still
+an error: collect only the waves that have saved attempts.
+
+The state records `collection_status=partial`, the remaining experiment IDs, and the last collection time.
+`collected_at` is set only when validated raw evidence satisfies the whole wave. Partial evidence can be
+staged with the ordinary command, and re-running collection retains identical files without overwriting
+them. `stage-platform-wave` stages the platform's full raw tree plus its checksum manifest, so review
+the cached diff if several waves were collected together.
+
+```bash
+make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=qwen7b-update-controls-4gpu
+git diff --cached --stat
+git commit -m "data: preserve completed H100 Qwen update trials"
+```
+
+Inspect scheduler states and logs separately to establish whether an unfinished trial timed out, was
+cancelled, or failed in the workload. An absent JSON is missing evidence, not proof of an application
+failure. On a later allocation, `retry-platform-wave` schedules incomplete experiment conditions;
+it may rerun all configured repetitions of a partially completed condition. Already imported immutable
+results are retained for the audit trail.
+
 ## 5. H100 Recovery Path
 
 For H100 execution, verify the node and start or resume its independent waves:
