@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +27,7 @@ def verify_canaries(result_root: Path, platform: str = "h100") -> dict[str, dict
     accepted: dict[str, dict[str, Any]] = {}
     for experiment_id, expectation in EXPECTATIONS.items():
         expected = expected_configs[experiment_id]
-        expected_hash = config_sha256(expected)
+        expected_hash = canary_contract_sha256(expected)
         records = matching_records(result_root / experiment_id, expected_hash)
         if not records:
             issues.append(f"{experiment_id}: no collected record matches the current resolved canary configuration")
@@ -63,7 +64,7 @@ def verify_canaries(result_root: Path, platform: str = "h100") -> dict[str, dict
         issues.extend(prefix + label + " failed" for label, passed in checks.items() if not passed)
         accepted[experiment_id] = {
             "result": str(record_path),
-            "config_sha256": expected_hash,
+            "canary_contract_sha256": expected_hash,
             "strategy": metrics.get("strategy_observed"),
             "strategy_detail": metrics.get("strategy_detail_observed"),
             "throughput_tokens_sec": metrics.get("throughput_tokens_sec"),
@@ -95,9 +96,26 @@ def matching_records(root: Path, expected_hash: str) -> list[tuple[Path, dict[st
     matches: list[tuple[Path, dict[str, Any]]] = []
     for path in sorted(root.glob("*.json")):
         record = json.loads(path.read_text(encoding="utf-8"))
-        if record.get("config_sha256") == expected_hash:
+        config = record.get("config")
+        if isinstance(config, dict) and canary_contract_sha256(config) == expected_hash:
             matches.append((path, record))
     return matches
+
+
+def canary_contract_sha256(config: Any) -> str:
+    """Hash a resolved config without its bundle-local source file location.
+
+    Each submission bundle correctly records the snapshot path from which it
+    was rendered. That absolute path changes per bundle and is therefore not a
+    portable runtime contract. The source-file checksum remains in the
+    fingerprint, so this normalisation does not weaken provenance checks.
+    """
+
+    payload = config.to_dict() if hasattr(config, "to_dict") else deepcopy(dict(config))
+    metadata = payload.get("metadata")
+    if isinstance(metadata, dict):
+        metadata.pop("source_config_path", None)
+    return config_sha256(payload)
 
 
 def finite(value: object) -> bool:

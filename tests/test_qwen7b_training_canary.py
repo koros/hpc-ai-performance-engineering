@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -10,7 +12,9 @@ from hpc_ai_perf.validation import qwen7b_training
 from hpc_ai_perf.workloads import transformer as transformer_workload
 
 
-def _record(experiment_id: str, config_hash: str, strategy: str, detail: str) -> dict[str, object]:
+def _record(experiment_id: str, config: Any, strategy: str, detail: str) -> dict[str, object]:
+    config_mapping = config.to_dict()
+    config_mapping["metadata"]["source_config_path"] = "/bundle/repo/configs/large_model_training/source.json"
     return {
         "status": "completed",
         "error": None,
@@ -18,7 +22,8 @@ def _record(experiment_id: str, config_hash: str, strategy: str, detail: str) ->
         "workload": "qwen2_5_7b_training",
         "precision": "bf16",
         "gpus": 2,
-        "config_sha256": config_hash,
+        "config_sha256": config_sha256(config_mapping),
+        "config": config_mapping,
         "environment": {"observed_gpu_model": "NVIDIA H100 80GB HBM3", "git_dirty": False},
         "metrics": {
             "strategy_observed": strategy,
@@ -67,7 +72,7 @@ def test_verify_qwen7b_canaries_accepts_current_controlled_records(tmp_path: Pat
             json.dumps(
                 _record(
                     experiment_id,
-                    config_sha256(expected[experiment_id]),
+                    expected[experiment_id],
                     expectation["strategy"],
                     expectation["detail"],
                 )
@@ -90,7 +95,7 @@ def test_verify_qwen7b_canaries_rejects_wrong_runtime_strategy(tmp_path: Path) -
             json.dumps(
                 _record(
                     experiment_id,
-                    config_sha256(expected[experiment_id]),
+                    expected[experiment_id],
                     strategy,
                     expectation["detail"],
                 )
@@ -99,4 +104,25 @@ def test_verify_qwen7b_canaries_rejects_wrong_runtime_strategy(tmp_path: Path) -
         )
 
     with pytest.raises(ValueError, match="E250: strategy failed"):
+        qwen7b_training.verify_canaries(tmp_path)
+
+
+def test_verify_qwen7b_canaries_rejects_a_real_config_change(tmp_path: Path) -> None:
+    expected = qwen7b_training.resolved_canary_configs("h100")
+    for experiment_id, expectation in qwen7b_training.EXPECTATIONS.items():
+        root = tmp_path / experiment_id
+        root.mkdir()
+        record = _record(
+            experiment_id,
+            expected[experiment_id],
+            expectation["strategy"],
+            expectation["detail"],
+        )
+        if experiment_id == "E250":
+            record_config = deepcopy(record["config"])
+            record_config["workload"]["parameters"]["sequence_length"] = 256
+            record["config"] = record_config
+        root.joinpath("trial.json").write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="E250: no collected record matches"):
         qwen7b_training.verify_canaries(tmp_path)
