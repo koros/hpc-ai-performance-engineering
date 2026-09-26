@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from shlex import quote
@@ -98,7 +99,7 @@ class SlurmJob:
             time_limit=time_limit or _time_limit(config),
             account=account,
             modules=modules or [],
-            environment=environment or {},
+            environment={**(environment or {}), **config.runtime.environment},
             setup_commands=setup_commands or [],
             repetitions=repetitions,
             run_output_dir=str(run_output_dir) if run_output_dir else None,
@@ -140,6 +141,8 @@ class SlurmJob:
         for module in self.modules:
             lines.append(f"module load {quote(module)}")
         for key, value in self.environment.items():
+            if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+                raise ValueError(f"Invalid environment variable name: {key!r}")
             lines.append(f"export {key}={quote(value)}")
         lines.append("")
         lines.append(self.command)

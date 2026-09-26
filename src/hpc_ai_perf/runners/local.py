@@ -43,6 +43,21 @@ class LocalBenchmarkRunner:
         self._profiler = profiler
 
     def run(self, config: ExperimentConfig, *, repetition_number: int | None = None) -> ExperimentResult:
+        """Run one config with its recorded runtime environment applied."""
+        previous = {key: os.environ.get(key) for key in config.runtime.environment}
+        try:
+            os.environ.update(config.runtime.environment)
+            return self._run_with_runtime_environment(config, repetition_number=repetition_number)
+        finally:
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+    def _run_with_runtime_environment(
+        self, config: ExperimentConfig, *, repetition_number: int | None = None
+    ) -> ExperimentResult:
         """Execute one config and always return a structured result record.
 
         Workload preparation, profiler start, and workload execution are all
@@ -142,6 +157,8 @@ def _environment(
         "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
         "deterministic_algorithms_requested": config.runtime.deterministic,
     }
+    for key in config.runtime.environment:
+        environment[f"runtime_environment.{key}"] = os.environ.get(key)
     try:
         import torch
 

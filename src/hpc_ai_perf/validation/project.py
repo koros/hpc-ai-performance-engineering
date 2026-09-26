@@ -113,6 +113,10 @@ def validate_experiment_configs(
             issues.append(ValidationIssue(config_path, "runtime.max_steps must be positive when provided"))
         if not config.runtime.output_dir:
             issues.append(ValidationIssue(config_path, "runtime.output_dir is required"))
+        if not isinstance(config.runtime.environment, dict) or any(
+            not isinstance(key, str) or not isinstance(value, str) for key, value in config.runtime.environment.items()
+        ):
+            issues.append(ValidationIssue(config_path, "runtime.environment must be an object of string values"))
         issues.extend(ValidationIssue(config_path, message) for message in unknown_parameter_issues(config))
 
         matrix_id = str(config.metadata.get("matrix_id", config.experiment_id))

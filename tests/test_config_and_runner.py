@@ -142,6 +142,19 @@ def test_render_slurm_script_with_setup_commands() -> None:
     assert "export TOKENIZERS_PARALLELISM=false" in script
 
 
+def test_render_slurm_script_includes_recorded_runtime_environment() -> None:
+    config_path = Path("configs/environment_validation/E001_cuda_pytorch_1gpu.json")
+    config = load_experiment_config(config_path)
+    config = replace(
+        config,
+        runtime=replace(config.runtime, environment={"PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"}),
+    )
+
+    script = render_slurm_script(config, config_path)
+
+    assert "export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True" in script
+
+
 def test_render_slurm_repetition_array() -> None:
     config_path = Path("configs/baseline_profiling/E008_gpt2_small_training_baseline.json")
     config = load_experiment_config(config_path)

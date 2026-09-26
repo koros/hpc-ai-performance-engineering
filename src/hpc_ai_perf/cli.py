@@ -1030,7 +1030,7 @@ def _render_platform_slurm(
             time_limit=slurm_options["time_limit"],
             cpus_per_task=requested_cpus,
             modules=slurm_options["modules"],
-            environment=slurm_options["environment"],
+            environment={**slurm_options["environment"], **config.runtime.environment},
             setup_commands=slurm_options["setup_commands"],
             repetitions=condition.required_trials,
             run_output_dir=staged_result_dir,

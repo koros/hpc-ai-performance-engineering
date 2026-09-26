@@ -63,9 +63,11 @@ class DistributedConfig:
 class RuntimeConfig:
     """Runtime controls shared across workloads.
 
-    Precision, maximum step count, seed, and output directory live here because
-    they affect execution rather than the conceptual workload definition. The
-    same shape works for local smoke runs and generated HPC jobs.
+    Precision, maximum step count, seed, output directory, and explicit runtime
+    environment live here because they affect execution rather than the
+    conceptual workload definition. The environment map is intentionally
+    configuration evidence: a scheduler must not rely on an unrecorded shell
+    export for a result-affecting runtime choice.
     """
 
     precision: Precision = "bf16"
@@ -73,6 +75,7 @@ class RuntimeConfig:
     seed: int = 1337
     deterministic: bool = False
     output_dir: str = "results/raw"
+    environment: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
