@@ -405,8 +405,7 @@ Keep E260 separate from E259 and the default-allocator E257 failure. Repeated su
 not a universal maximum batch or proof that every earlier OOM was fragmentation. Batch 48 consumed approximately
 77 GiB in E259 and improved throughput only about 1.3% over batch 40; reliability/headroom are part of the outcome.
 
-E257 is the preserved
-default-allocator micro-batch-48 failure: all three trials OOMed after using 72.53 GiB of the
+The default-allocator micro-batch-48 failure is preserved: all three E257 trials OOMed after using 72.53 GiB of the
 observed 79.19 GiB H100, with a further 9.20 GiB request and only 6.65 GiB free. It is deferred rather than retried.
 E258 is the independently collectable three-trial micro-batch-40 probe:
 

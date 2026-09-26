@@ -20,6 +20,8 @@ def write_canaries(root):
                 {
                     "status": "completed",
                     "error": None,
+                    "condition_id": condition.condition_id,
+                    "gpus": cfg.hardware.gpus,
                     "config": cfg.to_dict(),
                     "environment": {"observed_gpu_model": "NVIDIA H100", "git_dirty": False},
                     "metrics": {

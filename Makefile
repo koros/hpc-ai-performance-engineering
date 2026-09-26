@@ -3,6 +3,8 @@ SLURM_PROFILE ?=
 SLURM_PROFILE_ARG := $(if $(SLURM_PROFILE),--slurm-profile $(SLURM_PROFILE),)
 PLATFORM ?= l40s
 PLATFORM_WAVE ?= 0
+PLATFORM_TIME_LIMIT ?=
+PLATFORM_TIME_LIMIT_ARG := $(if $(PLATFORM_TIME_LIMIT),--time $(PLATFORM_TIME_LIMIT),)
 PLATFORM_PROFILE ?= platforms/$(PLATFORM).json
 PLATFORM_CONFIG_DIR ?= build/platform_configs/$(PLATFORM)
 PLATFORM_SLURM_DIR ?= slurm/generated/$(PLATFORM)/wave_$(PLATFORM_WAVE)
@@ -41,6 +43,7 @@ FP8_ENV ?= $(VLLM_BASE)/fp8-training-te$(TRANSFORMER_ENGINE_VERSION)
 FP8_ACCEPTANCE_ROOT ?= build/fp8_acceptance/$(PLATFORM)
 LOWBIT_ENV ?= $(VLLM_ENV)
 LOWBIT_ACCEPTANCE_JOB ?=
+LOWBIT_ACCEPTANCE_TIME ?= 01:00:00
 LOWBIT_ACCEPTANCE_ROOT ?= build/lowbit_acceptance/$(PLATFORM)/$(LOWBIT_ACCEPTANCE_JOB)
 LOWBIT_INCLUDE_BNB ?= 0
 LOWBIT_WAVE ?= lowbit-serving
@@ -146,8 +149,9 @@ prefetch-long-context-assets:
 
 submit-lowbit-acceptance:
 	@case "$(PLATFORM)" in l40s|h100) ;; *) echo "PLATFORM must be l40s or h100"; exit 1;; esac
+	@if test "$(LOWBIT_WAVE)" = "lowbit-quality"; then test "$(PLATFORM)" = "h100" || (echo "The quality extension is currently H100-only" && exit 1); fi
 	test -r "$(LOWBIT_ENV)/bin/activate"
-	sbatch --partition=gpu_$(PLATFORM) --export=ALL,HPC_AI_LOWBIT_ENV="$(LOWBIT_ENV)",HPC_AI_LOWBIT_PLATFORM="$(PLATFORM)",HPC_AI_LOWBIT_INCLUDE_BNB="$(LOWBIT_INCLUDE_BNB)",HPC_AI_LOWBIT_WAVE="$(LOWBIT_WAVE)" slurm/smoke/lowbit_acceptance.sbatch
+	sbatch --partition=gpu_$(PLATFORM) --time="$(LOWBIT_ACCEPTANCE_TIME)" --export=ALL,HPC_AI_LOWBIT_ENV="$(LOWBIT_ENV)",HPC_AI_LOWBIT_PLATFORM="$(PLATFORM)",HPC_AI_LOWBIT_INCLUDE_BNB="$(LOWBIT_INCLUDE_BNB)",HPC_AI_LOWBIT_WAVE="$(LOWBIT_WAVE)" slurm/smoke/lowbit_acceptance.sbatch
 
 verify-lowbit-acceptance:
 	test -n "$(LOWBIT_ACCEPTANCE_JOB)" || (echo "Set LOWBIT_ACCEPTANCE_JOB to the finished diagnostic job ID" && exit 1)
@@ -267,7 +271,7 @@ materialize-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli materialize-platform-configs --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --output-dir $(PLATFORM_CONFIG_DIR)
 
 render-platform-wave:
-	$(PYTHON) -m hpc_ai_perf.cli render-platform-slurm --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --config-output-dir $(PLATFORM_CONFIG_DIR) --output-dir $(PLATFORM_SLURM_DIR) --run-output-dir $(PLATFORM_RUN_OUTPUT_DIR) $(SLURM_PROFILE_ARG)
+	$(PYTHON) -m hpc_ai_perf.cli render-platform-slurm --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --config-output-dir $(PLATFORM_CONFIG_DIR) --output-dir $(PLATFORM_SLURM_DIR) --run-output-dir $(PLATFORM_RUN_OUTPUT_DIR) $(SLURM_PROFILE_ARG) $(PLATFORM_TIME_LIMIT_ARG)
 
 render-l40s-wave:
 	$(MAKE) render-platform-wave PLATFORM=l40s
@@ -291,7 +295,7 @@ submit-rendered-platform-wave:
 # ignored build state file, so monitoring, collection, and staging need no
 # copied path or shell environment variable.
 submit-platform-wave:
-	$(PYTHON) -m hpc_ai_perf.cli submit-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG) $(VENV_ACTIVATE_ARG)
+	$(PYTHON) -m hpc_ai_perf.cli submit-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG) $(VENV_ACTIVATE_ARG) $(PLATFORM_TIME_LIMIT_ARG)
 
 status-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli status-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE)
@@ -304,7 +308,7 @@ verify-hardware-energy-revalidation:
 	$(PYTHON) scripts/verify_hardware_energy_revalidation.py --result-root results/raw/l40s
 
 retry-platform-wave:
-	$(PYTHON) -m hpc_ai_perf.cli retry-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG) $(VENV_ACTIVATE_ARG)
+	$(PYTHON) -m hpc_ai_perf.cli retry-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --bundle-root $(SUBMISSION_BUNDLE_ROOT) $(SUBMISSION_BUNDLE_ID_ARG) --state-file $(PLATFORM_WAVE_STATE) $(SLURM_PROFILE_ARG) $(VENV_ACTIVATE_ARG) $(PLATFORM_TIME_LIMIT_ARG)
 
 stage-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli stage-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE)

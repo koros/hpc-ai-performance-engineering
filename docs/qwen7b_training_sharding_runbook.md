@@ -123,6 +123,9 @@ make submit-qwen7b-update-canary PLATFORM=h100
 make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=qwen7b-update-canary
 make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=qwen7b-update-canary
 make verify-qwen7b-update-canary PLATFORM=h100
+make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=qwen7b-update-canary
+git diff --cached --stat
+git commit -m "data: add H100 Qwen training update canaries"
 make submit-qwen7b-update-wave PLATFORM=h100
 make submit-qwen7b-update-wave PLATFORM=h100 QWEN7B_UPDATE_WAVE=qwen7b-update-controls-4gpu
 ```

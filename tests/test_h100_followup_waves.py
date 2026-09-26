@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -122,3 +123,19 @@ def test_generic_submission_cannot_bypass_new_gates(tmp_path, monkeypatch, wave)
     )
     with pytest.raises(ValueError):
         _submit_platform_wave(args)
+
+
+def test_short_reservation_time_override_reaches_recursive_submission_without_sbatch():
+    result = subprocess.run(
+        [
+            "make",
+            "-n",
+            "submit-qwen7b-update-canary",
+            "PLATFORM=h100",
+            "PLATFORM_TIME_LIMIT=00:15:00",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "--time 00:15:00" in result.stdout

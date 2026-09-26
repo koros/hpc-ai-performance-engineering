@@ -1,6 +1,7 @@
 # Controlled low-bit inference extension
 
-Status: implemented and locally tested; GPU acceptance and canonical trials are **not yet run**.
+Status: v1 has collected H100 evidence; the new v2 quality extension is implemented and locally tested but
+has not yet passed its GPU gate or produced canonical trials.
 The protocol is `qwen25_7b_lowbit_v1`. Existing E001–E238 configs and raw evidence are unchanged.
 
 ## Broader quality study: H100 E270–E273

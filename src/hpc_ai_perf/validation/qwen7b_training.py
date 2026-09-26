@@ -31,6 +31,8 @@ def verify_update_canaries(result_root: Path) -> dict[str, dict[str, Any]]:
         entry.config.experiment_id: entry for entry in discover_experiment_configs("configs/large_model_training")
     }
     conditions = load_platform_conditions("platforms/execution_matrix.json", "h100", wave="qwen7b-update-canary")
+    if {c.matrix_id for c in conditions} != set(UPDATE_EXPECTATIONS):
+        raise ValueError("Qwen update canary policy does not contain the three required controls")
     profile = load_platform_profile("platforms/h100.json")
     issues, accepted, initial_losses = [], {}, []
     for condition in conditions:
@@ -46,6 +48,8 @@ def verify_update_canaries(result_root: Path) -> dict[str, dict[str, Any]]:
         updates = config.runtime.max_steps + p["warmup_steps"]
         checks = {
             "completed": record.get("status") == "completed" and record.get("error") is None,
+            "condition": record.get("condition_id") == condition.condition_id,
+            "GPU count": record.get("gpus") == config.hardware.gpus,
             "H100 runtime": "h100" in str(env.get("observed_gpu_model", "")).lower(),
             "clean source": env.get("git_dirty") is False,
             "current runtime": m.get("training_update_runtime_sha256") == update_runtime_sha256(),

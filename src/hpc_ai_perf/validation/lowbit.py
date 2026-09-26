@@ -17,6 +17,8 @@ from hpc_ai_perf.config.platform import load_platform_conditions, load_platform_
 def resolved_lowbit_config(experiment_id: str, platform: str):
     if platform not in {"l40s", "h100"}:
         raise ValueError("Low-bit platform must be l40s or h100")
+    if experiment_id in QUALITY_METHOD_IDS.values() and platform != "h100":
+        raise ValueError("The broader low-bit quality wave is currently H100-only")
     entry = next(
         e for e in discover_experiment_configs("configs/lowbit_serving") if e.config.experiment_id == experiment_id
     )

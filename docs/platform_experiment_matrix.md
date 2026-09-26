@@ -1,6 +1,11 @@
 # Enhanced Platform Experiment Matrix
 
-This matrix routes every source `E001-E200` experiment family to Mac M1, L40/L40S, and H100. It also records supplemental conditions `E201-E259`; these add capacity boundaries, telemetry, full-node evidence, backend-matched FP8 controls, low-bit/long-context serving, and H100 Qwen sharding evidence without replacing the authoritative source matrix.
+This matrix routes every source `E001-E200` experiment family to Mac M1, L40/L40S, and H100. It also records supplemental conditions `E201-E276`; these add capacity boundaries, telemetry, full-node evidence, backend-matched FP8 controls, low-bit/long-context serving, H100 Qwen sharding, and separately controlled follow-up studies without replacing the authoritative source matrix.
+
+The H100 follow-up waves are documented in [the targeted execution runbook](h100_followup_runbook.md).
+E260 repeats the successful allocator shape; E261–E269 introduce DDP/update validation and separate two-/four-GPU
+Qwen controls; E270–E273 broaden the low-bit quality corpus with a fresh BF16 reference; E274–E276 are
+duration-controlled inference energy anchors. None changes existing source configurations or collected evidence.
 
 **Legend:** <br/>
 **`Direct`** means the logical row already represents that platform's hardware-comparison half. <br/>
