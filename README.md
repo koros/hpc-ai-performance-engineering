@@ -342,6 +342,9 @@ The dashboard publication workflow keeps its lightweight `.[dev]` validation sep
 2.8.0 test job. Tests that require this optional dependency skip when it is absent, but must run successfully with
 PyTorch installed before a dashboard deployment can proceed. CPU coverage validates projection conversion and
 training-update logic; it does not replace the CUDA, NCCL, or Transformer Engine acceptance gates on the HPC.
+Before running dashboard tests, CI runs `make refresh` to regenerate the processed and analysis CSVs from the
+committed raw evidence. These derived files are intentionally gitignored and do not exist in a fresh checkout;
+the publication order is refresh, project/dashboard checks, then artifact build and deployment.
 The scaling view overlays the isolated series on one GPU-count axis, assigns every series a stable colour, and uses
 solid and dashed strokes for strong and weak scaling. A local selector can show all series, strong scaling only, or
 weak scaling only. Its legend preserves the platform, workload, comparability, strategy, precision, baseline, and
