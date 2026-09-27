@@ -338,6 +338,10 @@ confidence intervals, and scaling baselines remain platform-local. Cross-study t
 submission summaries are deliberately omitted because they do not answer a controlled research question. Detailed
 trial evidence remains available in a collapsed audit panel. `make check` includes mixed-platform Python and
 JavaScript regression tests.
+The dashboard publication workflow keeps its lightweight `.[dev]` validation separate from a CPU-only PyTorch
+2.8.0 test job. Tests that require this optional dependency skip when it is absent, but must run successfully with
+PyTorch installed before a dashboard deployment can proceed. CPU coverage validates projection conversion and
+training-update logic; it does not replace the CUDA, NCCL, or Transformer Engine acceptance gates on the HPC.
 The scaling view overlays the isolated series on one GPU-count axis, assigns every series a stable colour, and uses
 solid and dashed strokes for strong and weak scaling. A local selector can show all series, strong scaling only, or
 weak scaling only. Its legend preserves the platform, workload, comparability, strategy, precision, baseline, and
