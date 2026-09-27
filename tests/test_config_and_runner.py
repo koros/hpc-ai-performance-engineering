@@ -804,7 +804,7 @@ def test_transformer_engine_backend_selects_matched_module_conversion() -> None:
 
 
 def test_transformer_engine_conversion_replaces_only_shape_compatible_projections() -> None:
-    import torch
+    torch = pytest.importorskip("torch")
 
     class Conv1D(torch.nn.Module):
         __module__ = "transformers.pytorch_utils"
@@ -841,6 +841,13 @@ def test_transformer_engine_conversion_replaces_only_shape_compatible_projection
     assert torch.allclose(model.projection.weight.float(), linear_weight, atol=2e-3)
     assert torch.allclose(model.conv_projection.weight.float(), conv_weight.transpose(0, 1), atol=1.0)
     assert isinstance(model.classifier, torch.nn.Linear)
+
+
+def test_transformer_engine_conversion_skips_without_optional_torch(monkeypatch) -> None:
+    monkeypatch.setitem(sys.modules, "torch", None)
+
+    with pytest.raises(pytest.skip.Exception, match="torch"):
+        test_transformer_engine_conversion_replaces_only_shape_compatible_projections()
 
 
 def test_fsdp_activation_checkpointing_prefers_non_reentrant_kwargs() -> None:
