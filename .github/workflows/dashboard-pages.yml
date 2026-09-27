@@ -62,6 +62,9 @@ jobs:
       - name: Install validation tools
         run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
 
+      - name: Generate dashboard analysis inputs
+        run: make refresh PYTHON=python
+
       - name: Validate project and dashboard
         run: make check PYTHON=python
 

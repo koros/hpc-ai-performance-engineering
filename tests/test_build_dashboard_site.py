@@ -4,6 +4,17 @@ import pytest
 from scripts.build_dashboard_site import ANALYSIS_FILES, DASHBOARD_FILES, PROCESSED_FILES, build_site
 
 
+def test_publication_refreshes_derived_inputs_before_dashboard_checks() -> None:
+    workflow = Path(".github/workflows/dashboard-pages.yml").read_text(encoding="utf-8")
+    publication = workflow.split("\n  publish:\n", maxsplit=1)[1]
+    commands = [
+        line.strip().removeprefix("run: ") for line in publication.splitlines() if line.strip().startswith("run: ")
+    ]
+
+    assert commands.index("make refresh PYTHON=python") < commands.index("make check PYTHON=python")
+    assert commands.index("make check PYTHON=python") < commands.index("make build-dashboard-site PYTHON=python")
+
+
 def test_build_site_publishes_only_dashboard_and_derived_evidence(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     for name in DASHBOARD_FILES:
