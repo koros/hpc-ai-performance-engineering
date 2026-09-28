@@ -103,8 +103,8 @@ const hardwareProtocolFields = [
   "parameter_tensor_parallel_size",
 ];
 const researchTargets = {
-  RQ1: "research-scaling",
-  RQ2: "research-strategy",
+  RQ1: "scaling",
+  RQ2: "performance",
   RQ3: "precisionBars",
   RQ4: "scaling",
   RQ5: "energyCoverage",
@@ -209,6 +209,10 @@ function bindInputs() {
   document.addEventListener("click", (event) => {
     const target = event.target.closest("[data-condition-ids]");
     if (target) openExperimentDialog(target.dataset.conditionIds.split(","));
+    const anchor = event.target.closest('a[href^="#"]');
+    if (anchor && document.getElementById(anchor.hash.slice(1))?.closest("#analysisExplorer")) {
+      document.getElementById("analysisExplorer").open = true;
+    }
   });
   document.addEventListener("keydown", (event) => {
     const target = event.target.closest("[data-condition-ids]");
@@ -840,20 +844,6 @@ function renderResearchQuestions() {
   markPanel("researchQuestionCards", coverage.rows.length > 0, state.researchQuestionSummary.length > 0, "Research-question coverage", "research_question_summary.csv");
 
   const findings = filteredAnalysisRows(state.researchFindingSummary, ["platform_id", "comparability", "workload", "precision", "strategy", "gpus", "research_question"]);
-  const rq1 = findings.rows.filter((row) => row.research_question === "RQ1");
-  const rq2 = findings.rows.filter((row) => row.research_question === "RQ2");
-  const rq1Series = buildRq1ScalingSeries(rq1);
-  const rq2Groups = buildRq2StrategyGroups(rq2);
-  renderLineCharts("rq1ScalingCharts", rq1Series, {
-    empty: findings.message || "No completed RQ1 scaling finding is available for the active filters.",
-    xLabel: "GPU count",
-    yLabel: "speedup",
-  });
-  renderStrategyTradeoffCharts("rq2StrategyCharts", rq2Groups, findings.message || "No matched RQ2 strategy findings are available for the active filters.");
-  document.getElementById("rq1Status").textContent = findings.message || (rq1Series.length ? rq1Series.length + " isolated scaling series" : "No scaling findings");
-  document.getElementById("rq2Status").textContent = findings.message || (rq2Groups.length ? rq2Groups.length + " matched strategy groups" : "No matched strategy findings");
-  markPanel("rq1ScalingCharts", rq1Series.length > 0, state.researchFindingSummary.some((row) => row.research_question === "RQ1"), "RQ1 scaling efficiency", "research_finding_summary.csv", true);
-  markPanel("rq2StrategyCharts", rq2Groups.length > 0, state.researchFindingSummary.some((row) => row.research_question === "RQ2"), "RQ2 strategy trade-off", "research_finding_summary.csv", true);
   renderResearchFindingList(findings.rows, findings.message);
   document.getElementById("researchFindingStatus").textContent = findings.message || (findings.rows.length ? findings.rows.length + " traceable finding" + (findings.rows.length === 1 ? "" : "s") : "No findings");
   markPanel("researchFindingList", findings.rows.length > 0, state.researchFindingSummary.length > 0, "Traceable research findings", "research_finding_summary.csv", true);
@@ -3028,7 +3018,7 @@ function markPanel(containerId, visible, sourceAvailable, label, source, include
 
 function organizeSections() {
   const metricFocus = document.getElementById("metricFilter").value;
-  const studySections = ["research", "overview", "performance", "memory", "scaling", "inference", "evidence"];
+  const studySections = ["research", "research-detail", "overview", "performance", "memory", "hardware", "scaling", "inference", "evidence"];
 
   document.querySelectorAll(".dashboard-section:not(#pendingStudies) .panel").forEach((panel) => {
     if (!("hasVisibleData" in panel.dataset)) return;

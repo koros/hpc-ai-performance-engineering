@@ -93,6 +93,91 @@ main {
   scroll-margin-top: 18px;
 }
 
+.analysis-explorer {
+  min-width: 0;
+  scroll-margin-top: 20px;
+  border: 1px solid #b9d8d3;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.analysis-explorer > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: clamp(18px, 3vw, 28px);
+  list-style: none;
+  cursor: pointer;
+}
+
+.analysis-explorer > summary::-webkit-details-marker {
+  display: none;
+}
+
+.analysis-explorer > summary > span:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.analysis-explorer > summary small {
+  color: var(--accent-strong);
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.analysis-explorer > summary strong {
+  font-size: clamp(1.05rem, 2vw, 1.4rem);
+}
+
+.analysis-explorer > summary em {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.analysis-explorer > summary:hover,
+.analysis-explorer > summary:focus-visible {
+  background: #f0fdfa;
+  outline-color: var(--accent);
+}
+
+.explorer-chevron {
+  color: var(--accent-strong);
+  font-size: 1.6rem;
+  transition: transform 0.2s ease;
+}
+
+.analysis-explorer[open] .explorer-chevron {
+  transform: rotate(180deg);
+}
+
+.analysis-explorer-body {
+  display: grid;
+  gap: 28px;
+  padding: 0 clamp(16px, 3vw, 28px) 30px;
+  border-top: 1px solid var(--line);
+}
+
+.finding-ledger > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px;
+  color: var(--accent-strong);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.finding-ledger > summary span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .section-heading {
   display: flex;
   align-items: end;
