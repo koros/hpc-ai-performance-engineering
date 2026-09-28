@@ -108,6 +108,29 @@ run("refreshed repository evidence produces the complete conclusion brief", () =
   assert.equal(insights.find((insight) => insight.id === "energy").tone, "limitation");
 });
 
+run("new serving conclusions use only repeated controlled evidence", () => {
+  const readCsv = (path) => parseCsv(fs.readFileSync(path, "utf8"));
+  const lowbit = readCsv("results/analysis/lowbit_summary.csv");
+  const inference = readCsv("results/analysis/inference_summary.csv");
+  const insights = buildDecisionInsights({ lowbit, inference });
+  const serving = insights.find((insight) => insight.id === "lowbit");
+  const context = insights.find((insight) => insight.id === "long-context");
+
+  assert.deepEqual(new Set(serving.conditionIds), new Set(["E270@h100", "E271@h100", "E272@h100", "E273@h100"]));
+  assert.match(serving.limitation, /publisher artifacts/i);
+  assert.deepEqual(new Set(context.conditionIds), new Set(["E247@h100", "E248@h100", "E249@h100"]));
+  assert.match(context.changed, /Prompt length/);
+  assert.ok(Number.parseFloat(context.metric) > 1);
+  assert.deepEqual(buildDecisionInsights({ lowbit: lowbit.filter((row) => row.evidence_status !== "complete") }), []);
+});
+
+run("the main story does not duplicate scaling and strategy charts", () => {
+  const html = fs.readFileSync("dashboard/index.html", "utf8");
+  assert.match(html, /id="analysisExplorer"/);
+  assert.doesNotMatch(html, /id="rq1ScalingCharts"|id="rq2StrategyCharts"/);
+  assert.equal([...html.matchAll(/id="scalingCharts"/g)].length, 1);
+});
+
 const rows = [
   { ...result("l40s", "exact", "gpt2_small", 100), experiment_id: "E001", condition_id: "E001@l40s" },
   { ...result("l40s", "exact", "gpt2_small", 120), experiment_id: "E001", condition_id: "E001@l40s" },

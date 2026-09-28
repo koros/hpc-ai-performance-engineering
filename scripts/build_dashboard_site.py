@@ -13,6 +13,7 @@ ANALYSIS_FILES = (
     "experiment_rankings.csv",
     "hardware_summary.csv",
     "inference_summary.csv",
+    "lowbit_summary.csv",
     "memory_summary.csv",
     "phase_summary.csv",
     "precision_summary.csv",

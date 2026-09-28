@@ -1064,12 +1064,13 @@ select {
 
 .decision-brief-summary {
   display: grid;
-  grid-template-columns: minmax(260px, 0.85fr) minmax(420px, 1.6fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   padding: 16px;
   border-bottom: 1px solid #d8e9e7;
   background: rgba(240, 253, 250, 0.56);
 }
+
 
 .decision-thesis {
   display: grid;
@@ -1134,23 +1135,21 @@ select {
 
 .decision-insight-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  padding: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding: 8px 20px 18px;
 }
 
 .decision-insight {
   --insight-color: var(--accent);
   display: grid;
+  grid-template-columns: minmax(190px, 0.85fr) minmax(260px, 1.15fr);
   align-content: start;
-  gap: 11px;
+  gap: 11px 24px;
   min-width: 0;
-  padding: 17px;
-  border: 1px solid var(--line);
-  border-top: 4px solid var(--insight-color);
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 8px 20px rgba(24, 32, 42, 0.04);
+  padding: 22px 6px;
+  border-top: 1px solid var(--line);
+  background: transparent;
 }
 
 .decision-insight.insight-conditional {
@@ -1159,7 +1158,23 @@ select {
 
 .decision-insight.insight-limitation {
   --insight-color: #d97706;
-  background: #fffdf8;
+}
+
+.decision-insight .insight-heading,
+.decision-insight .insight-method,
+.decision-insight footer {
+  grid-column: 1 / -1;
+}
+
+.decision-insight h3,
+.decision-insight .insight-metric {
+  grid-column: 1;
+}
+
+.decision-insight .insight-implication {
+  grid-column: 2;
+  grid-row: 2 / span 2;
+  align-self: center;
 }
 
 .insight-heading,
@@ -1263,6 +1278,33 @@ select {
   padding-top: 9px;
   border-top: 1px dashed #d8dee6;
   font-size: 0.71rem;
+}
+
+.insight-method {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #dce9e7;
+  border-radius: 8px;
+  background: #f8fbfb;
+}
+
+.insight-method > summary {
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.insight-method[open] > summary {
+  margin-bottom: 12px;
+}
+
+.insight-method .insight-contract {
+  margin-top: 12px;
+}
+
+.insight-method .insight-limitation {
+  margin-top: 12px;
 }
 
 .decision-insight footer {
@@ -3737,9 +3779,15 @@ td.numeric {
   }
 
   .decision-rules,
+  .decision-insight,
   .decision-insight-grid,
   .insight-contract {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .decision-insight .insight-implication {
+    grid-column: 1;
+    grid-row: auto;
   }
 
   .decision-brief-summary,

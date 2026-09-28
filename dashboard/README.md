@@ -15,6 +15,7 @@ Expected inputs:
 - `results/analysis/data_movement_summary.csv`
 - `results/analysis/memory_summary.csv`
 - `results/analysis/inference_summary.csv`
+- `results/analysis/lowbit_summary.csv`
 - `results/analysis/hardware_summary.csv`
 - `results/analysis/research_question_summary.csv`
 - `results/analysis/research_finding_summary.csv`
@@ -24,6 +25,16 @@ The dashboard loads these files automatically when served from the repository ro
 also accepts several analysis files at once for an offline/manual review.
 
 ## Presentation rules
+
+The front page now starts with a short, live-data research synthesis. Detailed study
+charts, coverage cards, and source-level findings sit in the closed **Explore the
+supporting studies** section. The trial audit is a separate disclosure. This keeps
+one scaling plot and one strategy comparison in the technical explorer instead of
+repeating both immediately beneath their conclusions. Each takeaway has an
+expandable explanation of the changed variable, matched controls, and limitation;
+source conditions remain clickable. The low-bit and long-context conclusions are
+derived from their refreshed analysis CSVs, not copied from `dashboard3`'s fixed
+snapshot.
 
 - L40S and H100 measurements are never averaged into one chart series.
 - `exact`, `platform_specific`, and `capacity_adjusted` results remain separate.
@@ -62,22 +73,21 @@ argument rather than a generic results explorer:
 - The **current evidence snapshot** reports active-view conditions, validated
   trials, research-question readiness, validated FP8 coverage, measured-region
   energy coverage, and the remaining legacy-telemetry boundary.
-- The **campaign synthesis** leads with seven evidence-derived conclusions
+- The **campaign synthesis** leads with evidence-derived conclusions
   rather than asking readers to infer them from charts. Each card reports an
   effect size, decision implication, changed variable, held-constant controls,
   limitation, and clickable source conditions. It currently covers scaling,
   distributed strategy, backend-matched FP8, checkpointing, NCCL capability,
-  matched H100/L40S performance, and the remaining hardware-energy gap.
+  matched H100/L40S performance, the remaining hardware-energy gap, 7B
+  low-bit serving, and H100 long-context latency.
 - **RQ1–RQ7 decision cards** condense platform-level coverage into one card per
   research question. Each card shows trial completion, platform scope, the
   remaining limitation, and a direct link to the relevant evidence view.
-- **RQ1 scaling** plots only within-platform speedup and parallel efficiency.
-  L40S scaling is labelled supporting evidence because the primary question is
-  framed around H100 one-to-four-GPU scaling.
-- **RQ2 strategy trade-offs** plot maximum observed GPU memory against mean
-  throughput only where workload, model, precision, GPU count, sequence length,
-  global batch, and accumulation settings match. The observed Pareto frontier is
-  shown instead of claiming a universal best strategy.
+- **RQ1 scaling** uses a single chart in the supporting-studies explorer. Its
+  platform and scaling-protocol series remain separate.
+- **RQ2 strategy trade-offs** use one matched-comparison selector in the
+  explorer; unlike workload, model, precision, GPU-count, and batch setups are
+  never put on the same axis.
 - **Traceable findings** link every displayed RQ1/RQ2 statistical finding to
   its source condition IDs and trial sufficiency. The campaign synthesis adds
   controlled RQ3–RQ6 interpretations and a scoped RQ5 limitation without

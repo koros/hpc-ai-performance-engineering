@@ -8,6 +8,7 @@ const state = {
   dataMovementSummary: [],
   memorySummary: [],
   inferenceSummary: [],
+  lowbitSummary: [],
   hardwareSummary: [],
   researchQuestionSummary: [],
   researchFindingSummary: [],
@@ -27,6 +28,7 @@ const paths = {
   dataMovementSummary: "../results/analysis/data_movement_summary.csv",
   memorySummary: "../results/analysis/memory_summary.csv",
   inferenceSummary: "../results/analysis/inference_summary.csv",
+  lowbitSummary: "../results/analysis/lowbit_summary.csv",
   hardwareSummary: "../results/analysis/hardware_summary.csv",
   researchQuestionSummary: "../results/analysis/research_question_summary.csv",
   researchFindingSummary: "../results/analysis/research_finding_summary.csv",
@@ -41,6 +43,7 @@ const analysisFileKeys = {
   "data_movement_summary.csv": "dataMovementSummary",
   "memory_summary.csv": "memorySummary",
   "inference_summary.csv": "inferenceSummary",
+  "lowbit_summary.csv": "lowbitSummary",
   "hardware_summary.csv": "hardwareSummary",
   "research_question_summary.csv": "researchQuestionSummary",
   "research_finding_summary.csv": "researchFindingSummary",
@@ -521,7 +524,7 @@ function buildResearchQuestionOverview(rows) {
   }).sort((left, right) => left.researchQuestion.localeCompare(right.researchQuestion));
 }
 
-function buildDecisionInsights({ researchFindings = [], hardware = [], communication = [], memory = [], results = [] }) {
+function buildDecisionInsights({ researchFindings = [], hardware = [], communication = [], memory = [], inference = [], lowbit = [], results = [] }) {
   return [
     buildScalingDecision(researchFindings),
     buildStrategyDecision(researchFindings),
@@ -530,6 +533,8 @@ function buildDecisionInsights({ researchFindings = [], hardware = [], communica
     buildCommunicationDecision(communication),
     buildHardwareDecision(hardware),
     buildEnergyDecision(results),
+    buildLowbitDecision(lowbit),
+    buildLongContextDecision(inference),
   ].filter(Boolean);
 }
 
@@ -539,13 +544,25 @@ function renderDecisionBrief() {
     hardware: state.hardwareSummary,
     communication: state.communicationSummary,
     memory: state.memorySummary,
+    inference: state.inferenceSummary,
+    lowbit: state.lowbitSummary,
     results: state.results,
   });
   const filters = selectedFilters();
-  const insights = allInsights.filter((insight) => {
+  const unsupported = Object.entries(filters).filter(([key, value]) => value && !["platform_id", "workload", "research_question"].includes(key)).map(([key]) => key);
+  const metricFocus = document.getElementById("metricFilter").value;
+  const metricIds = {
+    throughput: ["scaling", "strategy", "precision", "memory", "hardware", "lowbit", "long-context"],
+    runtime: ["scaling", "communication", "long-context"],
+    memory: ["strategy", "precision", "memory", "lowbit"],
+    energy: ["energy", "lowbit"],
+    latency: ["hardware", "lowbit", "long-context"],
+  };
+  const insights = unsupported.length ? [] : allInsights.filter((insight) => {
     if (filters.research_question && insight.researchQuestion !== filters.research_question) return false;
     if (filters.platform_id && !insight.platforms.includes(filters.platform_id)) return false;
     if (filters.workload && !insight.workloads.includes(filters.workload)) return false;
+    if (metricFocus && !metricIds[metricFocus]?.includes(insight.id)) return false;
     return true;
   });
   const container = document.getElementById("decisionInsightGrid");
@@ -553,31 +570,23 @@ function renderDecisionBrief() {
   document.getElementById("decisionBriefStatus").textContent = insights.length
     ? insights.length + " evidence-led conclusion" + (insights.length === 1 ? "" : "s")
     : "No conclusion matches the active scope";
-  renderDecisionBriefSummary(allInsights, insights);
+  renderDecisionBriefSummary(insights);
   if (!insights.length) {
-    container.append(emptyState("No campaign conclusion matches the selected platform, workload, or research question. Clear those filters to restore the complete synthesis."));
+    container.append(emptyState(unsupported.length
+      ? "The selected " + unsupported.map(displayName).join(", ") + " filter is not represented in every conclusion. Clear it to avoid treating a campaign-level conclusion as a filtered comparison."
+      : "No campaign conclusion matches this scope. Clear filters to restore the complete synthesis."));
     return;
   }
   insights.forEach((insight) => container.append(decisionInsightCard(insight)));
 }
 
-function renderDecisionBriefSummary(allInsights, visibleInsights) {
+function renderDecisionBriefSummary(visibleInsights) {
   const container = document.getElementById("decisionBriefSummary");
-  const hardware = allInsights.find((insight) => insight.id === "hardware");
-  const memory = allInsights.find((insight) => insight.id === "memory");
-  const energy = allInsights.find((insight) => insight.id === "energy");
   if (!visibleInsights.length) {
     container.replaceChildren();
     return;
   }
-  const recommendations = [
-    hardware ? ["Training", "Prefer H100 for the matched training protocols"] : null,
-    hardware ? ["Inference", "Benchmark by workload; the training advantage does not transfer automatically"] : null,
-    memory ? ["Memory pressure", "Use checkpointing for capacity, accepting its measured throughput cost"] : null,
-    energy && energy.tone === "limitation" ? ["Energy", "Keep the final hardware energy conclusion open until E235–E238"] : null,
-  ].filter(Boolean);
-  container.innerHTML = '<div class="decision-thesis"><span>Current overall interpretation</span><strong>No single configuration wins every objective.</strong><p>Hardware, workload, execution mode, and memory constraints change the answer. The recommendations below are conditional on matched experimental controls.</p></div>' +
-    '<div class="decision-rules">' + recommendations.map(([label, value]) => '<div><span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(value) + '</strong></div>').join("") + "</div>";
+  container.innerHTML = '<div class="decision-thesis"><span>Reading this evidence</span><strong>There is no universal fastest setup.</strong><p>What works depends on workload, hardware, memory budget, and whether you care about training or serving. The findings below apply only to their stated comparisons.</p></div>';
 }
 
 function decisionInsightCard(insight) {
@@ -589,10 +598,8 @@ function decisionInsightCard(insight) {
   card.innerHTML = '<div class="insight-heading"><span class="insight-rq">' + escapeHtml(insight.researchQuestion) + '</span><span class="insight-confidence">' + escapeHtml(insight.confidence) + "</span></div>" +
     "<h3>" + escapeHtml(insight.title) + "</h3>" +
     '<strong class="insight-metric">' + escapeHtml(insight.metric) + "</strong>" +
-    '<p class="insight-statement">' + escapeHtml(insight.statement) + "</p>" +
     '<p class="insight-implication"><span>Decision:</span> ' + escapeHtml(insight.implication) + "</p>" +
-    '<dl class="insight-contract"><div><dt>What changed</dt><dd>' + escapeHtml(insight.changed) + "</dd></div><div><dt>What stayed fixed</dt><dd>" + escapeHtml(insight.heldConstant) + "</dd></div></dl>" +
-    '<p class="insight-limitation"><span>Boundary</span>' + escapeHtml(insight.limitation) + "</p>" +
+    '<details class="insight-method"><summary>Why we say this</summary><p class="insight-statement">' + escapeHtml(insight.statement) + '</p><dl class="insight-contract"><div><dt>What changed</dt><dd>' + escapeHtml(insight.changed) + '</dd></div><div><dt>What stayed fixed</dt><dd>' + escapeHtml(insight.heldConstant) + '</dd></div></dl><p class="insight-limitation"><span>Boundary</span>' + escapeHtml(insight.limitation) + "</p></details>" +
     '<footer>' + evidenceButton + '<a href="#' + escapeHtml(insight.target) + '">See supporting analysis <span aria-hidden="true">→</span></a></footer>';
   return card;
 }
@@ -630,7 +637,7 @@ function buildScalingDecision(rows) {
     conditionIds: uniqueStrings([...parseConditionIds(best.source_condition_ids), ...parseConditionIds(weakest?.source_condition_ids), ...parseConditionIds(supporting?.source_condition_ids)]),
     platforms: uniqueStrings([best.platform_id, supporting?.platform_id]),
     workloads: uniqueStrings([best.workload, supporting?.workload]),
-    target: "research-scaling",
+    target: "scaling",
   };
 }
 
@@ -664,7 +671,7 @@ function buildStrategyDecision(rows) {
     conditionIds: uniqueStrings([...parseConditionIds(best.baseline.source_condition_ids), ...parseConditionIds(best.row.source_condition_ids)]),
     platforms: [best.row.platform_id],
     workloads: [best.row.workload],
-    target: "research-strategy",
+    target: "performance",
   };
 }
 
@@ -788,14 +795,14 @@ function buildHardwareDecision(rows) {
     id: "hardware",
     researchQuestion: "RQ6",
     tone: "positive",
-    confidence: "Four matched exact protocols",
-    title: "H100's advantage is strong for training, not universal for inference",
+    confidence: formatInteger(groups.length) + " matched exact protocols",
+    title: "The hardware advantage depends on training versus inference",
     metric: formatDecimal(Math.min(...trainingRatios), 2) + "–" + formatDecimal(Math.max(...trainingRatios), 2) + "× training throughput",
-    statement: "H100 led both matched training workloads. Inference ranged from " + formatDecimal(Math.min(...inferenceRatios), 2) + "× to " + formatDecimal(Math.max(...inferenceRatios), 2) + "× H100/L40S throughput, including one result where L40S was faster.",
-    implication: "Prefer H100 for these training protocols; benchmark the actual inference workload before assuming the same advantage.",
+    statement: "Across " + training.length + " matched training protocols, H100/L40S throughput ranged from " + formatDecimal(Math.min(...trainingRatios), 2) + "× to " + formatDecimal(Math.max(...trainingRatios), 2) + "×. Across " + inference.length + " matched inference protocols, the range was " + formatDecimal(Math.min(...inferenceRatios), 2) + "× to " + formatDecimal(Math.max(...inferenceRatios), 2) + "×" + (Math.min(...inferenceRatios) < 1 ? ", including one result where L40S was faster." : "."),
+    implication: "Use matched workload and execution-mode evidence before choosing a GPU; a training advantage does not automatically carry over to inference.",
     changed: "GPU platform: L40S ↔ H100",
     heldConstant: "One GPU, exact workload, model, mode, precision, batch and throughput unit",
-    limitation: "Energy-to-solution remains pending for the four L40S hardware energy anchors.",
+    limitation: "Throughput ratios do not establish energy-to-solution or price/performance. Those require separately matched measurements and cost data.",
     conditionIds: uniqueStrings(groups.flatMap((group) => group.entries.map((entry) => entry.conditionId))),
     platforms: ["h100", "l40s"],
     workloads: uniqueStrings(groups.map((group) => group.workload)),
@@ -813,7 +820,7 @@ function buildEnergyDecision(rows) {
   const eligible = rows.filter((row) => row.status === "completed" && row.energy_scope === "measured_region" && row.energy_measurement_status === "sufficient" && number(row.energy_joules) > 0);
   if (!eligible.length) return null;
   const conditions = uniqueConditionIds(eligible);
-  const pendingHardware = ["E123@l40s", "E124@l40s", "E127@l40s", "E128@l40s"].filter((id) => rows.some((row) => conditionId(row) === id && !number(row.energy_joules)));
+  const pendingHardware = ["E235@l40s", "E236@l40s", "E237@l40s", "E238@l40s"].filter((id) => !eligible.some((row) => conditionId(row) === id));
   return {
     id: "energy",
     researchQuestion: "RQ5",
@@ -821,7 +828,7 @@ function buildEnergyDecision(rows) {
     confidence: pendingHardware.length ? "Partial cross-platform coverage" : "Measured-region evidence",
     title: pendingHardware.length ? "Energy analysis is broad, but the hardware comparison is not yet complete" : "Measured-region energy evidence is available",
     metric: formatInteger(conditions.length) + " measured conditions",
-    statement: formatInteger(eligible.length) + " completed trials have sufficient measured-region energy." + (pendingHardware.length ? " The four original L40S hardware-comparison rows remain excluded from energy-to-solution conclusions until E235–E238 run." : ""),
+    statement: formatInteger(eligible.length) + " completed trials have sufficient measured-region energy." + (pendingHardware.length ? " " + pendingHardware.length + " of four corrected L40S hardware energy anchors (E235–E238) still lack sufficient evidence." : ""),
     implication: pendingHardware.length ? "Continue analysing scoped energy studies, but defer the final H100-versus-L40S energy conclusion." : "Energy comparisons may proceed only within matched protocols.",
     changed: "Depends on the selected controlled energy study",
     heldConstant: "Only schema-v3, sufficient, measured-region records are admitted",
@@ -830,6 +837,64 @@ function buildEnergyDecision(rows) {
     platforms: uniqueValues(eligible, "platform_id"),
     workloads: uniqueValues(eligible, "workload"),
     target: "energyCoverage",
+  };
+}
+
+function buildLowbitDecision(rows) {
+  const complete = rows.filter((row) => row.study_protocol === "qwen25_7b_lowbit_quality_v2" && row.evidence_status === "complete" && number(row.completed_trials) >= number(row.required_trials) && number(row.required_trials) >= 3);
+  const groups = Object.values(groupRows(complete, (row) => [row.platform_id, row.batch_size]));
+  const group = groups.find((entries) => entries.some((row) => row.method === "bf16") && ["awq", "gptq", "bitsandbytes_nf4"].every((method) => entries.some((row) => row.method === method)));
+  if (!group) return null;
+  const control = group.find((row) => row.method === "bf16");
+  const methods = group.filter((row) => row !== control);
+  if (!control || methods.some((row) => !isNumeric(row.throughput_change_pct) || !isNumeric(row.model_memory_saving_pct))) return null;
+  const quality = methods.every((row) => row.quality_status === "within_tolerance");
+  const savings = methods.map((row) => number(row.model_memory_saving_pct));
+  return {
+    id: "lowbit",
+    researchQuestion: "RQ3",
+    tone: "conditional",
+    confidence: "Four completed, batch-matched formats",
+    title: "7B low-bit serving saves weight memory, but speed depends on format",
+    metric: formatDecimal(Math.min(...savings), 0) + "–" + formatDecimal(Math.max(...savings), 0) + "% smaller weights",
+    statement: "At batch " + control.batch_size + " on " + displayPlatform(control.platform_id) + ", throughput relative to fresh BF16 was " + methods.map((row) => row.method.replace("bitsandbytes_", "") + " " + signedPercent(number(row.throughput_change_pct))).join(", ") + ". " + (quality ? "All three stayed within the preset held-out perplexity tolerance." : "Not every method passed the held-out perplexity tolerance."),
+    implication: "Choose a low-bit deployment format using throughput, latency, memory and quality together; smaller weights alone do not predict speed.",
+    changed: "Publisher model artifact and low-bit serving method",
+    heldConstant: "Platform, Qwen 7B family, batch size, request and quality protocol within the fresh study",
+    limitation: "Different publisher artifacts mean this is a deployment comparison, not a pure quantizer-effect experiment. One batch setting and one GPU platform do not establish a general ranking.",
+    conditionIds: group.map((row) => row.experiment_id + "@" + row.platform_id),
+    platforms: [control.platform_id],
+    workloads: ["qwen2_5_7b"],
+    target: "inference",
+  };
+}
+
+function buildLongContextDecision(rows) {
+  const candidates = rows.filter((row) => row.workload === "qwen2_5_7b_long_context" && row.comparability === "exact" && number(row.trials) >= 3 && number(row.prompt_length) >= 4096 && number(row.avg_ttft_p50_ms) > 0 && number(row.avg_throughput_tokens_sec) > 0);
+  const groups = Object.values(groupRows(candidates, (row) => [row.platform_id, row.framework, row.precision, row.gpus, row.batch_size, row.concurrent_requests, row.throughput_unit]));
+  const group = groups.find((entries) => new Set(entries.map((row) => number(row.prompt_length))).size >= 2);
+  if (!group) return null;
+  const ordered = [...group].sort((left, right) => number(left.prompt_length) - number(right.prompt_length));
+  const shortest = ordered[0];
+  const longest = ordered[ordered.length - 1];
+  const ttftRatio = number(longest.avg_ttft_p50_ms) / number(shortest.avg_ttft_p50_ms);
+  const throughputRatio = number(longest.avg_throughput_tokens_sec) / number(shortest.avg_throughput_tokens_sec);
+  return {
+    id: "long-context",
+    researchQuestion: "RQ6",
+    tone: "conditional",
+    confidence: ordered.length + " repeated prompt lengths",
+    title: "Longer prompts chiefly increase first-token delay",
+    metric: formatDecimal(ttftRatio, 2) + "× first-token time",
+    statement: "For " + displayPlatform(shortest.platform_id) + " Qwen 7B, increasing the prompt from " + formatInteger(number(shortest.prompt_length)) + " to " + formatInteger(number(longest.prompt_length)) + " tokens changed median first-token time from " + formatDecimal(number(shortest.avg_ttft_p50_ms), 0) + " to " + formatDecimal(number(longest.avg_ttft_p50_ms), 0) + " ms. Generated-token throughput changed by " + signedPercent((throughputRatio - 1) * 100) + ".",
+    implication: "For RAG-sized prompts, budget for prefill/first-token delay; generated-token rate alone understates user-visible latency.",
+    changed: "Prompt length",
+    heldConstant: "Platform, Qwen 7B artifact, vLLM, BF16, batch, concurrency and output protocol",
+    limitation: "Observed on one H100 at these prompt lengths; not evidence of the same ratio on L40S or other models.",
+    conditionIds: ordered.map((row) => row.condition_id),
+    platforms: [shortest.platform_id],
+    workloads: [shortest.workload],
+    target: "inference",
   };
 }
 
