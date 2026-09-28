@@ -555,7 +555,7 @@ function renderDecisionBrief() {
     throughput: ["scaling", "strategy", "precision", "memory", "hardware", "lowbit", "long-context"],
     runtime: ["scaling", "communication", "long-context"],
     memory: ["strategy", "precision", "memory", "lowbit"],
-    energy: ["energy", "lowbit"],
+    energy: ["energy"],
     latency: ["hardware", "lowbit", "long-context"],
   };
   const insights = unsupported.length ? [] : allInsights.filter((insight) => {
