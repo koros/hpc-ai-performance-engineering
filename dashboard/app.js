@@ -1066,6 +1066,7 @@ function renderActiveFilters() {
   const metric = document.getElementById("metricFilter").value;
   const active = Object.entries(filters).filter(([, value]) => Boolean(value)).map(([key, value]) => ({ key, label: displayName(key), value }));
   if (metric) active.push({ key: "metric", label: "metric focus", value: metric });
+  document.querySelector(".filter-summary").hidden = active.length === 0;
   container.replaceChildren();
   if (!active.length) {
     const empty = document.createElement("span");

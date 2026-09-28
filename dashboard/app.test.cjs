@@ -126,7 +126,8 @@ run("new serving conclusions use only repeated controlled evidence", () => {
 
 run("the main story does not duplicate scaling and strategy charts", () => {
   const html = fs.readFileSync("dashboard/index.html", "utf8");
-  assert.match(html, /id="analysisExplorer"/);
+  assert.match(html, /<details id="analysisExplorer" class="analysis-explorer">/);
+  assert.match(html, /<details id="viewControls" class="filter-disclosure">/);
   assert.doesNotMatch(html, /id="rq1ScalingCharts"|id="rq2StrategyCharts"/);
   assert.equal([...html.matchAll(/id="scalingCharts"/g)].length, 1);
 });

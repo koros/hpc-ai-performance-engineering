@@ -42,6 +42,8 @@
         <div id="campaignHighlights" class="campaign-highlights"></div>
       </section>
 
+      <details id="viewControls" class="filter-disclosure">
+        <summary>Refine the findings <span>Choose a platform, workload, question, or metric</span></summary>
       <section class="toolbar" aria-label="Dashboard filters">
         <label>Platform<select id="platformFilter"></select></label>
         <label>Workload<select id="workloadFilter"></select></label>
@@ -73,6 +75,7 @@
           </div>
         </details>
       </section>
+      </details>
 
       <section class="filter-summary" aria-live="polite">
         <div><span>Active view</span><div id="activeFilters" class="active-filter-list"><span class="filter-empty">All recorded evidence</span></div></div>
@@ -84,13 +87,6 @@
         <a href="#analysisExplorer">Explore the supporting studies</a>
         <a href="#evidence">Audit the trials</a>
       </nav>
-
-      <section class="kpi-grid" aria-label="Summary metrics">
-        <article><span>Conditions in view</span><strong id="kpiExperiments">0</strong></article>
-        <article><span>Completed trials</span><strong id="kpiCompleted">0</strong></article>
-        <article><span>Recorded GPU-hours</span><strong id="kpiGpuHours">0.0</strong></article>
-        <article><span>Matched H100/L40S protocols</span><strong id="kpiMatchedProtocols">0</strong></article>
-      </section>
 
       <section id="research" class="dashboard-section">
         <div class="section-heading">
@@ -111,6 +107,12 @@
       <details id="analysisExplorer" class="analysis-explorer">
         <summary><span><small>Supporting analysis</small><strong>Explore the charts, controls, and evidence coverage</strong><em>Detailed studies are optional; the conclusions above are the starting point.</em></span><span aria-hidden="true" class="explorer-chevron">⌄</span></summary>
         <div class="analysis-explorer-body">
+      <section class="kpi-grid" aria-label="Summary metrics">
+        <article><span>Conditions in view</span><strong id="kpiExperiments">0</strong></article>
+        <article><span>Completed trials</span><strong id="kpiCompleted">0</strong></article>
+        <article><span>Recorded GPU-hours</span><strong id="kpiGpuHours">0.0</strong></article>
+        <article><span>Matched H100/L40S protocols</span><strong id="kpiMatchedProtocols">0</strong></article>
+      </section>
       <section id="research-detail" class="dashboard-section">
         <article class="panel" data-metrics="throughput runtime memory energy latency">
           <div class="panel-heading"><h2>Research-question coverage</h2><span id="researchCoverageStatus">No research evidence</span></div>
