@@ -112,8 +112,60 @@ class Qwen25SevenBTrainingWorkload(TransformerWorkload):
         return super().run(config)
 
 
+class Qwen25ThreeBWorkload(TransformerWorkload):
+    """Causal-LM adapter for Qwen2.5-3B-Instruct.
+
+    Same family/tokenizer as the 7B model used elsewhere in the matrix, so
+    comparing this workload against TinyLlama (1.1B) and Qwen2.5-7B isolates
+    model size as the sole variable in strategy/scaling/serving studies. Uses
+    the generic causal-LM training and inference paths -- identical treatment
+    to GPT-2 Small, DistilBERT, and TinyLlama above, never the specialised
+    low-bit serving adapter.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(name="qwen2_5_3b", display_name="Qwen2.5-3B")
+
+    def run(self, config: ExperimentConfig) -> WorkloadRunOutput:
+        if config.mode in {"training", "profiling"}:
+            return _run_causal_training(config)
+        if config.mode == "inference":
+            return _run_causal_inference(config)
+        return super().run(config)
+
+
+class Qwen25SevenBServingWorkload(TransformerWorkload):
+    """Generic BF16 vLLM serving adapter for Qwen2.5-7B-Instruct.
+
+    Deliberately separate from both ``Qwen25SevenBTrainingWorkload`` (training
+    only) and the ``qwen2_5_7b`` low-bit serving workload in
+    ``hpc_ai_perf.workloads.lowbit`` (a pinned, versioned, single-GPU-only
+    quantization contract -- see ``config/lowbit.py``'s ``lowbit_issues``).
+    This adapter exists to test tensor-parallel BF16 serving (TP=2/4), which
+    the low-bit contract does not support and is not being relaxed to support
+    here. It reuses the same generic vLLM path already proven for GPT-2
+    Small, DistilBERT, and TinyLlama multi-GPU inference (``tensor_parallel_size``
+    read from ``workload.parameters``), so it carries no new execution risk.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(name="qwen2_5_7b_bf16_serving", display_name="Qwen2.5-7B BF16 serving")
+
+    def run(self, config: ExperimentConfig) -> WorkloadRunOutput:
+        if config.mode == "inference":
+            return _run_causal_inference(config)
+        return super().run(config)
+
+
 def transformer_workloads() -> list[TransformerWorkload]:
-    return [GPT2SmallWorkload(), DistilBERTWorkload(), TinyLlamaWorkload(), Qwen25SevenBTrainingWorkload()]
+    return [
+        GPT2SmallWorkload(),
+        DistilBERTWorkload(),
+        TinyLlamaWorkload(),
+        Qwen25SevenBTrainingWorkload(),
+        Qwen25ThreeBWorkload(),
+        Qwen25SevenBServingWorkload(),
+    ]
 
 
 def _run_causal_training(config: ExperimentConfig) -> WorkloadRunOutput:

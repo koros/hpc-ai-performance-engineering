@@ -16,6 +16,8 @@ SUPPORTED_WORKLOADS = {
     "qwen2_5_7b",
     "qwen2_5_7b_long_context",
     "qwen2_5_7b_training",
+    "qwen2_5_3b",
+    "qwen2_5_7b_bf16_serving",
 }
 SUPPORTED_ENVIRONMENT_TARGETS = {
     "cuda_pytorch",
@@ -102,6 +104,8 @@ WORKLOAD_PARAMETER_KEYS = {
     "qwen2_5_7b_long_context": LONG_CONTEXT_PARAMETERS,
     "qwen2_5_7b": LOWBIT_PARAMETERS,
     "qwen2_5_7b_training": TRANSFORMER_PARAMETER_KEYS,
+    "qwen2_5_3b": TRANSFORMER_PARAMETER_KEYS,
+    "qwen2_5_7b_bf16_serving": TRANSFORMER_PARAMETER_KEYS,
     "distilbert": TRANSFORMER_PARAMETER_KEYS,
     "gpt2_small": TRANSFORMER_PARAMETER_KEYS,
     "tinyllama": TRANSFORMER_PARAMETER_KEYS,
@@ -210,6 +214,8 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
         "tinyllama",
         "qwen2_5_7b_long_context",
         "qwen2_5_7b_training",
+        "qwen2_5_3b",
+        "qwen2_5_7b_bf16_serving",
     }:
         if config.experiment_id.startswith("E") and not config.workload.model_revision:
             issues.append("matrix transformer config must pin workload.model_revision")
@@ -320,6 +326,8 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
             "gpt2_small": 1024,
             "tinyllama": 2048,
             "qwen2_5_7b_long_context": 32768,
+            "qwen2_5_3b": 32768,
+            "qwen2_5_7b_bf16_serving": 32768,
         }
         context_limit = context_limits.get(workload)
         if context_limit is not None and input_length + generated_length > context_limit:
