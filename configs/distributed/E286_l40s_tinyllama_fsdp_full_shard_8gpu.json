@@ -1,0 +1,67 @@
+{
+  "experiment_id": "E286",
+  "experiment": "distributed_strategy_l40s_tinyllama_fsdp_full_shard_8gpu",
+  "mode": "training",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "batch_size": 2,
+      "sequence_length": 1024,
+      "distributed_strategy": "FSDP full shard",
+      "strategy_detail": "full_shard",
+      "fsdp_config": {
+        "sharding_strategy": "full_shard",
+        "mixed_precision": "bf16"
+      }
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe",
+    "gpus": 8
+  },
+  "distributed": {
+    "strategy": "fsdp",
+    "nodes": 1,
+    "gpus_per_node": 8,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "nccl"
+    ],
+    "parameters": {
+      "collect_communication_overhead": true,
+      "collect_memory_trace": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E286",
+    "template": "distributed_strategy",
+    "phase": "Distributed training strategy",
+    "priority": "Should Have",
+    "gpu_hours_estimate": 4.8,
+    "strategy_detail": "full_shard",
+    "objective": "Extend the distributed-strategy comparison to TinyLlama-1.1B on 8 L40S GPUs -- previously only DDP was tested for this model; GPT-2 and DistilBERT already have the full sweep.",
+    "key_metrics": [
+      "throughput",
+      "memory",
+      "communication_overhead",
+      "gpu_hours"
+    ],
+    "comparison_scope": "within_platform_8_gpu_strategy_comparison",
+    "limitation": "Per-GPU batch size is held constant across strategies but chosen per-platform (8 on H100, 2 on L40S) to stay within the memory ceiling TinyLlama already hit on L40S at batch 16 (see E208); this trades cross-platform batch comparability for within-platform strategy comparability, which is the axis this phase tests."
+  }
+}

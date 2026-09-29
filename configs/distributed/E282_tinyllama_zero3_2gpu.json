@@ -1,0 +1,67 @@
+{
+  "experiment_id": "E282",
+  "experiment": "distributed_strategy_tinyllama_zero3_2gpu",
+  "mode": "training",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "batch_size": 8,
+      "sequence_length": 1024,
+      "distributed_strategy": "ZeRO-3",
+      "strategy_detail": "zero_stage_3",
+      "deepspeed_config": {
+        "zero_optimization_stage": 3,
+        "bf16_enabled": true
+      }
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink",
+    "gpus": 2
+  },
+  "distributed": {
+    "strategy": "deepspeed_zero3",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "nccl"
+    ],
+    "parameters": {
+      "collect_communication_overhead": true,
+      "collect_memory_trace": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E282",
+    "template": "distributed_strategy",
+    "phase": "Distributed training strategy",
+    "priority": "Should Have",
+    "gpu_hours_estimate": 1.2,
+    "strategy_detail": "zero_stage_3",
+    "objective": "Extend the distributed-strategy comparison to TinyLlama-1.1B on 2 H100 GPUs -- previously only DDP was tested for this model; GPT-2 and DistilBERT already have the full sweep.",
+    "key_metrics": [
+      "throughput",
+      "memory",
+      "communication_overhead",
+      "gpu_hours"
+    ],
+    "comparison_scope": "within_platform_2_gpu_strategy_comparison",
+    "limitation": "Per-GPU batch size is held constant across strategies but chosen per-platform (8 on H100, 2 on L40S) to stay within the memory ceiling TinyLlama already hit on L40S at batch 16 (see E208); this trades cross-platform batch comparability for within-platform strategy comparability, which is the axis this phase tests."
+  }
+}
