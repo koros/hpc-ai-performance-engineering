@@ -1,0 +1,70 @@
+{
+  "experiment_id": "E293",
+  "experiment": "weak_scaling_l40s_tinyllama_weak_8gpu",
+  "mode": "training",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "scaling_type": "weak",
+      "per_gpu_batch_size": 2,
+      "global_batch_size": 16,
+      "sequence_length": 1024,
+      "fixed_workload": false,
+      "stack": "ddp"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe",
+    "gpus": 8
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 8,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "nccl"
+    ],
+    "parameters": {
+      "collect_scaling_metrics": true,
+      "collect_gpu_utilisation": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E293",
+    "template": "scaling_ddp",
+    "phase": "Weak scaling",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 4.8,
+    "strategy_detail": "ddp",
+    "objective": "Hold per-GPU batch constant while GPU count grows, to isolate whether TinyLlama's near-zero strong-scaling gain (E044-E046, E220) is a batch-starvation artefact of the fixed-global-batch protocol rather than a communication or interconnect limit.",
+    "key_metrics": [
+      "runtime",
+      "throughput",
+      "efficiency",
+      "memory"
+    ],
+    "source_experiment_ids": [
+      "E044",
+      "E045",
+      "E046",
+      "E220"
+    ],
+    "comparison_scope": "l40s_weak_scaling_companion_to_strong_scaling_curve"
+  }
+}
