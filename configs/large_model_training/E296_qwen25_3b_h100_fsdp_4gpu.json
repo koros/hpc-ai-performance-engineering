@@ -1,0 +1,86 @@
+{
+  "experiment_id": "E296",
+  "experiment": "qwen25_3b_h100_fsdp_4gpu",
+  "mode": "training",
+  "workload": {
+    "name": "qwen2_5_3b",
+    "model": "Qwen/Qwen2.5-3B-Instruct",
+    "model_revision": null,
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "study_protocol": "qwen25_3b_h100_sharding_v1",
+      "model_load_dtype": "bf16",
+      "batch_size": 1,
+      "sequence_length": 512,
+      "gradient_accumulation_steps": 4,
+      "effective_batch_size": 16,
+      "global_batch_size": 16,
+      "learning_rate": 1e-05,
+      "warmup_steps": 2,
+      "activation_checkpointing": true,
+      "distributed_strategy": "FSDP full shard",
+      "quality_sanity_check": true,
+      "strategy_detail": "full_shard",
+      "fsdp_config": {
+        "sharding_strategy": "full_shard",
+        "mixed_precision": "bf16"
+      }
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink",
+    "gpus": 4
+  },
+  "distributed": {
+    "strategy": "fsdp",
+    "nodes": 1,
+    "gpus_per_node": 4,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 12,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "nccl"
+    ],
+    "parameters": {
+      "sample_interval_seconds": 0.1,
+      "collect_communication_overhead": true,
+      "collect_memory_trace": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E296",
+    "phase": "Large-model distributed strategy",
+    "priority": "Must Have",
+    "template": "distributed_strategy",
+    "study_family": "qwen25_3b_h100_sharding_v1",
+    "objective": "Measure BF16 Qwen2.5-3B FSDP full shard throughput, memory, and communication on 4 H100 GPUs -- a third model-size point (with TinyLlama-1.1B and Qwen2.5-7B) for whether parallelism-strategy ranking flips with scale.",
+    "research_questions": [
+      "RQ2",
+      "RQ4"
+    ],
+    "analysis_tasks": [
+      "A03",
+      "A05"
+    ],
+    "gpu_hours_estimate": 1.0,
+    "key_metrics": [
+      "throughput",
+      "memory",
+      "communication_overhead",
+      "gpu_hours",
+      "quality_loss"
+    ],
+    "comparison_scope": "within_platform_4_gpu_strategy_comparison",
+    "limitation": "Identical batch/sequence/accumulation settings to the Qwen2.5-7B sharding study (E250-E255) by design, so results isolate model size as the only changed variable; model_revision is not yet pinned -- see handoff notes before running."
+  }
+}

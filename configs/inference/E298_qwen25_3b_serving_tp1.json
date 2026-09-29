@@ -1,0 +1,65 @@
+{
+  "experiment_id": "E298",
+  "experiment": "inference_multi_gpu_qwen25_3b_serving_tp1",
+  "mode": "inference",
+  "workload": {
+    "name": "qwen2_5_3b",
+    "model": "Qwen/Qwen2.5-3B-Instruct",
+    "model_revision": null,
+    "dataset": "synthetic_token_prompts_v1",
+    "parameters": {
+      "inference_study_type": "multi_gpu",
+      "framework": "vllm",
+      "tensor_parallel_size": 1,
+      "batch_size": 1,
+      "concurrent_requests": 1,
+      "prompt_length": 128,
+      "max_new_tokens": 128
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink",
+    "gpus": 1
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 100,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "serving_latency"
+    ],
+    "parameters": {
+      "collect_latency_distribution": true,
+      "collect_tensor_parallel_scaling": true,
+      "collect_memory_trace": true
+    }
+  },
+  "metadata": {
+    "matrix_id": "E298",
+    "template": "inference_serving",
+    "phase": "Inference multi-GPU",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.4,
+    "matrix_stack_strategy": "vLLM tensor parallel",
+    "objective": "TP=1 baseline anchor for the new Qwen2.5-3B workload -- a third model-size point on the tensor-parallel serving curve alongside TinyLlama (E195/E196) and Qwen2.5-7B (E301-E304).",
+    "key_metrics": [
+      "scaling",
+      "tokens_sec",
+      "latency",
+      "memory"
+    ]
+  }
+}
