@@ -588,6 +588,54 @@
       "experiment_ids": ["E214"],
       "required_trials": 3,
       "comparability": "platform_specific"
+    },
+    {
+      "platform": "h100",
+      "wave": "tinyllama-strategy-sweep",
+      "name": "H100 TinyLlama distributed-strategy sweep",
+      "experiment_ids": ["E277-E284"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "tinyllama-strategy-sweep",
+      "name": "L40S TinyLlama distributed-strategy sweep (8-GPU)",
+      "experiment_ids": ["E285-E286"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "tinyllama-weak-scaling",
+      "name": "H100 TinyLlama weak scaling",
+      "experiment_ids": ["E287-E289"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "tinyllama-weak-scaling",
+      "name": "L40S TinyLlama weak scaling",
+      "experiment_ids": ["E290-E293"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "qwen25-3b-new-workload",
+      "name": "H100 Qwen2.5-3B strategy and TP-serving (model_revision must be pinned before submission)",
+      "experiment_ids": ["E294-E300"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "qwen7b-tp-serving",
+      "name": "H100 Qwen2.5-7B BF16 tensor-parallel serving",
+      "experiment_ids": ["E301-E304"],
+      "required_trials": 3,
+      "comparability": "exact"
     }
   ],
   "deferred": [
