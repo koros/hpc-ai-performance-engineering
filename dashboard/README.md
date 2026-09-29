@@ -1,140 +1,202 @@
-# Dashboard
+# Research Dashboard — Experiment Catalog & plain-language summary
 
-Static dashboard for inspecting processed experiment outputs.
+This is the published dashboard. It is a static evidence snapshot through 27 September 2026;
+the L40S energy revalidation trials recorded on 28 September are not reflected in the embedded
+figures. The original `dashboard3/` files remain as the source reference.
 
-Expected inputs:
+Two self-contained pages (no build step, no dependencies), meant to be read in order:
 
-- `results/processed/experiments.csv`
-- `results/analysis/phase_summary.csv`
-- `results/analysis/trial_summary.csv`
-- `results/analysis/experiment_rankings.csv`
-- `results/analysis/scaling_summary.csv`
-- `results/analysis/precision_summary.csv`
-- `results/analysis/strategy_summary.csv`
-- `results/analysis/communication_summary.csv`
-- `results/analysis/data_movement_summary.csv`
-- `results/analysis/memory_summary.csv`
-- `results/analysis/inference_summary.csv`
-- `results/analysis/lowbit_summary.csv`
-- `results/analysis/hardware_summary.csv`
-- `results/analysis/research_question_summary.csv`
-- `results/analysis/research_finding_summary.csv`
-- `results/processed/readiness_report.md`
+1. **`index.html` — Part 1, Experiment Catalog.** The complete 276-condition experiment matrix,
+   grouped by research theme and study, with filters and an automatic "held constant vs. varied"
+   breakdown per comparison, plus a click-through details view. This is the evidence base.
+2. **`analysis.html` — Part 2, Analysis & Findings.** Turns that evidence into a non-technical
+   story for readers who aren't familiar with GPUs, distributed training, or the RQ1–RQ7 framing
+   used elsewhere in this repo: six KPI numbers up top, then one short section per research
+   question, each with a plain-English explanation, a simple chart, and a one-paragraph finding.
 
-The dashboard loads these files automatically when served from the repository root. The `Analysis CSVs` file picker
-also accepts several analysis files at once for an offline/manual review.
+Both pages link to each other (a "Part 1 / Part 2" pill pair at the top of each, plus a
+next/previous-part card at the bottom). Open either directly in a browser — nothing needs to be
+served or built.
 
-## Presentation rules
+## Presentation approach
 
-The front page now starts with a short, live-data research synthesis. Detailed study
-charts, coverage cards, and source-level findings sit in the closed **Explore the
-supporting studies** section. The trial audit is a separate disclosure. This keeps
-one scaling plot and one strategy comparison in the technical explorer instead of
-repeating both immediately beneath their conclusions. Each takeaway has an
-expandable explanation of the changed variable, matched controls, and limitation;
-source conditions remain clickable. The low-bit and long-context conclusions are
-derived from their refreshed analysis CSVs, not copied from `dashboard3`'s fixed
-snapshot.
+This site replaces the previous technical, CSV-driven dashboard. Its two pages are static and
+self-contained, with the underlying experiment data embedded for offline reading.
 
-- L40S and H100 measurements are never averaged into one chart series.
-- `exact`, `platform_specific`, and `capacity_adjusted` results remain separate.
-- Throughput charts use separate scales for different throughput units.
-- Empty study panels are removed from the main flow and listed under **Awaiting evidence** at the bottom.
-- Narrow screens render result tables as labelled cards, avoiding page-wide horizontal scrolling.
-- The metric-focus filter can reduce the page to throughput, runtime, memory, energy/power, or latency views.
-- Every analytical chart states which field or fields vary and lists a control only when that value is identical across the plotted rows.
-- The training-performance view shows one study at a time. Its dot is mean throughput, its whisker is the 95% confidence interval, and its run-variation percentage is the sample standard deviation divided by the mean. Strategy and precision comparisons use matched controls and report change from DDP or BF16 respectively; groups with only one configuration stay out of the comparison view.
-- The distributed-strategy chart shows one matched platform, workload, precision, and GPU-count comparison at a time. A selector switches among independent comparisons, a metric selector switches between throughput and measured GPU memory, and stable colours identify DDP, FSDP, and each ZeRO stage without implying that unrelated groups share a scale.
-- The precision view shows one matched workload at a time and uses coordinated throughput and measured-memory charts. BF16, FP16, and FP32 retain the same colour in both charts, while the summary and takeaway quantify BF16 relative to FP32. The current view therefore communicates the available L40S evidence without implying equivalent H100 precision coverage.
-- The overview groups completed evidence into controlled study families, names the variable tested, and links to the appropriate research panel. Condition and trial totals indicate coverage only; they are never presented as performance rankings.
-- Memory evidence is routed by `study_type`: micro-batch and gradient-accumulation sweeps use their respective numeric setting on the x-axis, while activation checkpointing uses a controlled off/on comparison. These studies are not combined into one apparent micro-batch curve.
-- Data-movement evidence is likewise separated by its independent variable: worker count and prefetch depth use millisecond-scale curves, while pinned memory uses an off/on comparison with loading-time and throughput deltas. Platform, workload, and the remaining loader settings stay fixed within each panel.
-- Cross-phase throughput is kept in the evidence section as a descriptive distribution. Trials are averaged within each condition first, and each condition then contributes once to the displayed median and minimum–maximum range. The phase inventory intentionally omits pooled throughput averages.
-- Active filters appear as removable chips; **Reset filters** restores the complete evidence view.
+`analysis.html` (Part 2) is a fixed narrative snapshot aimed at a non-technical reader: six KPI
+numbers up top, then one short section per research question, each with a plain-English
+explanation, a simple chart, and a one-paragraph finding. The underlying numbers are copied in
+(rounded, with the analysis CSVs used to derive them noted below) rather than fetched live, so it
+stays simple to open and share. `index.html` (Part 1) takes the opposite approach on purpose: it
+shows the full, unrounded experiment matrix rather than a curated narrative subset.
 
-## Experiment drill-down
+Each finding card also links to a **"Supporting Evidence & Analysis"** section at the bottom of
+the page, which is the deliberate exception to the plain-language rule: exact experiment IDs,
+trial counts, comparability classes (`exact` / `platform_specific` / `capacity_adjusted`),
+unrounded figures, and the source pipeline's own methodology/limitation notes, quoted rather than
+paraphrased. It exists so a technical reader (a supervisor, an examiner, future-you) can verify
+every rounded claim above against its exact source condition without leaving the page.
 
-Select an experiment row, bar, or chart point to open its condition-level detail view. The dialog keeps trial evidence together while separating:
+That section opens with three at-a-glance charts before the detail tables:
+- a **coverage meter list** showing completed vs. planned test runs for every category that isn't
+  yet 100% done (plus one summary row for the 12 categories that are),
+- a **line chart** of scaling efficiency vs. chip count, one line per workload/scaling-type, and
+- two small-multiple **scatter charts** (GPT-2 and DistilBERT) plotting throughput vs. memory per
+  distributed-training strategy, with a ringed dot marking each workload's Pareto-frontier method.
 
-- protocol and recorded controls;
-- performance and memory;
-- measured GPU utilisation, power, and energy;
-- Torch-profiler CPU time and data-movement timing;
-- inference latency and distributed-communication metrics;
-- trial consistency, environment details, and provenance.
+All three are built with plain inline SVG (no chart library) and read their numbers from the same
+figures quoted in the tables directly below them.
 
-Metric groups with no recorded values are omitted. The trial mini-chart uses aggregate values from each trial; it does not imply that telemetry sample histories were captured. “Torch profiler CPU time” is not presented as host CPU utilisation because the current result schema does not record that metric.
+Every row in every "Supporting Evidence" table is also clickable (name, id cell, or anywhere in
+the row) and opens a details drawer that slides in from the right, showing that experiment's full
+condition (workload, strategy, precision, batch sizes, comparability class, status) and its
+per-platform measured metrics (throughput, memory, latency, GPU utilization, power/energy,
+AllReduce/NCCL, data-loading, as available), with `n` = repetition count. Clicking a row whose
+source cell lists several experiment IDs (e.g. `E035, E036, E037`) opens one card per experiment.
+An id suffixed `@h100`/`@l40s` filters the card to that platform only. An id with no completed
+trial (shown as "(deferred)" in a table) still opens the drawer, with a note that it hasn't run
+yet. Closes via the &times; button, clicking outside the drawer, or Escape; fully keyboard-operable
+(tab to a row, Enter/Space to open).
 
-## Research-question views
+The drawer's data lives in `experiment-details.json`, a static lookup keyed by experiment ID,
+generated once from `results/processed/experiments.csv` (per-platform metric means) and
+`results/processed/experiment_tracker.csv` (status/phase/completion date) &mdash; embedded directly
+into `analysis.html` as the `EXPERIMENT_DETAILS` constant so the page still needs no server or
+build step. It's kept alongside both pages for reference/regeneration but isn't fetched at
+runtime. (Part 1's own, complete per-experiment dataset is embedded the same way in `index.html`,
+and also kept alongside as `experiments-data.json`.)
 
-The first dashboard section turns refreshed evidence into an explicit research
-argument rather than a generic results explorer:
+## Regenerating it
 
-- The **current evidence snapshot** reports active-view conditions, validated
-  trials, research-question readiness, validated FP8 coverage, measured-region
-  energy coverage, and the remaining legacy-telemetry boundary.
-- The **campaign synthesis** leads with evidence-derived conclusions
-  rather than asking readers to infer them from charts. Each card reports an
-  effect size, decision implication, changed variable, held-constant controls,
-  limitation, and clickable source conditions. It currently covers scaling,
-  distributed strategy, backend-matched FP8, checkpointing, NCCL capability,
-  matched H100/L40S performance, the remaining hardware-energy gap, 7B
-  low-bit serving, and H100 long-context latency.
-- **RQ1–RQ7 decision cards** condense platform-level coverage into one card per
-  research question. Each card shows trial completion, platform scope, the
-  remaining limitation, and a direct link to the relevant evidence view.
-- **RQ1 scaling** uses a single chart in the supporting-studies explorer. Its
-  platform and scaling-protocol series remain separate.
-- **RQ2 strategy trade-offs** use one matched-comparison selector in the
-  explorer; unlike workload, model, precision, GPU-count, and batch setups are
-  never put on the same axis.
-- **Traceable findings** link every displayed RQ1/RQ2 statistical finding to
-  its source condition IDs and trial sufficiency. The campaign synthesis adds
-  controlled RQ3–RQ6 interpretations and a scoped RQ5 limitation without
-  replacing those underlying analysis tables.
-- **Controlled Study Map** provides the bridge from collected phases to the
-  research views. It prevents workload, hardware, strategy, scaling, precision,
-  and memory changes from being compressed into one confounded leaderboard.
-- **RQ3 precision controls** now include validated FP8 training alongside FP32,
-  FP16, and BF16, with throughput, memory, and short-run quality-loss context.
-- **RQ6 hardware comparisons** match H100 and L40S by protocol rather than by
-  experiment ID. Throughput is shown beside memory for training or p50 latency
-  for inference; unmatched or legacy energy measurements are not implied.
+The figures embedded in `analysis.html` (Part 2) were computed from these files as of the date in
+the page's snapshot line:
 
-The five most commonly used filters remain visible. Comparability, phase,
-strategy, precision, GPU count, wave, and evidence-quality controls are grouped
-under **More filters** to keep the initial view focused on interpretation.
+- `results/analysis/research_question_summary.csv` and `research_finding_summary.csv` (RQ1/RQ2 scaling & strategy)
+- `results/analysis/precision_summary.csv` and `results/analysis/trial_summary.csv` (RQ3 precision, matched by experiment ID)
+- `results/analysis/communication_summary.csv` and `data_movement_summary.csv` (RQ4)
+- `results/analysis/hardware_summary.csv` (RQ6)
+- `results/analysis/inference_summary.csv` (batching)
+- `results/processed/experiment_tracker.csv` (overall coverage numbers, and the `status`/phase
+  columns behind the coverage meter list &mdash; 217 of 238 planned tests complete as of the last
+  check, 91%)
+- `results/processed/experiments.csv`, specifically the `metric_nvidia_smi_power_draw_watts_measured_region`
+  and `metric_nvidia_smi_energy_joules_measured_region` columns (RQ5, the "Power & energy" section) —
+  averaged per condition (n=3) and normalized to energy-per-1,000-tokens/responses by hand, since no
+  pre-built summary CSV exposes that normalized figure directly
 
-The Research question filter applies to raw trial rows and the research-specific
-tables. Other summary tables intentionally ask the user to clear that filter,
-because they do not contain an RQ-level grouping and must not be reinterpreted
-as such.
+To refresh after a new experiment wave, re-run `python -m hpc_ai_perf.cli refresh`, re-derive the
+handful of headline numbers from the files above, and update the constants inside the
+`<script>` block in `analysis.html` (search for the `ready()` function — each chart call has its
+values inline). There's no templating step; it's a static snapshot by design.
 
-Run the pipeline and serve the dashboard locally:
+To refresh the details-drawer data, re-derive `experiment-details.json` from
+`results/processed/experiments.csv` + `experiment_tracker.csv` (per experiment ID: workload/mode/
+strategy/precision/batch metadata from the first matching row, plus per-platform means of
+throughput, memory, latency, GPU utilization, `metric_nvidia_smi_power_draw_watts_measured_region`,
+`metric_nvidia_smi_energy_joules_measured_region`, AllReduce time, NCCL bandwidth, and data-loading/
+transfer time where present and non-zero), then paste the new JSON in as the `EXPERIMENT_DETAILS`
+constant near the top of the `<script>` block in `analysis.html`.
 
-```bash
-python -m hpc_ai_perf.cli refresh
-make serve-dashboard
-```
+To refresh Part 1's catalog after a new experiment wave, re-run the same two source files
+(`experiment_tracker.csv` + `experiments.csv`) through the generation step described in the
+2026-09-28 changelog entry below, and re-embed the result as the `DATA` constant near the top of
+the `<script>` block in `index.html` (also updating `experiments-data.json` alongside it).
 
-Open `http://localhost:8000/dashboard/`.
+## Changelog
 
-## GitHub Pages
+**2026-09-27** — Added a new "7B model (new)" section (`#lowbit`) plus matching
+"Supporting Evidence" block (`#nerd-lowbit`), covering a 2026-09-26/27 evidence wave on
+Qwen2.5-7B-Instruct (H100 only): serving speed/memory/quality across four number formats
+(BF16/AWQ/GPTQ/NF4, E239-E246, E270-E273), long-context time-to-first-token (E247-E249), and
+FSDP-vs-DeepSpeed-ZeRO-3 training throughput/memory at 2 and 4 GPUs (E250-E255). Also added two
+KPI tiles to `#glance` and one sentence to the RQ1 (`#nerd-scaling`) limitation note about a new
+capacity-adjusted probe (E256) that partially addresses the long-standing missing-E032 baseline
+gap. 18 new entries were merged into `experiment-details.json` / `EXPERIMENT_DETAILS` (E239-E256),
+bringing the total to 79.
 
-The `Deploy research dashboard` workflow rebuilds all derived summaries from committed raw evidence, runs the project
-and dashboard checks, and publishes a static artifact to the public
-[`hpc-ai-performance-engineering-dashboard`](https://github.com/koros/hpc-ai-performance-engineering-dashboard)
-repository whenever `main` changes. The artifact contains only the dashboard, analysis CSVs, the processed experiment
-table, and the readiness report; raw evidence and local build files are excluded.
+Caveat carried into the page itself (see the "Still coming" card in `#lowbit`): this wave's
+figures were read directly from raw trial JSON under `results/raw/h100/`, not from
+`experiment_tracker.csv` / `experiments.csv`, because those processed files had not been
+regenerated as of this update (`python -m hpc_ai_perf.cli refresh` needs a Python 3.11+
+environment). The page-wide coverage KPI ("217 / 238") and the "Evidence coverage" meter list in
+`#nerds` are therefore still pre-wave and do not yet count this batch of roughly three dozen new
+completed tests. A third training-strategy arm (DDP, E261/E264/E266/E267) and the L40S side of
+this same 7B model have no results yet either.
 
-The separate public repository is a transitional host while the complete research repository remains private. Once this
-repository completes its open-source review and becomes public, Pages can be moved here without changing the dashboard
-build process. The hosted URL is <https://koros.github.io/hpc-ai-performance-engineering-dashboard/>.
+**2026-09-28** — Refreshed against the now-regenerated pipeline (`experiment_tracker.csv` /
+`experiments.csv` were rebuilt 2026-09-27, resolving the Python-3.11 blocker noted above). Updated
+the page-wide coverage KPI and "Evidence coverage" meter list from 217/238 to 250/276 (91%), broken
+out by the current set of incomplete phases. Reworded the `#lowbit` "Still coming" card and the
+`#nerd-lowbit` method note to drop the now-resolved pipeline-refresh caveat, while keeping the
+still-real DDP-arm and L40S gaps. Added a new "Inference energy re-validation anchors" table to
+`#nerd-power` covering three H100 DistilBERT FP16/BF16 conditions (E274-E276, completed
+2026-09-26/27); merged their entries into `experiment-details.json` / `EXPERIMENT_DETAILS`
+(now 82 entries) so their table rows open correctly in the details drawer instead of the "not in
+the evidence set" fallback.
 
-To reproduce the publication artifact locally:
+Investigated, but did **not** add: an apparent "H100 8-GPU scaling wave" surfaced by the pipeline
+refresh (gpt2_small/distilbert/tinyllama at 8 GPUs in the refreshed `scaling_summary.csv`) turned
+out on inspection to be **L40S** data (E216-E220), not H100 — the analysis pipeline groups by
+platform, but a quick read of the summary rows alone doesn't show that. The H100-only
+`#nerd-scaling` table was left as it was (still 1/2/4 GPUs only); the true H100 8-GPU wave and a
+proper, clearly-labelled L40S comparison remain open items, not something to fold into an
+H100-labelled table without a platform column.
 
-```bash
-make build-dashboard-site
-```
+**2026-09-28 (2)** — Added a finding-card to `#lowbit`, right after the existing FSDP-vs-ZeRO-3
+speed finding, framing the same E252-E255 sharding data as a memory-capacity result: at 2 GPUs,
+ZeRO-3's 77.44GB is within ~3GB of the H100's 80GB ceiling while FSDP's 62.11GB has real headroom.
+This directly answers whether the 7B experiments contributed to the "does the model fit in memory"
+line of inquiry — the pipeline's formal "Memory optimisation" phase never included this model (it's
+GPT-2 Small/DistilBERT only, 25/31 completed), so this strategy comparison is the closest large-model
+equivalent evidence, not a duplicate of it. Added a matching clarifying sentence to the
+`#nerd-lowbit` methodology footnote for the same table.
 
-The generated site is written to `build/pages/`.
+**2026-09-29** — Added a new page, `experiments.html`, alongside the main report: a browsable catalog
+of all 276 planned experiment conditions (not just the ~82 referenced in the main report's nerd-tables).
+Built from `experiment_tracker.csv` (the full roster, including Configured/Deferred conditions with no
+completed trial yet) enriched with per-trial results from `experiments.csv` (averaged across
+repetitions, kept separate per platform).
+
+Hierarchy: 10 research themes (Environment & Baselines, Scaling Efficiency, Distributed Strategy,
+Precision & Quantization, Communication & Data Movement, Power & Energy, Hardware Comparison, Inference
+Serving, Memory & Capacity, Large Model/Qwen2.5-7B) &rarr; 26 studies (the pipeline's own `phase` field,
+unchanged) &rarr; one row-group per workload/model tested in that study. Each row-group shows two things
+side by side: which parameters were held constant across every condition in it ("Held constant" chips)
+and which were deliberately varied ("Varied" chips, plus matching table columns) &mdash; computed
+automatically per group, not hand-curated, so it can't drift out of sync with the data.
+
+Filters: theme, workload, platform, precision, strategy, status, mode, GPU count, plus free-text search;
+filtering collapses/hides non-matching branches and auto-expands ones with matches. Clicking any row (or
+a group's "Compare all" link) opens the same detail-drawer pattern as the main report, extended to show
+every known parameter for that condition plus per-platform measured results (throughput, memory, energy,
+latency, perplexity) where a trial has completed; Configured/Deferred conditions show their planned
+parameters with an explicit "no completed trial yet" note instead of blank/misleading fields.
+
+Linked from the main report's top nav ("Experiment Catalog") and from the Supporting Evidence section
+intro. `experiments-data.json` is kept alongside as a plain data export of the same hierarchy (same
+source the page embeds inline), in case it's useful to hand to a supervisor or reuse elsewhere.
+
+Verification: full-coverage stress test (every one of the 276 experiment cards and all 52 workload
+row-groups rendered through the actual page JS in Node with zero exceptions), tag-balance and CSS
+brace-balance counts, `node --check` on the extracted script, and manual reconciliation of theme/phase
+totals against `experiment_tracker.csv` (276/276, matches exactly). Live-browser click-through was not
+possible this session (the same local-server/browser-tool instability noted in earlier entries), so this
+is static + full-data-coverage verification, not a visual walkthrough.
+
+**2026-09-29 (2)** — Reordered the two pages so the evidence comes before the narrative, and did a
+publication pass over both. Renamed files: the plain-English report (formerly `index.html`) is now
+`analysis.html`; the Experiment Catalog (formerly `experiments.html`) is now `index.html`, so it's
+what opens by default. Both pages now carry a matching "Part 1 / Part 2" pill pair at the top (the
+current page highlighted) and a next/previous-part card at the bottom, so the reading order is
+explicit and either page can be opened first without getting lost. Updated every in-page
+cross-link and this README's own file references to match.
+
+Also tidied up language that read like a work-in-progress lab notebook rather than a finished
+document: the 7B-model section's kicker changed from the date-stamped "New evidence · 2026-09-26"
+to "Question 8" (continuing the plain-English page's existing Question 1–7 numbering — this is a
+reading-order label only, not a claim about the project's formal RQ1–RQ7 taxonomy, which the 7B
+work sits across several of rather than owning a number of its own), its nav link dropped the
+"(new)" suffix, and its Supporting Evidence heading dropped the "New evidence (2026-09-26/27)"
+prefix (the dates still appear in that block's methodology paragraph, where they're provenance
+rather than a headline). No figures, findings, or caveats were changed — this was navigation and
+framing only.

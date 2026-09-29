@@ -2237,30 +2237,24 @@ def test_hardware_energy_revalidation_gate_rejects_insufficient_samples(tmp_path
 def test_dashboard_static_assets_exist() -> None:
     dashboard_files = [
         Path("dashboard/index.html"),
-        Path("dashboard/styles.css"),
-        Path("dashboard/app.js"),
+        Path("dashboard/analysis.html"),
+        Path("dashboard/experiments-data.json"),
+        Path("dashboard/experiment-details.json"),
     ]
 
     for dashboard_file in dashboard_files:
         assert dashboard_file.exists()
 
     html = Path("dashboard/index.html").read_text(encoding="utf-8")
-    script = Path("dashboard/app.js").read_text(encoding="utf-8")
+    analysis = Path("dashboard/analysis.html").read_text(encoding="utf-8")
 
-    assert "../results/processed/experiments.csv" in script
-    assert "../results/analysis/research_finding_summary.csv" in script
-    assert 'id="throughputUnitFilter"' in html
-    assert 'id="platformFilter"' in html
-    assert 'id="comparabilityFilter"' in html
-    assert 'id="trialTable"' in html
-    assert 'id="studyMap"' in html
-    assert 'id="decisionInsightGrid"' in html
-    assert 'id="kpiMatchedProtocols"' in html
-    assert 'class="panel evidence-audit"' in html
-    assert "Top Experiments" not in html
-    assert "Submission Readiness" not in html
-    assert "buildStudyCoverageEntries" in script
-    assert "buildBroadHardwareComparisonGroups" in script
+    assert 'href="analysis.html"' in html
+    assert 'href="index.html"' in analysis
+    assert 'id="themeTree"' in html
+    assert 'id="drawer"' in html
+    assert 'id="nerds"' in analysis
+    assert 'id="snapshotLine"' in html
+    assert 'id="snapshotLine"' in analysis
 
 
 def test_hpc_smoke_runbook_exists() -> None:

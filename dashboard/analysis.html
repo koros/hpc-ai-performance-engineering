@@ -1,0 +1,2097 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Part 2 &middot; Analysis &amp; Findings &middot; HPC AI Performance Engineering</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --surface-2: #f2f1ee;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --good: #0ca30c;
+
+    --blue: #2a78d6;
+    --orange: #eb6834;
+    --aqua: #1baf7a;
+    --violet: #4a3aa7;
+
+    --seq-1: #86b6ef;
+    --seq-2: #5598e7;
+    --seq-3: #2a78d6;
+    --seq-4: #184f95;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --surface-2: #222221;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --good: #0ca30c;
+
+      --blue: #3987e5;
+      --orange: #d95926;
+      --aqua: #199e70;
+      --violet: #9085e9;
+
+      --seq-1: #6da7ec;
+      --seq-2: #3987e5;
+      --seq-3: #1c5cab;
+      --seq-4: #104281;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+    padding-bottom: 64px;
+  }
+
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+
+  header.hero {
+    padding: 56px 20px 40px;
+    background: linear-gradient(180deg, var(--surface-2), var(--page));
+    border-bottom: 1px solid var(--border);
+  }
+  .eyebrow {
+    font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text-muted); margin: 0 0 10px;
+  }
+  h1 {
+    font-size: clamp(28px, 4.5vw, 42px);
+    line-height: 1.15;
+    margin: 0 0 14px;
+    max-width: 16ch;
+  }
+  .lede {
+    font-size: 17px;
+    color: var(--text-secondary);
+    max-width: 62ch;
+    margin: 0 0 22px;
+  }
+  .snapshot-line {
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+
+  .part-nav { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .part-pill {
+    font-size: 12px; font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    text-decoration: none;
+    background: var(--surface);
+  }
+  .part-pill:hover { color: var(--text-primary); background: var(--surface-2); }
+  .part-pill.active { background: var(--text-primary); color: var(--page); border-color: var(--text-primary); }
+
+  .prev-part {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 18px 22px; margin: 22px 0 0;
+  }
+  .prev-part .np-label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin: 0 0 4px; }
+  .prev-part .np-title { font-size: 15px; font-weight: 700; margin: 0; }
+  .prev-part a.np-cta {
+    font-size: 13px; font-weight: 700; color: var(--text-primary);
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 9px 18px;
+    text-decoration: none; white-space: nowrap;
+  }
+  .prev-part a.np-cta:hover { background: var(--border); }
+
+  nav.jump {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    white-space: nowrap;
+    -ms-overflow-style: none; scrollbar-width: none;
+  }
+  nav.jump::-webkit-scrollbar { display: none; }
+  nav.jump .wrap { display: flex; gap: 4px; padding: 10px 20px; }
+  nav.jump a {
+    flex: 0 0 auto;
+    font-size: 13px; font-weight: 600;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 7px 12px;
+    border-radius: 999px;
+  }
+  nav.jump a:hover { background: var(--surface-2); color: var(--text-primary); }
+
+  section { padding: 48px 0; }
+  section + section { border-top: 1px solid var(--border); }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+  }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 18px 16px;
+  }
+  .kpi .value {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: 4px;
+  }
+  .kpi .value.good { color: var(--good); }
+  .kpi .label {
+    font-size: 13.5px;
+    color: var(--text-secondary);
+  }
+
+  h2 {
+    font-size: 23px;
+    margin: 0 0 6px;
+    max-width: 30ch;
+  }
+  .section-kicker {
+    font-size: 13px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--text-muted); margin: 0 0 8px;
+  }
+  .section-intro {
+    font-size: 15.5px;
+    color: var(--text-secondary);
+    max-width: 68ch;
+    margin: 0 0 24px;
+  }
+
+  .finding-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    margin-bottom: 18px;
+  }
+  .finding-card .headline {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .finding-card .headline .tag {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    background: var(--surface-2); color: var(--text-secondary);
+    border-radius: 999px; padding: 3px 8px;
+  }
+  .finding-card p { margin: 0; font-size: 14.5px; color: var(--text-secondary); max-width: 68ch; }
+  .finding-card .note { margin-top: 10px; font-size: 13px; color: var(--text-muted); }
+
+  .chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin: 18px 0 22px;
+  }
+  .chart-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 20px 14px;
+  }
+  .chart-panel .chart-title { font-size: 14px; font-weight: 700; margin: 0 0 2px; }
+  .chart-panel .chart-sub { font-size: 12.5px; color: var(--text-muted); margin: 0 0 10px; }
+  .chart-panel svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 12.5px; color: var(--text-secondary); }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+
+  .bar-label { font-size: 11.5px; fill: var(--text-secondary); }
+  .bar-value { font-size: 12.5px; font-weight: 700; fill: var(--text-primary); }
+  .axis-line { stroke: var(--baseline); stroke-width: 1; }
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .ref-line { stroke: var(--text-muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
+  .ref-label { font-size: 11px; fill: var(--text-muted); }
+
+  .practical {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .practical .item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--blue);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  .practical .item b { color: var(--text-primary); }
+
+  footer {
+    padding: 40px 0 10px;
+  }
+  footer .coverage {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+    font-size: 13.5px;
+    color: var(--text-secondary);
+  }
+  footer .coverage h3 { font-size: 14px; margin: 0 0 8px; color: var(--text-primary); }
+  footer .coverage .bar-wrap {
+    height: 8px; border-radius: 999px; background: var(--surface-2);
+    overflow: hidden; margin: 10px 0 12px;
+  }
+  footer .coverage .bar-fill { height: 100%; background: var(--good); border-radius: 999px; }
+  footer .fineprint { font-size: 12px; color: var(--text-muted); margin-top: 18px; }
+
+  /* -- Supporting Evidence & Analysis ---------------------------------- */
+  .see-stats {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--blue);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  .see-stats:hover { border-bottom-color: var(--blue); }
+
+  section#nerds {
+    background: var(--surface-2);
+  }
+  section#nerds .section-intro { max-width: 74ch; }
+  .nerd-callout {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    margin-bottom: 28px;
+  }
+  .nerd-callout code {
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .nerd-block {
+    margin-bottom: 30px;
+    padding-top: 6px;
+    scroll-margin-top: 56px;
+  }
+  .nerd-block h3 {
+    font-size: 15px;
+    margin: 0 0 4px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .nerd-block .nerd-method {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0 0 12px;
+    max-width: 72ch;
+  }
+  .nerd-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+  table.nerd-table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 520px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+  }
+  table.nerd-table caption { display: none; }
+  table.nerd-table th, table.nerd-table td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.nerd-table th {
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 10.5px;
+    letter-spacing: 0.03em;
+    background: var(--surface-2);
+  }
+  table.nerd-table tr:last-child td { border-bottom: none; }
+  table.nerd-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .nerd-limitation {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin: 10px 0 0;
+    font-style: italic;
+  }
+  .nerd-toc {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-bottom: 26px;
+  }
+  .nerd-toc a {
+    font-size: 12.5px; font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 12px;
+    text-decoration: none;
+  }
+  .nerd-toc a:hover { color: var(--blue); }
+
+  /* -- Coverage overview (meter list) ---------------------------------- */
+  .coverage-overview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px 8px;
+    margin-bottom: 26px;
+  }
+  .coverage-overview .chart-title { font-size: 14px; font-weight: 700; margin: 0 0 2px; }
+  .coverage-overview .chart-sub { font-size: 12.5px; color: var(--text-muted); margin: 0 0 16px; }
+  .meter-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 230px) 1fr 74px;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 11px;
+    font-size: 12.5px;
+  }
+  .meter-row .meter-label {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  @media (max-width: 520px) {
+    .meter-row {
+      grid-template-columns: 1fr 54px;
+      grid-template-areas: "label count" "track track";
+      row-gap: 5px;
+      margin-bottom: 14px;
+    }
+    .meter-row .meter-label { grid-area: label; white-space: normal; text-overflow: clip; }
+    .meter-row .meter-count { grid-area: count; }
+    .meter-row .meter-track { grid-area: track; }
+  }
+  .meter-track {
+    height: 9px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    overflow: hidden;
+    position: relative;
+  }
+  .meter-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--good);
+  }
+  .meter-fill.partial { background: var(--blue); }
+  .meter-count {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color: var(--text-muted);
+    text-align: right;
+    font-size: 11.5px;
+  }
+
+  /* -- Small-multiple scatter (RQ2 Pareto view) ------------------------ */
+  .scatter-wrap { margin-bottom: 6px; }
+  .scatter-caption { font-size: 11px; fill: var(--text-muted); }
+  .pareto-ring { fill: none; stroke-width: 2; }
+  .axis-title { font-size: 11px; fill: var(--text-muted); }
+
+  /* -- Line chart (RQ1 efficiency curve) ------------------------------- */
+  .line-path { fill: none; stroke-width: 2.5; }
+  .line-dot { stroke: var(--surface); stroke-width: 2; }
+  .line-end-label { font-size: 11.5px; font-weight: 700; }
+
+  /* -- Experiment detail drawer ----------------------------------------- */
+  table.nerd-table tbody tr td { transition: background .12s; }
+  tr.exp-row { cursor: pointer; }
+  tr.exp-row:hover td { background: var(--surface-2); }
+  tr.exp-row:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+  tr.exp-row td:last-child { color: var(--blue); font-weight: 600; }
+  html.drawer-locked { overflow: hidden; }
+  .drawer-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    opacity: 0; visibility: hidden;
+    transition: opacity .2s ease, visibility 0s linear .2s;
+    z-index: 60;
+  }
+  .drawer-overlay.open { opacity: 1; visibility: visible; transition: opacity .2s ease; }
+  .drawer {
+    position: fixed; top: 0; right: 0; height: 100%;
+    width: min(460px, 92vw);
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    box-shadow: -12px 0 32px rgba(0, 0, 0, 0.18);
+    transform: translateX(100%);
+    transition: transform .28s cubic-bezier(.2, .8, .2, 1);
+    z-index: 61;
+    display: flex; flex-direction: column;
+  }
+  .drawer.open { transform: translateX(0); }
+  .drawer-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px;
+    padding: 20px 20px 14px;
+    border-bottom: 1px solid var(--border);
+    flex: 0 0 auto;
+  }
+  .drawer-kicker {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--text-muted); margin: 0 0 4px;
+  }
+  .drawer-header h3 {
+    font-size: 16px; margin: 0;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    word-break: break-word;
+  }
+  .drawer-close {
+    border: none; background: var(--surface-2);
+    width: 30px; height: 30px; border-radius: 8px;
+    font-size: 18px; line-height: 1; cursor: pointer;
+    color: var(--text-secondary); flex: 0 0 auto;
+  }
+  .drawer-close:hover { background: var(--border); }
+  .drawer-body { padding: 16px 20px 28px; overflow-y: auto; flex: 1 1 auto; }
+  .exp-card {
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 14px;
+    background: var(--surface-2);
+  }
+  .exp-card:last-child { margin-bottom: 0; }
+  .exp-card h4 {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px; margin: 0 0 2px;
+  }
+  .exp-card .exp-sub { font-size: 12.5px; color: var(--text-muted); margin: 0 0 10px; }
+  .exp-meta, .exp-metric-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 5px 14px; font-size: 12.5px; margin-bottom: 4px;
+  }
+  .exp-meta { margin-bottom: 10px; }
+  .exp-metric-grid { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .exp-meta .k, .exp-metric-grid .k { color: var(--text-muted); font-family: inherit; }
+  .exp-platform { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+  .exp-platform:first-of-type { margin-top: 8px; }
+  .exp-platform h5 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--text-muted); margin: 0 0 6px;
+  }
+  .exp-note { grid-column: 1 / -1; color: var(--text-muted); font-style: italic; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">HPC AI Performance Engineering</p>
+    <nav class="part-nav" aria-label="Report sections">
+      <a class="part-pill" href="index.html">Part 1 &middot; Experiment Catalog</a>
+      <a class="part-pill active" href="analysis.html">Part 2 &middot; Analysis &amp; Findings</a>
+    </nav>
+    <h1>How well do these AI training chips really perform?</h1>
+    <p class="lede">
+      This page turns the technical test results from the dissertation project into a plain-English
+      story: what was tried, what actually happened, and what it means if you're deciding how to
+      train or run AI models. No jargon required.
+    </p>
+    <p class="snapshot-line" id="snapshotLine">Loading snapshot&hellip;</p>
+    <p class="snapshot-line">Evidence snapshot through 27 September 2026. L40S energy revalidation trials from 28 September are not included.</p>
+  </div>
+</header>
+
+<nav class="jump">
+  <div class="wrap">
+    <a href="#glance">At a glance</a>
+    <a href="#scaling">More chips</a>
+    <a href="#strategy">Splitting the work</a>
+    <a href="#precision">Number formats</a>
+    <a href="#communication">Chips talking</a>
+    <a href="#hardware">Chip types</a>
+    <a href="#batching">Serving many people</a>
+    <a href="#power">Power &amp; energy</a>
+    <a href="#lowbit">7B model</a>
+    <a href="#recommendations">What to do</a>
+    <a href="#nerds">Supporting Evidence</a>
+    <a href="index.html">Part 1 &middot; Experiment Catalog</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <section id="glance">
+    <p class="section-kicker">At a glance</p>
+    <h2>The six-second version</h2>
+    <p class="section-intro">
+      Every number below comes directly from the project's test results &mdash; nothing here is estimated
+      or guessed. Scroll down for the full story behind each one.
+    </p>
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="value good">Up to 3.9&times;</div>
+        <div class="label">faster by using 4 chips instead of 1, at up to 97% of the best possible result</div>
+      </div>
+      <div class="kpi">
+        <div class="value good">Up to 5.3&times;</div>
+        <div class="label">faster training just by storing numbers more compactly &mdash; with no accuracy lost</div>
+      </div>
+      <div class="kpi">
+        <div class="value good">26.7&times;</div>
+        <div class="label">more requests handled at once by serving people together, for only ~20% more wait</div>
+      </div>
+      <div class="kpi">
+        <div class="value">Up to 2.7&times;</div>
+        <div class="label">faster training on the premium chip (H100) vs. the budget chip (L40S)</div>
+      </div>
+      <div class="kpi">
+        <div class="value">Half</div>
+        <div class="label">the memory used, for about a third less speed, with one memory-saving switch</div>
+      </div>
+      <div class="kpi">
+        <div class="value good">Up to 21.6&times;</div>
+        <div class="label">less electricity used per finished response, just by serving requests in groups</div>
+      </div>
+      <div class="kpi">
+        <div class="value" id="coverageKpi">250 / 276</div>
+        <div class="label">planned tests completed so far (91%)</div>
+      </div>
+      <div class="kpi">
+        <div class="value good">Up to 2.4&times;</div>
+        <div class="label">less memory to serve a real 7-billion-parameter chat model, using a compact 4-bit format</div>
+      </div>
+      <div class="kpi">
+        <div class="value good">Up to 2.1&times;</div>
+        <div class="label">faster training that same 7B model with the "memory-smart" splitting method vs. the alternative</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="scaling">
+    <p class="section-kicker">Question 1</p>
+    <h2>Does adding more chips actually help?</h2>
+    <p class="section-intro">
+      In theory, using 4 chips instead of 1 should make a job 4 times faster. In practice, the chips
+      have to spend a little time coordinating with each other, so you never get the full 4&times;.
+      "Efficiency" here means how close the real result got to that perfect 4&times; (or 2&times;) number.
+      Tested on the top-tier chip (H100), the primary hardware for this project.
+    </p>
+    <div class="chart-grid">
+      <div class="chart-panel">
+        <p class="chart-title">Efficiency when you scale the job up with the hardware</p>
+        <p class="chart-sub">Give each extra chip its own extra slice of work &mdash; the easier scaling case</p>
+        <div id="chartScaling1"></div>
+      </div>
+      <div class="chart-panel">
+        <p class="chart-title">Efficiency when you split one fixed job further</p>
+        <p class="chart-sub">Keep the total job the same size and spread it across more chips &mdash; the harder case</p>
+        <div id="chartScaling2"></div>
+      </div>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> Adding chips paid off almost every time we tried it</p>
+      <p>
+        When the job grows along with the hardware, both models we tested this way stayed at 91&ndash;97%
+        efficient all the way up to 4 chips &mdash; essentially the full benefit. When we instead kept one
+        fixed-size job and split it across more chips, efficiency fell off a bit faster (down to 73%
+        for the text-classification model at 4 chips), which is expected: more chips means more
+        back-and-forth coordination for the same amount of work.
+      </p>
+      <p class="note">Based on 48 completed test runs on the H100 chip across three model types.</p>
+      <a class="see-stats" href="#nerd-scaling">Supporting evidence: exact speedups, sample sizes &amp; source runs &rarr;</a>
+    </div>
+  </section>
+
+  <section id="strategy">
+    <p class="section-kicker">Question 2</p>
+    <h2>What's the best way to split work across several chips?</h2>
+    <p class="section-intro">
+      There are a few different ways to divide an AI model across multiple chips. Think of it like
+      splitting a big printed report across several photocopiers: you can give every machine a full
+      copy (fast, but each one needs the whole document in front of it), or you can split the document
+      into sections and only hand each machine the pages it needs (slower to organise, but every
+      machine needs far less desk space).
+    </p>
+    <div class="chart-grid">
+      <div class="chart-panel">
+        <p class="chart-title">Processing speed, by method</p>
+        <p class="chart-sub">Text-generation model, 2 chips &middot; higher is better</p>
+        <div id="chartStrategySpeed"></div>
+      </div>
+      <div class="chart-panel">
+        <p class="chart-title">Memory used, by method</p>
+        <p class="chart-sub">Same test &middot; lower is better</p>
+        <div id="chartStrategyMemory"></div>
+      </div>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> The "memory-smart" method was the safest default</p>
+      <p>
+        The full-copy method ("DDP") is the simplest and often fastest when memory isn't tight. But the
+        memory-smart method ("FSDP") matched or beat it on speed while using noticeably less memory in
+        almost every test we ran &mdash; for the text-classification model it was both 1.7% faster and used
+        10% less memory at the same time. The deepest memory-saving mode helped further only when memory
+        was genuinely the bottleneck, and it cost real speed to get there.
+      </p>
+      <p class="note">Based on 35 matched H100 comparisons across two model types and multiple chip counts.</p>
+      <a class="see-stats" href="#nerd-strategy">Supporting evidence: throughput &amp; memory by method &rarr;</a>
+    </div>
+  </section>
+
+  <section id="precision">
+    <p class="section-kicker">Question 3</p>
+    <h2>Does it matter how precisely we store the numbers?</h2>
+    <p class="section-intro">
+      Every number inside an AI model can be stored with more or less precision &mdash; a bit like the
+      difference between a large, exact photo file and a compressed one. The compressed version is much
+      faster to move around and barely looks different, unless you compress it too far.
+    </p>
+    <div class="chart-grid">
+      <div class="chart-panel">
+        <p class="chart-title">Text-generation model &mdash; training speed</p>
+        <p class="chart-sub">Most exact &rarr; most compact number format &middot; speed multiplier vs. the most exact format</p>
+        <div id="chartPrecisionGpt2"></div>
+      </div>
+      <div class="chart-panel">
+        <p class="chart-title">Text-classification model &mdash; training speed</p>
+        <p class="chart-sub">Same comparison &middot; speed multiplier vs. the most exact format</p>
+        <div id="chartPrecisionDistilbert"></div>
+      </div>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> Compressed number formats were the single biggest speed win we found</p>
+      <p>
+        Moving from the most exact number format to a more compact one made training 2.6&ndash;3.6&times;
+        faster for the text-generation model, and 4.7&ndash;5.3&times; faster for the text-classification
+        model &mdash; on the exact same chip, doing the exact same job. And in a direct head-to-head accuracy
+        check, the compact format got exactly the same number of answers right (98.4%) as the fully exact
+        one. This is the cheapest performance upgrade in the whole study: no new hardware required.
+      </p>
+      <p class="note">Based on 22 matched H100 precision comparisons per model. The most extreme compressed format for live serving (rather than training) is still being validated for two of the three models.</p>
+      <a class="see-stats" href="#nerd-precision">Supporting evidence: per-format throughput &amp; runtime &rarr;</a>
+    </div>
+  </section>
+
+  <section id="communication">
+    <p class="section-kicker">Question 4</p>
+    <h2>Do the chips waste time talking to each other?</h2>
+    <p class="section-intro">
+      When several chips work on the same job, they periodically have to "check in" with each other to
+      stay in sync. If that check-in step takes too long, it eats into the time saved by using multiple
+      chips in the first place.
+    </p>
+    <div class="chart-grid">
+      <div class="chart-panel">
+        <p class="chart-title">Time spent checking in, per step</p>
+        <p class="chart-sub">2 chips working together &middot; milliseconds &middot; lower is better</p>
+        <div id="chartComms"></div>
+      </div>
+      <div class="chart-panel">
+        <p class="chart-title">Getting data ready for the chip</p>
+        <p class="chart-sub">A simple loading setting, switched off vs. on &middot; milliseconds &middot; lower is better</p>
+        <div id="chartDataLoading"></div>
+      </div>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> The premium chip barely notices the coordination step &mdash; the budget chip notices more</p>
+      <p>
+        On the premium chip, checking in with the other chip took well under a thousandth of a second
+        &mdash; a rounding error next to the actual work being done. On the budget chip doing the identical
+        job, that same check-in took 6 to 46 times longer (still a small slice of total time, but a much
+        larger one). Separately, a simple data-loading setting called "pinned memory" cut data-preparation
+        waiting time by over 90% &mdash; though in these tests the chip itself was always the bottleneck, not
+        the data feed, so turning it on didn't change overall speed by much. It's still worth switching on:
+        it's free and never hurts.
+      </p>
+      <p class="note">Based on 28+ communication tests and 16 data-loading tests, both platforms.</p>
+      <a class="see-stats" href="#nerd-communication">Supporting evidence: AllReduce time &amp; NCCL bandwidth &rarr;</a>
+    </div>
+  </section>
+
+  <section id="hardware">
+    <p class="section-kicker">Question 5</p>
+    <h2>Premium chip or budget chip?</h2>
+    <p class="section-intro">
+      The project compared NVIDIA's premium H100 chip against the more affordable L40S chip, using
+      identical jobs on both, so the comparison is apples-to-apples.
+    </p>
+    <div class="chart-grid">
+      <div class="chart-panel" style="grid-column: 1 / -1;">
+        <p class="chart-title">How much faster was the premium chip?</p>
+        <p class="chart-sub">Same job on both chips &middot; right of the line = premium chip faster &middot; left of the line = budget chip faster</p>
+        <div id="chartHardware"></div>
+      </div>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> The premium chip's advantage depends heavily on the job</p>
+      <p>
+        For training, the premium chip was consistently and clearly faster &mdash; about 2.4&ndash;2.7 times.
+        But for simple, one-request-at-a-time use (generating text or classifying a sentence), the gap
+        nearly vanished: the two chips tied on text generation, and the budget chip was actually 14%
+        <em>faster</em> than the premium one for text classification in this test. If your main job is
+        training models, the premium chip earns its price. If your main job is serving individual
+        requests, the budget chip may be a smarter buy than its price tag suggests.
+      </p>
+      <p class="note">Based on 4 matched training/inference pairs across two model types, both chips.</p>
+      <a class="see-stats" href="#nerd-hardware">Supporting evidence: raw H100 vs. L40S condition data &rarr;</a>
+    </div>
+  </section>
+
+  <section id="batching">
+    <p class="section-kicker">Question 6</p>
+    <h2>What's the best way to serve many people at once?</h2>
+    <p class="section-intro">
+      When a chip is answering requests (for example, generating text for users), it can either handle
+      them one at a time, or group several together and answer them almost simultaneously &mdash; similar to
+      a bus picking up many passengers on one trip instead of running an individual taxi for each person.
+    </p>
+    <div class="chart-grid">
+      <div class="chart-panel">
+        <p class="chart-title">Total work done per second</p>
+        <p class="chart-sub">Requests grouped together at once &middot; higher is better</p>
+        <div id="chartBatchThroughput"></div>
+      </div>
+      <div class="chart-panel">
+        <p class="chart-title">Each person's typical wait time</p>
+        <p class="chart-sub">Same test &middot; milliseconds &middot; lower is better</p>
+        <div id="chartBatchLatency"></div>
+      </div>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> Grouping requests together was one of the most effective levers we found</p>
+      <p>
+        Serving 32 requests together got 26.7 times more total work done per second than serving them
+        one at a time &mdash; while each individual person's typical wait time grew by only about 20%. If
+        you're running a service with many simultaneous users, batching requests together is a very cheap
+        way to get far more value from the same chip.
+      </p>
+      <p class="note">Based on 6 matched batch-size tests on the H100 chip, text-generation model.</p>
+      <a class="see-stats" href="#nerd-batching">Supporting evidence: throughput &amp; p50 latency by batch size &rarr;</a>
+    </div>
+  </section>
+
+  <section id="power">
+    <p class="section-kicker">Question 7</p>
+    <h2>Does any of this actually save electricity?</h2>
+    <p class="section-intro">
+      Everything so far has been about speed. But chips draw real electricity while they work, and
+      a faster chip isn't automatically a more efficient one &mdash; it might just be drawing more
+      power to get there. This section checks whether the speed wins above also turned into using
+      less electricity per finished piece of work, using the project's own power-meter readings
+      taken directly off each chip during the tests (not estimates).
+    </p>
+    <div class="chart-grid">
+      <div class="chart-panel">
+        <p class="chart-title">Text-generation model &mdash; energy efficiency</p>
+        <p class="chart-sub">Most exact &rarr; most compact number format &middot; electricity used per finished piece of work, relative to the most exact format</p>
+        <div id="chartEnergyGpt2"></div>
+      </div>
+      <div class="chart-panel">
+        <p class="chart-title">Text-classification model &mdash; energy efficiency</p>
+        <p class="chart-sub">Same comparison &middot; electricity used per finished piece of work, relative to the most exact format</p>
+        <div id="chartEnergyDistilbert"></div>
+      </div>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> Compact number formats save even more electricity than they save time</p>
+      <p>
+        For the text-classification model, the most compact number format used about 17.5 times
+        less electricity per finished piece of work than the most exact format &mdash; noticeably more
+        than its 5.3&times; speed gain from earlier, because the chip also draws a bit less power per
+        second while working in the compact format. Same free upgrade, extra payoff.
+      </p>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-panel">
+        <p class="chart-title">Text-classification model &mdash; total electricity draw</p>
+        <p class="chart-sub">1, 2, and 4 chips working together &middot; watts drawn in total, not per chip</p>
+        <div id="chartPowerScaling"></div>
+      </div>
+      <div class="chart-panel">
+        <p class="chart-title">Text-classification model &mdash; electricity per finished job</p>
+        <p class="chart-sub">Same test &middot; efficiency relative to using 1 chip &middot; higher is better</p>
+        <div id="chartEnergyScaling"></div>
+      </div>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> More chips drew more power, but finished the job so much faster that total electricity use per job went down</p>
+      <p>
+        Going from 1 chip to 4 roughly tripled the total power being drawn (625 &rarr; 1,961 watts,
+        not a full 4&times;, since each individual chip also settled into a slightly lower power draw
+        once shared across more of them). But because the job finished so much faster, the total
+        electricity spent per finished job actually dropped by more than half. Adding chips wasn't
+        just a speed win here &mdash; it was an efficiency win too.
+      </p>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-panel" style="grid-column: 1 / -1;">
+        <p class="chart-title">Serving requests in groups &mdash; energy per 1,000 responses</p>
+        <p class="chart-sub">Text-generation model, one chip &middot; efficiency relative to serving one request at a time &middot; higher is better</p>
+        <div id="chartEnergyBatching"></div>
+      </div>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> Grouping requests together was the single biggest electricity saver in the whole study</p>
+      <p>
+        The chip only drew about 14% more power when busy serving 32 requests at once compared to
+        serving one at a time (132 &rarr; 150 watts) &mdash; but because it got through so much more
+        work in that time, the electricity cost per individual response dropped by about 95%. If
+        you're running a service for many people, this is the highest-leverage change measured in
+        this entire project, for either speed or electricity use.
+      </p>
+      <p class="note">Power and energy figures use the project's "measured-region" telemetry &mdash; power draw sampled directly from the chip during the timed portion of each run, excluding warm-up and shutdown. Full-window estimates are excluded from these figures.</p>
+      <a class="see-stats" href="#nerd-power">Supporting evidence: watts, joules &amp; energy-per-token by condition &rarr;</a>
+    </div>
+  </section>
+
+  <section id="lowbit">
+    <p class="section-kicker">Question 8</p>
+    <h2>Does all this still hold for a real, modern 7-billion-parameter chat model?</h2>
+    <p class="section-intro">
+      Everything above uses two small, easy-to-train models (GPT-2 Small and DistilBERT) so that many
+      conditions could be tested quickly. This section checks whether the same patterns hold up on a
+      much larger, more realistic model &mdash; Qwen2.5-7B-Instruct, a real instruction-tuned chat model
+      &mdash; using a fresh batch of tests run on the premium chip (H100) on 26&ndash;27 September 2026.
+    </p>
+    <div class="chart-grid">
+      <div class="chart-panel">
+        <p class="chart-title">Serving speed, by number format</p>
+        <p class="chart-sub">Qwen2.5-7B-Instruct, 8 requests grouped together &middot; higher is better</p>
+        <div id="chartLowbitSpeed"></div>
+      </div>
+      <div class="chart-panel">
+        <p class="chart-title">Memory used, by number format</p>
+        <p class="chart-sub">Same test &middot; peak memory per chip &middot; lower is better</p>
+        <div id="chartLowbitMemory"></div>
+      </div>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> Compact 4-bit formats cut memory by more than half, and two of them are faster, not slower</p>
+      <p>
+        Two 4-bit formats (AWQ and GPTQ) served requests 8&ndash;12% faster than the uncompressed BF16
+        control while needing well under half the memory (about 6.7 GB peak vs. 15.7 GB). A third format
+        (NF4, bitsandbytes) used a similar amount of memory but ran nearly 3&times; slower, so the
+        memory-vs-speed trade-off depends heavily on which compact format you pick &mdash; it isn't
+        automatic. All three stayed within roughly 8&ndash;13% of BF16's answer quality (measured as
+        perplexity on held-out text; smaller deltas are better).
+      </p>
+      <p class="note">Batch of 8 requests, H100, 6 trials per format. Quality deltas use a follow-up, higher-trial-count re-run (E270&ndash;E273) for tighter statistics.</p>
+    </div>
+    <div class="chart-grid">
+      <div class="chart-panel" style="grid-column: 1 / -1;">
+        <p class="chart-title">Time to first word, by prompt length</p>
+        <p class="chart-sub">Qwen2.5-7B-Instruct, BF16, H100 &middot; real multi-thousand-word prompts &middot; lower is better</p>
+        <div id="chartLongContext"></div>
+      </div>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> Longer prompts take proportionally longer to start responding, with no nasty surprises</p>
+      <p>
+        Doubling the prompt length from about 4,000 to about 8,000 tokens roughly doubled the wait
+        before the first word of the reply appeared (96ms &rarr; 200ms) &mdash; a clean, predictable
+        relationship rather than a cliff. For a chat application, even the longest prompt tested here
+        still starts responding in well under a quarter of a second.
+      </p>
+    </div>
+    <div class="chart-grid">
+      <div class="chart-panel" style="grid-column: 1 / -1;">
+        <p class="chart-title">Training speed by splitting method, at 7B-model scale</p>
+        <p class="chart-sub">Qwen2.5-7B-Instruct training &middot; higher is better</p>
+        <div id="chartSharding"></div>
+      </div>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> The "memory-smart" splitting method's advantage gets bigger, not smaller, on a real 7B model</p>
+      <p>
+        On the two small models earlier in this report, the memory-smart method (FSDP) was roughly on
+        par with or modestly ahead of the alternative (DeepSpeed ZeRO-3). At 7B-model scale the gap
+        widened substantially: FSDP was about 1.8&times; faster with 2 chips and about 2.1&times; faster
+        with 4 chips &mdash; while also using less memory per chip in both cases. For a model this size,
+        the choice of splitting method matters considerably more than it did for the smaller models.
+      </p>
+      <p class="note">3 trials per condition. These are short training runs focused on infrastructure performance (throughput, memory), not on producing a converged, high-quality model, so no accuracy/quality figures are reported for this comparison.</p>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> At 7B scale, the splitting method decides whether the model comfortably fits &mdash; or barely does</p>
+      <p>
+        The earlier memory-tuning tests in this report (batch size, gradient accumulation, activation
+        checkpointing) were only ever run on GPT-2 Small and DistilBERT &mdash; neither is large enough to
+        seriously test a chip's 80GB capacity. This 7B model is. With 2 chips, the memory-smart method
+        (FSDP) used 62.1GB per chip, comfortable headroom, while the deepest-sharding alternative
+        (DeepSpeed ZeRO-3) used 77.4GB &mdash; within about 3GB of the H100's ceiling. With 4 chips both
+        methods have far more room (42.7GB and 50.8GB). So this project's small-model memory studies
+        don't directly cover a model this size, but this strategy comparison stands in for that question
+        at 7B scale: the splitting method is what keeps the model safely inside memory, not just faster.
+      </p>
+      <p class="note">Same runs as the finding above (E252&ndash;E255, 3 trials per condition).</p>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Still coming</span> A few things this new evidence doesn't cover yet</p>
+      <p>
+        A third splitting method (full-copy/DDP) was added to this same 7B comparison but still
+        hasn't produced results, so it isn't included above. As with the rest of this report, the
+        budget chip (L40S) has no equivalent tests yet for this 7B model. The project's summary
+        pipeline has since been re-run (2026-09-27), so the coverage numbers elsewhere on this page
+        now include this batch, plus a further wave of quality-robustness, capacity-probe, and
+        DistilBERT energy re-validation conditions, in full.
+      </p>
+    </div>
+    <p class="note" style="padding: 0 4px;">
+      <a class="see-stats" href="#nerd-lowbit">Supporting evidence: exact figures, sample sizes &amp; source runs &rarr;</a>
+    </p>
+  </section>
+
+  <section id="recommendations">
+    <p class="section-kicker">Putting it together</p>
+    <h2>What this means in practice</h2>
+    <p class="section-intro">
+      Plain, practical takeaways from everything tested so far.
+    </p>
+    <div class="practical">
+      <div class="item"><b>Compress your numbers first.</b> It was the single biggest, cheapest speed win in the whole study (up to 5.3&times;), with no measured accuracy loss.</div>
+      <div class="item"><b>Default to the "memory-smart" splitting method</b> when using several chips &mdash; it matched or beat the simple full-copy method while using less memory.</div>
+      <div class="item"><b>Adding chips is worth it, up to 4.</b> Expect 91&ndash;97% of the theoretical benefit if the job scales with the hardware, a bit less (73%+) if you're splitting one fixed job.</div>
+      <div class="item"><b>If you're serving many users, batch their requests.</b> 26.7&times; more throughput for roughly 20% more individual wait &mdash; a very good trade.</div>
+      <div class="item"><b>Buy the premium chip for training; consider the budget chip for simple serving.</b> The price gap is easiest to justify when you're training, hardest to justify for light, one-at-a-time inference.</div>
+      <div class="item"><b>Turn on the free, low-risk switches.</b> Pinned memory loading and activation checkpointing (memory-saving pause points) each cost little and help when you're memory-constrained.</div>
+      <div class="item"><b>Speed and electricity use moved together in every test.</b> Nothing measured here was a speed-for-energy trade-off &mdash; the faster option was consistently the more efficient one too, especially compact number formats and batching.</div>
+    </div>
+  </section>
+
+  <section id="nerds">
+    <p class="section-kicker">Methodology &amp; sources</p>
+    <h2>Supporting Evidence &amp; Analysis</h2>
+    <p class="section-intro">
+      Everything above is a simplified retelling. This section is the opposite: an at-a-glance look
+      at how much evidence backs each finding, followed by the exact source experiment IDs, sample
+      sizes, and unrounded figures each finding above was built from, plus the methodology caveats
+      the project's own analysis pipeline attaches to them. No number here has been softened.
+    </p>
+    <p class="section-intro" style="margin-top:-12px;">
+      Looking for the full picture rather than one finding at a time? Part 1&rsquo;s
+      <a class="see-stats" href="index.html" style="margin-top:0;">Experiment Catalog &rarr;</a>
+      breaks all 276 planned conditions down by research theme and study, with filters and the exact
+      parameters each comparison varied vs. held constant &mdash; built for walking through progress
+      study-by-study.
+    </p>
+    <div class="nerd-callout">
+      <b>Comparability classes, briefly:</b> <code>exact</code> means every control variable (model,
+      precision, batch size, sequence length, GPU count) matches between the compared conditions.
+      <code>platform_specific</code> means the condition only exists meaningfully on one platform
+      (e.g. an 8-GPU L40S full-node run with no H100 equivalent). <code>capacity_adjusted</code>
+      means a batch size or similar setting had to be reduced to fit the platform's memory, so it's
+      kept separate from <code>exact</code> comparisons rather than pooled with them. All figures
+      below are <code>exact</code> unless noted otherwise. Trial counts (<code>n</code>) are the
+      number of independently repeated runs a mean is drawn from &mdash; the pipeline requires at
+      least 3 per condition for a Must-Have result.
+    </div>
+
+    <div class="coverage-overview">
+      <p class="chart-title">Evidence coverage, by test category</p>
+      <p class="chart-sub">Completed test runs vs. total planned, across every category in the experiment matrix &middot; 217 of 238 planned tests done (91%)</p>
+      <div id="chartCoverageMeters"></div>
+    </div>
+
+    <div class="nerd-toc">
+      <a href="#nerd-scaling">RQ1 &middot; Scaling</a>
+      <a href="#nerd-strategy">RQ2 &middot; Strategy</a>
+      <a href="#nerd-precision">RQ3 &middot; Precision</a>
+      <a href="#nerd-communication">RQ4 &middot; Communication</a>
+      <a href="#nerd-hardware">RQ6 &middot; Hardware</a>
+      <a href="#nerd-batching">Batching</a>
+      <a href="#nerd-power">RQ5 &middot; Power &amp; energy</a>
+      <a href="#nerd-lowbit">7B model</a>
+    </div>
+
+    <div class="nerd-block" id="nerd-scaling">
+      <h3>RQ1 &middot; Scaling efficiency (H100, exact)</h3>
+      <p class="nerd-method">
+        Efficiency = speedup &divide; chip-count ratio, where speedup = mean throughput at N chips
+        &divide; mean throughput at the baseline chip count, within matched workload / precision /
+        strategy. "Same-size-per-chip" = weak scaling (global batch scales with GPU count).
+        "Fixed-total-job" = strong scaling (global batch held constant).
+      </p>
+      <div class="chart-panel" style="margin-bottom: 14px;">
+        <p class="chart-title">Efficiency vs. chip count, by workload</p>
+        <p class="chart-sub">100% = perfect scaling &middot; table below adds a 5th row (GPT-2, fixed-total-job) baselined differently, so it's left off this chart</p>
+        <div id="chartScalingLine"></div>
+      </div>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th>Workload</th><th>Type</th><th>GPUs</th><th>Baseline</th><th class="num">Speedup</th><th class="num">Efficiency</th><th class="num">Mean tok/s</th><th class="num">n</th><th>Source conditions</th></tr></thead>
+        <tbody>
+          <tr><td>GPT-2 Small</td><td>same-size-per-chip</td><td class="num">2</td><td class="num">1</td><td class="num">1.939483</td><td class="num">96.974%</td><td class="num">243,625.72</td><td class="num">9</td><td>E035, E036, E037</td></tr>
+          <tr><td>GPT-2 Small</td><td>same-size-per-chip</td><td class="num">4</td><td class="num">1</td><td class="num">3.886951</td><td class="num">97.174%</td><td class="num">488,254.35</td><td class="num">9</td><td>E035, E036, E037</td></tr>
+          <tr><td>DistilBERT</td><td>same-size-per-chip</td><td class="num">2</td><td class="num">1</td><td class="num">1.827285</td><td class="num">91.363%</td><td class="num">1,257,182.58</td><td class="num">9</td><td>E041, E042, E043</td></tr>
+          <tr><td>DistilBERT</td><td>same-size-per-chip</td><td class="num">4</td><td class="num">1</td><td class="num">3.695329</td><td class="num">92.383%</td><td class="num">2,542,408.16</td><td class="num">9</td><td>E041, E042, E043</td></tr>
+          <tr><td>DistilBERT</td><td>fixed-total-job</td><td class="num">2</td><td class="num">1</td><td class="num">1.733375</td><td class="num">86.669%</td><td class="num">1,499,617.02</td><td class="num">9</td><td>E038, E039, E040</td></tr>
+          <tr><td>DistilBERT</td><td>fixed-total-job</td><td class="num">4</td><td class="num">1</td><td class="num">2.937814</td><td class="num">73.445%</td><td class="num">2,541,627.45</td><td class="num">9</td><td>E038, E039, E040</td></tr>
+          <tr><td>TinyLlama</td><td>fixed-total-job</td><td class="num">2</td><td class="num">1</td><td class="num">1.616375</td><td class="num">80.819%</td><td class="num">67,235.81</td><td class="num">6</td><td>E044, E045</td></tr>
+          <tr><td>GPT-2 Small</td><td>fixed-total-job</td><td class="num">4</td><td class="num">2&#8224;</td><td class="num">1.885152</td><td class="num">94.258%</td><td class="num">489,142.86</td><td class="num">6</td><td>E033, E034</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-limitation">
+        &#8224; GPT-2's fixed-total-job 1-GPU reference (E032) has not been run yet, so that row is
+        baselined against 2 GPUs instead of 1 and is not directly comparable to the other efficiency
+        percentages in this table. Source pipeline note: "Speedup is calculated within this platform,
+        comparability class, workload, precision, and strategy." A capacity-adjusted probe (E256,
+        2026-09-26) gives a data point close to a true 1-GPU baseline (132,882.50 mean tok/s, n=3);
+        substituting it for the missing E032 would put fixed-total-job efficiency at 4 GPUs around 92%,
+        in line with the same-size-per-chip results above. E256 uses a different batch/gradient-
+        accumulation configuration than E033/E034 to fit within memory limits (comparability:
+        capacity_adjusted), so treat that figure as indicative rather than a direct substitute for E032.
+        H100 scaling data above 4 GPUs has not been collected yet.
+      </p>
+    </div>
+
+    <div class="nerd-block" id="nerd-strategy">
+      <h3>RQ2 &middot; Strategy throughput/memory trade-off (H100, exact)</h3>
+      <p class="nerd-method">
+        "Pareto frontier" (pipeline label) = no other tested method beat this one on both throughput
+        and memory simultaneously. "Dominated" = at least one other method beat it on both axes.
+        DDP = full-copy. FSDP = sharded parameters/gradients/optimizer state. ZeRO 1/2/3 = DeepSpeed,
+        increasing sharding depth.
+      </p>
+      <div class="chart-grid" style="margin-top: 0; margin-bottom: 14px;">
+        <div class="chart-panel">
+          <p class="chart-title">GPT-2 Small &mdash; speed vs. memory, by method</p>
+          <p class="chart-sub">2-chip runs, where every method was tested &middot; up-right is better</p>
+          <div id="chartStrategyScatterGpt2"></div>
+        </div>
+        <div class="chart-panel">
+          <p class="chart-title">DistilBERT &mdash; speed vs. memory, by method</p>
+          <p class="chart-sub">2-chip runs, where every method was tested &middot; up-right is better</p>
+          <div id="chartStrategyScatterDistilbert"></div>
+        </div>
+      </div>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th>Workload</th><th class="num">GPUs</th><th>Strategy</th><th class="num">Mean tok/s</th><th class="num">Max mem (GB)</th><th class="num">n</th><th>Verdict</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td>GPT-2 Small</td><td class="num">2</td><td>DDP</td><td class="num">243,865.36</td><td class="num">29.278</td><td class="num">3</td><td>Dominated</td><td>E047</td></tr>
+          <tr><td>GPT-2 Small</td><td class="num">2</td><td>DeepSpeed ZeRO-1</td><td class="num">290,534.30</td><td class="num">24.517</td><td class="num">3</td><td>Pareto</td><td>E052</td></tr>
+          <tr><td>GPT-2 Small</td><td class="num">2</td><td>DeepSpeed ZeRO-2</td><td class="num">290,465.80</td><td class="num">24.517</td><td class="num">3</td><td>Dominated</td><td>E053</td></tr>
+          <tr><td>GPT-2 Small</td><td class="num">2</td><td>DeepSpeed ZeRO-3</td><td class="num">265,114.36</td><td class="num">26.038</td><td class="num">3</td><td>Dominated</td><td>E054</td></tr>
+          <tr><td>GPT-2 Small</td><td class="num">2</td><td>FSDP</td><td class="num">248,566.51</td><td class="num">29.481</td><td class="num">6</td><td>Dominated</td><td>E049, E051</td></tr>
+          <tr><td>GPT-2 Small</td><td class="num">4</td><td>DDP</td><td class="num">488,939.59</td><td class="num">29.608</td><td class="num">3</td><td>Dominated</td><td>E048</td></tr>
+          <tr><td>GPT-2 Small</td><td class="num">4</td><td>FSDP</td><td class="num">501,675.87</td><td class="num">29.464</td><td class="num">3</td><td>Pareto</td><td>E050</td></tr>
+          <tr><td>DistilBERT</td><td class="num">2</td><td>DDP</td><td class="num">1,256,938.03</td><td class="num">6.251</td><td class="num">3</td><td>Dominated</td><td>E055</td></tr>
+          <tr><td>DistilBERT</td><td class="num">2</td><td>DeepSpeed ZeRO-1</td><td class="num">1,182,332.41</td><td class="num">6.255</td><td class="num">3</td><td>Dominated</td><td>E060</td></tr>
+          <tr><td>DistilBERT</td><td class="num">2</td><td>DeepSpeed ZeRO-2</td><td class="num">1,173,375.24</td><td class="num">6.255</td><td class="num">3</td><td>Dominated</td><td>E061</td></tr>
+          <tr><td>DistilBERT</td><td class="num">2</td><td>DeepSpeed ZeRO-3</td><td class="num">627,027.43</td><td class="num">6.071</td><td class="num">3</td><td>Dominated</td><td>E062</td></tr>
+          <tr><td>DistilBERT</td><td class="num">2</td><td>FSDP</td><td class="num">1,277,842.35</td><td class="num">5.608</td><td class="num">6</td><td>Pareto</td><td>E057, E059</td></tr>
+          <tr><td>DistilBERT</td><td class="num">4</td><td>DDP</td><td class="num">2,543,518.18</td><td class="num">6.581</td><td class="num">3</td><td>Dominated</td><td>E056</td></tr>
+          <tr><td>DistilBERT</td><td class="num">4</td><td>FSDP</td><td class="num">2,708,000.88</td><td class="num">5.659</td><td class="num">3</td><td>Pareto</td><td>E058</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-limitation">Source pipeline note: "This is an observed throughput-memory trade-off for matched conditions, not a universal strategy ranking."</p>
+    </div>
+
+    <div class="nerd-block" id="nerd-precision">
+      <h3>RQ3 &middot; Precision (H100, matched single-condition trials)</h3>
+      <p class="nerd-method">
+        Figures below are per-experiment trial means from <code>trial_summary.csv</code>, matched to
+        their precision label via <code>experiment_tracker.csv</code> &mdash; <em>not</em> the pooled
+        <code>precision_summary.csv</code> averages, which mix in every other condition that happens
+        to default to BF16 (up to 120+ trials) and would overstate BF16's apparent lead. Each row
+        below is a single controlled condition, 3 trials each, same batch/sequence settings within
+        its workload.
+      </p>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th>Workload</th><th>Mode</th><th>Format</th><th class="num">Mean tok/s</th><th class="num">Mean runtime (s)</th><th class="num">vs. FP32</th><th>Exp. ID</th></tr></thead>
+        <tbody>
+          <tr><td>GPT-2 Small</td><td>training</td><td>FP32</td><td class="num">46,251.07</td><td class="num">45.761</td><td class="num">1.00&times;</td><td>E083</td></tr>
+          <tr><td>GPT-2 Small</td><td>training</td><td>FP16</td><td class="num">122,367.11</td><td class="num">21.710</td><td class="num">2.65&times;</td><td>E084</td></tr>
+          <tr><td>GPT-2 Small</td><td>training</td><td>BF16</td><td class="num">125,673.98</td><td class="num">20.854</td><td class="num">2.72&times;</td><td>E085</td></tr>
+          <tr><td>GPT-2 Small</td><td>training</td><td>FP8</td><td class="num">167,305.33</td><td class="num">16.318</td><td class="num">3.62&times;</td><td>E086</td></tr>
+          <tr><td>GPT-2 Small</td><td>inference</td><td>FP16</td><td class="num">270.85</td><td class="num">56.900</td><td class="num">&mdash;</td><td>E087</td></tr>
+          <tr><td>GPT-2 Small</td><td>inference</td><td>BF16</td><td class="num">290.07</td><td class="num">53.735</td><td class="num">&mdash;</td><td>E088</td></tr>
+          <tr><td>GPT-2 Small</td><td>inference</td><td>FP8</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td>E089 (deferred)</td></tr>
+          <tr><td>DistilBERT</td><td>training</td><td>FP32</td><td class="num">141,780.81</td><td class="num">18.997</td><td class="num">1.00&times;</td><td>E090</td></tr>
+          <tr><td>DistilBERT</td><td>training</td><td>FP16</td><td class="num">662,546.09</td><td class="num">9.561</td><td class="num">4.67&times;</td><td>E091</td></tr>
+          <tr><td>DistilBERT</td><td>training</td><td>BF16</td><td class="num">686,880.63</td><td class="num">9.312</td><td class="num">4.84&times;</td><td>E092</td></tr>
+          <tr><td>DistilBERT</td><td>training</td><td>FP8</td><td class="num">750,064.52</td><td class="num">7.623</td><td class="num">5.29&times;</td><td>E093</td></tr>
+          <tr><td>DistilBERT</td><td>inference</td><td>FP16</td><td class="num">75,970.69</td><td class="num">11.085</td><td class="num">&mdash;</td><td>E094</td></tr>
+          <tr><td>DistilBERT</td><td>inference</td><td>BF16</td><td class="num">81,384.43</td><td class="num">10.479</td><td class="num">&mdash;</td><td>E095</td></tr>
+          <tr><td>DistilBERT</td><td>inference</td><td>FP8</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td>E096 (deferred)</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-limitation">
+        Accuracy claim (98.4%) is from <code>precision_summary.csv</code> for
+        <code>distilbert-base-uncased-finetuned-sst-2-english</code> inference, BF16 (n=54 pooled) vs.
+        FP16 (n=3 pooled) &mdash; both report accuracy 0.984375 exactly. This is a pooled comparison
+        across the model class, not a single matched trial pair, and quality-loss/perplexity figures
+        for the base (non-finetuned) GPT-2/DistilBERT heads were not used for the accuracy claim since
+        that head has no meaningful classification target. Source pipeline note: "Performance-format
+        evidence alone does not establish application-level quality."
+      </p>
+    </div>
+
+    <div class="nerd-block" id="nerd-communication">
+      <h3>RQ4 &middot; Communication &amp; data movement</h3>
+      <p class="nerd-method">
+        AllReduce time is the mean measured synchronization time per training step, 2-GPU DDP,
+        <code>platform_specific</code> comparability class (this microbenchmark is not run at every
+        GPU count on every platform, so H100/L40S here are each read within their own set, matched
+        by workload and strategy). NCCL bandwidth is the effective collective-communication bandwidth
+        recorded on the same step.
+      </p>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th>Workload</th><th>Strategy</th><th>Platform</th><th class="num">GPUs</th><th class="num">Mean AllReduce (s)</th><th class="num">Mean NCCL BW (Gbps)</th><th class="num">n</th><th>Exp. ID</th></tr></thead>
+        <tbody>
+          <tr><td>GPT-2 Small</td><td>DDP</td><td>H100</td><td class="num">2</td><td class="num">0.0006633</td><td class="num">101.175</td><td class="num">3</td><td>E113@h100</td></tr>
+          <tr><td>GPT-2 Small</td><td>DDP</td><td>L40S</td><td class="num">2</td><td class="num">0.0043443</td><td class="num">17.490</td><td class="num">3</td><td>E113@l40s</td></tr>
+          <tr><td>GPT-2 Small</td><td>FSDP</td><td>H100</td><td class="num">2</td><td class="num">0.0006615</td><td class="num">101.450</td><td class="num">3</td><td>E114@h100</td></tr>
+          <tr><td>GPT-2 Small</td><td>FSDP</td><td>L40S</td><td class="num">2</td><td class="num">0.0032127</td><td class="num">20.897</td><td class="num">3</td><td>E114@l40s</td></tr>
+          <tr><td>DistilBERT</td><td>DDP</td><td>H100</td><td class="num">2</td><td class="num">0.0006635</td><td class="num">101.149</td><td class="num">3</td><td>E117@h100</td></tr>
+          <tr><td>DistilBERT</td><td>DDP</td><td>L40S</td><td class="num">2</td><td class="num">0.0304546</td><td class="num">9.170</td><td class="num">3</td><td>E117@l40s</td></tr>
+          <tr><td>DistilBERT</td><td>FSDP</td><td>H100</td><td class="num">2</td><td class="num">0.0006608</td><td class="num">101.555</td><td class="num">3</td><td>E118@h100</td></tr>
+          <tr><td>DistilBERT</td><td>FSDP</td><td>L40S</td><td class="num">2</td><td class="num">0.0031901</td><td class="num">21.039</td><td class="num">3</td><td>E118@l40s</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-method" style="margin-top:16px;">
+        Pinned-memory data-loading comparison, GPT-2, H100, <code>num_workers</code>=4,
+        <code>prefetch_factor</code>=4:
+      </p>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th>Pinned memory</th><th class="num">Mean data-loading (s)</th><th class="num">Mean transfer (s)</th><th class="num">Mean tok/s</th><th class="num">n</th><th>Exp. ID</th></tr></thead>
+        <tbody>
+          <tr><td>Off</td><td class="num">0.074031</td><td class="num">0.024450</td><td class="num">124,569.72</td><td class="num">3</td><td>E101@h100</td></tr>
+          <tr><td>On</td><td class="num">0.006034</td><td class="num">0.013621</td><td class="num">125,312.54</td><td class="num">3</td><td>E102@h100</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-limitation">Source pipeline note: "Standalone communication and loader measurements do not by themselves prove in-loop causal attribution."</p>
+    </div>
+
+    <div class="nerd-block" id="nerd-hardware">
+      <h3>RQ6 &middot; Hardware comparison (matched exact pairs)</h3>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th>Workload</th><th>Mode</th><th>Platform</th><th class="num">Mean tok/s</th><th class="num">Mean mem (GB)</th><th class="num">Mean energy (J)</th><th class="num">n</th><th>Exp. ID</th></tr></thead>
+        <tbody>
+          <tr><td>GPT-2 Small</td><td>training</td><td>H100</td><td class="num">125,756.81</td><td class="num">28.265</td><td class="num">6,606.74</td><td class="num">3</td><td>E121@h100</td></tr>
+          <tr><td>GPT-2 Small</td><td>training</td><td>L40S</td><td class="num">45,827.24</td><td class="num">28.033</td><td class="num">&mdash;</td><td class="num">3</td><td>E123@l40s</td></tr>
+          <tr><td>GPT-2 Small</td><td>inference</td><td>H100</td><td class="num">289.80</td><td class="num">0.978</td><td class="num">5,913.20</td><td class="num">3</td><td>E122@h100</td></tr>
+          <tr><td>GPT-2 Small</td><td>inference</td><td>L40S</td><td class="num">288.79</td><td class="num">0.797</td><td class="num">&mdash;</td><td class="num">3</td><td>E124@l40s</td></tr>
+          <tr><td>DistilBERT</td><td>training</td><td>H100</td><td class="num">687,746.25</td><td class="num">5.229</td><td class="num">1,141.03</td><td class="num">3</td><td>E125@h100</td></tr>
+          <tr><td>DistilBERT</td><td>training</td><td>L40S</td><td class="num">282,559.85</td><td class="num">4.936</td><td class="num">&mdash;</td><td class="num">3</td><td>E127@l40s</td></tr>
+          <tr><td>DistilBERT</td><td>inference</td><td>H100</td><td class="num">80,686.18</td><td class="num">0.851</td><td class="num">17.06</td><td class="num">3</td><td>E126@h100</td></tr>
+          <tr><td>DistilBERT</td><td>inference</td><td>L40S</td><td class="num">92,126.80</td><td class="num">0.650</td><td class="num">&mdash;</td><td class="num">3</td><td>E128@l40s</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-limitation">
+        L40S energy telemetry is not populated for these conditions in the current evidence set
+        (dashes above), so per-chip energy/Watt cannot yet be compared directly &mdash; only H100 has
+        recorded energy for this matched set. Source pipeline note: "A hardware conclusion requires
+        matched exact L40S and H100 conditions; raw trials are never pooled."
+      </p>
+    </div>
+
+    <div class="nerd-block" id="nerd-batching">
+      <h3>Batching (H100, GPT-2 Small, pytorch_eager, single request stream)</h3>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th class="num">Batch size</th><th class="num">Mean tok/s</th><th class="num">Mean p50 latency (ms)</th><th class="num">n</th><th>Exp. ID</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td class="num">354.65</td><td class="num">360.946</td><td class="num">3</td><td>E132</td></tr>
+          <tr><td class="num">2</td><td class="num">663.24</td><td class="num">386.243</td><td class="num">3</td><td>E133</td></tr>
+          <tr><td class="num">4</td><td class="num">1,304.87</td><td class="num">392.717</td><td class="num">3</td><td>E134</td></tr>
+          <tr><td class="num">8</td><td class="num">2,577.31</td><td class="num">397.459</td><td class="num">3</td><td>E135</td></tr>
+          <tr><td class="num">16</td><td class="num">4,955.30</td><td class="num">413.376</td><td class="num">3</td><td>E136</td></tr>
+          <tr><td class="num">32</td><td class="num">9,463.20</td><td class="num">432.578</td><td class="num">3</td><td>E137</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-limitation">Throughput ratio 32:1 batch = 26.68&times;. Latency delta = +19.85%. A separate concurrent-request sweep (E138&ndash;E142, batch=1, concurrency 1&ndash;16) shows the same pattern via a different axis and is not duplicated here.</p>
+    </div>
+
+    <div class="nerd-block" id="nerd-power">
+      <h3>RQ5 &middot; Power &amp; energy (H100, measured-region telemetry)</h3>
+      <p class="nerd-method">
+        <code>metric_nvidia_smi_power_draw_watts_measured_region</code> and
+        <code>metric_nvidia_smi_energy_joules_measured_region</code> from
+        <code>results/processed/experiments.csv</code>, averaged per condition (n=3), restricted to
+        rows with <code>energy_measurement_status = sufficient</code>. Energy-per-1k-tokens =
+        mean energy (J) &divide; (mean throughput &times; mean runtime, tokens) &times; 1000. This is
+        <em>not</em> the same figure as <code>hardware_summary.csv</code>'s per-trial energy column,
+        which reports raw joules rather than joules normalized by work done. L40S measured-region
+        power/energy is absent (empty) for the majority of conditions below &mdash; that is a
+        telemetry-coverage gap in the current evidence, not a claim that the L40S used zero power.
+      </p>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th>Workload</th><th>Format</th><th class="num">Mean power (W)</th><th class="num">Mean energy (J)</th><th class="num">J / 1k tok</th><th class="num">vs. FP32</th><th>Exp. ID</th></tr></thead>
+        <tbody>
+          <tr><td>GPT-2 Small</td><td>FP32</td><td class="num">614.5</td><td class="num">21,766.8</td><td class="num">10.288</td><td class="num">1.00&times;</td><td>E083@h100</td></tr>
+          <tr><td>GPT-2 Small</td><td>FP16</td><td class="num">526.8</td><td class="num">7,053.5</td><td class="num">2.654</td><td class="num">3.88&times;</td><td>E084@h100</td></tr>
+          <tr><td>GPT-2 Small</td><td>BF16</td><td class="num">512.7</td><td class="num">6,683.7</td><td class="num">2.550</td><td class="num">4.03&times;</td><td>E085@h100</td></tr>
+          <tr><td>GPT-2 Small</td><td>FP8</td><td class="num">486.1</td><td class="num">4,760.1</td><td class="num">1.744</td><td class="num">5.90&times;</td><td>E086@h100</td></tr>
+          <tr><td>DistilBERT</td><td>FP32</td><td class="num">603.9</td><td class="num">6,978.3</td><td class="num">2.591</td><td class="num">1.00&times;</td><td>E090@h100</td></tr>
+          <tr><td>DistilBERT</td><td>FP16</td><td class="num">480.4</td><td class="num">1,188.1</td><td class="num">0.1875</td><td class="num">13.82&times;</td><td>E091@h100</td></tr>
+          <tr><td>DistilBERT</td><td>BF16</td><td class="num">477.3</td><td class="num">1,138.4</td><td class="num">0.1780</td><td class="num">14.55&times;</td><td>E092@h100</td></tr>
+          <tr><td>DistilBERT</td><td>FP8</td><td class="num">387.7</td><td class="num">847.0</td><td class="num">0.1482</td><td class="num">17.48&times;</td><td>E093@h100</td></tr>
+          <tr><td>DistilBERT</td><td>FP8 (L40S)</td><td class="num">283.4</td><td class="num">1,145.9</td><td class="num">0.1820</td><td class="num">14.24&times;&#8225;</td><td>E093@l40s</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-method" style="margin-top:16px;">GPU-count scaling, DistilBERT, strong-scaling / DDP:</p>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th class="num">GPUs</th><th>Platform</th><th class="num">Total power (W)</th><th class="num">Mean energy (J)</th><th class="num">J / 1k tok</th><th class="num">Efficiency vs. 1 GPU</th><th>Exp. ID</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>H100</td><td class="num">625.2</td><td class="num">4,735.9</td><td class="num">0.3119</td><td class="num">1.00&times;</td><td>E038@h100</td></tr>
+          <tr><td class="num">2</td><td>H100</td><td class="num">1,124.8</td><td class="num">4,915.3</td><td class="num">0.2344</td><td class="num">1.33&times;</td><td>E039@h100</td></tr>
+          <tr><td class="num">4</td><td>H100</td><td class="num">1,960.6</td><td class="num">5,055.2</td><td class="num">0.1189</td><td class="num">2.62&times;</td><td>E040@h100</td></tr>
+          <tr><td class="num">4</td><td>L40S</td><td class="num">1,090.3</td><td class="num">7,924.0</td><td class="num">0.4691</td><td class="num">0.66&times;&#8225;</td><td>E040@l40s</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-method" style="margin-top:16px;">Batching, GPT-2 Small inference, H100, single request stream:</p>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th class="num">Batch size</th><th class="num">Mean power (W)</th><th class="num">Mean energy (J)</th><th class="num">J / 1k responses</th><th class="num">vs. batch=1</th><th>Exp. ID</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td class="num">131.9</td><td class="num">4,761.5</td><td class="num">211.98</td><td class="num">1.00&times;</td><td>E132@h100</td></tr>
+          <tr><td class="num">2</td><td class="num">129.1</td><td class="num">4,984.3</td><td class="num">114.71</td><td class="num">1.85&times;</td><td>E133@h100</td></tr>
+          <tr><td class="num">4</td><td class="num">130.5</td><td class="num">5,122.3</td><td class="num">59.67</td><td class="num">3.55&times;</td><td>E134@h100</td></tr>
+          <tr><td class="num">8</td><td class="num">134.4</td><td class="num">5,341.7</td><td class="num">30.87</td><td class="num">6.87&times;</td><td>E135@h100</td></tr>
+          <tr><td class="num">16</td><td class="num">139.2</td><td class="num">5,751.9</td><td class="num">16.89</td><td class="num">12.55&times;</td><td>E136@h100</td></tr>
+          <tr><td class="num">32</td><td class="num">150.2</td><td class="num">6,499.4</td><td class="num">9.815</td><td class="num">21.60&times;</td><td>E137@h100</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-limitation">
+        &#8225; The two L40S rows above are the only conditions in the current evidence set where
+        L40S measured-region power/energy telemetry is populated for a condition that also has an
+        H100 counterpart; they are not part of a systematic H100-vs-L40S energy study and should be
+        read as a single data point, not a platform-wide conclusion. Source pipeline note: "Only
+        measured-region energy records with sufficient samples are eligible for energy-efficiency
+        conclusions."
+      </p>
+      <p class="nerd-method" style="margin-top:16px;">Inference energy re-validation anchors (2026-09-26/27, DistilBERT, H100, single request stream):</p>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th>Format</th><th class="num">Prompt length</th><th class="num">Mean power (W)</th><th class="num">Mean energy (J)</th><th class="num">J / 1k tok</th><th class="num">vs. FP16 @128</th><th>Exp. ID</th></tr></thead>
+        <tbody>
+          <tr><td>FP16</td><td class="num">128</td><td class="num">142.2</td><td class="num">4,265.4</td><td class="num">1.336</td><td class="num">1.00&times;</td><td>E274@h100</td></tr>
+          <tr><td>BF16</td><td class="num">128</td><td class="num">142.2</td><td class="num">4,265.4</td><td class="num">1.275</td><td class="num">1.05&times;</td><td>E275@h100</td></tr>
+          <tr><td>BF16</td><td class="num">512</td><td class="num">179.1</td><td class="num">5,371.8</td><td class="num">0.441</td><td class="num">3.03&times;&sect;</td><td>E276@h100</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-limitation">
+        &sect; The 512-token row isn't a like-for-like precision comparison with the two 128-token rows
+        above &mdash; its lower J/1k-tok figure mostly reflects a longer prompt amortizing fixed
+        per-request overhead over more tokens (the same effect documented for batching elsewhere on
+        this page), not a precision effect. These three conditions re-validate the DistilBERT energy
+        figures already shown in the first table above; all three completed 2026-09-26/27, n=3 each.
+      </p>
+    </div>
+
+    <div class="nerd-block" id="nerd-lowbit">
+      <h3>Qwen2.5-7B-Instruct &middot; quantization, long context &amp; sharding (H100)</h3>
+      <p class="nerd-method">
+        Added in a sweep on 2026-09-26/27 and folded into the processed pipeline on 2026-09-27.
+        Figures below are still read directly from raw trial JSON under <code>results/raw/h100/</code>
+        (they match the now-refreshed <code>experiment_tracker.csv</code> / <code>experiments.csv</code>),
+        since the per-method quality/memory breakdown isn't exposed by those two files directly &mdash;
+        it lives in the pipeline's dedicated <code>lowbit_summary.csv</code> instead.
+      </p>
+      <p class="nerd-method" style="margin-top:14px;">Serving speed &amp; memory by number format (batch of 8, vLLM):</p>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th>Format</th><th class="num">Mean tok/s</th><th class="num">Peak mem (GB)</th><th class="num">Perplexity</th><th class="num">n</th><th>Exp. ID</th></tr></thead>
+        <tbody>
+          <tr><td>BF16 (control)</td><td class="num">756.85</td><td class="num">15.70</td><td class="num">13.54</td><td class="num">6</td><td>E240</td></tr>
+          <tr><td>AWQ (4-bit)</td><td class="num">817.30</td><td class="num">6.66</td><td class="num">15.22</td><td class="num">6</td><td>E242</td></tr>
+          <tr><td>GPTQ (4-bit)</td><td class="num">845.42</td><td class="num">6.68</td><td class="num">14.61</td><td class="num">6</td><td>E244</td></tr>
+          <tr><td>NF4 / bitsandbytes (4-bit)</td><td class="num">264.15</td><td class="num">7.06</td><td class="num">14.76</td><td class="num">3</td><td>E246</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-limitation">
+        Same-condition batch=1 figures (E239, E241, E243, E245) show the same ranking. A separate,
+        higher-trial-count re-run at batch=1 for tighter perplexity statistics (E270&ndash;E273, 3 trials
+        each) gives: BF16 10.22, GPTQ (int4) 10.70, AWQ (int4) 11.02, NF4 10.83 &mdash; the same
+        ordering pattern with narrower gaps, so the quality deltas above should be read as directional
+        rather than exact to the last decimal.
+      </p>
+      <p class="nerd-method" style="margin-top:14px;">Long-context serving, time-to-first-token p95 (BF16, batch=1, real text prompts):</p>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th class="num">Prompt length (tokens)</th><th class="num">TTFT p95 (ms)</th><th class="num">n</th><th>Exp. ID</th></tr></thead>
+        <tbody>
+          <tr><td class="num">~4,096</td><td class="num">95.97</td><td class="num">3</td><td>E247</td></tr>
+          <tr><td class="num">~6,144</td><td class="num">148.94</td><td class="num">3</td><td>E248</td></tr>
+          <tr><td class="num">~8,192</td><td class="num">199.51</td><td class="num">3</td><td>E249</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-method" style="margin-top:14px;">Distributed training strategy at 7B scale (BF16, comparability: platform_specific):</p>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th class="num">GPUs</th><th>Strategy</th><th class="num">Mean tok/s</th><th class="num">Mean mem (GB)</th><th class="num">n</th><th>Exp. ID</th></tr></thead>
+        <tbody>
+          <tr><td class="num">2</td><td>FSDP</td><td class="num">4,758.69</td><td class="num">62.11</td><td class="num">3</td><td>E252</td></tr>
+          <tr><td class="num">2</td><td>DeepSpeed ZeRO-3</td><td class="num">2,624.33</td><td class="num">77.44</td><td class="num">3</td><td>E253</td></tr>
+          <tr><td class="num">4</td><td>FSDP</td><td class="num">10,716.24</td><td class="num">42.66</td><td class="num">3</td><td>E254</td></tr>
+          <tr><td class="num">4</td><td>DeepSpeed ZeRO-3</td><td class="num">5,189.87</td><td class="num">50.79</td><td class="num">3</td><td>E255</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-limitation">
+        Single-trial canary runs at a smaller configuration (E250 FSDP, E251 DeepSpeed ZeRO-3, both
+        2 GPUs, n=1) are omitted from the table above as under-powered; they show throughput within
+        0.3% of each other and are not informative for a strategy comparison. A follow-up wave
+        (E261&ndash;E269) added a third strategy (DDP/full-copy) at 2 and 4 GPUs for this same model;
+        its FSDP/ZeRO-3 conditions (E262&ndash;E263, E265, E268&ndash;E269) closely reproduce the figures
+        above, but the DDP-specific conditions (E261, E264, E266, E267) have no completed or failed
+        trials yet, so DDP cannot be compared here. <code>quality_perplexity</code> is reported by the
+        pipeline for these training runs but is not meaningful for this comparison &mdash; these are
+        short, infrastructure-focused runs rather than runs to convergence, and reported perplexity
+        values for them range from roughly 260,000 to 4.5 million, orders of magnitude outside anything
+        indicating a trained model. This strategy comparison (E252&ndash;E255) is the closest thing this
+        project has to a memory-capacity study for a large model: the pipeline's dedicated "Memory
+        optimisation" phase (micro-batch size, gradient accumulation, activation checkpointing) was run
+        only on GPT-2 Small and DistilBERT (25 of 31 planned conditions completed), never on this 7B model.
+      </p>
+    </div>
+
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="coverage">
+      <h3>How complete is this picture?</h3>
+      <p>
+        This summary is built from <b id="coverageCompleted">217</b> completed tests out of
+        <b id="coverageTotal">238</b> planned (<b id="coveragePct">91%</b>).
+      </p>
+      <div class="bar-wrap"><div class="bar-fill" id="coverageBar" style="width:0%"></div></div>
+      <p>
+        Almost every planned test has run. The small remainder is a handful of specialised cases
+        (an alternative serving engine for one model, and a couple of extra-compressed number formats)
+        that need specific extra tooling before they can run &mdash; they don't change any of the findings
+        above. A full technical breakdown, with every underlying number and confidence interval, lives
+        in the project's detailed research dashboard alongside this page.
+      </p>
+    </div>
+    <div class="prev-part">
+      <div>
+        <p class="np-label">Part 1</p>
+        <p class="np-title">Experiment Catalog</p>
+      </div>
+      <a class="np-cta" href="index.html">&larr; Browse every experiment</a>
+    </div>
+    <p class="fineprint">
+      Generated from the project's own recorded test results (<code>results/analysis/</code>) as a
+      plain-language companion to the full technical dashboard. Figures are rounded for readability;
+      see the technical dashboard for exact values, confidence intervals, and every individual test.
+    </p>
+  </div>
+</footer>
+
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<aside class="drawer" id="drawer" aria-hidden="true" aria-label="Experiment details">
+  <div class="drawer-header">
+    <div>
+      <p class="drawer-kicker">Supporting evidence</p>
+      <h3 id="drawerTitle">Experiment details</h3>
+    </div>
+    <button type="button" class="drawer-close" id="drawerClose" aria-label="Close experiment details">&times;</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<script>
+(function () {
+  "use strict";
+
+  var EXPERIMENT_DETAILS = {"E033":{"batch_size":"32","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"64","gpus":"2","mode":"training","model":"gpt2","per_gpu_batch_size":"32","phase":"Strong scaling","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":27328.1258,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":99.1722,"memory_used_gb":56.0166,"n":3,"nccl_bw_gbps":101.8801,"power_w":1081.9744,"runtime_seconds":35.6429,"throughput_samples_sec":253.3898,"throughput_tokens_sec":259471.1462,"transfer_s":0.0}},"precision":"bf16","scaling_type":"strong","status":"Completed","strategy":"ddp","workload":"gpt2_small"},"E034":{"batch_size":"16","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"64","gpus":"4","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Strong scaling","platforms":{"lovelace_h100":{"allreduce_s":0.0003,"data_loading_s":0.0,"energy_j":28397.4456,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.4991,"memory_used_gb":29.6084,"n":3,"nccl_bw_gbps":293.6293,"power_w":2119.5033,"runtime_seconds":28.1076,"throughput_samples_sec":477.6786,"throughput_tokens_sec":489142.8614,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0059,"data_loading_s":0.0,"energy_j":40287.0631,"energy_status":"sufficient","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":99.4994,"memory_used_gb":28.6465,"n":3,"nccl_bw_gbps":17.1806,"power_w":1057.9192,"runtime_seconds":54.3744,"throughput_samples_sec":168.0617,"throughput_tokens_sec":172095.1964,"transfer_s":0.0}},"precision":"bf16","scaling_type":"strong","status":"Completed","strategy":"ddp","workload":"gpt2_small"},"E035":{"batch_size":"16","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"16","gpus":"1","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Weak scaling","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":6696.4523,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.6487,"memory_used_gb":28.2646,"n":3,"power_w":513.4078,"runtime_seconds":21.8122,"throughput_samples_sec":122.6697,"throughput_tokens_sec":125613.7299,"transfer_s":0.0},"lovelace_l40s":{"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":91.7108,"memory_used_gb":28.0332,"n":3,"runtime_seconds":51.305,"throughput_samples_sec":44.6995,"throughput_tokens_sec":45772.2988,"transfer_s":0.0}},"precision":"bf16","scaling_type":"weak","status":"Completed","strategy":"ddp","workload":"gpt2_small"},"E036":{"batch_size":"16","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"32","gpus":"2","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Weak scaling","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":13716.1551,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.5339,"memory_used_gb":29.2783,"n":3,"nccl_bw_gbps":101.5057,"power_w":1019.7668,"runtime_seconds":23.4346,"throughput_samples_sec":237.9157,"throughput_tokens_sec":243625.715,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":88.6063,"memory_used_gb":28.6855,"n":3,"nccl_bw_gbps":21.5224,"runtime_seconds":50.8746,"throughput_samples_sec":85.5738,"throughput_tokens_sec":87627.6126,"transfer_s":0.0}},"precision":"bf16","scaling_type":"weak","status":"Completed","strategy":"ddp","workload":"gpt2_small"},"E037":{"batch_size":"16","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"64","gpus":"4","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Weak scaling","platforms":{"lovelace_h100":{"allreduce_s":0.0003,"data_loading_s":0.0,"energy_j":28328.2822,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.5195,"memory_used_gb":29.6084,"n":3,"nccl_bw_gbps":294.124,"power_w":2110.4944,"runtime_seconds":28.3758,"throughput_samples_sec":476.8109,"throughput_tokens_sec":488254.3547,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0058,"data_loading_s":0.0,"energy_j":40706.2516,"energy_status":"sufficient","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":99.495,"memory_used_gb":28.6465,"n":3,"nccl_bw_gbps":17.2182,"power_w":1068.0341,"runtime_seconds":50.539,"throughput_samples_sec":167.9206,"throughput_tokens_sec":171950.7065,"transfer_s":0.0}},"precision":"bf16","scaling_type":"weak","status":"Completed","strategy":"ddp","workload":"gpt2_small"},"E038":{"batch_size":"128","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"128","gpus":"1","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"128","phase":"Strong scaling","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":4735.8769,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.6875,"memory_used_gb":14.5947,"n":3,"power_w":625.1789,"runtime_seconds":17.5481,"throughput_samples_sec":1689.733,"throughput_tokens_sec":865143.2968,"transfer_s":0.0},"lovelace_l40s":{"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":87.8633,"memory_used_gb":14.3438,"n":3,"runtime_seconds":36.8138,"throughput_samples_sec":554.9759,"throughput_tokens_sec":284147.6498,"transfer_s":0.0}},"precision":"bf16","scaling_type":"strong","status":"Completed","strategy":"ddp","workload":"distilbert"},"E039":{"batch_size":"64","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"128","gpus":"2","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"64","phase":"Strong scaling","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":4915.3166,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":97.2254,"memory_used_gb":9.5049,"n":3,"nccl_bw_gbps":101.565,"power_w":1124.7507,"runtime_seconds":13.9795,"throughput_samples_sec":2928.9395,"throughput_tokens_sec":1499617.0241,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":74.4293,"memory_used_gb":8.627,"n":3,"nccl_bw_gbps":21.4916,"runtime_seconds":27.8177,"throughput_samples_sec":999.0684,"throughput_tokens_sec":511523.0328,"transfer_s":0.0}},"precision":"bf16","scaling_type":"strong","status":"Completed","strategy":"ddp","workload":"distilbert"},"E040":{"batch_size":"32","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"128","gpus":"4","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Strong scaling","platforms":{"lovelace_h100":{"allreduce_s":0.0003,"data_loading_s":0.0,"energy_j":5055.2303,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":95.2556,"memory_used_gb":6.5811,"n":3,"nccl_bw_gbps":294.749,"power_w":1960.5514,"runtime_seconds":16.7261,"throughput_samples_sec":4964.1161,"throughput_tokens_sec":2541627.4545,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0059,"data_loading_s":0.0,"energy_j":7923.97,"energy_status":"sufficient","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":97.9971,"memory_used_gb":5.541,"n":3,"nccl_bw_gbps":17.1239,"power_w":1090.3103,"runtime_seconds":18.7279,"throughput_samples_sec":1761.2336,"throughput_tokens_sec":901751.6046,"transfer_s":0.0}},"precision":"bf16","scaling_type":"strong","status":"Completed","strategy":"ddp","workload":"distilbert"},"E041":{"batch_size":"32","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"32","gpus":"1","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Weak scaling","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":1139.58,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":94.3778,"memory_used_gb":5.2295,"n":3,"power_w":478.5179,"runtime_seconds":10.2868,"throughput_samples_sec":1343.7614,"throughput_tokens_sec":688005.8317,"transfer_s":0.0},"lovelace_l40s":{"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":49.2778,"memory_used_gb":4.9355,"n":3,"runtime_seconds":22.4895,"throughput_samples_sec":554.3996,"throughput_tokens_sec":283852.5904,"transfer_s":0.0}},"precision":"bf16","scaling_type":"weak","status":"Completed","strategy":"ddp","workload":"distilbert"},"E042":{"batch_size":"32","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"64","gpus":"2","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Weak scaling","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":2467.4451,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":93.8463,"memory_used_gb":6.0947,"n":3,"nccl_bw_gbps":101.6528,"power_w":946.6389,"runtime_seconds":11.839,"throughput_samples_sec":2455.4347,"throughput_tokens_sec":1257182.5839,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":49.9502,"memory_used_gb":5.3848,"n":3,"nccl_bw_gbps":21.5107,"runtime_seconds":22.4196,"throughput_samples_sec":922.7272,"throughput_tokens_sec":472436.333,"transfer_s":0.0}},"precision":"bf16","scaling_type":"weak","status":"Completed","strategy":"ddp","workload":"distilbert"},"E043":{"batch_size":"32","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"128","gpus":"4","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Weak scaling","platforms":{"lovelace_h100":{"allreduce_s":0.0003,"data_loading_s":0.0,"energy_j":5023.4673,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":95.5167,"memory_used_gb":6.5029,"n":3,"nccl_bw_gbps":293.8076,"power_w":1948.7852,"runtime_seconds":16.5125,"throughput_samples_sec":4965.6409,"throughput_tokens_sec":2542408.1555,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0059,"data_loading_s":0.0,"energy_j":7878.7709,"energy_status":"sufficient","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":98.0208,"memory_used_gb":5.6139,"n":3,"nccl_bw_gbps":17.1841,"power_w":1084.792,"runtime_seconds":20.7186,"throughput_samples_sec":1762.3806,"throughput_tokens_sec":902338.8881,"transfer_s":0.0}},"precision":"bf16","scaling_type":"weak","status":"Completed","strategy":"ddp","workload":"distilbert"},"E044":{"batch_size":"16","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"16","gpus":"1","mode":"training","model":"TinyLlama/TinyLlama-1.1B-Chat-v1.0","per_gpu_batch_size":"16","phase":"Strong scaling","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":25628.3173,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":99.4668,"memory_used_gb":65.4854,"n":3,"power_w":650.6604,"runtime_seconds":49.2478,"throughput_samples_sec":40.6218,"throughput_tokens_sec":41596.7273,"transfer_s":0.0}},"precision":"bf16","scaling_type":"strong","status":"Completed","strategy":"ddp","workload":"tinyllama"},"E045":{"batch_size":"8","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"16","gpus":"2","mode":"training","model":"TinyLlama/TinyLlama-1.1B-Chat-v1.0","per_gpu_batch_size":"8","phase":"Strong scaling","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":29931.4222,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.7057,"memory_used_gb":46.1787,"n":3,"nccl_bw_gbps":101.9294,"power_w":1228.3066,"runtime_seconds":35.721,"throughput_samples_sec":65.66,"throughput_tokens_sec":67235.8135,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0033,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":96.0611,"memory_used_gb":42.4746,"n":3,"nccl_bw_gbps":20.1605,"runtime_seconds":100.383,"throughput_samples_sec":19.4312,"throughput_tokens_sec":19897.554,"transfer_s":0.0}},"precision":"bf16","scaling_type":"strong","status":"Completed","strategy":"ddp","workload":"tinyllama"},"E047":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"32","gpus":"2","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":13650.3425,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.4583,"memory_used_gb":29.2783,"n":3,"nccl_bw_gbps":101.7453,"power_w":1015.8858,"runtime_seconds":23.8045,"throughput_samples_sec":238.1498,"throughput_tokens_sec":243865.3612,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":88.8525,"memory_used_gb":28.6855,"n":3,"nccl_bw_gbps":21.5349,"runtime_seconds":52.9353,"throughput_samples_sec":85.5484,"throughput_tokens_sec":87601.5575,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"ddp","workload":"gpt2_small"},"E048":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"64","gpus":"4","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0003,"data_loading_s":0.0,"energy_j":28338.5343,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.4828,"memory_used_gb":29.6084,"n":3,"nccl_bw_gbps":294.1739,"power_w":2114.2254,"runtime_seconds":28.4884,"throughput_samples_sec":477.4801,"throughput_tokens_sec":488939.5854,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0059,"data_loading_s":0.0,"energy_j":40704.2664,"energy_status":"sufficient","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":99.5178,"memory_used_gb":28.6465,"n":3,"nccl_bw_gbps":17.19,"power_w":1067.8161,"runtime_seconds":51.781,"throughput_samples_sec":167.8948,"throughput_tokens_sec":171924.2494,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"ddp","workload":"gpt2_small"},"E049":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"32","gpus":"2","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":13309.5143,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.8461,"memory_used_gb":29.4814,"n":3,"nccl_bw_gbps":102.1016,"power_w":1010.7306,"runtime_seconds":23.6817,"throughput_samples_sec":243.0115,"throughput_tokens_sec":248843.8124,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":86.4732,"memory_used_gb":28.957,"n":3,"nccl_bw_gbps":21.3634,"runtime_seconds":50.3414,"throughput_samples_sec":88.6972,"throughput_tokens_sec":90825.965,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"fsdp","workload":"gpt2_small"},"E050":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"64","gpus":"4","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0003,"data_loading_s":0.0,"energy_j":26845.09,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.4342,"memory_used_gb":29.4639,"n":3,"nccl_bw_gbps":294.4181,"power_w":2054.9745,"runtime_seconds":28.0503,"throughput_samples_sec":489.9178,"throughput_tokens_sec":501675.8672,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0059,"data_loading_s":0.0,"energy_j":38912.8761,"energy_status":"sufficient","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":99.5099,"memory_used_gb":28.5684,"n":3,"nccl_bw_gbps":17.1761,"power_w":1062.8104,"runtime_seconds":50.1905,"throughput_samples_sec":174.8006,"throughput_tokens_sec":178995.7694,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"fsdp","workload":"gpt2_small"},"E051":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"32","gpus":"2","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":13325.1664,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.8494,"memory_used_gb":29.4814,"n":3,"nccl_bw_gbps":102.3638,"power_w":1009.6679,"runtime_seconds":25.3011,"throughput_samples_sec":242.4699,"throughput_tokens_sec":248289.2128,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":86.7922,"memory_used_gb":28.957,"n":3,"nccl_bw_gbps":21.39,"runtime_seconds":48.6802,"throughput_samples_sec":88.8414,"throughput_tokens_sec":90973.5767,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"fsdp","workload":"gpt2_small"},"E052":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"32","gpus":"2","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":10885.165,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":97.6458,"memory_used_gb":24.5166,"n":3,"nccl_bw_gbps":101.9854,"power_w":965.1162,"runtime_seconds":25.2073,"throughput_samples_sec":283.7249,"throughput_tokens_sec":290534.2991,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":72.0868,"memory_used_gb":24.0124,"n":3,"nccl_bw_gbps":21.3763,"runtime_seconds":44.9939,"throughput_samples_sec":119.4554,"throughput_tokens_sec":122322.3722,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"deepspeed_zero1","workload":"gpt2_small"},"E053":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"32","gpus":"2","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":10871.642,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":97.5806,"memory_used_gb":24.5166,"n":3,"nccl_bw_gbps":102.1127,"power_w":963.6904,"runtime_seconds":24.8979,"throughput_samples_sec":283.658,"throughput_tokens_sec":290465.7994,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":82.9833,"memory_used_gb":23.9707,"n":3,"nccl_bw_gbps":21.4629,"runtime_seconds":44.8653,"throughput_samples_sec":119.6201,"throughput_tokens_sec":122490.9348,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"deepspeed_zero2","workload":"gpt2_small"},"E054":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"32","gpus":"2","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":11132.1071,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":86.8211,"memory_used_gb":26.0381,"n":3,"nccl_bw_gbps":102.1989,"power_w":900.6533,"runtime_seconds":27.3465,"throughput_samples_sec":258.9007,"throughput_tokens_sec":265114.3617,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":74.4213,"memory_used_gb":25.4251,"n":3,"nccl_bw_gbps":21.4427,"runtime_seconds":46.6647,"throughput_samples_sec":122.6982,"throughput_tokens_sec":125642.9288,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"deepspeed_zero3","workload":"gpt2_small"},"E055":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"64","gpus":"2","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":2366.4058,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":95.2824,"memory_used_gb":6.251,"n":3,"nccl_bw_gbps":101.4833,"power_w":907.7703,"runtime_seconds":11.6014,"throughput_samples_sec":2454.9571,"throughput_tokens_sec":1256938.0258,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":46.2432,"memory_used_gb":5.5605,"n":3,"nccl_bw_gbps":21.4926,"runtime_seconds":18.5458,"throughput_samples_sec":919.0867,"throughput_tokens_sec":470572.4052,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"ddp","workload":"distilbert"},"E056":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"128","gpus":"4","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0003,"data_loading_s":0.0,"energy_j":5024.9672,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":95.5389,"memory_used_gb":6.5029,"n":3,"nccl_bw_gbps":294.2803,"power_w":1950.1952,"runtime_seconds":16.9777,"throughput_samples_sec":4967.8089,"throughput_tokens_sec":2543518.1805,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0058,"data_loading_s":0.0,"energy_j":7907.1608,"energy_status":"sufficient","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":98.026,"memory_used_gb":5.6191,"n":3,"nccl_bw_gbps":17.2111,"power_w":1088.6534,"runtime_seconds":19.7829,"throughput_samples_sec":1762.2951,"throughput_tokens_sec":902295.0766,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"ddp","workload":"distilbert"},"E057":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"64","gpus":"2","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":2380.9803,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":93.7815,"memory_used_gb":5.6084,"n":3,"nccl_bw_gbps":101.8656,"power_w":927.355,"runtime_seconds":12.6342,"throughput_samples_sec":2492.7312,"throughput_tokens_sec":1276278.3989,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":57.4589,"memory_used_gb":4.9434,"n":3,"nccl_bw_gbps":21.4147,"runtime_seconds":23.0657,"throughput_samples_sec":976.5944,"throughput_tokens_sec":500016.3221,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"fsdp","workload":"distilbert"},"E058":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"128","gpus":"4","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0003,"data_loading_s":0.0,"energy_j":4667.1293,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":94.9458,"memory_used_gb":5.6592,"n":3,"nccl_bw_gbps":293.836,"power_w":1928.4501,"runtime_seconds":16.9847,"throughput_samples_sec":5289.0642,"throughput_tokens_sec":2708000.8819,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0059,"data_loading_s":0.0,"energy_j":7987.3394,"energy_status":"sufficient","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":98.7064,"memory_used_gb":4.7188,"n":3,"nccl_bw_gbps":17.1735,"power_w":919.3651,"runtime_seconds":19.9945,"throughput_samples_sec":1473.7087,"throughput_tokens_sec":754538.8385,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"fsdp","workload":"distilbert"},"E059":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"64","gpus":"2","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":2368.1075,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":93.8958,"memory_used_gb":5.6084,"n":3,"nccl_bw_gbps":101.9688,"power_w":924.603,"runtime_seconds":13.1668,"throughput_samples_sec":2498.8404,"throughput_tokens_sec":1279406.294,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":53.1611,"memory_used_gb":4.9434,"n":3,"nccl_bw_gbps":21.3895,"runtime_seconds":26.2321,"throughput_samples_sec":977.9245,"throughput_tokens_sec":500697.3307,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"fsdp","workload":"distilbert"},"E060":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"64","gpus":"2","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":2274.9393,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":94.1407,"memory_used_gb":6.2549,"n":3,"nccl_bw_gbps":101.9204,"power_w":820.8178,"runtime_seconds":15.4692,"throughput_samples_sec":2309.243,"throughput_tokens_sec":1182332.4116,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":59.0886,"memory_used_gb":5.6882,"n":3,"nccl_bw_gbps":21.3216,"runtime_seconds":21.2152,"throughput_samples_sec":1006.9136,"throughput_tokens_sec":515539.7772,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"deepspeed_zero1","workload":"distilbert"},"E061":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"64","gpus":"2","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":2271.4132,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":93.6476,"memory_used_gb":6.2549,"n":3,"nccl_bw_gbps":101.8409,"power_w":813.3391,"runtime_seconds":15.2567,"throughput_samples_sec":2291.7485,"throughput_tokens_sec":1173375.2418,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":63.1806,"memory_used_gb":5.6543,"n":3,"nccl_bw_gbps":21.4021,"runtime_seconds":23.438,"throughput_samples_sec":1007.1464,"throughput_tokens_sec":515658.9594,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"deepspeed_zero2","workload":"distilbert"},"E062":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-06","global_batch_size":"64","gpus":"2","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Distributed training strategy","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":3130.3232,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":50.1064,"memory_used_gb":6.0713,"n":3,"nccl_bw_gbps":101.751,"power_w":598.9854,"runtime_seconds":18.6464,"throughput_samples_sec":1224.663,"throughput_tokens_sec":627027.4317,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0031,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":45.3095,"memory_used_gb":5.5508,"n":3,"nccl_bw_gbps":21.4226,"runtime_seconds":21.0162,"throughput_samples_sec":1000.0,"throughput_tokens_sec":512000.0129,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"deepspeed_zero3","workload":"distilbert"},"E083":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"16","gpus":"1","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Precision study","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":21766.8305,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":99.6896,"memory_used_gb":34.0049,"n":3,"power_w":614.4718,"runtime_seconds":45.7612,"throughput_samples_sec":45.1671,"throughput_tokens_sec":46251.0675,"transfer_s":0.0},"lovelace_l40s":{"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":93.5348,"memory_used_gb":33.7441,"n":3,"runtime_seconds":76.3544,"throughput_samples_sec":25.7363,"throughput_tokens_sec":26354.0001,"transfer_s":0.0}},"precision":"fp32","status":"Completed","strategy":"none","workload":"gpt2_small"},"E084":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"16","gpus":"1","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Precision study","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":7053.4563,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.5144,"memory_used_gb":28.2646,"n":3,"power_w":526.7959,"runtime_seconds":21.7099,"throughput_samples_sec":119.4991,"throughput_tokens_sec":122367.1081,"transfer_s":0.0},"lovelace_l40s":{"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":89.5277,"memory_used_gb":28.0332,"n":3,"runtime_seconds":51.3194,"throughput_samples_sec":44.1044,"throughput_tokens_sec":45162.8905,"transfer_s":0.0}},"precision":"fp16","status":"Completed","strategy":"none","workload":"gpt2_small"},"E085":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"16","gpus":"1","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Precision study","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":6683.666,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":99.1117,"memory_used_gb":28.2646,"n":3,"power_w":512.6616,"runtime_seconds":20.8537,"throughput_samples_sec":122.7285,"throughput_tokens_sec":125673.977,"transfer_s":0.0},"lovelace_l40s":{"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":88.022,"memory_used_gb":28.0332,"n":3,"runtime_seconds":45.6672,"throughput_samples_sec":44.667,"throughput_tokens_sec":45738.9673,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"none","workload":"gpt2_small"},"E086":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"16","gpus":"1","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Precision study","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":4760.1043,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":97.9341,"memory_used_gb":23.2686,"n":3,"power_w":486.0622,"runtime_seconds":16.3175,"throughput_samples_sec":163.3841,"throughput_tokens_sec":167305.3279,"transfer_s":0.0},"lovelace_l40s":{"data_loading_s":0.0,"energy_j":6473.2237,"energy_status":"sufficient","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":99.1471,"memory_used_gb":23.0312,"n":3,"power_w":277.2134,"runtime_seconds":36.1431,"throughput_samples_sec":68.5198,"throughput_tokens_sec":70164.2251,"transfer_s":0.0}},"precision":"fp8","quantization_method":"fp8_delayed_scaling_hybrid","status":"Completed","strategy":"none","workload":"gpt2_small"},"E087":{"batch_size":"1","batch_size_param":"1","comparability":"exact","completed_at":"2026-09-12","framework":"pytorch_eager","gpus":"1","mode":"inference","model":"gpt2","phase":"Precision study","platforms":{"lovelace_h100":{"concurrent_requests":1.0,"energy_j":6262.8824,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":35.3452,"latency_p50_ms":472.4964,"latency_p95_ms":474.5838,"memory_used_gb":0.9775,"n":3,"power_w":132.5207,"runtime_seconds":56.9003,"throughput_tokens_sec":270.8539},"lovelace_l40s":{"concurrent_requests":1.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":27.1716,"latency_p50_ms":440.6403,"latency_p95_ms":442.86,"memory_used_gb":0.8184,"n":3,"runtime_seconds":55.3901,"throughput_tokens_sec":287.9417}},"precision":"fp16","prompt_length":"128","status":"Completed","strategy":"none","workload":"gpt2_small"},"E088":{"batch_size":"1","batch_size_param":"1","comparability":"exact","completed_at":"2026-09-12","framework":"pytorch_eager","gpus":"1","mode":"inference","model":"gpt2","phase":"Precision study","platforms":{"lovelace_h100":{"concurrent_requests":1.0,"energy_j":5931.9164,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":37.8068,"latency_p50_ms":441.2394,"latency_p95_ms":443.1429,"memory_used_gb":0.9775,"n":3,"power_w":134.4053,"runtime_seconds":53.7348,"throughput_tokens_sec":290.0699},"lovelace_l40s":{"concurrent_requests":1.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":28.8567,"latency_p50_ms":432.824,"latency_p95_ms":435.1597,"memory_used_gb":0.8184,"n":3,"runtime_seconds":54.5931,"throughput_tokens_sec":295.7467}},"precision":"bf16","prompt_length":"128","status":"Completed","strategy":"none","workload":"gpt2_small"},"E090":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"32","gpus":"1","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Precision study","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":6978.3156,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":99.0826,"memory_used_gb":6.6631,"n":3,"power_w":603.8756,"runtime_seconds":18.9974,"throughput_samples_sec":276.9156,"throughput_tokens_sec":141780.8051,"transfer_s":0.0},"lovelace_l40s":{"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":79.4918,"memory_used_gb":6.4102,"n":3,"runtime_seconds":27.0613,"throughput_samples_sec":184.5858,"throughput_tokens_sec":94507.9542,"transfer_s":0.0}},"precision":"fp32","status":"Completed","strategy":"none","workload":"distilbert"},"E091":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"32","gpus":"1","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Precision study","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":1188.1018,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":95.9697,"memory_used_gb":5.2295,"n":3,"power_w":480.4313,"runtime_seconds":9.5608,"throughput_samples_sec":1294.0353,"throughput_tokens_sec":662546.0943,"transfer_s":0.0},"lovelace_l40s":{"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":53.548,"memory_used_gb":4.9355,"n":3,"runtime_seconds":17.3985,"throughput_samples_sec":544.0857,"throughput_tokens_sec":278571.8548,"transfer_s":0.0}},"precision":"fp16","status":"Completed","strategy":"none","workload":"distilbert"},"E092":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"32","gpus":"1","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Precision study","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":1138.3978,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":94.6,"memory_used_gb":5.2295,"n":3,"power_w":477.2518,"runtime_seconds":9.3118,"throughput_samples_sec":1341.5637,"throughput_tokens_sec":686880.6269,"transfer_s":0.0},"lovelace_l40s":{"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":28.0606,"memory_used_gb":4.9355,"n":3,"runtime_seconds":16.4615,"throughput_samples_sec":555.3275,"throughput_tokens_sec":284327.6672,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"none","workload":"distilbert"},"E093":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"32","gpus":"1","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Precision study","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":846.9527,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":77.1481,"memory_used_gb":3.6924,"n":3,"power_w":387.718,"runtime_seconds":7.6231,"throughput_samples_sec":1464.9698,"throughput_tokens_sec":750064.5181,"transfer_s":0.0},"lovelace_l40s":{"data_loading_s":0.0,"energy_j":1145.8731,"energy_status":"sufficient","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":96.3834,"memory_used_gb":3.4824,"n":3,"power_w":283.4205,"runtime_seconds":15.5359,"throughput_samples_sec":791.5226,"throughput_tokens_sec":405259.5927,"transfer_s":0.0}},"precision":"fp8","quantization_method":"fp8_delayed_scaling_hybrid","status":"Completed","strategy":"none","workload":"distilbert"},"E094":{"batch_size":"1","batch_size_param":"1","comparability":"exact","completed_at":"2026-09-12","framework":"pytorch_eager","gpus":"1","mode":"inference","model":"distilbert-base-uncased","phase":"Precision study","platforms":{"lovelace_h100":{"concurrent_requests":1.0,"energy_j":17.7557,"energy_status":"insufficient_samples","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":5.55,"latency_p50_ms":1.6774,"latency_p95_ms":1.7118,"memory_used_gb":0.848,"n":3,"power_w":104.689,"runtime_seconds":11.0854,"throughput_samples_sec":593.521,"throughput_tokens_sec":75970.6941},"lovelace_l40s":{"concurrent_requests":1.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":0.5673,"latency_p50_ms":1.3919,"latency_p95_ms":1.4236,"memory_used_gb":0.6823,"n":3,"runtime_seconds":15.2963,"throughput_samples_sec":713.8425,"throughput_tokens_sec":91371.8376}},"precision":"fp16","prompt_length":"128","status":"Completed","strategy":"none","workload":"distilbert"},"E095":{"batch_size":"1","batch_size_param":"1","comparability":"exact","completed_at":"2026-09-12","framework":"pytorch_eager","gpus":"1","mode":"inference","model":"distilbert-base-uncased","phase":"Precision study","platforms":{"lovelace_h100":{"concurrent_requests":1.0,"energy_j":16.4307,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":0.4868,"latency_p50_ms":1.5661,"latency_p95_ms":1.6015,"memory_used_gb":0.8493,"n":3,"power_w":104.3633,"runtime_seconds":10.4793,"throughput_samples_sec":635.8159,"throughput_tokens_sec":81384.4332},"lovelace_l40s":{"concurrent_requests":1.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":0.9099,"latency_p50_ms":1.3765,"latency_p95_ms":1.4013,"memory_used_gb":0.6699,"n":3,"runtime_seconds":14.4203,"throughput_samples_sec":723.5931,"throughput_tokens_sec":92619.9132}},"precision":"bf16","prompt_length":"128","status":"Completed","strategy":"none","workload":"distilbert"},"E101":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"16","gpus":"1","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Data movement","pinned_memory":"False","platforms":{"lovelace_h100":{"data_loading_s":0.074,"energy_j":6673.1616,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":97.9136,"memory_used_gb":28.2646,"n":3,"power_w":507.3604,"runtime_seconds":21.1427,"throughput_samples_sec":121.6501,"throughput_tokens_sec":124569.719,"transfer_s":0.0244},"lovelace_l40s":{"data_loading_s":0.0778,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":57.5225,"memory_used_gb":19.0781,"n":3,"runtime_seconds":49.3531,"throughput_samples_sec":44.5198,"throughput_tokens_sec":45588.2951,"transfer_s":0.0243}},"precision":"bf16","status":"Completed","strategy":"none","workload":"gpt2_small"},"E102":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"16","gpus":"1","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Data movement","pinned_memory":"True","platforms":{"lovelace_h100":{"data_loading_s":0.006,"energy_j":6601.9614,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.4196,"memory_used_gb":28.2646,"n":3,"power_w":504.9402,"runtime_seconds":20.8572,"throughput_samples_sec":122.3755,"throughput_tokens_sec":125312.5385,"transfer_s":0.0136},"lovelace_l40s":{"data_loading_s":0.0067,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":86.8345,"memory_used_gb":28.0332,"n":3,"runtime_seconds":51.82,"throughput_samples_sec":44.6964,"throughput_tokens_sec":45769.1013,"transfer_s":0.013}},"precision":"bf16","status":"Completed","strategy":"none","workload":"gpt2_small"},"E113":{"batch_size":"16","batch_size_param":"16","comparability":"platform_specific","completed_at":"2026-09-12","global_batch_size":"32","gpus":"2","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Communication analysis","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":13756.7353,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":97.9218,"memory_used_gb":29.292,"n":3,"nccl_bw_gbps":101.1748,"power_w":1010.6237,"runtime_seconds":126.9542,"throughput_samples_sec":235.086,"throughput_tokens_sec":240728.0812,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0043,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":40.8632,"memory_used_gb":28.6738,"n":3,"nccl_bw_gbps":17.4903,"runtime_seconds":178.8471,"throughput_samples_sec":64.7996,"throughput_tokens_sec":66354.787,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"ddp","workload":"gpt2_small"},"E114":{"batch_size":"16","batch_size_param":"16","comparability":"platform_specific","completed_at":"2026-09-12","global_batch_size":"32","gpus":"2","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Communication analysis","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":13387.7058,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":98.4028,"memory_used_gb":29.4951,"n":3,"nccl_bw_gbps":101.4495,"power_w":1001.8209,"runtime_seconds":126.7063,"throughput_samples_sec":239.4606,"throughput_tokens_sec":245207.6607,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0032,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":44.0974,"memory_used_gb":28.9453,"n":3,"nccl_bw_gbps":20.8972,"runtime_seconds":174.7654,"throughput_samples_sec":64.8234,"throughput_tokens_sec":66379.1934,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"fsdp","workload":"gpt2_small"},"E117":{"batch_size":"32","batch_size_param":"32","comparability":"platform_specific","completed_at":"2026-09-12","global_batch_size":"64","gpus":"2","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Communication analysis","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":2540.6595,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":89.6796,"memory_used_gb":6.2646,"n":3,"nccl_bw_gbps":101.1492,"power_w":903.394,"runtime_seconds":74.5834,"throughput_samples_sec":2275.7154,"throughput_tokens_sec":1165166.2879,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0305,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":25.8549,"memory_used_gb":5.6465,"n":3,"nccl_bw_gbps":9.1695,"runtime_seconds":84.2766,"throughput_samples_sec":607.0305,"throughput_tokens_sec":310799.5993,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"ddp","workload":"distilbert"},"E118":{"batch_size":"32","batch_size_param":"32","comparability":"platform_specific","completed_at":"2026-09-12","global_batch_size":"64","gpus":"2","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Communication analysis","platforms":{"lovelace_h100":{"allreduce_s":0.0007,"data_loading_s":0.0,"energy_j":2556.3245,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":82.3157,"memory_used_gb":5.6221,"n":3,"nccl_bw_gbps":101.5553,"power_w":826.833,"runtime_seconds":71.8415,"throughput_samples_sec":2070.0503,"throughput_tokens_sec":1059865.7505,"transfer_s":0.0},"lovelace_l40s":{"allreduce_s":0.0032,"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":28.8397,"memory_used_gb":4.9316,"n":3,"nccl_bw_gbps":21.0395,"runtime_seconds":79.6252,"throughput_samples_sec":565.1674,"throughput_tokens_sec":289365.7017,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"fsdp","workload":"distilbert"},"E121":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"16","gpus":"1","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Hardware comparison","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":6606.7373,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":99.1735,"memory_used_gb":28.2646,"n":3,"power_w":507.1012,"runtime_seconds":24.3522,"throughput_samples_sec":122.8094,"throughput_tokens_sec":125756.8114,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"none","workload":"gpt2_small"},"E122":{"batch_size":"1","batch_size_param":"1","comparability":"exact","completed_at":"2026-09-12","framework":"pytorch_eager","gpus":"1","mode":"inference","model":"gpt2","phase":"Hardware comparison","platforms":{"lovelace_h100":{"concurrent_requests":1.0,"energy_j":5913.1964,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":37.7683,"latency_p50_ms":441.5763,"latency_p95_ms":443.8894,"memory_used_gb":0.9775,"n":3,"power_w":133.876,"runtime_seconds":53.903,"throughput_tokens_sec":289.804}},"precision":"bf16","prompt_length":"128","status":"Completed","strategy":"none","workload":"gpt2_small"},"E123":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-08-31","global_batch_size":"16","gpus":"1","mode":"training","model":"gpt2","per_gpu_batch_size":"16","phase":"Hardware comparison","platforms":{"lovelace_l40s":{"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":84.1318,"memory_used_gb":28.0332,"n":3,"runtime_seconds":50.9705,"throughput_samples_sec":44.7532,"throughput_tokens_sec":45827.2419,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"none","workload":"gpt2_small"},"E124":{"batch_size":"1","batch_size_param":"1","comparability":"exact","completed_at":"2026-08-31","framework":"pytorch_eager","gpus":"1","mode":"inference","model":"gpt2","phase":"Hardware comparison","platforms":{"lovelace_l40s":{"concurrent_requests":1.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":26.0052,"latency_p50_ms":443.2347,"latency_p95_ms":445.6502,"memory_used_gb":0.7969,"n":3,"runtime_seconds":60.0947,"throughput_tokens_sec":288.7878}},"precision":"bf16","prompt_length":"128","status":"Completed","strategy":"none","workload":"gpt2_small"},"E125":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-12","global_batch_size":"32","gpus":"1","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Hardware comparison","platforms":{"lovelace_h100":{"data_loading_s":0.0,"energy_j":1141.0347,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":96.4788,"memory_used_gb":5.2295,"n":3,"power_w":478.9479,"runtime_seconds":9.4235,"throughput_samples_sec":1343.2544,"throughput_tokens_sec":687746.2458,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"none","workload":"distilbert"},"E126":{"batch_size":"1","batch_size_param":"1","comparability":"exact","completed_at":"2026-09-12","framework":"pytorch_eager","gpus":"1","mode":"inference","model":"distilbert-base-uncased","phase":"Hardware comparison","platforms":{"lovelace_h100":{"concurrent_requests":1.0,"energy_j":17.0587,"energy_status":"insufficient_samples","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":9.0741,"latency_p50_ms":1.5771,"latency_p95_ms":1.6185,"memory_used_gb":0.8506,"n":3,"power_w":107.7218,"runtime_seconds":6.8099,"throughput_samples_sec":630.3608,"throughput_tokens_sec":80686.18}},"precision":"bf16","prompt_length":"128","status":"Completed","strategy":"none","workload":"distilbert"},"E127":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-08-31","global_batch_size":"32","gpus":"1","mode":"training","model":"distilbert-base-uncased","per_gpu_batch_size":"32","phase":"Hardware comparison","platforms":{"lovelace_l40s":{"data_loading_s":0.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":47.4815,"memory_used_gb":4.9355,"n":3,"runtime_seconds":17.2832,"throughput_samples_sec":551.8747,"throughput_tokens_sec":282559.8543,"transfer_s":0.0}},"precision":"bf16","status":"Completed","strategy":"none","workload":"distilbert"},"E128":{"batch_size":"1","batch_size_param":"1","comparability":"exact","completed_at":"2026-08-31","framework":"pytorch_eager","gpus":"1","mode":"inference","model":"distilbert-base-uncased","phase":"Hardware comparison","platforms":{"lovelace_l40s":{"concurrent_requests":1.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":1.2857,"latency_p50_ms":1.3832,"latency_p95_ms":1.4103,"memory_used_gb":0.6497,"n":3,"runtime_seconds":11.304,"throughput_samples_sec":719.7406,"throughput_tokens_sec":92126.7972}},"precision":"bf16","prompt_length":"128","status":"Completed","strategy":"none","workload":"distilbert"},"E132":{"batch_size":"1","batch_size_param":"1","comparability":"exact","completed_at":"2026-09-11","framework":"vllm","gpus":"1","mode":"inference","model":"gpt2","phase":"Inference batching","platforms":{"lovelace_h100":{"concurrent_requests":1.0,"energy_j":4761.4518,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":32.7955,"latency_p50_ms":360.9458,"latency_p95_ms":363.6441,"memory_used_gb":72.4326,"n":3,"power_w":131.9323,"runtime_seconds":63.3318,"throughput_tokens_sec":354.6549},"lovelace_l40s":{"concurrent_requests":1.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":16.3901,"latency_p50_ms":346.1681,"latency_p95_ms":349.1314,"memory_used_gb":41.0195,"n":3,"runtime_seconds":68.9756,"throughput_tokens_sec":369.5773}},"precision":"bf16","prompt_length":"128","status":"Completed","strategy":"none","workload":"gpt2_small"},"E133":{"batch_size":"2","batch_size_param":"2","comparability":"exact","completed_at":"2026-09-11","framework":"vllm","gpus":"1","mode":"inference","model":"gpt2","phase":"Inference batching","platforms":{"lovelace_h100":{"concurrent_requests":1.0,"energy_j":4984.2643,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":33.6512,"latency_p50_ms":386.2426,"latency_p95_ms":388.1364,"memory_used_gb":72.4326,"n":3,"power_w":129.1308,"runtime_seconds":65.5292,"throughput_tokens_sec":663.2447},"lovelace_l40s":{"concurrent_requests":1.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":18.3621,"latency_p50_ms":364.7079,"latency_p95_ms":366.9072,"memory_used_gb":41.0195,"n":3,"runtime_seconds":72.2522,"throughput_tokens_sec":702.307}},"precision":"bf16","prompt_length":"128","status":"Completed","strategy":"none","workload":"gpt2_small"},"E134":{"batch_size":"4","batch_size_param":"4","comparability":"exact","completed_at":"2026-09-11","framework":"vllm","gpus":"1","mode":"inference","model":"gpt2","phase":"Inference batching","platforms":{"lovelace_h100":{"concurrent_requests":1.0,"energy_j":5122.3115,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":33.1657,"latency_p50_ms":392.7173,"latency_p95_ms":394.6051,"memory_used_gb":72.4339,"n":3,"power_w":130.5425,"runtime_seconds":65.784,"throughput_tokens_sec":1304.8652},"lovelace_l40s":{"concurrent_requests":1.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":19.6214,"latency_p50_ms":361.1921,"latency_p95_ms":363.3942,"memory_used_gb":41.0208,"n":3,"runtime_seconds":70.1739,"throughput_tokens_sec":1416.9026}},"precision":"bf16","prompt_length":"128","status":"Completed","strategy":"none","workload":"gpt2_small"},"E135":{"batch_size":"8","batch_size_param":"8","comparability":"exact","completed_at":"2026-09-11","framework":"vllm","gpus":"1","mode":"inference","model":"gpt2","phase":"Inference batching","platforms":{"lovelace_h100":{"concurrent_requests":1.0,"energy_j":5341.7287,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":33.4243,"latency_p50_ms":397.4587,"latency_p95_ms":399.4321,"memory_used_gb":72.4326,"n":3,"power_w":134.4461,"runtime_seconds":67.139,"throughput_tokens_sec":2577.3092},"lovelace_l40s":{"concurrent_requests":1.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":20.76,"latency_p50_ms":370.092,"latency_p95_ms":373.2342,"memory_used_gb":41.0195,"n":3,"runtime_seconds":65.8383,"throughput_tokens_sec":2765.3488}},"precision":"bf16","prompt_length":"128","status":"Completed","strategy":"none","workload":"gpt2_small"},"E136":{"batch_size":"16","batch_size_param":"16","comparability":"exact","completed_at":"2026-09-11","framework":"vllm","gpus":"1","mode":"inference","model":"gpt2","phase":"Inference batching","platforms":{"lovelace_h100":{"concurrent_requests":1.0,"energy_j":5751.9159,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":34.0233,"latency_p50_ms":413.3761,"latency_p95_ms":415.5998,"memory_used_gb":72.4339,"n":3,"power_w":139.1632,"runtime_seconds":68.7323,"throughput_tokens_sec":4955.2955},"lovelace_l40s":{"concurrent_requests":1.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":22.5823,"latency_p50_ms":383.1365,"latency_p95_ms":385.3583,"memory_used_gb":41.0195,"n":3,"runtime_seconds":66.6022,"throughput_tokens_sec":5348.3474}},"precision":"bf16","prompt_length":"128","status":"Completed","strategy":"none","workload":"gpt2_small"},"E137":{"batch_size":"32","batch_size_param":"32","comparability":"exact","completed_at":"2026-09-11","framework":"vllm","gpus":"1","mode":"inference","model":"gpt2","phase":"Inference batching","platforms":{"lovelace_h100":{"concurrent_requests":1.0,"energy_j":6499.4282,"energy_status":"sufficient","gpu_model":"NVIDIA H100 SXM 80GB","gpu_utilization":35.9689,"latency_p50_ms":432.5781,"latency_p95_ms":435.779,"memory_used_gb":72.4365,"n":3,"power_w":150.155,"runtime_seconds":69.9719,"throughput_tokens_sec":9463.2},"lovelace_l40s":{"concurrent_requests":1.0,"energy_status":"","gpu_model":"NVIDIA L40S 48GB","gpu_utilization":26.6416,"latency_p50_ms":398.8748,"latency_p95_ms":402.2309,"memory_used_gb":41.0215,"n":3,"runtime_seconds":68.0457,"throughput_tokens_sec":10262.4432}},"precision":"bf16","prompt_length":"128","status":"Completed","strategy":"none","workload":"gpt2_small"},"E239":{"batch_size":"1","comparability":"exact","completed_at":"2026-09-26","gpus":"1","memory_worker_peak_allocated_gb":15.2239,"mode":"inference","model":"Qwen/Qwen2.5-7B-Instruct","phase":"Inference precision/quantization","platforms":{"lovelace_h100":{"energy_j":10929.1111,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","latency_p50_ms":1183.169,"latency_p95_ms":1185.5292,"memory_used_gb":16.9092,"n":6,"power_w":355.21,"runtime_seconds":62.9693,"throughput_tokens_sec":108.1727}},"precision":"bf16","quality_loss_pct":2.6056,"quality_perplexity":13.5392,"status":"Completed","strategy":"bf16","ttft_p95_ms":14.042,"workload":"qwen2_5_7b"},"E240":{"batch_size":"8","comparability":"exact","completed_at":"2026-09-26","gpus":"1","memory_worker_peak_allocated_gb":15.6981,"mode":"inference","model":"Qwen/Qwen2.5-7B-Instruct","phase":"Inference precision/quantization","platforms":{"lovelace_h100":{"energy_j":11630.7311,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","latency_p50_ms":1352.4619,"latency_p95_ms":1355.6819,"memory_used_gb":17.1904,"n":6,"power_w":376.4672,"runtime_seconds":60.8159,"throughput_tokens_sec":756.853}},"precision":"bf16","quality_loss_pct":2.6056,"quality_perplexity":13.5392,"status":"Completed","strategy":"bf16","ttft_p95_ms":91.4152,"workload":"qwen2_5_7b"},"E241":{"batch_size":"1","comparability":"exact","completed_at":"2026-09-26","gpus":"1","memory_worker_peak_allocated_gb":6.1878,"mode":"inference","model":"Qwen/Qwen2.5-7B-Instruct-AWQ","phase":"Inference precision/quantization","platforms":{"lovelace_h100":{"energy_j":7448.7701,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","latency_p50_ms":1018.2424,"latency_p95_ms":1020.8975,"memory_used_gb":7.9893,"n":6,"power_w":243.8009,"runtime_seconds":54.5464,"throughput_tokens_sec":125.6921}},"precision":"awq","quality_loss_pct":2.7224,"quality_perplexity":15.2175,"status":"Completed","strategy":"awq","ttft_p95_ms":27.0341,"workload":"qwen2_5_7b"},"E242":{"batch_size":"8","comparability":"exact","completed_at":"2026-09-26","gpus":"1","memory_worker_peak_allocated_gb":6.661,"mode":"inference","model":"Qwen/Qwen2.5-7B-Instruct-AWQ","phase":"Inference precision/quantization","platforms":{"lovelace_h100":{"energy_j":9789.0263,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","latency_p50_ms":1252.398,"latency_p95_ms":1255.4523,"memory_used_gb":8.3076,"n":6,"power_w":321.1181,"runtime_seconds":54.6094,"throughput_tokens_sec":817.2994}},"precision":"awq","quality_loss_pct":2.7224,"quality_perplexity":15.2175,"status":"Completed","strategy":"awq","ttft_p95_ms":194.6282,"workload":"qwen2_5_7b"},"E243":{"batch_size":"1","comparability":"exact","completed_at":"2026-09-26","gpus":"1","memory_worker_peak_allocated_gb":6.1917,"mode":"inference","model":"Qwen/Qwen2.5-7B-Instruct-GPTQ-Int4","phase":"Inference precision/quantization","platforms":{"lovelace_h100":{"energy_j":7013.2341,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","latency_p50_ms":1071.6908,"latency_p95_ms":1074.3691,"memory_used_gb":7.9795,"n":6,"power_w":229.5827,"runtime_seconds":53.77,"throughput_tokens_sec":119.4138}},"precision":"gptq","quality_loss_pct":2.6818,"quality_perplexity":14.6116,"status":"Completed","strategy":"gptq","ttft_p95_ms":13.9805,"workload":"qwen2_5_7b"},"E244":{"batch_size":"8","comparability":"exact","completed_at":"2026-09-26","gpus":"1","memory_worker_peak_allocated_gb":6.6813,"mode":"inference","model":"Qwen/Qwen2.5-7B-Instruct-GPTQ-Int4","phase":"Inference precision/quantization","platforms":{"lovelace_h100":{"energy_j":8360.6808,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","latency_p50_ms":1210.7638,"latency_p95_ms":1213.7811,"memory_used_gb":8.2959,"n":6,"power_w":276.0961,"runtime_seconds":53.8171,"throughput_tokens_sec":845.4197}},"precision":"gptq","quality_loss_pct":2.6818,"quality_perplexity":14.6116,"status":"Completed","strategy":"gptq","ttft_p95_ms":87.2959,"workload":"qwen2_5_7b"},"E245":{"batch_size":"1","comparability":"exact","completed_at":"2026-09-26","gpus":"1","memory_worker_peak_allocated_gb":6.5648,"mode":"inference","model":"Qwen/Qwen2.5-7B-Instruct","phase":"Inference precision/quantization","platforms":{"lovelace_h100":{"energy_j":7113.4424,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","latency_p50_ms":2134.7378,"latency_p95_ms":2140.2341,"memory_used_gb":8.2861,"n":3,"power_w":227.3005,"runtime_seconds":63.7717,"throughput_tokens_sec":59.9769}},"precision":"bitsandbytes_nf4","quality_loss_pct":2.692,"quality_perplexity":14.7609,"status":"Completed","strategy":"bitsandbytes_nf4","ttft_p95_ms":33.6527,"workload":"qwen2_5_7b"},"E246":{"batch_size":"8","comparability":"exact","completed_at":"2026-09-26","gpus":"1","memory_worker_peak_allocated_gb":7.0624,"mode":"inference","model":"Qwen/Qwen2.5-7B-Instruct","phase":"Inference precision/quantization","platforms":{"lovelace_h100":{"energy_j":12587.6142,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","latency_p50_ms":3875.7482,"latency_p95_ms":3882.9276,"memory_used_gb":8.6885,"n":3,"power_w":405.8613,"runtime_seconds":68.5624,"throughput_tokens_sec":264.148}},"precision":"bitsandbytes_nf4","quality_loss_pct":2.692,"quality_perplexity":14.7609,"status":"Completed","strategy":"bitsandbytes_nf4","ttft_p95_ms":123.2324,"workload":"qwen2_5_7b"},"E247":{"batch_size":"1","comparability":"exact","completed_at":"2026-09-26","gpus":"1","memory_worker_peak_allocated_gb":15.6981,"mode":"inference","model":"Qwen/Qwen2.5-7B-Instruct","phase":"Inference long-context prompt length","platforms":{"lovelace_h100":{"energy_j":11738.5071,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","latency_p50_ms":1268.6947,"latency_p95_ms":1272.8876,"memory_used_gb":16.46,"n":3,"power_w":385.3355,"runtime_seconds":61.4021,"throughput_tokens_sec":100.8428}},"precision":"bf16","status":"Completed","strategy":"bf16","ttft_p95_ms":95.9685,"workload":"qwen2_5_7b_long_context"},"E248":{"batch_size":"1","comparability":"exact","completed_at":"2026-09-26","gpus":"1","memory_worker_peak_allocated_gb":15.9696,"mode":"inference","model":"Qwen/Qwen2.5-7B-Instruct","phase":"Inference long-context prompt length","platforms":{"lovelace_h100":{"energy_j":12258.6049,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","latency_p50_ms":1317.0919,"latency_p95_ms":1320.629,"memory_used_gb":16.749,"n":3,"power_w":404.71,"runtime_seconds":60.6119,"throughput_tokens_sec":97.1927}},"precision":"bf16","status":"Completed","strategy":"bf16","ttft_p95_ms":148.9353,"workload":"qwen2_5_7b_long_context"},"E249":{"batch_size":"1","comparability":"exact","completed_at":"2026-09-26","gpus":"1","memory_worker_peak_allocated_gb":16.2411,"mode":"inference","model":"Qwen/Qwen2.5-7B-Instruct","phase":"Inference long-context prompt length","platforms":{"lovelace_h100":{"energy_j":12534.5488,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","latency_p50_ms":1373.0377,"latency_p95_ms":1375.8781,"memory_used_gb":17.0381,"n":3,"power_w":414.8232,"runtime_seconds":59.2551,"throughput_tokens_sec":93.1949}},"precision":"bf16","status":"Completed","strategy":"bf16","ttft_p95_ms":199.5069,"workload":"qwen2_5_7b_long_context"},"E250":{"batch_size":"1","comparability":"platform_specific","completed_at":"2026-09-26","gpus":"2","mode":"training","model":"Qwen/Qwen2.5-7B-Instruct","phase":"Large-model distributed strategy","platforms":{"lovelace_h100":{"energy_j":1351.9356,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","memory_used_gb":50.0283,"n":1,"power_w":510.2217,"runtime_seconds":17.9108,"throughput_tokens_sec":2199.7681}},"precision":"bf16","quality_loss_pct":13.3826,"quality_perplexity":648593.0322,"status":"Completed","strategy":"fsdp","workload":"qwen2_5_7b_training"},"E251":{"batch_size":"1","comparability":"platform_specific","completed_at":"2026-09-26","gpus":"2","mode":"training","model":"Qwen/Qwen2.5-7B-Instruct","phase":"Large-model distributed strategy","platforms":{"lovelace_h100":{"energy_j":2024.4695,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","memory_used_gb":76.458,"n":1,"power_w":542.1344,"runtime_seconds":30.0161,"throughput_tokens_sec":2193.5754}},"precision":"bf16","quality_loss_pct":13.3844,"quality_perplexity":649815.8128,"status":"Completed","strategy":"deepspeed_zero3","workload":"qwen2_5_7b_training"},"E252":{"batch_size":"1","comparability":"platform_specific","completed_at":"2026-09-26","gpus":"2","mode":"training","model":"Qwen/Qwen2.5-7B-Instruct","phase":"Large-model distributed strategy","platforms":{"lovelace_h100":{"energy_j":17574.7577,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","memory_used_gb":62.1084,"n":3,"power_w":850.7223,"runtime_seconds":42.861,"throughput_tokens_sec":4758.693}},"precision":"bf16","quality_loss_pct":12.6554,"quality_perplexity":313442.6432,"status":"Completed","strategy":"fsdp","workload":"qwen2_5_7b_training"},"E253":{"batch_size":"1","comparability":"platform_specific","completed_at":"2026-09-26","gpus":"2","mode":"training","model":"Qwen/Qwen2.5-7B-Instruct","phase":"Large-model distributed strategy","platforms":{"lovelace_h100":{"energy_j":25496.6533,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","memory_used_gb":77.4385,"n":3,"power_w":680.6454,"runtime_seconds":66.8562,"throughput_tokens_sec":2624.3323}},"precision":"bf16","quality_loss_pct":15.325,"quality_perplexity":4524346.0114,"status":"Completed","strategy":"deepspeed_zero3","workload":"qwen2_5_7b_training"},"E254":{"batch_size":"1","comparability":"platform_specific","completed_at":"2026-09-26","gpus":"4","mode":"training","model":"Qwen/Qwen2.5-7B-Instruct","phase":"Large-model distributed strategy","platforms":{"lovelace_h100":{"energy_j":18386.5292,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","memory_used_gb":42.6631,"n":3,"power_w":2004.3122,"runtime_seconds":36.4109,"throughput_tokens_sec":10716.2421}},"precision":"bf16","quality_loss_pct":12.4622,"quality_perplexity":258381.3807,"status":"Completed","strategy":"fsdp","workload":"qwen2_5_7b_training"},"E255":{"batch_size":"1","comparability":"platform_specific","completed_at":"2026-09-26","gpus":"4","mode":"training","model":"Qwen/Qwen2.5-7B-Instruct","phase":"Large-model distributed strategy","platforms":{"lovelace_h100":{"energy_j":27177.3111,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","memory_used_gb":50.7861,"n":3,"power_w":1434.7937,"runtime_seconds":54.4058,"throughput_tokens_sec":5189.8712}},"precision":"bf16","quality_loss_pct":14.5891,"quality_perplexity":2200458.6232,"status":"Completed","strategy":"deepspeed_zero3","workload":"qwen2_5_7b_training"},"E256":{"comparability":"capacity_adjusted","completed_at":"2026-09-26","gpus":"1","mode":"training","model":"gpt2","phase":"Strong scaling","platforms":{"lovelace_h100":{"energy_j":26512.5981,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","memory_used_gb":55.167,"n":3,"power_w":537.5763,"runtime_seconds":60.9893,"throughput_tokens_sec":132882.4957}},"precision":"bf16","status":"Completed","strategy":"ddp","workload":"gpt2_small"},"E274":{"comparability":"exact","completed_at":"2026-09-26","gpus":"1","mode":"inference","model":"distilbert-base-uncased","phase":"Inference energy anchors","platforms":{"lovelace_h100":{"energy_j":4265.4292,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","memory_used_gb":0.8486,"n":3,"power_w":142.1766,"runtime_seconds":41.4183,"throughput_tokens_sec":77085.2265}},"precision":"fp16","status":"Completed","workload":"distilbert"},"E275":{"comparability":"exact","completed_at":"2026-09-26","gpus":"1","mode":"inference","model":"distilbert-base-uncased","phase":"Inference energy anchors","platforms":{"lovelace_h100":{"energy_j":4265.4484,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","memory_used_gb":0.8506,"n":3,"power_w":142.1772,"runtime_seconds":40.8786,"throughput_tokens_sec":81838.0909}},"precision":"bf16","status":"Completed","workload":"distilbert"},"E276":{"comparability":"exact","completed_at":"2026-09-26","gpus":"1","mode":"inference","model":"distilbert-base-uncased","phase":"Inference energy anchors","platforms":{"lovelace_h100":{"energy_j":5371.7725,"energy_status":"sufficient","gpu_model":"NVIDIA H100 80GB HBM3","memory_used_gb":0.8545,"n":3,"power_w":179.0532,"runtime_seconds":39.2943,"throughput_tokens_sec":310154.9629}},"precision":"bf16","status":"Completed","workload":"distilbert"}};
+
+  var PLATFORM_LABEL = { lovelace_h100: "H100", lovelace_l40s: "L40S" };
+  var METRIC_LABELS = [
+    ['throughput_tokens_sec', 'Tokens / sec', 0],
+    ['throughput_samples_sec', 'Samples / sec', 2],
+    ['latency_p50_ms', 'p50 latency (ms)', 3],
+    ['latency_p95_ms', 'p95 latency (ms)', 3],
+    ['memory_used_gb', 'Memory used (GB)', 3],
+    ['gpu_utilization', 'GPU utilization (%)', 1],
+    ['power_w', 'Power draw (W)', 1],
+    ['energy_j', 'Energy (J)', 1],
+    ['allreduce_s', 'AllReduce time (s)', 6],
+    ['nccl_bw_gbps', 'NCCL bandwidth (Gbps)', 2],
+    ['data_loading_s', 'Data-loading time (s)', 5],
+    ['transfer_s', 'CPU\u2192GPU transfer (s)', 5],
+    ['runtime_seconds', 'Runtime (s)', 2]
+  ];
+
+  function fmtMetric(v, decimals) {
+    return typeof v === 'number' ? fmt(v, decimals) : '\u2014';
+  }
+
+  function renderExpCard(idToken) {
+    var m = idToken.match(/^(E\d+)(?:@([a-z0-9]+))?$/i);
+    var base = m ? m[1] : idToken;
+    var platformFilter = m && m[2] ? m[2].toLowerCase() : null;
+    var d = EXPERIMENT_DETAILS[base];
+    if (!d) {
+      return '<div class="exp-card"><h4>' + base + '</h4>' +
+        '<p class="exp-sub">Not in the current evidence set yet &mdash; this condition is configured or deferred and has no completed trial to show.</p></div>';
+    }
+    var workloadLabel = (d.workload || '').replace(/_/g, ' ');
+    var lines = [];
+    lines.push('<div class="exp-card">');
+    lines.push('<h4>' + base + (platformFilter ? ' \u00b7 ' + platformFilter.toUpperCase() : '') + '</h4>');
+    lines.push('<p class="exp-sub">' + workloadLabel + (d.model ? ' (' + d.model + ')' : '') + ' \u00b7 ' + (d.mode || '') + (d.phase ? ' \u00b7 ' + d.phase : '') + '</p>');
+
+    var metaPairs = [];
+    if (d.strategy) metaPairs.push(['Strategy', d.strategy]);
+    if (d.scaling_type) metaPairs.push(['Scaling type', d.scaling_type]);
+    if (d.gpus) metaPairs.push(['GPUs', d.gpus]);
+    if (d.precision) metaPairs.push(['Precision', d.precision.toUpperCase()]);
+    if (d.batch_size) metaPairs.push(['Batch size', d.batch_size]);
+    if (d.global_batch_size) metaPairs.push(['Global batch', d.global_batch_size]);
+    if (d.per_gpu_batch_size) metaPairs.push(['Per-GPU batch', d.per_gpu_batch_size]);
+    if (d.framework) metaPairs.push(['Framework', d.framework]);
+    if (d.pinned_memory) metaPairs.push(['Pinned memory', d.pinned_memory]);
+    if (d.comparability) metaPairs.push(['Comparability', d.comparability]);
+    if (d.status) metaPairs.push(['Status', d.status]);
+    if (d.completed_at) metaPairs.push(['Completed', d.completed_at]);
+
+    lines.push('<div class="exp-meta">');
+    metaPairs.forEach(function (p) {
+      lines.push('<div><span class="k">' + p[0] + ':</span> ' + p[1] + '</div>');
+    });
+    lines.push('</div>');
+
+    var platforms = Object.keys(d.platforms || {});
+    if (platformFilter) {
+      platforms = platforms.filter(function (p) { return p.indexOf(platformFilter) !== -1; });
+    }
+    platforms.forEach(function (plat) {
+      var pd = d.platforms[plat];
+      lines.push('<div class="exp-platform">');
+      lines.push('<h5>' + (PLATFORM_LABEL[plat] || plat) + ' \u00b7 n=' + pd.n + ' repetitions</h5>');
+      lines.push('<div class="exp-metric-grid">');
+      METRIC_LABELS.forEach(function (ml) {
+        var key = ml[0], label = ml[1], dec = ml[2];
+        if (pd[key] === undefined) return;
+        lines.push('<div><span class="k">' + label + ':</span> ' + fmtMetric(pd[key], dec) + '</div>');
+      });
+      if (pd.energy_status && pd.energy_status !== 'sufficient') {
+        lines.push('<div class="exp-note">Energy telemetry: ' + pd.energy_status.replace(/_/g, ' ') + '</div>');
+      }
+      lines.push('</div></div>');
+    });
+
+    lines.push('</div>');
+    return lines.join('');
+  }
+
+  var lastFocusedEl = null;
+
+  function openDrawer(ids) {
+    var body = document.getElementById('drawerBody');
+    var title = document.getElementById('drawerTitle');
+    title.textContent = ids.length > 1 ? ids.length + ' experiments' : ids[0];
+    body.innerHTML = ids.map(renderExpCard).join('');
+    lastFocusedEl = document.activeElement;
+    document.getElementById('drawer').classList.add('open');
+    document.getElementById('drawer').setAttribute('aria-hidden', 'false');
+    document.getElementById('drawerOverlay').classList.add('open');
+    document.documentElement.classList.add('drawer-locked');
+    document.getElementById('drawerClose').focus();
+  }
+
+  function closeDrawer() {
+    document.getElementById('drawer').classList.remove('open');
+    document.getElementById('drawer').setAttribute('aria-hidden', 'true');
+    document.getElementById('drawerOverlay').classList.remove('open');
+    document.documentElement.classList.remove('drawer-locked');
+    if (lastFocusedEl && lastFocusedEl.focus) lastFocusedEl.focus();
+  }
+
+  function initExpRows() {
+    var idPattern = /E\d+(?:@[a-z0-9]+)?/gi;
+    document.querySelectorAll('.nerd-table tbody tr').forEach(function (tr) {
+      var lastCell = tr.querySelector('td:last-child');
+      if (!lastCell) return;
+      var text = lastCell.textContent || '';
+      var ids = text.match(idPattern);
+      if (!ids || !ids.length) return;
+      tr.classList.add('exp-row');
+      tr.setAttribute('tabindex', '0');
+      tr.setAttribute('role', 'button');
+      tr.setAttribute('aria-label', (ids.length > 1 ? 'View details for experiments ' : 'View details for experiment ') + ids.join(', '));
+      tr.addEventListener("click", function () { openDrawer(ids); });
+      tr.addEventListener("keydown", function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDrawer(ids); }
+      });
+    });
+    document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+    document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && document.getElementById('drawer').classList.contains('open')) closeDrawer();
+    });
+  }
+
+  function css(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function fmt(n, decimals) {
+    if (decimals === undefined) decimals = 0;
+    return Number(n).toLocaleString(undefined, { maximumFractionDigits: decimals, minimumFractionDigits: decimals });
+  }
+
+  // ---- Generic grouped bar chart renderer -------------------------------
+  // series: [{ name, color, values: [..] }]
+  // categories: [labels]
+  function renderBars(containerId, opts) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    var categories = opts.categories;
+    var series = opts.series;
+    var unit = opts.unit || "";
+    var valueFmt = opts.valueFmt || function (v) { return fmt(v) + unit; };
+    var refLine = opts.refLine; // { value, label }
+    var maxOverride = opts.max;
+
+    var W = 560, marginL = 8, marginR = 8, marginT = 18, marginB = 30;
+    var groupCount = categories.length;
+    var seriesCount = series.length;
+    var rowH = seriesCount > 1 ? 96 : 74;
+    var H = marginT + marginB + groupCount * rowH;
+
+    var allVals = [];
+    series.forEach(function (s) { s.values.forEach(function (v) { allVals.push(v); }); });
+    if (refLine) allVals.push(refLine.value);
+    var maxVal = maxOverride || Math.max.apply(null, allVals) * 1.18;
+
+    var plotW = W - marginL - marginR;
+    var plotX = marginL;
+
+    function xScale(v) { return plotX + (v / maxVal) * plotW; }
+
+    var svg = [];
+    svg.push('<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMinYMin meet" role="img">');
+
+    // grid lines (4 ticks)
+    for (var g = 1; g <= 3; g++) {
+      var gx = plotX + (plotW * g / 4);
+      svg.push('<line class="grid-line" x1="' + gx + '" y1="' + marginT + '" x2="' + gx + '" y2="' + (H - marginB + 4) + '" />');
+    }
+
+    var barH = seriesCount > 1 ? 16 : 22;
+    var barGap = 6;
+
+    categories.forEach(function (cat, gi) {
+      var groupTop = marginT + gi * rowH;
+      var label = '<text class="bar-label" x="' + plotX + '" y="' + (groupTop - 4) + '">' + cat + '</text>';
+      svg.push(label);
+
+      series.forEach(function (s, si) {
+        var y = groupTop + si * (barH + barGap);
+        var v = s.values[gi];
+        var x2 = xScale(v);
+        var w = Math.max(2, x2 - plotX);
+        svg.push('<rect x="' + plotX + '" y="' + y + '" width="' + w + '" height="' + barH + '" rx="4" ry="4" fill="' + s.color + '"></rect>');
+        var labelX = x2 + 6;
+        svg.push('<text class="bar-value" x="' + labelX + '" y="' + (y + barH - 5) + '">' + valueFmt(v) + (s.suffix || '') + '</text>');
+      });
+
+      var groupBottom = groupTop + seriesCount * barH + (seriesCount - 1) * barGap;
+      // baseline for this group
+      svg.push('<line class="axis-line" x1="' + plotX + '" y1="' + groupTop + '" x2="' + plotX + '" y2="' + groupBottom + '" />');
+    });
+
+    if (refLine) {
+      var rx = xScale(refLine.value);
+      svg.push('<line class="ref-line" x1="' + rx + '" y1="' + (marginT - 10) + '" x2="' + rx + '" y2="' + (H - marginB + 6) + '" />');
+      svg.push('<text class="ref-label" x="' + (rx + 4) + '" y="' + (marginT - 12) + '">' + refLine.label + '</text>');
+    }
+
+    svg.push('</svg>');
+    el.innerHTML = svg.join("");
+
+    if (seriesCount > 1) {
+      var legend = document.createElement("div");
+      legend.className = "legend";
+      series.forEach(function (s) {
+        var item = document.createElement("span");
+        item.className = "item";
+        item.innerHTML = '<span class="swatch" style="background:' + s.color + '"></span>' + s.name;
+        legend.appendChild(item);
+      });
+      el.parentElement.appendChild(legend);
+    }
+  }
+
+  // ---- Diverging bar chart (ratio around a 1.0x baseline) ---------------
+  function renderDiverging(containerId, opts) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    var categories = opts.categories;
+    var values = opts.values; // ratios, e.g. 2.74 means 2.74x
+    var posColor = opts.posColor, negColor = opts.negColor;
+    var posLabel = opts.posLabel, negLabel = opts.negLabel;
+
+    var W = 620, marginT = 18, marginB = 30;
+    var rowH = 54;
+    var H = marginT + marginB + categories.length * rowH;
+
+    var maxAbs = Math.max.apply(null, values.map(function (v) { return Math.abs(Math.log2(v)); })) * 1.35;
+    var centerX = W / 2;
+    var halfW = (W / 2) - 170;
+
+    function xFor(v) {
+      var logv = Math.log2(v);
+      return centerX + (logv / maxAbs) * halfW;
+    }
+
+    var svg = [];
+    svg.push('<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMinYMin meet" role="img">');
+    svg.push('<line class="axis-line" x1="' + centerX + '" y1="' + (marginT - 6) + '" x2="' + centerX + '" y2="' + (H - marginB + 6) + '" />');
+    svg.push('<text class="ref-label" x="' + centerX + '" y="' + (marginT - 10) + '" text-anchor="middle">equal (1×)</text>');
+
+    categories.forEach(function (cat, i) {
+      var y = marginT + i * rowH;
+      var v = values[i];
+      var x = xFor(v);
+      var barY = y + 14;
+      var barH = 18;
+      var isPos = v >= 1;
+      var color = isPos ? posColor : negColor;
+      var x1 = Math.min(centerX, x), x2 = Math.max(centerX, x);
+      var w = Math.max(2, x2 - x1);
+      svg.push('<text class="bar-label" x="' + centerX + '" y="' + (y + 8) + '" text-anchor="middle">' + cat + '</text>');
+      svg.push('<rect x="' + x1 + '" y="' + barY + '" width="' + w + '" height="' + barH + '" rx="4" ry="4" fill="' + color + '"></rect>');
+      var label = fmt(v, 2) + '× ' + (isPos ? posLabel : negLabel);
+      var labelX = isPos ? x2 + 8 : x1 - 8;
+      var anchor = isPos ? 'start' : 'end';
+      svg.push('<text class="bar-value" x="' + labelX + '" y="' + (barY + barH - 4) + '" text-anchor="' + anchor + '">' + label + '</text>');
+    });
+
+    svg.push('</svg>');
+    el.innerHTML = svg.join("");
+
+    var legend = document.createElement("div");
+    legend.className = "legend";
+    legend.innerHTML =
+      '<span class="item"><span class="swatch" style="background:' + posColor + '"></span>' + posLabel + '</span>' +
+      '<span class="item"><span class="swatch" style="background:' + negColor + '"></span>' + negLabel + '</span>';
+    el.parentElement.appendChild(legend);
+  }
+
+  // ---- Meter list (coverage by test category) ---------------------------
+  function renderMeterList(containerId, rows) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    var html = [];
+    rows.forEach(function (r) {
+      var pct = r.total > 0 ? (r.completed / r.total) * 100 : 0;
+      var cls = pct >= 100 ? '' : ' partial';
+      html.push(
+        '<div class="meter-row">' +
+          '<span class="meter-label" title="' + r.label + '">' + r.label + '</span>' +
+          '<span class="meter-track"><span class="meter-fill' + cls + '" style="width:' + pct + '%"></span></span>' +
+          '<span class="meter-count">' + r.completed + ' / ' + r.total + '</span>' +
+        '</div>'
+      );
+    });
+    el.innerHTML = html.join('');
+  }
+
+  // ---- Line chart (efficiency curve vs. chip count) ----------------------
+  function renderLineChart(containerId, opts) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    var series = opts.series; // [{ name, color, points: [{x, y}] }]
+    var xTicks = opts.xTicks;
+    var yMax = opts.yMax || 110;
+
+    var W = 640, marginL = 34, marginR = 150, marginT = 18, marginB = 30, plotH = 188;
+    var plotW = W - marginL - marginR;
+    var H = marginT + plotH + marginB;
+
+    function xScale(v) {
+      var i = xTicks.indexOf(v);
+      return marginL + (i / (xTicks.length - 1)) * plotW;
+    }
+    function yScale(v) { return marginT + plotH - (v / yMax) * plotH; }
+
+    var svg = [];
+    svg.push('<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMinYMin meet" role="img">');
+
+    [0, 25, 50, 75, 100].forEach(function (g) {
+      var gy = yScale(g);
+      svg.push('<line class="grid-line" x1="' + marginL + '" y1="' + gy + '" x2="' + (marginL + plotW) + '" y2="' + gy + '" />');
+      svg.push('<text class="axis-title" x="' + (marginL - 6) + '" y="' + (gy + 3) + '" text-anchor="end">' + g + '%</text>');
+    });
+    xTicks.forEach(function (t) {
+      svg.push('<text class="axis-title" x="' + xScale(t) + '" y="' + (marginT + plotH + 18) + '" text-anchor="middle">' + t + (t === 1 ? ' chip' : ' chips') + '</text>');
+    });
+    svg.push('<line class="axis-line" x1="' + marginL + '" y1="' + (marginT + plotH) + '" x2="' + (marginL + plotW) + '" y2="' + (marginT + plotH) + '" />');
+
+    series.forEach(function (s) {
+      var pts = s.points;
+      var d = pts.map(function (p, i) { return (i === 0 ? 'M' : 'L') + xScale(p.x) + ' ' + yScale(p.y); }).join(' ');
+      svg.push('<path class="line-path" d="' + d + '" stroke="' + s.color + '"></path>');
+      pts.forEach(function (p) {
+        svg.push('<circle class="line-dot" cx="' + xScale(p.x) + '" cy="' + yScale(p.y) + '" r="4" fill="' + s.color + '"></circle>');
+      });
+    });
+
+    // declutter end-of-line labels so close values don't overlap
+    var labels = series.map(function (s) {
+      var last = s.points[s.points.length - 1];
+      return { name: s.name, color: s.color, y: yScale(last.y), x: xScale(last.x) };
+    });
+    labels.sort(function (a, b) { return a.y - b.y; });
+    var minGap = 13;
+    for (var i = 1; i < labels.length; i++) {
+      if (labels[i].y - labels[i - 1].y < minGap) labels[i].y = labels[i - 1].y + minGap;
+    }
+    labels.forEach(function (lp) {
+      svg.push('<text class="line-end-label" x="' + (lp.x + 8) + '" y="' + (lp.y + 4) + '" fill="' + lp.color + '">' + lp.name + '</text>');
+    });
+
+    svg.push('</svg>');
+    el.innerHTML = svg.join('');
+  }
+
+  // ---- Small-multiple scatter (speed vs. memory, Pareto view) -----------
+  function renderScatter(containerId, opts) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    var points = opts.points; // [{label, group, x, y, color, pareto}]
+
+    var W = 320, marginL = 20, marginR = 20, marginT = 20, marginB = 34, plotH = 180;
+    var plotW = W - marginL - marginR;
+    var H = marginT + plotH + marginB;
+
+    var xs = points.map(function (p) { return p.x; });
+    var ys = points.map(function (p) { return p.y; });
+    var xMin = Math.min.apply(null, xs), xMax = Math.max.apply(null, xs);
+    var yMin = Math.min.apply(null, ys), yMax = Math.max.apply(null, ys);
+    var xPad = (xMax - xMin) * 0.2 || xMax * 0.1 || 1;
+    var yPad = (yMax - yMin) * 0.28 || yMax * 0.1 || 1;
+    xMin -= xPad; xMax += xPad; yMin -= yPad; yMax += yPad;
+
+    function xScale(v) { return marginL + ((v - xMin) / (xMax - xMin)) * plotW; }
+    function yScale(v) { return marginT + plotH - ((v - yMin) / (yMax - yMin)) * plotH; } // lower memory = higher on chart
+
+    var svg = [];
+    svg.push('<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMinYMin meet" role="img">');
+    svg.push('<line class="axis-line" x1="' + marginL + '" y1="' + (marginT + plotH) + '" x2="' + (marginL + plotW) + '" y2="' + (marginT + plotH) + '" />');
+    svg.push('<line class="axis-line" x1="' + marginL + '" y1="' + marginT + '" x2="' + marginL + '" y2="' + (marginT + plotH) + '" />');
+    svg.push('<text class="axis-title" x="' + (marginL + plotW / 2) + '" y="' + (H - 6) + '" text-anchor="middle">faster →</text>');
+    svg.push('<text class="axis-title" x="' + (marginL + plotW - 4) + '" y="' + (marginT + 10) + '" text-anchor="end">↑ less memory</text>');
+
+    // some conditions land almost exactly on top of one another (e.g. ZeRO-1 vs
+    // ZeRO-2 draw near-identical throughput/memory) — nudge apart dots that would
+    // otherwise visually merge, so every point and its Pareto ring stay visible
+    var pos = points.map(function (p) { return { cx: xScale(p.x), cy: yScale(p.y) }; });
+    var minDist = 20;
+    for (var pass = 0; pass < 3; pass++) {
+      for (var a = 0; a < pos.length; a++) {
+        for (var b = a + 1; b < pos.length; b++) {
+          var dx = pos[b].cx - pos[a].cx, dy = pos[b].cy - pos[a].cy;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < minDist) {
+            var ang = dist > 0.01 ? Math.atan2(dy, dx) : (a % 2 === 0 ? 0 : Math.PI / 2);
+            var push = (minDist - dist) / 2 + 0.5;
+            pos[a].cx -= Math.cos(ang) * push; pos[a].cy -= Math.sin(ang) * push;
+            pos[b].cx += Math.cos(ang) * push; pos[b].cy += Math.sin(ang) * push;
+          }
+        }
+      }
+    }
+
+    points.forEach(function (p, i) {
+      svg.push('<circle cx="' + pos[i].cx + '" cy="' + pos[i].cy + '" r="6" fill="' + p.color + '"></circle>');
+    });
+    points.forEach(function (p, i) {
+      if (p.pareto) svg.push('<circle class="pareto-ring" cx="' + pos[i].cx + '" cy="' + pos[i].cy + '" r="9" stroke="' + p.color + '"></circle>');
+    });
+    // declutter labels top-to-bottom so nudged/close dots don't get overlapping text
+    var order = points.map(function (p, i) { return i; });
+    order.sort(function (i, j) { return pos[i].cy - pos[j].cy; });
+    var minGapY = 12;
+    for (var k = 1; k < order.length; k++) {
+      var prev = order[k - 1], cur = order[k];
+      if (pos[cur].cy - pos[prev].cy < minGapY) pos[cur].cy = pos[prev].cy + minGapY;
+    }
+    points.forEach(function (p, i) {
+      svg.push('<text class="scatter-caption" x="' + pos[i].cx + '" y="' + (pos[i].cy - 12) + '" text-anchor="middle">' + p.label + '</text>');
+    });
+
+    svg.push('</svg>');
+    el.innerHTML = svg.join('');
+
+    var seen = {}, items = [];
+    points.forEach(function (p) { if (!seen[p.group]) { seen[p.group] = true; items.push(p); } });
+    var legend = document.createElement('div');
+    legend.className = 'legend';
+    legend.innerHTML = items.map(function (p) {
+      return '<span class="item"><span class="swatch" style="background:' + p.color + '"></span>' + p.group + '</span>';
+    }).join('') + '<span class="item">○ ringed dot = Pareto frontier</span>';
+    el.parentElement.appendChild(legend);
+  }
+
+  function ready() {
+    var BLUE = css('--blue'), ORANGE = css('--orange'), AQUA = css('--aqua'), VIOLET = css('--violet');
+    var SEQ = [css('--seq-1'), css('--seq-2'), css('--seq-3'), css('--seq-4')];
+
+    // --- Scaling (RQ1) ----------------------------------------------------
+    renderBars('chartScaling1', {
+      categories: ['Text generation (GPT-2), 4 chips', 'Text classification (DistilBERT), 4 chips'],
+      series: [{ name: 'Actual efficiency', color: BLUE, values: [97.2, 92.4] }],
+      valueFmt: function (v) { return fmt(v, 1) + '%'; },
+      max: 115,
+      refLine: { value: 100, label: 'perfect (100%)' }
+    });
+
+    renderBars('chartScaling2', {
+      categories: ['Text classification (DistilBERT), 4 chips', 'Small chat model (TinyLlama), 2 chips'],
+      series: [{ name: 'Actual efficiency', color: ORANGE, values: [73.4, 80.8] }],
+      valueFmt: function (v) { return fmt(v, 1) + '%'; },
+      max: 115,
+      refLine: { value: 100, label: 'perfect (100%)' }
+    });
+
+    // --- Strategy (RQ2) ---------------------------------------------------
+    renderBars('chartStrategySpeed', {
+      categories: ['Full-copy (DDP)', 'Memory-smart (FSDP)', 'Deep memory-save (DeepSpeed)'],
+      series: [{ name: 'Tokens processed / second', color: BLUE, values: [243865, 248567, 290534] }],
+      valueFmt: function (v) { return fmt(v / 1000, 0) + 'k/s'; },
+    });
+    renderBars('chartStrategyMemory', {
+      categories: ['Full-copy (DDP)', 'Memory-smart (FSDP)', 'Deep memory-save (DeepSpeed)'],
+      series: [{ name: 'GB of chip memory used', color: ORANGE, values: [29.28, 29.48, 24.52] }],
+      valueFmt: function (v) { return fmt(v, 1) + ' GB'; },
+    });
+
+    // --- Precision (RQ3) ---------------------------------------------------
+    renderBars('chartPrecisionGpt2', {
+      categories: ['Most exact (FP32)', 'Standard-compact (FP16)', 'Standard-compact (BF16)', 'Most compact (FP8)'],
+      series: [{ name: 'Speed multiplier', color: BLUE, values: [1.0, 2.65, 2.72, 3.62] }],
+      valueFmt: function (v) { return fmt(v, 2) + '×'; },
+      max: 4.3
+    });
+    // recolor precision bars sequentially after render
+    (function paintSequential(id) {
+      var svg = document.getElementById(id).querySelector('svg');
+      var rects = svg.querySelectorAll('rect');
+      rects.forEach(function (r, i) { r.setAttribute('fill', SEQ[i] || SEQ[SEQ.length - 1]); });
+    })('chartPrecisionGpt2');
+
+    renderBars('chartPrecisionDistilbert', {
+      categories: ['Most exact (FP32)', 'Standard-compact (FP16)', 'Standard-compact (BF16)', 'Most compact (FP8)'],
+      series: [{ name: 'Speed multiplier', color: BLUE, values: [1.0, 4.67, 4.84, 5.29] }],
+      valueFmt: function (v) { return fmt(v, 2) + '×'; },
+      max: 6.2
+    });
+    (function paintSequential(id) {
+      var svg = document.getElementById(id).querySelector('svg');
+      var rects = svg.querySelectorAll('rect');
+      rects.forEach(function (r, i) { r.setAttribute('fill', SEQ[i] || SEQ[SEQ.length - 1]); });
+    })('chartPrecisionDistilbert');
+
+    // --- Communication (RQ4) -----------------------------------------------
+    renderBars('chartComms', {
+      categories: ['Text generation (GPT-2)', 'Text classification (DistilBERT)'],
+      series: [
+        { name: 'Premium chip (H100)', color: BLUE, values: [0.66, 0.66] },
+        { name: 'Budget chip (L40S)', color: ORANGE, values: [4.34, 30.45] }
+      ],
+      valueFmt: function (v) { return fmt(v, 2) + ' ms'; },
+    });
+
+    renderBars('chartDataLoading', {
+      categories: ['Setting switched off', 'Setting switched on'],
+      series: [{ name: 'Time spent loading data', color: AQUA, values: [74.0, 6.0] }],
+      valueFmt: function (v) { return fmt(v, 1) + ' ms'; },
+    });
+
+    // --- Hardware (RQ6) -----------------------------------------------------
+    renderDiverging('chartHardware', {
+      categories: ['Text generation – training', 'Text generation – answering one request', 'Text classification – training', 'Text classification – answering one request'],
+      values: [2.74, 1.00, 2.43, 0.88],
+      posColor: BLUE, negColor: ORANGE,
+      posLabel: 'premium chip faster', negLabel: 'budget chip faster'
+    });
+
+    // --- Batching (RQ5 / practical) ------------------------------------------
+    renderBars('chartBatchThroughput', {
+      categories: ['One request at a time', '32 requests together'],
+      series: [{ name: 'Requests processed / second', color: VIOLET, values: [354.7, 9463.2] }],
+      valueFmt: function (v) { return fmt(v, 0) + '/s'; },
+    });
+    renderBars('chartBatchLatency', {
+      categories: ['One request at a time', '32 requests together'],
+      series: [{ name: 'Typical wait per person', color: VIOLET, values: [360.9, 432.6] }],
+      valueFmt: function (v) { return fmt(v, 0) + ' ms'; },
+    });
+
+    // --- Power & energy (RQ5) -----------------------------------------------
+    renderBars('chartEnergyGpt2', {
+      categories: ['Most exact (FP32)', 'Standard-compact (FP16)', 'Standard-compact (BF16)', 'Most compact (FP8)'],
+      series: [{ name: 'Energy efficiency', color: BLUE, values: [1.0, 3.88, 4.03, 5.90] }],
+      valueFmt: function (v) { return fmt(v, 2) + '×'; },
+      max: 6.8
+    });
+    (function paintSequential(id) {
+      var svg = document.getElementById(id).querySelector('svg');
+      var rects = svg.querySelectorAll('rect');
+      rects.forEach(function (r, i) { r.setAttribute('fill', SEQ[i] || SEQ[SEQ.length - 1]); });
+    })('chartEnergyGpt2');
+
+    renderBars('chartEnergyDistilbert', {
+      categories: ['Most exact (FP32)', 'Standard-compact (FP16)', 'Standard-compact (BF16)', 'Most compact (FP8)'],
+      series: [{ name: 'Energy efficiency', color: BLUE, values: [1.0, 13.82, 14.55, 17.48] }],
+      valueFmt: function (v) { return fmt(v, 2) + '×'; },
+      max: 20
+    });
+    (function paintSequential(id) {
+      var svg = document.getElementById(id).querySelector('svg');
+      var rects = svg.querySelectorAll('rect');
+      rects.forEach(function (r, i) { r.setAttribute('fill', SEQ[i] || SEQ[SEQ.length - 1]); });
+    })('chartEnergyDistilbert');
+
+    renderBars('chartPowerScaling', {
+      categories: ['1 chip', '2 chips', '4 chips'],
+      series: [{ name: 'Total watts drawn', color: ORANGE, values: [625, 1125, 1961] }],
+      valueFmt: function (v) { return fmt(v, 0) + ' W'; },
+    });
+
+    renderBars('chartEnergyScaling', {
+      categories: ['1 chip', '2 chips', '4 chips'],
+      series: [{ name: 'Energy efficiency', color: AQUA, values: [1.0, 1.33, 2.62] }],
+      valueFmt: function (v) { return fmt(v, 2) + '×'; },
+      max: 3.0
+    });
+
+    renderBars('chartEnergyBatching', {
+      categories: ['1 at a time', '2 together', '4 together', '8 together', '16 together', '32 together'],
+      series: [{ name: 'Energy efficiency', color: VIOLET, values: [1.0, 1.85, 3.55, 6.87, 12.55, 21.60] }],
+      valueFmt: function (v) { return fmt(v, 2) + '×'; },
+      max: 25
+    });
+
+    // --- 7B model: quantization, long context & sharding (new, 2026-09-26) --
+    renderBars('chartLowbitSpeed', {
+      categories: ['BF16 (control)', 'AWQ (4-bit)', 'GPTQ (4-bit)', 'NF4 (4-bit)'],
+      series: [{ name: 'Tokens processed / second', color: BLUE, values: [756.85, 817.30, 845.42, 264.15] }],
+      valueFmt: function (v) { return fmt(v, 0) + '/s'; },
+    });
+    (function paintSequential(id) {
+      var svg = document.getElementById(id).querySelector('svg');
+      var rects = svg.querySelectorAll('rect');
+      rects.forEach(function (r, i) { r.setAttribute('fill', SEQ[i] || SEQ[SEQ.length - 1]); });
+    })('chartLowbitSpeed');
+
+    renderBars('chartLowbitMemory', {
+      categories: ['BF16 (control)', 'AWQ (4-bit)', 'GPTQ (4-bit)', 'NF4 (4-bit)'],
+      series: [{ name: 'Peak GB of chip memory used', color: ORANGE, values: [15.70, 6.66, 6.68, 7.06] }],
+      valueFmt: function (v) { return fmt(v, 1) + ' GB'; },
+    });
+    (function paintSequential(id) {
+      var svg = document.getElementById(id).querySelector('svg');
+      var rects = svg.querySelectorAll('rect');
+      rects.forEach(function (r, i) { r.setAttribute('fill', SEQ[i] || SEQ[SEQ.length - 1]); });
+    })('chartLowbitMemory');
+
+    renderBars('chartLongContext', {
+      categories: ['~4,096-token prompt', '~6,144-token prompt', '~8,192-token prompt'],
+      series: [{ name: 'Time to first word', color: AQUA, values: [95.97, 148.94, 199.51] }],
+      valueFmt: function (v) { return fmt(v, 0) + ' ms'; },
+    });
+
+    renderBars('chartSharding', {
+      categories: ['Memory-smart (FSDP), 2 chips', 'Deep memory-save (ZeRO-3), 2 chips', 'Memory-smart (FSDP), 4 chips', 'Deep memory-save (ZeRO-3), 4 chips'],
+      series: [{ name: 'Tokens processed / second', color: VIOLET, values: [4758.69, 2624.33, 10716.24, 5189.87] }],
+      valueFmt: function (v) { return fmt(v / 1000, 2) + 'k/s'; },
+    });
+
+    // --- Coverage meter list (Supporting Evidence) --------------------------
+    renderMeterList('chartCoverageMeters', [
+      { label: 'Hardware energy revalidation', completed: 0, total: 4 },
+      { label: 'Large-model training update controls', completed: 3, total: 6 },
+      { label: 'Inference framework', completed: 5, total: 9 },
+      { label: 'Training update validation', completed: 2, total: 3 },
+      { label: 'Inference precision/quantization', completed: 16, total: 20 },
+      { label: 'Memory optimisation', completed: 25, total: 31 },
+      { label: 'Environment validation', completed: 8, total: 9 },
+      { label: 'Precision study', completed: 16, total: 18 },
+      { label: 'Strong scaling', completed: 14, total: 15 },
+      { label: 'All 16 other categories', completed: 161, total: 161 }
+    ]);
+
+    // --- RQ1 scaling-efficiency line chart -----------------------------------
+    renderLineChart('chartScalingLine', {
+      xTicks: [1, 2, 4],
+      yMax: 110,
+      series: [
+        { name: 'GPT-2 · weak scaling', color: BLUE, points: [{ x: 1, y: 100 }, { x: 2, y: 96.974 }, { x: 4, y: 97.174 }] },
+        { name: 'DistilBERT · weak scaling', color: ORANGE, points: [{ x: 1, y: 100 }, { x: 2, y: 91.363 }, { x: 4, y: 92.383 }] },
+        { name: 'DistilBERT · strong scaling', color: AQUA, points: [{ x: 1, y: 100 }, { x: 2, y: 86.669 }, { x: 4, y: 73.445 }] },
+        { name: 'TinyLlama · strong scaling', color: VIOLET, points: [{ x: 1, y: 100 }, { x: 2, y: 80.819 }] }
+      ]
+    });
+
+    // --- RQ2 strategy Pareto scatter (2-chip runs) ---------------------------
+    renderScatter('chartStrategyScatterGpt2', {
+      points: [
+        { label: 'DDP', group: 'DDP (full copy)', x: 243865.36, y: 29.278, color: BLUE, pareto: false },
+        { label: 'ZeRO-1', group: 'DeepSpeed (ZeRO)', x: 290534.30, y: 24.517, color: AQUA, pareto: true },
+        { label: 'ZeRO-2', group: 'DeepSpeed (ZeRO)', x: 290465.80, y: 24.517, color: AQUA, pareto: false },
+        { label: 'ZeRO-3', group: 'DeepSpeed (ZeRO)', x: 265114.36, y: 26.038, color: AQUA, pareto: false },
+        { label: 'FSDP', group: 'FSDP (sharded)', x: 248566.51, y: 29.481, color: ORANGE, pareto: false }
+      ]
+    });
+    renderScatter('chartStrategyScatterDistilbert', {
+      points: [
+        { label: 'DDP', group: 'DDP (full copy)', x: 1256938.03, y: 6.251, color: BLUE, pareto: false },
+        { label: 'ZeRO-1', group: 'DeepSpeed (ZeRO)', x: 1182332.41, y: 6.255, color: AQUA, pareto: false },
+        { label: 'ZeRO-2', group: 'DeepSpeed (ZeRO)', x: 1173375.24, y: 6.255, color: AQUA, pareto: false },
+        { label: 'ZeRO-3', group: 'DeepSpeed (ZeRO)', x: 627027.43, y: 6.071, color: AQUA, pareto: false },
+        { label: 'FSDP', group: 'FSDP (sharded)', x: 1277842.35, y: 5.608, color: ORANGE, pareto: true }
+      ]
+    });
+
+    // --- Snapshot line + coverage -------------------------------------------
+    var total = 276, completed = 250, pct = Math.round((completed / total) * 100);
+    document.getElementById('snapshotLine').textContent =
+      'Snapshot generated from ' + completed + ' of ' + total + ' planned tests (' + pct + '% complete), ' +
+      'spanning two chip types and three AI models.';
+    document.getElementById('coverageCompleted').textContent = completed;
+    document.getElementById('coverageTotal').textContent = total;
+    document.getElementById('coveragePct').textContent = pct + '%';
+    document.getElementById('coverageBar').style.width = pct + '%';
+
+    initExpRows();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ready);
+  } else {
+    ready();
+  }
+})();
+</script>
+
+</body>
+</html>

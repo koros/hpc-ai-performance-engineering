@@ -84,7 +84,7 @@ test:
 	$(PYTHON) -m pytest
 
 test-dashboard:
-	node dashboard/app.test.cjs
+	node dashboard/site.test.cjs
 
 check: lint test test-dashboard
 
