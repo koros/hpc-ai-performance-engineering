@@ -20,6 +20,7 @@
 
     --blue: #2a78d6;
     --orange: #eb6834;
+    --danger: #c73535;
     --aqua: #1baf7a;
     --violet: #4a3aa7;
 
@@ -44,6 +45,7 @@
 
       --blue: #3987e5;
       --orange: #d95926;
+      --danger: #f07171;
       --aqua: #199e70;
       --violet: #9085e9;
 
@@ -321,11 +323,17 @@
   .status-completed { background: rgba(12,163,12,0.14); color: var(--good); }
   .status-configured { background: rgba(42,120,214,0.14); color: var(--blue); }
   .status-deferred { background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--border); }
-  .status-oom-limited { background: rgba(235,104,52,0.14); color: var(--orange); }
+  .status-oom-limited { background: rgba(199,53,53,0.14); color: var(--danger); }
   .status-recovered { background: rgba(27,175,122,0.14); color: var(--aqua); }
-  .status-subline { display: block; margin-top: 4px; font-size: 11px; color: var(--orange); white-space: normal; }
-  .status-subline.recovered { color: var(--aqua); }
-  .platform-status-list { display: flex; flex-direction: column; gap: 2px; font-size: 11.5px; white-space: normal; }
+  .platform-status-list { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .platform-marker { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; white-space: nowrap; }
+  .platform-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; }
+  .state-completed .platform-dot { background: var(--good); }
+  .state-oom-limited .platform-dot { background: var(--danger); }
+  .state-configured .platform-dot { background: var(--blue); }
+  .state-deferred .platform-dot { background: var(--text-muted); }
+  .status-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin: 0 0 14px; color: var(--text-secondary); }
+  .status-legend .platform-marker { font-size: 12px; }
 
   .hidden-row { display: none !important; }
 
@@ -378,6 +386,7 @@
     margin: 10px 0; padding: 10px 12px; border-left: 3px solid var(--orange);
     border-radius: 0 8px 8px 0; background: var(--surface); font-size: 12.5px;
   }
+  .capacity-note.oom-limited { border-left-color: var(--danger); }
   .capacity-note.recovered { border-left-color: var(--aqua); }
   .capacity-note strong { display: block; margin-bottom: 3px; }
   .capacity-note p { margin: 0; color: var(--text-secondary); }
@@ -436,13 +445,15 @@
     it was tested on. The <span class="chip">grey chips</span> above each table are the parameters that
     stayed fixed for every condition in that group &mdash; the <span class="chip varied">blue chips</span>
     and the table's own columns are the parameters that were deliberately changed between conditions.
-    Click any row (or a group's &ldquo;Compare all&rdquo; link) to open the full measured detail, including
-    results by platform. <code>Configured</code> means no completed trial is recorded yet;
-    <code>Deferred</code> means the condition is on hold for another reason.
-    <code>OOM-limited</code> means a CUDA out-of-memory failure was measured on the named GPU at
-    the tested settings. It is a ceiling for that configuration, not proof that a smaller batch
-    or a different method cannot run. An experiment may be completed on H100 but OOM-limited on
-    L40S. Failed attempts do not count as completed performance results.
+    Click a row for measured results and failure details. The dot beside each platform shows its
+    status: red means CUDA OOM at the tested settings, not that a smaller configuration cannot run.
+    Failed attempts are not counted as completed results.
+  </div>
+  <div class="status-legend" aria-label="Platform status key">
+    <span class="platform-marker state-completed"><span class="platform-dot" aria-hidden="true"></span>Completed</span>
+    <span class="platform-marker state-oom-limited"><span class="platform-dot" aria-hidden="true"></span>OOM-limited</span>
+    <span class="platform-marker state-configured"><span class="platform-dot" aria-hidden="true"></span>Configured</span>
+    <span class="platform-marker state-deferred"><span class="platform-dot" aria-hidden="true"></span>Deferred</span>
   </div>
   <div id="themeTree"></div>
 </main>
@@ -531,7 +542,7 @@ function catalogStatusForPlatform(e, platform) {
   var history = (CAPACITY_HISTORY[e.id] || {})[platform];
   if (history && history.state === "deferred") return history.measuredOom ? "OOM-limited" : "Deferred";
   if ((e.platforms || {})[platform]) return "Completed";
-  return catalogStatus(e);
+  return e.status === "Deferred" ? "Deferred" : "Configured";
 }
 function catalogPlatforms(e) {
   var platforms = (e.platform_list || []).slice();
@@ -547,17 +558,24 @@ function catalogTotals(ids) {
   });
   return totals;
 }
+function platformMarker(platform, status) {
+  var meaning = {
+    "Completed": "completed trial",
+    "Configured": "configured; no completed trial",
+    "Deferred": "deferred; not run",
+    "OOM-limited": "CUDA out of memory at tested settings"
+  }[status];
+  var label = (platform ? platform.toUpperCase() : "Condition") + ": " + meaning;
+  return '<span class="platform-marker state-' + status.toLowerCase() + '" role="img" aria-label="' + esc(label) +
+    '" title="' + esc(label) + '"><span class="platform-dot" aria-hidden="true"></span>' +
+    esc(platform ? platform.toUpperCase() : status) + "</span>";
+}
 function platformStatusHtml(e) {
   var platforms = catalogPlatforms(e);
-  if (!platforms.length) return "<span>—</span>";
+  if (!platforms.length) return platformMarker("", catalogStatus(e));
   return platforms.map(function (platform) {
     var history = (CAPACITY_HISTORY[e.id] || {})[platform];
-    if (history && history.state === "deferred") {
-      return "<span>" + esc(platform.toUpperCase()) + " · " +
-        (history.measuredOom ? '<span class="status-pill status-oom-limited">OOM-limited</span>' : "deferred") + "</span>";
-    }
-    if (history && history.state === "recovered") return "<span>" + esc(platform.toUpperCase()) + " · completed (prior OOM resolved)</span>";
-    return "<span>" + esc(platform.toUpperCase()) + " · completed</span>";
+    return platformMarker(platform, history && history.state === "recovered" ? "Completed" : catalogStatusForPlatform(e, platform));
   }).join("");
 }
 
@@ -647,7 +665,7 @@ function miniMeter(totals) {
 }
 
 function renderParamChips(group, cls) {
-  var keys = Object.keys(group).filter(function (k) { return k !== "workload_label"; });
+  var keys = Object.keys(group).filter(function (k) { return k !== "workload_label" && k !== "platform_list"; });
   if (!keys.length) return "";
   return keys.map(function (k) {
     var label = COL_LABEL[k] || k;
@@ -657,21 +675,14 @@ function renderParamChips(group, cls) {
 }
 
 function renderCluster(cluster) {
-  var variedCols = Object.keys(cluster.varied).filter(function (k) { return k !== "workload_label"; });
-  var head = ["Exp. ID"].concat(variedCols.map(function (c) { return COL_LABEL[c] || c; })).concat(["Status", "Platform(s)"]);
+  var variedCols = Object.keys(cluster.varied).filter(function (k) { return k !== "workload_label" && k !== "platform_list"; });
+  var head = ["Exp. ID"].concat(variedCols.map(function (c) { return COL_LABEL[c] || c; })).concat(["Platform status"]);
   var rows = cluster.experiment_ids.map(function (eid) {
     var e = DATA.experiments[eid];
-    var status = catalogStatus(e);
-    var history = CAPACITY_HISTORY[eid] || {};
-    var oomPlatforms = Object.keys(history).filter(function (platform) { return history[platform].measuredOom && history[platform].state === "deferred"; });
-    var recovered = Object.keys(history).some(function (platform) { return history[platform].state === "recovered"; });
     var cells = ["<td>" + eid + "</td>"];
     variedCols.forEach(function (c) {
       cells.push("<td>" + esc(fmtSingle(c, e[c])) + "</td>");
     });
-    cells.push('<td><span class="status-pill status-' + status.toLowerCase() + '">' + status + "</span>" +
-      (oomPlatforms.length ? '<span class="status-subline">OOM on ' + esc(oomPlatforms.map(function (p) { return p.toUpperCase(); }).join(" + ")) + "</span>" : "") +
-      (recovered ? '<span class="status-subline recovered">Earlier OOM resolved</span>' : "") + "</td>");
     cells.push('<td><span class="platform-status-list">' + platformStatusHtml(e) + "</span></td>");
     return '<tr data-id="' + eid + '" tabindex="0" role="button" aria-label="View details for experiment ' + eid + '">' + cells.join("") + "</tr>";
   }).join("");
@@ -900,7 +911,7 @@ function renderExpCard(eid, opts) {
     var record = history[platform];
     var label = record.state === "recovered" ? "Completed after earlier OOM" :
       (record.measuredOom ? "OOM-limited at tested settings" : "Deferred; not run");
-    lines.push('<div class="capacity-note' + (record.state === "recovered" ? " recovered" : "") + '">' +
+    lines.push('<div class="capacity-note' + (record.state === "recovered" ? " recovered" : record.measuredOom ? " oom-limited" : "") + '">' +
       "<strong>" + esc(platform.toUpperCase()) + " · " + esc(label) + "</strong>" +
       "<p>" + esc(record.note) + "</p></div>");
   });

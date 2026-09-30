@@ -10,7 +10,10 @@ Two self-contained pages (no build step, no dependencies), meant to be read in o
    grouped by research theme and study, with filters and an automatic "held constant vs. varied"
    breakdown per comparison, plus a click-through details view. The catalog overlays platform-specific
    CUDA OOM deferrals from `platforms/execution_matrix.json`: a condition may be complete on H100
-   but **OOM-limited** at the tested settings on L40S. This is a distinct badge, filter, and KPI;
+   but **OOM-limited** at the tested settings on L40S. The catalog shows one compact platform-status
+   column: green/blue/grey/red dots denote completed/configured/deferred/OOM-limited, with a legend,
+   hover descriptions, and full details in the drawer. Platform is omitted from the varied chips and
+   duplicate table columns. OOM-limited remains a distinct status filter and KPI;
    configured (not yet run) and other deferred conditions are not counted as measured OOMs.
    E250's first-attempt OOM is labelled recovered because its later canary completed. The overlay
    updates the displayed status counts without changing the embedded
