@@ -10,8 +10,10 @@ Two self-contained pages (no build step, no dependencies), meant to be read in o
    grouped by research theme and study, with filters and an automatic "held constant vs. varied"
    breakdown per comparison, plus a click-through details view. The catalog overlays platform-specific
    CUDA OOM deferrals from `platforms/execution_matrix.json`: a condition may be complete on H100
-   but deferred after OOM on L40S. E250's first-attempt OOM is labelled recovered because its later
-   canary completed. The overlay updates the displayed status counts without changing the embedded
+   but **OOM-limited** at the tested settings on L40S. This is a distinct badge, filter, and KPI;
+   configured (not yet run) and other deferred conditions are not counted as measured OOMs.
+   E250's first-attempt OOM is labelled recovered because its later canary completed. The overlay
+   updates the displayed status counts without changing the embedded
    completed-trial means or the older `experiments-data.json` evidence snapshot. This is the evidence base.
 2. **`analysis.html` — Part 2, Analysis & Findings.** Turns that evidence into a non-technical
    story for readers who aren't familiar with GPUs, distributed training, or the RQ1–RQ7 framing
