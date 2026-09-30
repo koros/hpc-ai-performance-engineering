@@ -17,6 +17,26 @@ or E268/E269 only, with three repetitions per strategy.
 **`No`** means do not run that matrix row on the platform. <br/>
 **`Deferred`** means do not schedule that condition on the named platform yet.<br/>
 
+### Measured CUDA out-of-memory conditions
+
+The execution matrix marks the following platform-specific conditions `deferred` with
+`observed_failure: cuda_oom`. This is a measured failure of the stated configuration, not a
+claim that the experiment ID fails on every platform. Failed attempts are retained in their
+submission bundles; they are not completed throughput evidence.
+
+| Platform | Deferred after measured OOM | Outcome |
+| --- | --- | --- |
+| L40S | `E032`, `E033`, `E044`, `E067`, `E068` | Original strong-scaling or memory-sweep shapes exceeded device capacity. |
+| L40S | `E203`, `E204`, `E206`, `E207` | Capacity-adjusted GPT-2 upper-bound probes exceeded device capacity. |
+| H100 | `E032`, `E068`, `E257` | Exact GPT-2 shapes or the default-allocator batch-48 probe exceeded capacity. |
+| H100 | `E261` | Two-GPU Qwen 7B DDP canary exceeded capacity. |
+
+H100 `E250` also OOMed **on its first attempt**, but decoder-layer FSDP wrapping fixed the
+runtime issue and the subsequent canary completed. It is recorded in `recovered_failures`, not
+the deferred list. `E264` is deferred because its matching `E261` canary OOMed; `E264` was not
+itself run. `E267` awaits an independent four-GPU DDP feasibility check and must not be described
+as a measured OOM.
+
 Current site policy: the PyTorch CUDA runtime is usable on both GPU partitions, so ordinary CUDA/NCCL/FSDP/DeepSpeed
 experiments remain scheduled. The private PyTorch 2.8.0/CUDA 12.4 and vLLM 0.10.2 stack has passed E006 acceptance on
 L40S and H100, so supported vLLM conditions use platform-separated dedicated waves. Meanwhile,
