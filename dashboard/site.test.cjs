@@ -14,11 +14,12 @@ for (const [name, html, other] of [
   ["findings", findings, "index.html"],
 ]) {
   assert.match(html, new RegExp(`href="${other}"`), `${name} must link to the other page`);
-  assert.match(html, /L40S energy revalidation trials from 28 September are not included/);
   const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
   assert.ok(scripts.length > 0, `${name} must include its self-contained script`);
   for (const [, script] of scripts) new vm.Script(script, { filename: `${name}.html` });
 }
+assert.match(catalog, /Verified L40S hardware-energy anchors E235–E238 from 28 September 2026 are included/);
+assert.match(findings, /hardware-energy anchors collected on 28 September are listed in the catalog but are not yet included in these findings/);
 
 function embeddedJson(html, variable) {
   const line = html.split("\n").find((entry) => entry.trimStart().startsWith(`var ${variable} = `));
@@ -35,6 +36,13 @@ assert.equal(
   catalogData.meta.completed + catalogData.meta.configured + catalogData.meta.deferred,
   catalogData.meta.total,
 );
+assert.equal(catalogData.meta.completed, 254);
+assert.equal(catalogData.meta.configured, 12);
+const energyPhase = catalogData.themes.flatMap((theme) => theme.phases)
+  .find((phase) => phase.id === "hardware-energy-revalidation");
+assert.equal(energyPhase.totals.completed, 4);
+assert.equal(energyPhase.totals.configured, 0);
+assert.ok(energyPhase.clusters.every((cluster) => cluster.totals.completed === 2));
 
 const matrix = JSON.parse(fs.readFileSync(path.join(root, "../platforms/execution_matrix.json"), "utf8"));
 const catalogScript = [...catalog.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)][0][1];
@@ -67,6 +75,24 @@ for (const entry of matrix.deferred.filter((item) => item.observed_failure === "
 }
 assert.equal(matrix.recovered_failures[0].experiment_id, "E250");
 assert.equal(catalogContext.CAPACITY_HISTORY.E250.h100.state, "recovered");
+for (const [experimentId, referenceId] of Object.entries({ E235: "E123", E236: "E124", E237: "E127", E238: "E128" })) {
+  const anchor = catalogData.experiments[experimentId];
+  const trials = fs.readdirSync(path.join(root, "..", "results", "raw", "l40s", experimentId))
+    .filter((name) => name.endsWith(".json"))
+    .map((name) => JSON.parse(fs.readFileSync(path.join(root, "..", "results", "raw", "l40s", experimentId, name), "utf8")));
+  assert.equal(anchor.status, "Completed");
+  assert.equal(anchor.energy_reference_experiment_id, referenceId);
+  assert.equal(anchor.platforms.l40s.n, 3);
+  assert.equal(trials.length, 3);
+  assert.ok(trials.every((trial) => trial.status === "completed" && trial.config.metadata.energy_reference_experiment_id === referenceId));
+  const meanEnergy = trials.reduce((sum, trial) => sum + trial.metrics.energy_joules_measured_region, 0) / trials.length;
+  const meanPower = trials.reduce((sum, trial) => sum + trial.metrics.power_draw_watts, 0) / trials.length;
+  assert.ok(Math.abs(anchor.platforms.l40s.energy_joules - meanEnergy) < 0.0001);
+  assert.ok(Math.abs(anchor.platforms.l40s.power_draw_watts - meanPower) < 0.0001);
+  assert.match(catalogContext.platformStatusHtml(anchor), /state-completed[^>]+role="img"/);
+  assert.match(catalogContext.renderExpCard(experimentId), /Measured power \(W\)/);
+  assert.match(catalogContext.renderExpCard(experimentId), new RegExp(`Energy reference:[\\s\\S]*${referenceId}`));
+}
 assert.equal(catalogContext.catalogStatus(catalogContext.DATA.experiments.E032), "OOM-limited");
 assert.equal(catalogContext.catalogStatus(catalogContext.DATA.experiments.E033), "Completed");
 assert.equal(catalogContext.catalogStatus(catalogContext.DATA.experiments.E250), "Completed");
@@ -114,7 +140,7 @@ const shownTotals = catalogContext.catalogTotals(Object.keys(catalogContext.DATA
 assert.equal(shownTotals.total, catalogData.meta.total);
 assert.equal(shownTotals.completed + shownTotals.configured + shownTotals.deferred + shownTotals.oom_limited, shownTotals.total);
 assert.equal(shownTotals.oom_limited, 8);
-assert.equal(shownTotals.configured, 6);
+assert.equal(shownTotals.configured, 2);
 assert.equal(shownTotals.deferred, 12);
 
 console.log("Dashboard catalog and findings checks passed.");

@@ -1,8 +1,9 @@
 # Research Dashboard — Experiment Catalog & plain-language summary
 
-This is the published dashboard. It is a static evidence snapshot through 27 September 2026;
-the L40S energy revalidation trials recorded on 28 September are not reflected in the embedded
-figures. The original `dashboard3/` files remain as the source reference.
+This is the published dashboard. The catalog now includes the verified L40S hardware-energy
+anchors E235–E238 collected on 28 September 2026; the separate findings page remains a static
+narrative snapshot through 27 September. The original `dashboard3/` files remain as the source
+reference.
 
 Two self-contained pages (no build step, no dependencies), meant to be read in order:
 
@@ -16,8 +17,9 @@ Two self-contained pages (no build step, no dependencies), meant to be read in o
    duplicate table columns. OOM-limited remains a distinct status filter and KPI;
    configured (not yet run) and other deferred conditions are not counted as measured OOMs.
    E250's first-attempt OOM is labelled recovered because its later canary completed. The overlay
-   updates the displayed status counts without changing the embedded
-   completed-trial means or the older `experiments-data.json` evidence snapshot. This is the evidence base.
+   updates the displayed status counts without changing the embedded completed-trial means.
+   The four hardware-energy anchors are synchronized from verified raw and processed evidence,
+   including their measured-region energy, power, and reference experiment IDs. This is the evidence base.
 2. **`analysis.html` — Part 2, Analysis & Findings.** Turns that evidence into a non-technical
    story for readers who aren't familiar with GPUs, distributed training, or the RQ1–RQ7 framing
    used elsewhere in this repo: six KPI numbers up top, then one short section per research
@@ -112,6 +114,11 @@ To refresh Part 1's catalog after a new experiment wave, re-run the same two sou
  the `<script>` block in `index.html` (also updating `experiments-data.json` alongside it). Keep the
  `CAPACITY_HISTORY` overlay aligned with the matrix's measured `cuda_oom` deferrals and its
  `recovered_failures` entry; `dashboard/site.test.cjs` checks that alignment.
+
+For the four L40S hardware-energy anchors, run `python3 scripts/update_dashboard_energy_anchors.py`
+after refreshing processed results. The script checks the raw evidence gate and trial provenance,
+then synchronizes `experiments-data.json` and the embedded `DATA` in `index.html`. Use `--check`
+to detect a stale catalog without changing files.
 
 ## Changelog
 
