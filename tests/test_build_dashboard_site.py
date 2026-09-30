@@ -1,4 +1,5 @@
 from pathlib import Path
+from xml.etree import ElementTree
 
 import pytest
 from scripts.build_dashboard_site import DASHBOARD_FILES, build_site
@@ -33,9 +34,17 @@ def test_build_site_publishes_only_dashboard3_content(tmp_path: Path) -> None:
     assert "url=dashboard/" in (output / "index.html").read_text(encoding="utf-8")
     for name in DASHBOARD_FILES:
         assert (output / "dashboard" / name).is_file()
+    assert (output / "dashboard" / "logo.svg").read_text(encoding="utf-8") == "logo.svg"
+    assert 'href="dashboard/logo.svg"' in (output / "index.html").read_text(encoding="utf-8")
     assert not (output / "results").exists()
     assert not (output / "dashboard" / "analysis.html.bak").exists()
     assert not (output / "dashboard" / "site.test.cjs").exists()
+
+
+def test_favicon_is_valid_svg() -> None:
+    root = ElementTree.parse("dashboard/logo.svg").getroot()
+    assert root.tag == "{http://www.w3.org/2000/svg}svg"
+    assert root.attrib["viewBox"] == "0 0 200 200"
 
 
 def test_build_site_rejects_destructive_output_outside_build(tmp_path: Path) -> None:

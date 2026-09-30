@@ -14,10 +14,12 @@ for (const [name, html, other] of [
   ["findings", findings, "index.html"],
 ]) {
   assert.match(html, new RegExp(`href="${other}"`), `${name} must link to the other page`);
+  assert.match(html, /<link rel="icon" type="image\/svg\+xml" href="logo\.svg"\s*\/>/, `${name} must use the dashboard favicon`);
   const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
   assert.ok(scripts.length > 0, `${name} must include its self-contained script`);
   for (const [, script] of scripts) new vm.Script(script, { filename: `${name}.html` });
 }
+assert.match(fs.readFileSync(path.join(root, "logo.svg"), "utf8"), /<svg\b[^>]*viewBox="0 0 200 200"/);
 assert.match(catalog, /Includes verified L40S energy anchors E235–E238 and the completed TinyLlama strategy sweep E277–E286/);
 assert.match(findings, /hardware-energy anchors collected on 28 September are listed in the catalog but are not yet included in the findings/);
 

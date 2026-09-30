@@ -6,7 +6,14 @@ import argparse
 import shutil
 from pathlib import Path
 
-DASHBOARD_FILES = ("index.html", "analysis.html", "README.md", "experiment-details.json", "experiments-data.json")
+DASHBOARD_FILES = (
+    "index.html",
+    "analysis.html",
+    "logo.svg",
+    "README.md",
+    "experiment-details.json",
+    "experiments-data.json",
+)
 
 ROOT_REDIRECT = """<!doctype html>
 <html lang="en">
@@ -15,6 +22,7 @@ ROOT_REDIRECT = """<!doctype html>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="refresh" content="0; url=dashboard/">
     <title>HPC AI Performance Engineering</title>
+    <link rel="icon" type="image/svg+xml" href="dashboard/logo.svg">
   </head>
   <body>
     <p><a href="dashboard/">Open the experiment dashboard</a></p>
