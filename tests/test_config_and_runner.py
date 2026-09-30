@@ -95,9 +95,9 @@ def test_discover_matrix_configs() -> None:
     entries = discover_experiment_configs()
     experiment_ids = {entry.config.experiment_id for entry in entries}
     source_ids = {f"E{index:03d}" for index in range(1, 201)}
-    supplemental_ids = {f"E{index:03d}" for index in range(201, 277)}
+    supplemental_ids = {f"E{index:03d}" for index in range(201, 305)}
 
-    assert len(entries) == 276
+    assert len(entries) == 304
     assert experiment_ids == source_ids | supplemental_ids
 
 
@@ -571,7 +571,9 @@ def test_default_registry_includes_transformer_workload_skeletons() -> None:
         "distilbert",
         "environment_validation",
         "gpt2_small",
+        "qwen2_5_3b",
         "qwen2_5_7b",
+        "qwen2_5_7b_bf16_serving",
         "qwen2_5_7b_long_context",
         "qwen2_5_7b_training",
         "synthetic",
@@ -2309,13 +2311,13 @@ def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
     report = report_path.read_text(encoding="utf-8")
 
     assert "Source matrix configs discovered: 200" in report
-    assert "Supplemental platform probes discovered: 71" in report
+    assert "Supplemental platform probes discovered: 99" in report
     assert "Cross-platform telemetry anchors discovered: 5" in report
-    assert "Total E-number configs discovered: 276" in report
+    assert "Total E-number configs discovered: 304" in report
     assert "`gpt2_small`" in report
     assert "slurm/smoke/gpt2_small_smoke.sbatch" in report
     assert "Submission Gate" in report
-    assert "Research-readiness blockers: 0" in report
+    assert "Research-readiness blockers: 7" in report
     assert "Deferred scope rows: 11" in report
 
 
@@ -2357,7 +2359,7 @@ def test_track_experiment_progress_writes_reports(tmp_path: Path) -> None:
 
     assert csv_path == output_csv
     assert markdown_path == output_markdown
-    assert len(rows) == 276
+    assert len(rows) == 304
     assert e033["status"] == "Completed"
     assert e033["runtime_seconds"] == "600.0"
     assert e034["status"] == "Configured"
@@ -2522,16 +2524,29 @@ def test_research_preflight_has_only_documented_execution_blockers() -> None:
         "E176",
         "E179",
         "E200",
+        "E294",
+        "E295",
+        "E296",
+        "E297",
+        "E298",
+        "E299",
+        "E300",
     }
 
 
 def test_research_preflight_excludes_explicitly_deferred_scope() -> None:
-    assert validate_experiment_configs("configs", research_ready=True) == []
+    issues = validate_experiment_configs("configs", research_ready=True)
+    assert {issue.path.stem[:4] for issue in issues} == {f"E{index}" for index in range(294, 301)}
+    assert all(issue.message == "matrix transformer config must pin workload.model_revision" for issue in issues)
 
 
 def test_matrix_transformer_models_are_pinned() -> None:
+    awaiting_revision = {f"E{index}" for index in range(294, 301)}
     for entry in discover_experiment_configs():
         if entry.config.workload.name == "environment_validation":
+            continue
+        if entry.config.experiment_id in awaiting_revision:
+            assert entry.config.workload.model_revision is None
             continue
         assert entry.config.workload.model_revision is not None
         assert len(entry.config.workload.model_revision) == 40
