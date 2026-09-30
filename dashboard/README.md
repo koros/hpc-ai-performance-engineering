@@ -1,13 +1,14 @@
 # Research Dashboard — Experiment Catalog & plain-language summary
 
-This is the published dashboard. The catalog now includes the verified L40S hardware-energy
-anchors E235–E238 collected on 28 September 2026; the separate findings page remains a static
-narrative snapshot through 27 September. The original `dashboard3/` files remain as the source
-reference.
+This is the published dashboard. The catalog includes the verified L40S hardware-energy anchors
+E235–E238 and the TinyLlama strategy sweep E277–E286 (three trials per condition). The main
+findings remain a base narrative snapshot through 27 September, with a separately dated TinyLlama
+RQ2 extension from 30 September. Newer matrix additions after E286 are not yet in this catalog
+snapshot. The original `dashboard3/` files remain as the source reference.
 
 Two self-contained pages (no build step, no dependencies), meant to be read in order:
 
-1. **`index.html` — Part 1, Experiment Catalog.** The complete 276-condition experiment matrix,
+1. **`index.html` — Part 1, Experiment Catalog.** The current 286-condition catalog snapshot,
    grouped by research theme and study, with filters and an automatic "held constant vs. varied"
    breakdown per comparison, plus a click-through details view. The catalog overlays platform-specific
    CUDA OOM deferrals from `platforms/execution_matrix.json`: a condition may be complete on H100
@@ -19,7 +20,10 @@ Two self-contained pages (no build step, no dependencies), meant to be read in o
    E250's first-attempt OOM is labelled recovered because its later canary completed. The overlay
    updates the displayed status counts without changing the embedded completed-trial means.
    The four hardware-energy anchors are synchronized from verified raw and processed evidence,
-   including their measured-region energy, power, and reference experiment IDs. This is the evidence base.
+   including their measured-region energy, power, and reference experiment IDs. The TinyLlama
+   strategy conditions are also synchronized from matching raw and processed trials. H100 and L40S
+   use different per-GPU batch sizes (8 versus 2), so the study groups and findings do not pool them.
+   This is the evidence base.
 2. **`analysis.html` — Part 2, Analysis & Findings.** Turns that evidence into a non-technical
    story for readers who aren't familiar with GPUs, distributed training, or the RQ1–RQ7 framing
    used elsewhere in this repo: six KPI numbers up top, then one short section per research

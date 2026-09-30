@@ -18,8 +18,8 @@ for (const [name, html, other] of [
   assert.ok(scripts.length > 0, `${name} must include its self-contained script`);
   for (const [, script] of scripts) new vm.Script(script, { filename: `${name}.html` });
 }
-assert.match(catalog, /Verified L40S hardware-energy anchors E235–E238 from 28 September 2026 are included/);
-assert.match(findings, /hardware-energy anchors collected on 28 September are listed in the catalog but are not yet included in these findings/);
+assert.match(catalog, /Includes verified L40S energy anchors E235–E238 and the completed TinyLlama strategy sweep E277–E286/);
+assert.match(findings, /hardware-energy anchors collected on 28 September are listed in the catalog but are not yet included in the findings/);
 
 function embeddedJson(html, variable) {
   const line = html.split("\n").find((entry) => entry.trimStart().startsWith(`var ${variable} = `));
@@ -36,13 +36,47 @@ assert.equal(
   catalogData.meta.completed + catalogData.meta.configured + catalogData.meta.deferred,
   catalogData.meta.total,
 );
-assert.equal(catalogData.meta.completed, 254);
+assert.equal(catalogData.meta.completed, 264);
 assert.equal(catalogData.meta.configured, 12);
 const energyPhase = catalogData.themes.flatMap((theme) => theme.phases)
   .find((phase) => phase.id === "hardware-energy-revalidation");
 assert.equal(energyPhase.totals.completed, 4);
 assert.equal(energyPhase.totals.configured, 0);
 assert.ok(energyPhase.clusters.every((cluster) => cluster.totals.completed === 2));
+const strategyPhase = catalogData.themes.flatMap((theme) => theme.phases)
+  .find((phase) => phase.id === "distributed-training-strategy");
+assert.equal(strategyPhase.totals.completed, 30);
+assert.deepStrictEqual(strategyPhase.clusters.slice(-2).map((cluster) => cluster.experiment_ids), [
+  ["E277", "E278", "E279", "E280", "E281", "E282", "E283", "E284"],
+  ["E285", "E286"],
+]);
+assert.equal(strategyPhase.clusters.at(-1).constant.gpus, "8");
+assert.equal(strategyPhase.clusters.at(-1).constant.per_gpu_batch_size, "2");
+assert.equal(strategyPhase.clusters.at(-2).constant.per_gpu_batch_size, "8");
+assert.match(findings, /id="nerd-tinyllama-strategy"/);
+assert.match(findings, /H100 used a batch of 8 per chip, L40S a batch of 2/);
+assert.match(findings, /id="chartTinyllamaStrategySpeed"/);
+assert.match(findings, /id="chartTinyllamaStrategyMemory"/);
+for (let number = 277; number <= 286; number++) {
+  const id = `E${number}`;
+  const platform = number >= 285 ? "l40s" : "h100";
+  const catalogEntry = catalogData.experiments[id];
+  const detailsEntry = detailsData[id];
+  const paths = fs.readdirSync(path.join(root, "..", "results", "raw", platform, id))
+    .filter((name) => name.endsWith(".json"));
+  const trials = paths.map((name) => JSON.parse(fs.readFileSync(
+    path.join(root, "..", "results", "raw", platform, id, name), "utf8")));
+  assert.equal(paths.length, 3);
+  assert.ok(trials.every((trial) => trial.status === "completed"));
+  assert.equal(catalogEntry.status, "Completed");
+  assert.deepStrictEqual(catalogEntry.platform_list, [platform]);
+  assert.equal(catalogEntry.platforms[platform].n, 3);
+  assert.equal(detailsEntry.platforms[`lovelace_${platform}`].n, 3);
+  for (const [field, metric] of [["throughput_tokens_sec", "throughput_tokens_sec"], ["memory_used_gb", "memory_used_gb"]]) {
+    const average = trials.reduce((sum, trial) => sum + trial.metrics[metric], 0) / 3;
+    assert.ok(Math.abs(catalogEntry.platforms[platform][field] - average) < 0.0001);
+  }
+}
 
 const matrix = JSON.parse(fs.readFileSync(path.join(root, "../platforms/execution_matrix.json"), "utf8"));
 const catalogScript = [...catalog.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)][0][1];
