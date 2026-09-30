@@ -1,10 +1,13 @@
 # Research Dashboard — Experiment Catalog & plain-language summary
 
 This is the published dashboard. The catalog includes the verified L40S hardware-energy anchors
-E235–E238 and the TinyLlama strategy sweep E277–E286 (three trials per condition). The main
-findings remain a base narrative snapshot through 27 September, with a separately dated TinyLlama
-RQ2 extension from 30 September. Newer matrix additions after E286 are not yet in this catalog
-snapshot. The original `dashboard3/` files remain as the source reference.
+E235–E238, the TinyLlama strategy sweep E277–E286, and the TinyLlama weak-scaling wave E287–E293
+(three trials per condition; E287–E289 are the matched H100 conditions, configured but not yet
+run). The main findings carry a base narrative snapshot through 27 September, plus two dated
+TinyLlama RQ1/RQ2 extensions from 30 September (strategy sweep, then weak scaling). Matrix
+additions beyond this wave (the Qwen2.5-3B distributed-strategy study and the Qwen2.5-7B BF16
+serving study) are configured/blocked with no completed trials yet, so they are not in this
+catalog snapshot. The original `dashboard3/` files remain as the source reference.
 
 Two self-contained pages (no build step, no dependencies), meant to be read in order:
 
@@ -222,3 +225,33 @@ work sits across several of rather than owning a number of its own), its nav lin
 prefix (the dates still appear in that block's methodology paragraph, where they're provenance
 rather than a headline). No figures, findings, or caveats were changed — this was navigation and
 framing only.
+
+**2026-09-30 (2)** — Added the TinyLlama weak-scaling wave (E287-E293) to both pages. `index.html`
+gained two new clusters under Scaling Efficiency &rarr; Weak scaling: `tinyllama_l40s` (E290-E293,
+completed, 1/2/4/8 chips) and `tinyllama_h100` (E287-E289, configured, the matched wave on the
+primary chip, not yet run). Catalog totals moved from 286/264/12/10 (total/completed/configured/
+deferred) to 293/268/15/10; `experiments-data.json` was regenerated alongside the embedded `DATA`
+constant so the two stay identical, per this file's own regeneration note above. `analysis.html`
+gained a new "New evidence" finding card under Question 1 (same-size-per-chip scaling reached only
+33-40% efficiency on L40S at 4/8 chips, short of the 91-97% GPT-2/DistilBERT reached on H100) and a
+matching `#nerd-tinyllama-weak-scaling` supporting-evidence block with its own chart, table, and
+`EXPERIMENT_DETAILS` entries (E290-E293; now 96 entries) for the details drawer. Refreshed the
+page-wide coverage KPI, the Supporting Evidence coverage caption, and the coverage meter list
+(`chartCoverageMeters`) from the stale 250/276 they had been left at — the "Hardware energy
+revalidation" category is now folded into "16 other" (completed by the earlier L40S-anchors update)
+while "Weak scaling" (12/15) takes its place as a still-incomplete category.
+
+Data quality note carried into the page itself: two of E291's three trials (2-GPU L40S) show
+wall-clock inflation consistent with transient multi-tenant contention on the shared node, dragging
+its reported efficiency down to 7% against 33-40% at 4 and 8 chips. The figures above use this
+pipeline's standard unfiltered 3-trial mean (matching every other condition in these pages); the
+caveat and an alternative single-trial reading (~60%) are in the nerd-block's limitation note, not
+silently smoothed over. The matched H100 weak-scaling wave (E287-E289) is still required to tell
+whether TinyLlama's original near-zero strong-scaling result was a batch-starvation artefact, per
+the open question noted in the RQ1 nerd-block above it.
+
+Investigated, but left out: the newer Qwen2.5-3B distributed-strategy/inference matrix (E294-E300,
+blocked on an unresolved `model_revision` pin) and the Qwen2.5-7B BF16 TP-serving matrix
+(E301-E304, configured, not yet run) have zero completed trials between them, so neither is
+represented in the catalog yet, consistent with how every prior wave here was only added once real
+trial data existed.

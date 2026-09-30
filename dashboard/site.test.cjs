@@ -20,7 +20,7 @@ for (const [name, html, other] of [
   for (const [, script] of scripts) new vm.Script(script, { filename: `${name}.html` });
 }
 assert.match(fs.readFileSync(path.join(root, "logo.svg"), "utf8"), /<svg\b[^>]*viewBox="0 0 200 200"/);
-assert.match(catalog, /Includes verified L40S energy anchors E235–E238 and the completed TinyLlama strategy sweep E277–E286/);
+assert.match(catalog, /Includes verified L40S energy anchors E235–E238, the completed TinyLlama strategy sweep E277–E286, and the TinyLlama weak-scaling wave E287–E293/);
 assert.match(findings, /hardware-energy anchors collected on 28 September are listed in the catalog but are not yet included in the findings/);
 
 function embeddedJson(html, variable) {
@@ -38,8 +38,8 @@ assert.equal(
   catalogData.meta.completed + catalogData.meta.configured + catalogData.meta.deferred,
   catalogData.meta.total,
 );
-assert.equal(catalogData.meta.completed, 264);
-assert.equal(catalogData.meta.configured, 12);
+assert.equal(catalogData.meta.completed, 268);
+assert.equal(catalogData.meta.configured, 15);
 const energyPhase = catalogData.themes.flatMap((theme) => theme.phases)
   .find((phase) => phase.id === "hardware-energy-revalidation");
 assert.equal(energyPhase.totals.completed, 4);
@@ -176,7 +176,7 @@ const shownTotals = catalogContext.catalogTotals(Object.keys(catalogContext.DATA
 assert.equal(shownTotals.total, catalogData.meta.total);
 assert.equal(shownTotals.completed + shownTotals.configured + shownTotals.deferred + shownTotals.oom_limited, shownTotals.total);
 assert.equal(shownTotals.oom_limited, 8);
-assert.equal(shownTotals.configured, 2);
+assert.equal(shownTotals.configured, 5);
 assert.equal(shownTotals.deferred, 12);
 
 console.log("Dashboard catalog and findings checks passed.");
