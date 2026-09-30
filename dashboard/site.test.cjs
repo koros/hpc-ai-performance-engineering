@@ -36,4 +36,58 @@ assert.equal(
   catalogData.meta.total,
 );
 
+const matrix = JSON.parse(fs.readFileSync(path.join(root, "../platforms/execution_matrix.json"), "utf8"));
+const catalogScript = [...catalog.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)][0][1];
+const catalogContext = vm.createContext({});
+vm.runInContext(catalogScript.split("\nrenderKpis();")[0], catalogContext);
+
+function expandIds(selectors) {
+  return selectors.flatMap((selector) => {
+    const match = /^(E)(\d+)-(?:E)?(\d+)$/.exec(selector);
+    if (!match) return [selector];
+    return Array.from({ length: Number(match[3]) - Number(match[2]) + 1 }, (_, index) =>
+      `${match[1]}${String(Number(match[2]) + index).padStart(match[2].length, "0")}`);
+  });
+}
+
+const matrixOoms = matrix.deferred
+  .filter((entry) => entry.observed_failure === "cuda_oom")
+  .flatMap((entry) => entry.platforms.flatMap((platform) =>
+    expandIds(entry.experiment_ids).map((id) => `${id}@${platform}`)))
+  .sort();
+const catalogOoms = Object.entries(catalogContext.CAPACITY_HISTORY)
+  .flatMap(([id, platforms]) => Object.entries(platforms)
+    .filter(([, event]) => event.measuredOom && event.state === "deferred")
+    .map(([platform]) => `${id}@${platform}`))
+  .sort();
+assert.deepStrictEqual(catalogOoms, matrixOoms, "catalog OOM annotations must match deferred matrix policy");
+assert.equal(matrixOoms.length, 13);
+for (const entry of matrix.deferred.filter((item) => item.observed_failure === "cuda_oom")) {
+  assert.equal(entry.status, "deferred");
+}
+assert.equal(matrix.recovered_failures[0].experiment_id, "E250");
+assert.equal(catalogContext.CAPACITY_HISTORY.E250.h100.state, "recovered");
+assert.equal(catalogContext.catalogStatus(catalogContext.DATA.experiments.E032), "Deferred");
+assert.equal(catalogContext.catalogStatus(catalogContext.DATA.experiments.E033), "Completed");
+assert.equal(catalogContext.catalogStatus(catalogContext.DATA.experiments.E250), "Completed");
+assert.equal(catalogContext.catalogStatusForPlatform(catalogContext.DATA.experiments.E033, "l40s"), "Deferred");
+assert.equal(catalogContext.catalogStatusForPlatform(catalogContext.DATA.experiments.E033, "h100"), "Completed");
+assert.match(catalogContext.platformStatusHtml(catalogContext.DATA.experiments.E033), /L40S · deferred \(OOM\)/);
+assert.match(catalogContext.platformStatusHtml(catalogContext.DATA.experiments.E033), /H100 · completed/);
+catalogContext.filters.platform = "l40s";
+catalogContext.filters.status = "Deferred";
+assert.equal(catalogContext.matchExp(catalogContext.DATA.experiments.E033), true);
+assert.equal(catalogContext.matchExp(catalogContext.DATA.experiments.E250), false);
+catalogContext.filters.platform = "h100";
+catalogContext.filters.status = "Completed";
+assert.equal(catalogContext.matchExp(catalogContext.DATA.experiments.E033), true);
+assert.equal(catalogContext.matchExp(catalogContext.DATA.experiments.E032), false);
+assert.match(catalogContext.renderExpCard("E033"), /L40S · Deferred after measured CUDA OOM/);
+assert.match(catalogContext.renderExpCard("E250"), /H100 · Completed after earlier OOM/);
+assert.match(catalogContext.renderExpCard("E264"), /Not run: deferred because/);
+assert.doesNotMatch(catalogContext.renderExpCard("E264"), /E264 itself OOMed/);
+const shownTotals = catalogContext.catalogTotals(Object.keys(catalogContext.DATA.experiments));
+assert.equal(shownTotals.total, catalogData.meta.total);
+assert.equal(shownTotals.completed + shownTotals.configured + shownTotals.deferred, shownTotals.total);
+
 console.log("Dashboard catalog and findings checks passed.");

@@ -8,7 +8,11 @@ Two self-contained pages (no build step, no dependencies), meant to be read in o
 
 1. **`index.html` — Part 1, Experiment Catalog.** The complete 276-condition experiment matrix,
    grouped by research theme and study, with filters and an automatic "held constant vs. varied"
-   breakdown per comparison, plus a click-through details view. This is the evidence base.
+   breakdown per comparison, plus a click-through details view. The catalog overlays platform-specific
+   CUDA OOM deferrals from `platforms/execution_matrix.json`: a condition may be complete on H100
+   but deferred after OOM on L40S. E250's first-attempt OOM is labelled recovered because its later
+   canary completed. The overlay updates the displayed status counts without changing the embedded
+   completed-trial means or the older `experiments-data.json` evidence snapshot. This is the evidence base.
 2. **`analysis.html` — Part 2, Analysis & Findings.** Turns that evidence into a non-technical
    story for readers who aren't familiar with GPUs, distributed training, or the RQ1–RQ7 framing
    used elsewhere in this repo: six KPI numbers up top, then one short section per research
@@ -100,7 +104,9 @@ constant near the top of the `<script>` block in `analysis.html`.
 To refresh Part 1's catalog after a new experiment wave, re-run the same two source files
 (`experiment_tracker.csv` + `experiments.csv`) through the generation step described in the
 2026-09-28 changelog entry below, and re-embed the result as the `DATA` constant near the top of
-the `<script>` block in `index.html` (also updating `experiments-data.json` alongside it).
+ the `<script>` block in `index.html` (also updating `experiments-data.json` alongside it). Keep the
+ `CAPACITY_HISTORY` overlay aligned with the matrix's measured `cuda_oom` deferrals and its
+ `recovered_failures` entry; `dashboard/site.test.cjs` checks that alignment.
 
 ## Changelog
 
