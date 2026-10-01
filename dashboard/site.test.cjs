@@ -155,7 +155,18 @@ assert.match(catalogContext.platformStatusHtml(catalogContext.DATA.experiments.E
 assert.match(catalogContext.platformStatusHtml(catalogContext.DATA.experiments.E089), /state-deferred[^>]+role="img"[^>]+>.*Deferred<\/span>/);
 assert.match(catalogContext.platformStatusHtml(catalogContext.DATA.experiments.E250), /state-completed[^>]+role="img"/);
 const firstCluster = catalogContext.renderCluster(catalogContext.DATA.themes[0].phases[0].clusters[0]);
-assert.equal((firstCluster.match(/<th>Platform status<\/th>/g) || []).length, 1);
+assert.equal((firstCluster.match(/<th[^>]*>Platform status<\/th>/g) || []).length, 1);
+// Every table shows what changed and the measured outcome, not just IDs and status.
+const clusterOf = (id) => catalogContext.DATA.themes.flatMap((theme) => theme.phases)
+  .flatMap((phase) => phase.clusters).find((cluster) => cluster.experiment_ids.includes(id));
+const dataMovement = catalogContext.renderCluster(clusterOf("E097"));
+for (const header of ["Pinned memory", "Loader workers", "Prefetch factor", "Tok/s · H100", "Tok/s · L40S"]) {
+  assert.match(dataMovement, new RegExp(`<th[^>]*>${header}</th>`), `data movement table must show ${header}`);
+}
+assert.match(dataMovement, /class="cluster-takeaway"/);
+assert.equal(catalogContext.DATA.experiments.E104.prefetch_factor, "8");
+assert.match(catalogContext.renderCluster(clusterOf("E154")), /<th>Framework<\/th>[\s\S]*vLLM[\s\S]*TensorRT-LLM/);
+assert.match(catalogContext.renderCluster(clusterOf("E281")), /<th[^>]*>Memory GB · H100<\/th>/);
 assert.doesNotMatch(firstCluster, /<th>Status<\/th>|<th>Platform\(s\)<\/th>|Platform\(s\):/);
 assert.match(catalog, /class="status-legend" aria-label="Platform status key"/);
 assert.deepStrictEqual(Array.from(catalogContext.CATALOG_STATUSES), ["Completed", "Configured", "OOM-limited", "Deferred"]);

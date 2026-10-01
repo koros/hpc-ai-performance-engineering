@@ -287,3 +287,29 @@ Not fixed here: `update_dashboard_energy_anchors.py --check` and
 `update_dashboard_tinyllama_strategy.py --check` both already reported stale data before this
 update, since each hard-codes its own `generated_at` date and catalog totals. They need
 reconciling before they can serve as standing checks.
+
+**2026-10-01 (2)** — Catalog tables now show what each condition changed *and* what was measured.
+Before, a table listed only the experiment ID, the group's `varied` columns, and platform status.
+Groups whose knobs were not in the catalog's column set therefore showed just two columns. Data
+movement (E097-E112) was the clearest case: its pinned-memory, loader-worker and prefetch settings
+never appeared. The DistilBERT inference-framework group (E153-E155) was another, because its
+deferred rows had a blank framework.
+
+- New `scripts/update_dashboard_catalog_context.py` syncs knobs from `configs/` into
+  `experiments-data.json` and the embedded `DATA`. It adds `prefetch_factor`, fills the blank
+  `framework` on 10 deferred conditions, and adds each config's `objective`, which the drawer
+  shows. It also adds pinned memory, loader workers, prefetch factor, gradient accumulation and
+  activation checkpointing to a group's `varied` set when they really differ. No measured value
+  changes. `--check` verifies the data is in sync.
+- Each table gains shaded result columns: the headline metric(s) for the study, per platform. The
+  default is tok/s plus memory. Serving studies use tok/s plus p50 latency, energy studies use
+  energy plus power, and long context uses p95 latency. Each value shows its change against the
+  group's first completed condition in the same mode. Changes of 3% or more are coloured by
+  direction: green is better, red is worse.
+- A **Takeaway** line above each table summarises the headline metric per mode and platform.
+  It says either "flat across N conditions (within x%)" or names the best condition, what it set
+  and its margin over the weakest. Where conditions are matched, it adds the H100-vs-L40S ratio.
+  Environment-validation smoke checks get no takeaway.
+
+The automatic takeaway describes the numbers; it does not judge noise or causes. With n=3 trials,
+differences under ~3% should be read as noise.
