@@ -336,6 +336,17 @@
     font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
     color: var(--text-muted); margin-right: 6px;
   }
+  table.exp-table th.result-group {
+    text-align: center; color: var(--text-primary); text-transform: none; font-size: 11px; letter-spacing: 0;
+  }
+  table.exp-table th.result-sub { font-size: 10px; padding-top: 3px; }
+  table.exp-table thead tr:first-child th[rowspan] { vertical-align: bottom; }
+  .th-hint { font-weight: 400; color: var(--text-muted); }
+  .result-switch { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; }
+  .result-switch .rs-label { font-size: 12px; color: var(--text-muted); margin-right: 2px; }
+  .toolbar-actions .result-switch button[aria-pressed="true"] {
+    background: var(--text-primary); color: var(--page); border-color: var(--text-primary);
+  }
   .table-note { font-size: 11px; color: var(--text-muted); margin: 6px 2px 0; }
 
   .status-pill {
@@ -456,6 +467,12 @@
       <button type="button" id="expandAllBtn">Expand all</button>
       <button type="button" id="collapseAllBtn">Collapse all</button>
       <button type="button" id="resetFiltersBtn">Reset filters</button>
+      <span class="result-switch" role="group" aria-label="Results shown for platform">
+        <span class="rs-label">Results for</span>
+        <button type="button" data-platform="" aria-pressed="true">Both</button>
+        <button type="button" data-platform="h100" aria-pressed="false">H100</button>
+        <button type="button" data-platform="l40s" aria-pressed="false">L40S</button>
+      </span>
       <span class="visible-count" id="visibleCount"></span>
     </div>
   </div>
@@ -717,14 +734,14 @@ function renderParamChips(group, cls) {
    whether higher or lower is better for each one.
 --------------------------------------------------------------------- */
 var RESULT_METRICS = {
-  throughput_tokens_sec: { label: "Tok/s", unit: "tok/s", higherBetter: true, noun: "Throughput" },
-  memory_used_gb: { label: "Memory GB", unit: "GB", higherBetter: false, noun: "Memory" },
-  latency_p50_ms: { label: "p50 ms", unit: "ms", higherBetter: false, noun: "Median latency" },
-  latency_p95_ms: { label: "p95 ms", unit: "ms", higherBetter: false, noun: "p95 latency" },
-  energy_joules: { label: "Energy J", unit: "J", higherBetter: false, noun: "Energy" },
-  power_draw_watts: { label: "Power W", unit: "W", higherBetter: false, noun: "Power" },
-  quality_perplexity: { label: "Perplexity", unit: "", higherBetter: false, noun: "Perplexity" },
-  runtime_seconds: { label: "Runtime s", unit: "s", higherBetter: false, noun: "Runtime" }
+  throughput_tokens_sec: { label: "Tok/s", heading: "Throughput (tok/s)", unit: "tok/s", higherBetter: true, noun: "Throughput" },
+  memory_used_gb: { label: "Memory GB", heading: "Memory (GB)", unit: "GB", higherBetter: false, noun: "Memory" },
+  latency_p50_ms: { label: "p50 ms", heading: "Median latency (ms)", unit: "ms", higherBetter: false, noun: "Median latency" },
+  latency_p95_ms: { label: "p95 ms", heading: "p95 latency (ms)", unit: "ms", higherBetter: false, noun: "p95 latency" },
+  energy_joules: { label: "Energy J", heading: "Energy (J)", unit: "J", higherBetter: false, noun: "Energy" },
+  power_draw_watts: { label: "Power W", heading: "Power (W)", unit: "W", higherBetter: false, noun: "Power" },
+  quality_perplexity: { label: "Perplexity", heading: "Perplexity", unit: "", higherBetter: false, noun: "Perplexity" },
+  runtime_seconds: { label: "Runtime s", heading: "Runtime (s)", unit: "s", higherBetter: false, noun: "Runtime" }
 };
 var PHASE_METRICS = {
   "environment-validation": ["runtime_seconds"],
@@ -739,6 +756,7 @@ var PHASE_METRICS = {
   "inference-multi-gpu": ["throughput_tokens_sec", "latency_p50_ms"],
   "inference-precision-quantization": ["throughput_tokens_sec", "latency_p50_ms"]
 };
+var resultPlatform = ""; // "" shows every platform; otherwise only that platform's result columns
 var DELTA_THRESHOLD = 3; // percent; smaller changes are shown muted
 // Smoke checks, not comparisons: a "best runtime" sentence would mislead.
 var NO_TAKEAWAY_PHASES = ["environment-validation"];
@@ -795,15 +813,15 @@ function platformBadgesHtml(e) {
     return statusBadge(status, platform) + " " + esc(platform.toUpperCase());
   }).join("&nbsp;&nbsp;");
 }
-function resultCell(cluster, e, key, platform, first, showStatus) {
+function resultCell(cluster, e, key, platform, first, headline) {
   var cls = "num result" + (first ? " result-first" : "");
   var pd = (e.platforms || {})[platform];
   if (!pd || typeof pd[key] !== "number") {
     var status = catalogStatusForPlatform(e, platform);
-    var inner = showStatus && status !== "Completed" ? statusBadge(status, platform) : '<span class="no-result">&mdash;</span>';
-    return '<td class="' + cls + '">' + inner + '<span class="delta"></span></td>';
+    var inner = headline && status !== "Completed" ? statusBadge(status, platform) : '<span class="no-result">&mdash;</span>';
+    return '<td class="' + cls + '">' + inner + (headline ? '<span class="delta"></span>' : "") + "</td>";
   }
-  var ref = resultReference(cluster, key, platform, e.mode);
+  var ref = headline ? resultReference(cluster, key, platform, e.mode) : null;
   var delta = "";
   if (ref && ref.id === e.id) {
     delta = '<span class="delta ref" title="Reference condition for this column">ref</span>';
@@ -910,18 +928,25 @@ function clusterTakeaway(cluster, variedCols, metrics, platforms) {
 function renderCluster(cluster) {
   var variedCols = Object.keys(cluster.varied).filter(function (k) { return k !== "workload_label" && k !== "platform_list"; });
   var metrics = clusterMetrics(cluster);
-  var platforms = clusterResultPlatforms(cluster);
+  var allPlatforms = clusterResultPlatforms(cluster);
+  var platforms = resultPlatform ? allPlatforms.filter(function (p) { return p === resultPlatform; }) : allPlatforms;
+  if (!platforms.length) metrics = [];
   var resultCols = [];
   metrics.forEach(function (key) {
-    platforms.forEach(function (platform) { resultCols.push({ key: key, platform: platform }); });
+    platforms.forEach(function (platform, j) { resultCols.push({ key: key, platform: platform, groupStart: j === 0 }); });
   });
-  var headHtml = "<th>Exp. ID</th>" +
-    variedCols.map(function (c) { return "<th>" + esc(COL_LABEL[c] || c) + "</th>"; }).join("") +
-    resultCols.map(function (rc, i) {
-      return '<th class="num result' + (i === 0 ? " result-first" : "") + '">' +
-        esc(RESULT_METRICS[rc.key].label + " · " + rc.platform.toUpperCase()) + "</th>";
+  // Two header rows: each metric spans its platform sub-columns.
+  var span = resultCols.length ? ' rowspan="2"' : "";
+  var headHtml = "<tr><th" + span + ">Exp. ID</th>" +
+    variedCols.map(function (c) { return "<th" + span + ">" + esc(COL_LABEL[c] || c) + "</th>"; }).join("") +
+    metrics.map(function (key) {
+      return '<th class="result result-group result-first" colspan="' + platforms.length + '">' +
+        esc(RESULT_METRICS[key].heading) + (key === metrics[0] && metrics.length > 1 ? ' <span class="th-hint">&middot; % vs ref</span>' : "") + "</th>";
     }).join("") +
-    (resultCols.length ? "" : "<th>Platform status</th>");
+    (resultCols.length ? "" : "<th>Platform status</th>") + "</tr>" +
+    (resultCols.length ? "<tr>" + resultCols.map(function (rc) {
+      return '<th class="num result result-sub' + (rc.groupStart ? " result-first" : "") + '">' + esc(rc.platform.toUpperCase()) + "</th>";
+    }).join("") + "</tr>" : "");
   var rows = cluster.experiment_ids.map(function (eid) {
     var e = DATA.experiments[eid];
     var cells = ["<td>" + eid + "</td>"];
@@ -929,7 +954,7 @@ function renderCluster(cluster) {
       cells.push("<td>" + esc(fmtSingle(c, e[c])) + "</td>");
     });
     // A platform without a result shows its status badge in that platform's first metric column.
-    resultCols.forEach(function (rc, i) { cells.push(resultCell(cluster, e, rc.key, rc.platform, i === 0, rc.key === metrics[0])); });
+    resultCols.forEach(function (rc) { cells.push(resultCell(cluster, e, rc.key, rc.platform, rc.groupStart, rc.key === metrics[0])); });
     if (!resultCols.length) cells.push("<td>" + platformBadgesHtml(e) + "</td>");
     return '<tr data-id="' + eid + '" tabindex="0" role="button" aria-label="View details for experiment ' + eid + '">' + cells.join("") + "</tr>";
   }).join("");
@@ -949,9 +974,11 @@ function renderCluster(cluster) {
         (variedHtml ? '<div class="param-group"><span class="pg-label">Varied</span>' + variedHtml + "</div>" : "") +
       "</div>" +
       (takeaway ? '<p class="cluster-takeaway"><span class="tk-label">Takeaway</span>' + takeaway + "</p>" : "") +
-      '<div class="exp-table-wrap"><table class="exp-table"><thead><tr>' + headHtml +
-      "</tr></thead><tbody>" + rows + "</tbody></table></div>" +
-      (resultCols.length ? "" : '<p class="table-note">No completed performance trial in this group yet.</p>') +
+      '<div class="exp-table-wrap"><table class="exp-table"><thead>' + headHtml +
+      "</thead><tbody>" + rows + "</tbody></table></div>" +
+      (resultCols.length ? "" : '<p class="table-note">' + (resultPlatform && allPlatforms.length
+        ? "No " + esc(resultPlatform.toUpperCase()) + " results in this group; switch Results to see " + esc(allPlatforms.join(", ").toUpperCase()) + "."
+        : "No completed performance trial in this group yet.") + "</p>") +
     "</div>"
   );
 }
@@ -1258,6 +1285,25 @@ function initInteractions() {
     document.querySelectorAll("details").forEach(function (d) { d.open = false; });
   });
   document.getElementById("resetFiltersBtn").addEventListener("click", resetFilters);
+  document.querySelectorAll(".result-switch button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      resultPlatform = btn.getAttribute("data-platform");
+      document.querySelectorAll(".result-switch button").forEach(function (b) {
+        b.setAttribute("aria-pressed", String(b === btn));
+      });
+      // Re-render the tables for the chosen platform, keeping the reader's open sections open.
+      var open = Array.prototype.map.call(document.querySelectorAll("details[open]"), function (d) {
+        return d.getAttribute("data-theme-id") || d.getAttribute("data-phase-id");
+      });
+      var y = window.scrollY;
+      renderTree();
+      document.querySelectorAll("details").forEach(function (d) {
+        if (open.indexOf(d.getAttribute("data-theme-id") || d.getAttribute("data-phase-id")) !== -1) d.open = true;
+      });
+      applyFilters();
+      window.scrollTo(0, y);
+    });
+  });
 }
 
 renderKpis();

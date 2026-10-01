@@ -319,3 +319,9 @@ columns, since it repeated what those columns imply. When a platform has no resu
 result column now shows the original coloured status badge instead: Configured, Deferred, or OOM
 (red, meaning CUDA OOM at the tested settings). Groups with no completed result at all keep a
 status column, drawn with the same badges. The status key above the tree uses the badges too.
+
+**2026-10-01 (4)** — Made the result columns easier to read. Each metric now has one header
+(e.g. "Throughput (tok/s)") spanning per-platform sub-columns, instead of headers like
+"Tok/s · H100". The % change against the reference condition appears only on the headline
+metric; secondary metrics such as memory show plain values. A new "Results for: Both / H100 /
+L40S" switch in the toolbar shows only one platform's columns and takeaway, halving the width.

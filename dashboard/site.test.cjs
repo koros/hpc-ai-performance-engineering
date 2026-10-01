@@ -165,13 +165,18 @@ assert.match(strongGpt2, /status-pill status-oom-limited" title="L40S: OOM-limit
 assert.match(catalogContext.renderCluster(clusterOf("E267")), /status-pill status-deferred" title="H100: Deferred"/);
 // Every table shows what changed and the measured outcome, not just IDs and status.
 const dataMovement = catalogContext.renderCluster(clusterOf("E097"));
-for (const header of ["Pinned memory", "Loader workers", "Prefetch factor", "Tok/s · H100", "Tok/s · L40S"]) {
+for (const header of ["Pinned memory", "Loader workers", "Prefetch factor", "H100", "L40S"]) {
   assert.match(dataMovement, new RegExp(`<th[^>]*>${header}</th>`), `data movement table must show ${header}`);
 }
 assert.match(dataMovement, /class="cluster-takeaway"/);
+assert.match(dataMovement, /colspan="2">Throughput \(tok\/s\)/);
 assert.equal(catalogContext.DATA.experiments.E104.prefetch_factor, "8");
-assert.match(catalogContext.renderCluster(clusterOf("E154")), /<th>Framework<\/th>[\s\S]*vLLM[\s\S]*TensorRT-LLM/);
-assert.match(catalogContext.renderCluster(clusterOf("E281")), /<th[^>]*>Memory GB · H100<\/th>/);
+assert.match(catalogContext.renderCluster(clusterOf("E154")), /<th[^>]*>Framework<\/th>[\s\S]*vLLM[\s\S]*TensorRT-LLM/);
+assert.match(catalogContext.renderCluster(clusterOf("E281")), /colspan="1">Memory \(GB\)<\/th>/);
+catalogContext.resultPlatform = "l40s";
+assert.match(catalogContext.renderCluster(clusterOf("E097")), /colspan="1">Throughput/);
+assert.match(catalogContext.renderCluster(clusterOf("E281")), /No H100 results in this group|No L40S results in this group/);
+catalogContext.resultPlatform = "";
 assert.doesNotMatch(firstCluster, /<th>Status<\/th>|<th>Platform\(s\)<\/th>|Platform\(s\):/);
 assert.match(catalog, /class="status-legend" aria-label="Platform status key"/);
 assert.deepStrictEqual(Array.from(catalogContext.CATALOG_STATUSES), ["Completed", "Configured", "OOM-limited", "Deferred"]);
