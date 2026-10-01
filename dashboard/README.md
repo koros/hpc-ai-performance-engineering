@@ -2,9 +2,9 @@
 
 This is the published dashboard. The catalog includes the verified L40S hardware-energy anchors
 E235–E238, the TinyLlama strategy sweep E277–E286, and the TinyLlama weak-scaling wave E287–E293
-(three trials per condition; E287–E289 are the matched H100 conditions, configured but not yet
-run). The main findings carry a base narrative snapshot through 27 September, plus two dated
-TinyLlama RQ1/RQ2 extensions from 30 September (strategy sweep, then weak scaling). Matrix
+(three trials per condition; E287–E289 on H100, completed 1 October, and E290–E293 on L40S).
+The main findings carry a base narrative snapshot through 27 September, plus two dated
+TinyLlama RQ1/RQ2 extensions from 30 September and 1 October (strategy sweep, then weak scaling). Matrix
 additions beyond this wave (the Qwen2.5-3B distributed-strategy study and the Qwen2.5-7B BF16
 serving study) are configured/blocked with no completed trials yet, so they are not in this
 catalog snapshot. The original `dashboard3/` files remain as the source reference.
@@ -121,6 +121,13 @@ To refresh Part 1's catalog after a new experiment wave, re-run the same two sou
  the `<script>` block in `index.html` (also updating `experiments-data.json` alongside it). Keep the
  `CAPACITY_HISTORY` overlay aligned with the matrix's measured `cuda_oom` deferrals and its
  `recovered_failures` entry; `dashboard/site.test.cjs` checks that alignment.
+
+For the TinyLlama weak-scaling wave (E287–E293), run
+`python3 scripts/update_dashboard_tinyllama_weak_scaling.py` after refreshing processed results.
+Like the strategy-sweep script, it checks for three matching raw and processed completed trials per
+condition, then synchronizes both catalog JSON files and their embedded copies; `--check` detects
+stale data without changing files. The prose, tables and chart values in `analysis.html` are
+still updated by hand.
 
 For the four L40S hardware-energy anchors, run `python3 scripts/update_dashboard_energy_anchors.py`
 after refreshing processed results. The script checks the raw evidence gate and trial provenance,
@@ -255,3 +262,28 @@ blocked on an unresolved `model_revision` pin) and the Qwen2.5-7B BF16 TP-servin
 (E301-E304, configured, not yet run) have zero completed trials between them, so neither is
 represented in the catalog yet, consistent with how every prior wave here was only added once real
 trial data existed.
+
+**2026-10-01** — Added the H100 TinyLlama weak-scaling results (E287-E289, three trials each,
+research-node-a, completed 1 October) to both pages, using the newly regenerated pipeline
+(`python -m hpc_ai_perf.cli refresh`). The new
+`scripts/update_dashboard_tinyllama_weak_scaling.py` rebuilt the catalog entries, cluster totals and
+`EXPERIMENT_DETAILS` (now 99 entries) from processed trials, and reproduced the existing L40S
+E290-E293 entries byte-for-byte. Catalog totals moved from 268/15 to 271/12 (completed/configured),
+and coverage figures from 268/293 (91%) to 271/293 (92%). "Weak scaling" (now 15/15) moved into the
+"All 17 other categories" meter row.
+
+Result: TinyLlama held 92.4% weak-scaling efficiency at 2 GPUs and 92.2% at 4 GPUs on H100, in
+line with GPT-2 Small (97%) and DistilBERT (91-92%). `analysis.html` therefore rewrites the
+Question 1 TinyLlama finding card. Before, the L40S data "muddies" the question; now, TinyLlama
+scales on H100 and the L40S shortfall (33-40% at 4/8 GPUs) is platform-specific. The card also
+adds TinyLlama to the Question 1 "scale the job up" chart and the RQ1 H100 table and line chart
+(the existing TinyLlama strong-scaling line is now dashed to tell the two apart). The
+`#nerd-tinyllama-weak-scaling` block becomes a two-platform table and line chart. The per-GPU
+batch differs by platform (8 on H100, 2 on L40S), so the page states that the two lines are not a
+controlled chip comparison. It also does not attribute the L40S shortfall to any specific cause,
+and notes that H100 still has no 8-GPU point.
+
+Not fixed here: `update_dashboard_energy_anchors.py --check` and
+`update_dashboard_tinyllama_strategy.py --check` both already reported stale data before this
+update, since each hard-codes its own `generated_at` date and catalog totals. They need
+reconciling before they can serve as standing checks.

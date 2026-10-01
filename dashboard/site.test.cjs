@@ -38,8 +38,8 @@ assert.equal(
   catalogData.meta.completed + catalogData.meta.configured + catalogData.meta.deferred,
   catalogData.meta.total,
 );
-assert.equal(catalogData.meta.completed, 268);
-assert.equal(catalogData.meta.configured, 15);
+assert.equal(catalogData.meta.completed, 271);
+assert.equal(catalogData.meta.configured, 12);
 const energyPhase = catalogData.themes.flatMap((theme) => theme.phases)
   .find((phase) => phase.id === "hardware-energy-revalidation");
 assert.equal(energyPhase.totals.completed, 4);
@@ -58,6 +58,16 @@ assert.equal(strategyPhase.clusters.at(-2).constant.per_gpu_batch_size, "8");
 assert.match(findings, /id="nerd-tinyllama-strategy"/);
 assert.match(findings, /H100 used a batch of 8 per chip, L40S a batch of 2/);
 assert.match(findings, /id="chartTinyllamaStrategySpeed"/);
+const weakPhase = catalogData.themes.flatMap((theme) => theme.phases)
+  .find((phase) => phase.id === "weak-scaling");
+assert.deepStrictEqual(weakPhase.totals, { completed: 15, configured: 0, deferred: 0, total: 15 });
+for (const id of ["E287", "E288", "E289"]) {
+  assert.equal(catalogData.experiments[id].status, "Completed");
+  assert.deepStrictEqual(catalogData.experiments[id].platform_list, ["h100"]);
+  assert.equal(detailsData[id].platforms.lovelace_h100.n, 3);
+}
+assert.match(findings, /id="nerd-tinyllama-weak-scaling"/);
+assert.match(findings, /different per-chip batches \(8 on H100, 2 on L40S\)/);
 assert.match(findings, /id="chartTinyllamaStrategyMemory"/);
 for (let number = 277; number <= 286; number++) {
   const id = `E${number}`;
@@ -176,7 +186,7 @@ const shownTotals = catalogContext.catalogTotals(Object.keys(catalogContext.DATA
 assert.equal(shownTotals.total, catalogData.meta.total);
 assert.equal(shownTotals.completed + shownTotals.configured + shownTotals.deferred + shownTotals.oom_limited, shownTotals.total);
 assert.equal(shownTotals.oom_limited, 8);
-assert.equal(shownTotals.configured, 5);
+assert.equal(shownTotals.configured, 2);
 assert.equal(shownTotals.deferred, 12);
 
 console.log("Dashboard catalog and findings checks passed.");
