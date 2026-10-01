@@ -154,11 +154,16 @@ assert.doesNotMatch(mixedPlatformStatus, /status-pill|OOM on/);
 assert.match(catalogContext.platformStatusHtml(catalogContext.DATA.experiments.E007), /state-configured[^>]+role="img"[^>]+>.*Configured<\/span>/);
 assert.match(catalogContext.platformStatusHtml(catalogContext.DATA.experiments.E089), /state-deferred[^>]+role="img"[^>]+>.*Deferred<\/span>/);
 assert.match(catalogContext.platformStatusHtml(catalogContext.DATA.experiments.E250), /state-completed[^>]+role="img"/);
-const firstCluster = catalogContext.renderCluster(catalogContext.DATA.themes[0].phases[0].clusters[0]);
-assert.equal((firstCluster.match(/<th[^>]*>Platform status<\/th>/g) || []).length, 1);
-// Every table shows what changed and the measured outcome, not just IDs and status.
 const clusterOf = (id) => catalogContext.DATA.themes.flatMap((theme) => theme.phases)
   .flatMap((phase) => phase.clusters).find((cluster) => cluster.experiment_ids.includes(id));
+const firstCluster = catalogContext.renderCluster(catalogContext.DATA.themes[0].phases[0].clusters[0]);
+// Result columns carry platform status, so the separate status column only appears without them.
+assert.doesNotMatch(firstCluster, /Platform status/);
+const strongGpt2 = catalogContext.renderCluster(clusterOf("E033"));
+assert.doesNotMatch(strongGpt2, /Platform status/);
+assert.match(strongGpt2, /status-pill status-oom-limited" title="L40S: OOM-limited">OOM</);
+assert.match(catalogContext.renderCluster(clusterOf("E267")), /status-pill status-deferred" title="H100: Deferred"/);
+// Every table shows what changed and the measured outcome, not just IDs and status.
 const dataMovement = catalogContext.renderCluster(clusterOf("E097"));
 for (const header of ["Pinned memory", "Loader workers", "Prefetch factor", "Tok/s · H100", "Tok/s · L40S"]) {
   assert.match(dataMovement, new RegExp(`<th[^>]*>${header}</th>`), `data movement table must show ${header}`);

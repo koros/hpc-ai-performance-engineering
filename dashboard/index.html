@@ -471,15 +471,16 @@
     The shaded columns are the measured outcome (mean of completed trials, per platform), with the
     change against the group's first comparable condition; green/red marks a change of 3% or more in
     the better/worse direction. The <b>Takeaway</b> line sums up the group's headline metric.
-    Click a row for every measured metric and failure details. The dot beside each platform shows its
-    status: red means CUDA OOM at the tested settings, not that a smaller configuration cannot run.
+    Click a row for every measured metric and failure details. Where a platform has no result, its
+    result cell shows a status badge instead: configured (not yet run), deferred, or OOM;
+    red means CUDA OOM at the tested settings, not that a smaller configuration cannot run.
     Failed attempts are not counted as completed results.
   </div>
   <div class="status-legend" aria-label="Platform status key">
-    <span class="platform-marker state-completed"><span class="platform-dot" aria-hidden="true"></span>Completed</span>
-    <span class="platform-marker state-oom-limited"><span class="platform-dot" aria-hidden="true"></span>OOM-limited</span>
-    <span class="platform-marker state-configured"><span class="platform-dot" aria-hidden="true"></span>Configured</span>
-    <span class="platform-marker state-deferred"><span class="platform-dot" aria-hidden="true"></span>Deferred</span>
+    <span>Shown in a result cell when that platform has no result:</span>
+    <span class="status-pill status-configured">Configured</span>
+    <span class="status-pill status-oom-limited">OOM</span>
+    <span class="status-pill status-deferred">Deferred</span>
   </div>
   <div id="themeTree"></div>
 </main>
@@ -755,7 +756,8 @@ function clusterMetrics(cluster) {
 function clusterResultPlatforms(cluster) {
   var seen = [];
   cluster.experiment_ids.forEach(function (id) {
-    Object.keys(DATA.experiments[id].platforms || {}).forEach(function (p) { if (seen.indexOf(p) === -1) seen.push(p); });
+    var e = DATA.experiments[id];
+    Object.keys(e.platforms || {}).concat(catalogPlatforms(e)).forEach(function (p) { if (seen.indexOf(p) === -1) seen.push(p); });
   });
   return seen.sort();
 }
@@ -777,11 +779,29 @@ function resultReference(cluster, key, platform, mode) {
   }
   return null;
 }
-function resultCell(cluster, e, key, platform, first) {
+var STATUS_BADGE_TEXT = { "Configured": "Configured", "Deferred": "Deferred", "OOM-limited": "OOM" };
+function statusBadge(status, platform) {
+  var label = (platform ? platform.toUpperCase() + ": " : "") + status;
+  return '<span class="status-pill status-' + status.toLowerCase() + '" title="' + esc(label) + '">' +
+    esc(platform ? (STATUS_BADGE_TEXT[status] || status) : status) + "</span>";
+}
+// Status badges for the "no result columns" fallback, one per platform.
+function platformBadgesHtml(e) {
+  var platforms = catalogPlatforms(e);
+  if (!platforms.length) return statusBadge(catalogStatus(e), "");
+  return platforms.map(function (platform) {
+    var history = (CAPACITY_HISTORY[e.id] || {})[platform];
+    var status = history && history.state === "recovered" ? "Completed" : catalogStatusForPlatform(e, platform);
+    return statusBadge(status, platform) + " " + esc(platform.toUpperCase());
+  }).join("&nbsp;&nbsp;");
+}
+function resultCell(cluster, e, key, platform, first, showStatus) {
   var cls = "num result" + (first ? " result-first" : "");
   var pd = (e.platforms || {})[platform];
   if (!pd || typeof pd[key] !== "number") {
-    return '<td class="' + cls + '"><span class="no-result">&mdash;</span><span class="delta"></span></td>';
+    var status = catalogStatusForPlatform(e, platform);
+    var inner = showStatus && status !== "Completed" ? statusBadge(status, platform) : '<span class="no-result">&mdash;</span>';
+    return '<td class="' + cls + '">' + inner + '<span class="delta"></span></td>';
   }
   var ref = resultReference(cluster, key, platform, e.mode);
   var delta = "";
@@ -901,15 +921,16 @@ function renderCluster(cluster) {
       return '<th class="num result' + (i === 0 ? " result-first" : "") + '">' +
         esc(RESULT_METRICS[rc.key].label + " · " + rc.platform.toUpperCase()) + "</th>";
     }).join("") +
-    "<th" + (resultCols.length ? ' class="result-first"' : "") + ">Platform status</th>";
+    (resultCols.length ? "" : "<th>Platform status</th>");
   var rows = cluster.experiment_ids.map(function (eid) {
     var e = DATA.experiments[eid];
     var cells = ["<td>" + eid + "</td>"];
     variedCols.forEach(function (c) {
       cells.push("<td>" + esc(fmtSingle(c, e[c])) + "</td>");
     });
-    resultCols.forEach(function (rc, i) { cells.push(resultCell(cluster, e, rc.key, rc.platform, i === 0)); });
-    cells.push("<td" + (resultCols.length ? ' class="result-first"' : "") + '><span class="platform-status-list">' + platformStatusHtml(e) + "</span></td>");
+    // A platform without a result shows its status badge in that platform's first metric column.
+    resultCols.forEach(function (rc, i) { cells.push(resultCell(cluster, e, rc.key, rc.platform, i === 0, rc.key === metrics[0])); });
+    if (!resultCols.length) cells.push("<td>" + platformBadgesHtml(e) + "</td>");
     return '<tr data-id="' + eid + '" tabindex="0" role="button" aria-label="View details for experiment ' + eid + '">' + cells.join("") + "</tr>";
   }).join("");
 

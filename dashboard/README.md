@@ -313,3 +313,9 @@ deferred rows had a blank framework.
 
 The automatic takeaway describes the numbers; it does not judge noise or causes. With n=3 trials,
 differences under ~3% should be read as noise.
+
+**2026-10-01 (3)** — Removed the separate "Platform status" column from tables that have result
+columns, since it repeated what those columns imply. When a platform has no result, its first
+result column now shows the original coloured status badge instead: Configured, Deferred, or OOM
+(red, meaning CUDA OOM at the tested settings). Groups with no completed result at all keep a
+status column, drawn with the same badges. The status key above the tree uses the badges too.
