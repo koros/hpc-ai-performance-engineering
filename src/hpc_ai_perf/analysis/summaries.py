@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import statistics
 from collections import defaultdict
@@ -8,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from hpc_ai_perf.analysis.lowbit import LOWBIT_COLUMNS, build_lowbit_summary
+from hpc_ai_perf.analysis.scaling import scaling_contract, scaling_rows
 from hpc_ai_perf.config.traceability import PHASE_TRACEABILITY, RESEARCH_QUESTIONS
 from hpc_ai_perf.result_identity import COMPARABILITY_VALUES, MATRIX_PLATFORMS, is_matrix_experiment_id
 
@@ -65,6 +67,16 @@ ANALYSIS_TABLES = {
         "tokens_per_kwh",
     ],
     "scaling_summary": [
+        "study_id",
+        "series_id",
+        "fixed_parameters",
+        "experiment_ids",
+        "sequence_length",
+        "global_batch_size",
+        "per_gpu_batch_size",
+        "baseline_status",
+        "throughput_ci95_low",
+        "throughput_ci95_high",
         "platform_id",
         "comparability",
         "phase",
@@ -769,12 +781,7 @@ def build_scaling_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
     count with a runtime becomes the baseline. Other rows are compared against
     that baseline to estimate speedup and efficiency.
     """
-    completed_rows = [
-        row
-        for row in rows
-        if row.get("status") == "completed"
-        and (row.get("scaling_type") in {"strong", "weak"} or row.get("phase") in {"Strong scaling", "Weak scaling"})
-    ]
+    completed_rows = scaling_rows(rows)
     grouped: dict[tuple[str, ...], list[dict[str, str]]] = defaultdict(list)
     for row in completed_rows:
         key = (
@@ -787,6 +794,7 @@ def build_scaling_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
             _value(row, "strategy"),
             _value(row, "scaling_type") or ("weak" if _value(row, "phase") == "Weak scaling" else "strong"),
             _value(row, "throughput_unit"),
+            scaling_contract(row),
         )
         grouped[key].append(row)
 
@@ -801,7 +809,9 @@ def build_scaling_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
         strategy,
         scaling_type,
         throughput_unit,
+        contract,
     ), group_rows in sorted(grouped.items()):
+        fixed = json.loads(contract)
         by_gpus: dict[float, list[dict[str, str]]] = defaultdict(list)
         for row in group_rows:
             gpus = _float(row.get("gpus"))
@@ -844,6 +854,20 @@ def build_scaling_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
                 efficiency = _divide(speedup, gpu_ratio)
             summaries.append(
                 {
+                    "study_id": fixed["study_id"],
+                    "series_id": hashlib.sha256(
+                        json.dumps(
+                            [platform_id, comparability, model, precision, strategy, scaling_type, contract]
+                        ).encode()
+                    ).hexdigest()[:16],
+                    "fixed_parameters": contract,
+                    "experiment_ids": ",".join(sorted({_value(row, "experiment_id") for row in gpu_rows})),
+                    "sequence_length": fixed["sequence_length"],
+                    "global_batch_size": gpu_rows[0].get("global_batch_size", ""),
+                    "per_gpu_batch_size": gpu_rows[0].get("per_gpu_batch_size", ""),
+                    "baseline_status": "one_gpu_reference" if baseline_gpus == 1 else "relative_to_smallest_observed",
+                    "throughput_ci95_low": _ci95(_metric_values(gpu_rows, "throughput_tokens_sec"))[0],
+                    "throughput_ci95_high": _ci95(_metric_values(gpu_rows, "throughput_tokens_sec"))[1],
                     "platform_id": platform_id,
                     "comparability": comparability,
                     "phase": phase,
