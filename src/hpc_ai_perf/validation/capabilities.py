@@ -5,6 +5,7 @@ from hpc_ai_perf.config.long_context import PARAMETERS as LONG_CONTEXT_PARAMETER
 from hpc_ai_perf.config.long_context import long_context_issues
 from hpc_ai_perf.config.lowbit import PARAMETERS as LOWBIT_PARAMETERS
 from hpc_ai_perf.config.lowbit import lowbit_issues
+from hpc_ai_perf.config.scaling import scaling_issues
 from hpc_ai_perf.profiling import SUPPORTED_PROFILERS
 
 SUPPORTED_WORKLOADS = {
@@ -28,6 +29,11 @@ SUPPORTED_ENVIRONMENT_TARGETS = {
     "tensorrt_llm",
 }
 TRANSFORMER_PARAMETER_KEYS = {
+    "attention_backend",
+    "input_protocol",
+    "scaling_study_id",
+    "scaling_role",
+    "scaling_weak_per_gpu_batch_size",
     "activation_checkpointing",
     "allreduce_bytes",
     "allreduce_iterations",
@@ -162,6 +168,7 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
     if str(config.metadata.get("execution_status", "ready")).lower() == "deferred" and not include_deferred:
         return issues
     parameters = config.workload.parameters
+    issues.extend(scaling_issues(config))
     workload = config.workload.name
     if workload == "qwen2_5_7b":
         issues.extend(lowbit_issues(config))

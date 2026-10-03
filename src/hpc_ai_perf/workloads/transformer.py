@@ -12,9 +12,11 @@ from functools import partial
 from typing import Any
 
 from hpc_ai_perf.config import ExperimentConfig
+from hpc_ai_perf.config.scaling import INPUT_PROTOCOL, scaling_issues
 from hpc_ai_perf.profiling import measured_region
 from hpc_ai_perf.runtime_checks import disable_deepspeed_nvtx_annotations, prepare_deepspeed_import_environment
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
+from hpc_ai_perf.workloads.scaling import GlobalTrainingInputs, capture_training_placement, scaling_runtime_sha256
 
 
 @dataclass(frozen=True)
@@ -174,10 +176,14 @@ def _run_causal_training(config: ExperimentConfig) -> WorkloadRunOutput:
     parameters = config.workload.parameters
     model_name = str(parameters.get("hf_model_name", config.workload.model))
     model_dtype = _training_model_dtype(torch, config)
+    attention_kwargs = (
+        {"attn_implementation": parameters["attention_backend"]} if "attention_backend" in parameters else {}
+    )
     model = auto_model.from_pretrained(
         model_name,
         revision=_selected_model_revision(config, model_name),
         torch_dtype=model_dtype,
+        **attention_kwargs,
     )
     return _run_training_loop(torch, config, runtime, model, task="causal_lm", model_name=model_name)
 
@@ -238,6 +244,11 @@ def _run_training_loop(
 ) -> WorkloadRunOutput:
     parameters = config.workload.parameters
     steps = int(config.runtime.max_steps or parameters.get("steps", 1))
+    controlled_inputs = parameters.get("input_protocol") == INPUT_PROTOCOL
+    if issues := scaling_issues(config):
+        raise ValueError("Invalid scaling contract: " + "; ".join(issues))
+    if controlled_inputs:
+        model.config.use_cache = False
     warmup_steps = _warmup_steps(parameters, steps)
     batch_size = _per_gpu_batch_size(parameters)
     sequence_length = int(parameters.get("sequence_length", 128))
@@ -303,7 +314,10 @@ def _run_training_loop(
         required_batches=(warmup_steps + steps) * accumulation_steps,
     )
     static_batch = None
-    if data_iterator is None:
+    global_inputs = None
+    if controlled_inputs:
+        global_inputs = GlobalTrainingInputs(torch, config, runtime, device, int(_model_config(model).vocab_size))
+    elif data_iterator is None:
         static_batch = _make_device_batch(
             torch,
             task,
@@ -314,6 +328,14 @@ def _run_training_loop(
             device,
             config.runtime.seed + runtime.rank,
         )
+
+    placement_metrics = {}
+    if parameters.get("capture_gpu_topology"):
+        placement_metrics = capture_training_placement(torch, runtime)
+    trace_enabled = config.profiling.enabled and "torch_profiler" in config.profiling.profilers
+
+    def trace(name):
+        return torch.profiler.record_function(name) if trace_enabled else nullcontext()
 
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats(device)
@@ -340,7 +362,9 @@ def _run_training_loop(
         for accumulation_index in range(accumulation_steps):
             if engine is not None and accumulation_mode == "explicit_boundary_v1":
                 engine.set_gradient_accumulation_boundary(accumulation_index == accumulation_steps - 1)
-            if data_iterator is None:
+            if global_inputs is not None:
+                batch = global_inputs.next_batch()
+            elif data_iterator is None:
                 batch = static_batch
             else:
                 load_start = time.perf_counter()
@@ -358,31 +382,33 @@ def _run_training_loop(
             if accumulation_index < accumulation_steps - 1 and hasattr(model, "no_sync") and engine is None:
                 sync_context = model.no_sync()
             with sync_context:
-                with amp_context():
+                with trace("training/forward"), amp_context():
                     outputs = model(**batch)
                     if update_diagnostics and initial_loss is None:
                         initial_loss = float(outputs.loss.detach().cpu())
                     loss = outputs.loss / accumulation_steps
-                if engine is not None:
-                    if accumulation_mode == "explicit_boundary_v1":
-                        # The shared loop already divided the loss by GAS.
-                        engine.backward(loss, scale_wrt_gas=False)
+                with trace("training/backward_and_gradient_sync"):
+                    if engine is not None:
+                        if accumulation_mode == "explicit_boundary_v1":
+                            # The shared loop already divided the loss by GAS.
+                            engine.backward(loss, scale_wrt_gas=False)
+                        else:
+                            engine.backward(loss)
+                    elif scaler is not None:
+                        scaler.scale(loss).backward()
                     else:
-                        engine.backward(loss)
-                elif scaler is not None:
-                    scaler.scale(loss).backward()
-                else:
-                    loss.backward()
+                        loss.backward()
                 step_loss += float(loss.detach().cpu())
                 backward_calls += 1
 
-        if engine is not None:
-            engine.step()
-        elif scaler is not None:
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            optimizer.step()
+        with trace("training/optimizer_update"):
+            if engine is not None:
+                engine.step()
+            elif scaler is not None:
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                optimizer.step()
         optimizer_step_calls += 1
         if measured:
             data_loading_seconds += step_load
@@ -454,7 +480,21 @@ def _run_training_loop(
         "deepspeed_nvtx_annotations_disabled": deepspeed_nvtx_annotations_disabled,
         **strategy_runtime_metadata,
         **transformer_engine_metadata,
+        **placement_metrics,
     }
+    if global_inputs is not None:
+        if global_inputs.index != global_inputs.batches:
+            raise RuntimeError("Controlled input consumption differs from declared optimizer updates")
+        metrics.update(
+            {
+                "dataset_execution": INPUT_PROTOCOL,
+                "global_input_sha256": global_inputs.sha256,
+                "input_micro_batches_consumed": global_inputs.index,
+                "scaling_runtime_sha256": scaling_runtime_sha256(),
+                "attention_backend_observed": _model_config(model)._attn_implementation,
+                "training_use_cache": _model_config(model).use_cache,
+            }
+        )
     if cuda_event_seconds is not None:
         metrics["cuda_event_seconds"] = cuda_event_seconds
     if update_diagnostics:
