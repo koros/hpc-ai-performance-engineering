@@ -1,0 +1,103 @@
+{
+  "experiment_id": "E696",
+  "experiment": "scaling_deep_dive_distilbert_mb32_seq512_te_fp8_4gpu",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+    "dataset": "synthetic_global_batches_v1",
+    "parameters": {
+      "scaling_study_id": "scaling_deep_dive_v1",
+      "scaling_role": "performance",
+      "scaling_type": "strong",
+      "fixed_workload": true,
+      "input_protocol": "synthetic_global_batches_v1",
+      "stack": "ddp",
+      "per_gpu_batch_size": 32,
+      "global_batch_size": 128,
+      "gradient_accumulation_steps": 1,
+      "sequence_length": 512,
+      "warmup_steps": 10,
+      "learning_rate": 5e-05,
+      "model_load_dtype": "bf16",
+      "attention_backend": "sdpa",
+      "activation_checkpointing": false,
+      "training_update_diagnostics": true,
+      "capture_gpu_topology": true,
+      "scaling_weak_per_gpu_batch_size": 32,
+      "num_labels": 2,
+      "precision_backend": "transformer_engine",
+      "base_compute_dtype": "bf16",
+      "quantization_method": "fp8_delayed_scaling_hybrid",
+      "fp8_amax_history_len": 16,
+      "comparison_control_id": "E692"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 4,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 4,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "fp8",
+    "max_steps": 200,
+    "seed": 1337,
+    "output_dir": "results/raw",
+    "environment": {
+      "OMP_NUM_THREADS": "1"
+    }
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory",
+      "nccl"
+    ],
+    "parameters": {
+      "sample_interval_seconds": 0.1
+    }
+  },
+  "metadata": {
+    "matrix_id": "E696",
+    "phase": "Scaling deep dive",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.467,
+    "serial_submission": true,
+    "objective": "Test whether faster per-GPU compute (BF16, FP8) leaves communication more exposed than FP32",
+    "scaling_studies": [
+      "S8:precision"
+    ],
+    "research_questions": [
+      "RQ1",
+      "RQ3",
+      "RQ5",
+      "RQ7"
+    ],
+    "analysis_tasks": [
+      "A01",
+      "A03",
+      "A04",
+      "A05",
+      "A07"
+    ],
+    "key_metrics": [
+      "throughput",
+      "scaling_efficiency",
+      "step_time_p95",
+      "gpu_hours",
+      "memory",
+      "input_identity"
+    ],
+    "estimated_peak_memory_gb": 5.7,
+    "comparison_scope": "controlled_scaling_deep_dive_v1_not_legacy_static_input"
+  }
+}

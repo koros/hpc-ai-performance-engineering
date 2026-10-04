@@ -1,0 +1,99 @@
+{
+  "experiment_id": "E654",
+  "experiment": "scaling_deep_dive_tinyllama_mb4_seq1024_wikitext_pad_to_max_1gpu",
+  "mode": "training",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+    "dataset": "Salesforce/wikitext",
+    "parameters": {
+      "scaling_study_id": "scaling_deep_dive_v1",
+      "scaling_role": "performance",
+      "scaling_type": "strong",
+      "fixed_workload": true,
+      "input_protocol": "wikitext103_global_batches_v1",
+      "stack": "ddp",
+      "per_gpu_batch_size": 4,
+      "global_batch_size": 4,
+      "gradient_accumulation_steps": 1,
+      "sequence_length": 1024,
+      "warmup_steps": 10,
+      "learning_rate": 5e-05,
+      "model_load_dtype": "fp32",
+      "attention_backend": "sdpa",
+      "activation_checkpointing": false,
+      "training_update_diagnostics": true,
+      "capture_gpu_topology": true,
+      "scaling_weak_per_gpu_batch_size": 4,
+      "dataset_revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+      "dataset_subset": "wikitext-103-raw-v1",
+      "text_batching": "pad_to_max"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 1,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 1,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 200,
+    "seed": 1337,
+    "output_dir": "results/raw",
+    "environment": {
+      "OMP_NUM_THREADS": "1"
+    }
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory"
+    ],
+    "parameters": {
+      "sample_interval_seconds": 0.1
+    }
+  },
+  "metadata": {
+    "matrix_id": "E654",
+    "phase": "Scaling deep dive",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.117,
+    "serial_submission": true,
+    "objective": "Measure the efficiency cost of variable-length WikiText-103 inputs and how packing or bucketing recovers it",
+    "scaling_studies": [
+      "S7:real-text"
+    ],
+    "research_questions": [
+      "RQ1",
+      "RQ4",
+      "RQ5",
+      "RQ7"
+    ],
+    "analysis_tasks": [
+      "A01",
+      "A03",
+      "A04",
+      "A05",
+      "A07"
+    ],
+    "key_metrics": [
+      "throughput",
+      "scaling_efficiency",
+      "step_time_p95",
+      "gpu_hours",
+      "memory",
+      "input_identity"
+    ],
+    "estimated_peak_memory_gb": 35.3,
+    "comparison_scope": "controlled_scaling_deep_dive_v1_not_legacy_static_input"
+  }
+}
