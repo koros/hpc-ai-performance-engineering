@@ -27,6 +27,7 @@ from hpc_ai_perf.config import (
     load_platform_profile,
     materialize_platform_configs,
     resolve_platform_config,
+    scaling_deep_dive,
 )
 from hpc_ai_perf.results import (
     ExperimentResult,
@@ -331,19 +332,38 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     )
     shared_lowbit_ids = {f"E{index:03d}" for index in range(239, 247)}
     shared_long_context_ids = {f"E{index:03d}" for index in range(247, 250)}
+    # Controlled scaling: the TinyLlama batch crossover and its canaries run on both platforms,
+    # its E318/E319 diagnostics on L40S only; the deep dive routes per its design module.
+    shared_scaling_ids = {f"E{index:03d}" for index in range(305, 318)}
+    l40s_scaling_diagnostic_ids = {"E318", "E319"}
+    deep_dive = scaling_deep_dive.design()
+    l40s_deep_dive_ids = {eid for eid, condition, _ in deep_dive if "l40s" in condition.run_platforms}
+    h100_deep_dive_ids = {eid for eid, condition, _ in deep_dive if "h100" in condition.run_platforms}
 
     l40s_conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s")
     h100_conditions = load_platform_conditions("platforms/execution_matrix.json", "h100")
 
     assert len([condition for condition in l40s_conditions if condition.matrix_id in source_ids]) == 200
     assert {condition.matrix_id for condition in l40s_conditions if condition.matrix_id in source_ids} == source_ids
-    assert {
-        condition.matrix_id for condition in l40s_conditions if condition.matrix_id not in source_ids
-    } == l40s_only_supplemental_ids | shared_telemetry_ids | shared_lowbit_ids | shared_long_context_ids
-    assert len(h100_conditions) == 267
-    assert {
-        condition.matrix_id for condition in h100_conditions
-    } == source_ids | shared_telemetry_ids | h100_only_supplemental_ids | shared_lowbit_ids | shared_long_context_ids
+    assert {condition.matrix_id for condition in l40s_conditions if condition.matrix_id not in source_ids} == (
+        l40s_only_supplemental_ids
+        | shared_telemetry_ids
+        | shared_lowbit_ids
+        | shared_long_context_ids
+        | shared_scaling_ids
+        | l40s_scaling_diagnostic_ids
+        | l40s_deep_dive_ids
+    )
+    assert len(h100_conditions) == 267 + len(shared_scaling_ids) + len(h100_deep_dive_ids)
+    assert {condition.matrix_id for condition in h100_conditions} == (
+        source_ids
+        | shared_telemetry_ids
+        | h100_only_supplemental_ids
+        | shared_lowbit_ids
+        | shared_long_context_ids
+        | shared_scaling_ids
+        | h100_deep_dive_ids
+    )
     l40s_planned_source_count = sum(
         condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in source_ids
     )

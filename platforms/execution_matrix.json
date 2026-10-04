@@ -684,6 +684,166 @@
       "experiment_ids": ["E301-E304"],
       "required_trials": 3,
       "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "scaling-dd-canary",
+      "name": "H100 scaling deep dive C: Deep-dive acceptance canaries",
+      "experiment_ids": ["E320-E367", "E370-E384"],
+      "required_trials": 1,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-dd-canary",
+      "name": "L40S scaling deep dive C: Deep-dive acceptance canaries",
+      "experiment_ids": ["E320-E385"],
+      "required_trials": 1,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "h100",
+      "wave": "scaling-dd-accumulation",
+      "name": "H100 scaling deep dive S1: Gradient accumulation and strong vs weak scaling",
+      "experiment_ids": ["E386-E388", "E390-E392", "E394-E396", "E398-E400", "E402-E404", "E406-E408", "E410-E412", "E414-E416", "E418-E420", "E422-E424", "E426-E428", "E430-E432"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-dd-accumulation",
+      "name": "L40S scaling deep dive S1: Gradient accumulation and strong vs weak scaling",
+      "experiment_ids": ["E386-E433"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "scaling-dd-split",
+      "name": "H100 scaling deep dive S2: Tokens per GPU: batch versus sequence length",
+      "experiment_ids": ["E434-E436", "E438-E440", "E442-E444", "E446-E448", "E450-E452", "E454-E456", "E458-E460", "E462-E464", "E466-E468", "E470-E472", "E474-E476", "E478-E480", "E482-E484", "E486-E488", "E490-E492", "E494-E496", "E498-E500", "E502-E504"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-dd-split",
+      "name": "L40S scaling deep dive S2: Tokens per GPU: batch versus sequence length",
+      "experiment_ids": ["E434-E505"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "scaling-dd-model-size",
+      "name": "H100 scaling deep dive S3: Model size and gradient volume",
+      "experiment_ids": ["E506-E508", "E510-E512", "E514-E516", "E518-E520", "E522-E524", "E526-E528", "E530-E532"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-dd-model-size",
+      "name": "L40S scaling deep dive S3: Model size and gradient volume",
+      "experiment_ids": ["E506-E533"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "scaling-dd-ddp-comm",
+      "name": "H100 scaling deep dive S4: DDP communication tuning",
+      "experiment_ids": ["E534-E535", "E537-E538", "E540-E541", "E543-E544", "E546-E547", "E549-E550", "E552-E553", "E555-E556", "E558-E559", "E561-E562", "E564-E565", "E567-E568", "E570-E571", "E573-E574", "E576-E577"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-dd-ddp-comm",
+      "name": "L40S scaling deep dive S4: DDP communication tuning",
+      "experiment_ids": ["E534-E578"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "scaling-dd-stacks",
+      "name": "H100 scaling deep dive S5: Training stack scaling curves",
+      "experiment_ids": ["E579-E580", "E582-E583", "E585-E586", "E588-E589", "E591-E592", "E594-E595", "E597-E598", "E600-E601", "E603-E604", "E606"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-dd-stacks",
+      "name": "L40S scaling deep dive S5: Training stack scaling curves",
+      "experiment_ids": ["E579-E607"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "scaling-dd-topology",
+      "name": "H100 scaling deep dive S6: GPU placement, peer-to-peer and NCCL algorithm",
+      "experiment_ids": ["E619-E622", "E634-E637"],
+      "required_trials": 3,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-dd-topology",
+      "name": "L40S scaling deep dive S6: GPU placement, peer-to-peer and NCCL algorithm",
+      "experiment_ids": ["E608-E618", "E623-E633"],
+      "required_trials": 3,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "h100",
+      "wave": "scaling-dd-real-text",
+      "name": "H100 scaling deep dive S7: Variable-length real text: padding, packing and stragglers",
+      "experiment_ids": ["E638-E640", "E642-E644", "E646-E648", "E650-E652", "E654-E656", "E658-E660", "E662-E664", "E666-E668"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-dd-real-text",
+      "name": "L40S scaling deep dive S7: Variable-length real text: padding, packing and stragglers",
+      "experiment_ids": ["E638-E669"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "scaling-dd-precision",
+      "name": "H100 scaling deep dive S8: Numeric precision and scaling",
+      "experiment_ids": ["E670-E672", "E674-E676", "E678-E680", "E682-E684", "E686-E688", "E690-E692", "E694-E696"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-dd-precision",
+      "name": "L40S scaling deep dive S8: Numeric precision and scaling",
+      "experiment_ids": ["E670-E697"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "scaling-dd-run-length",
+      "name": "H100 scaling deep dive RL: Run-length check",
+      "experiment_ids": ["E698", "E700"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-dd-run-length",
+      "name": "L40S scaling deep dive RL: Run-length check",
+      "experiment_ids": ["E698-E701"],
+      "required_trials": 3,
+      "comparability": "exact"
     }
   ],
   "deferred": [
