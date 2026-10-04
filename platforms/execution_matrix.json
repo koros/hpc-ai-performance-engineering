@@ -3,6 +3,54 @@
   "waves": [
     {
       "platform": "h100",
+      "wave": "scaling-batch-canary",
+      "name": "H100 controlled scaling input and capacity acceptance",
+      "experiment_ids": ["E314-E317"],
+      "required_trials": 1,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-batch-canary",
+      "name": "L40S controlled scaling input and capacity acceptance",
+      "experiment_ids": ["E314-E317"],
+      "required_trials": 1,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "scaling-batch-crossover",
+      "name": "H100 TinyLlama batch versus GPU-count crossover",
+      "experiment_ids": ["E305-E313"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-batch-crossover",
+      "name": "L40S TinyLlama batch versus GPU-count crossover",
+      "experiment_ids": ["E305-E313"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-placement-diagnostic",
+      "name": "L40S serial E291 reproduction with placement evidence",
+      "experiment_ids": ["E318"],
+      "required_trials": 3,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "l40s",
+      "wave": "scaling-trace-diagnostic",
+      "name": "L40S short E291 training trace",
+      "experiment_ids": ["E319"],
+      "required_trials": 1,
+      "comparability": "platform_specific"
+    },
+    {
+      "platform": "h100",
       "wave": "h100-inference-energy-anchors",
       "name": "H100 duration-controlled DistilBERT FP16 BF16 and context energy anchors",
       "experiment_ids": ["E274-E276"],

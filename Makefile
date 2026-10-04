@@ -315,6 +315,19 @@ retry-platform-wave:
 stage-platform-wave:
 	$(PYTHON) -m hpc_ai_perf.cli stage-platform-wave --platform-profile $(PLATFORM_PROFILE) --wave $(PLATFORM_WAVE) --state-file $(PLATFORM_WAVE_STATE)
 
+.PHONY: submit-scaling-canary verify-scaling-acceptance submit-scaling-wave retry-scaling-wave
+submit-scaling-canary:
+	$(MAKE) submit-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=scaling-batch-canary
+
+verify-scaling-acceptance:
+	PYTHONPATH="$(CURDIR)/src" $(PYTHON) scripts/verify_scaling_acceptance.py --platform $(PLATFORM) --result-root results/raw/$(PLATFORM)
+
+submit-scaling-wave: verify-scaling-acceptance
+	$(MAKE) submit-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=scaling-batch-crossover
+
+retry-scaling-wave: verify-scaling-acceptance
+	$(MAKE) retry-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=scaling-batch-crossover
+
 # Legacy bundle primitives remain available for inspection and one-off
 # recovery, but the targets above are the standard L40S/H100 workflow.
 create-platform-wave-bundle:

@@ -1179,6 +1179,14 @@ def _submit_platform_wave(args: argparse.Namespace):
     if not args.wave:
         raise ValueError("submit-platform-wave requires --wave")
     profile = load_platform_profile(args.platform_profile)
+    if args.wave == "scaling-batch-crossover":
+        from hpc_ai_perf.validation.scaling_acceptance import verify_scaling_canaries
+
+        verify_scaling_canaries(
+            Path("results/raw") / profile.platform_id,
+            profile.platform_id,
+            execution_matrix=args.execution_matrix,
+        )
     if args.wave in {"qwen7b-update-controls-2gpu", "qwen7b-update-controls-4gpu"}:
         from hpc_ai_perf.validation.qwen7b_training import verify_update_canaries
 
