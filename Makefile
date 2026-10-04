@@ -1,4 +1,8 @@
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
+# The project .venv sits on the Spack module stack: Torch and its dependencies (for example
+# fsspec) come from the modules' PYTHONPATH. Prepend src rather than replacing that path.
+# Private environments (LOWBIT_ENV, LONG_CONTEXT_ENV) are self-contained and keep src only.
+PROJECT_PYTHONPATH = $(CURDIR)/src$(if $(PYTHONPATH),:$(PYTHONPATH),)
 SLURM_PROFILE ?=
 SLURM_PROFILE_ARG := $(if $(SLURM_PROFILE),--slurm-profile $(SLURM_PROFILE),)
 PLATFORM ?= l40s
@@ -152,16 +156,16 @@ prefetch-long-context-assets:
 
 # Scaling deep dive (docs/scaling_deep_dive_runbook.md): configs and scaling-dd-* waves are generated.
 generate-scaling-deep-dive:
-	PYTHONPATH="$(CURDIR)/src" $(PYTHON) scripts/generate_scaling_deep_dive.py
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/generate_scaling_deep_dive.py
 
 check-scaling-deep-dive:
-	PYTHONPATH="$(CURDIR)/src" $(PYTHON) scripts/generate_scaling_deep_dive.py --check
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/generate_scaling_deep_dive.py --check
 
 prefetch-scaling-deep-dive-assets:
-	PYTHONPATH="$(CURDIR)/src" $(PYTHON) scripts/prefetch_scaling_deep_dive_assets.py
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/prefetch_scaling_deep_dive_assets.py
 
 verify-scaling-deep-dive-canaries:
-	PYTHONPATH="$(CURDIR)/src" $(PYTHON) scripts/verify_scaling_deep_dive_canaries.py --platform "$(PLATFORM)"
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/verify_scaling_deep_dive_canaries.py --platform "$(PLATFORM)"
 
 submit-lowbit-acceptance:
 	@case "$(PLATFORM)" in l40s|h100) ;; *) echo "PLATFORM must be l40s or h100"; exit 1;; esac
@@ -207,7 +211,7 @@ submit-qwen7b-training-canary:
 
 verify-qwen7b-training-canary:
 	test "$(PLATFORM)" = "h100" || (echo "Qwen2.5-7B training canaries require PLATFORM=h100" && exit 1)
-	PYTHONPATH="$(CURDIR)/src" "$(PYTHON)" scripts/verify_qwen7b_training_canary.py --platform h100 --result-root "$(QWEN7B_TRAINING_RESULT_ROOT)"
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" "$(PYTHON)" scripts/verify_qwen7b_training_canary.py --platform h100 --result-root "$(QWEN7B_TRAINING_RESULT_ROOT)"
 
 submit-qwen7b-training-wave: verify-qwen7b-training-canary
 	$(MAKE) submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=qwen7b-training
@@ -221,7 +225,7 @@ submit-qwen7b-update-canary:
 
 verify-qwen7b-update-canary:
 	test "$(PLATFORM)" = "h100"
-	PYTHONPATH="$(CURDIR)/src" "$(PYTHON)" scripts/verify_qwen7b_training_canary.py --platform h100 --update-controls --result-root "$(QWEN7B_TRAINING_RESULT_ROOT)"
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" "$(PYTHON)" scripts/verify_qwen7b_training_canary.py --platform h100 --update-controls --result-root "$(QWEN7B_TRAINING_RESULT_ROOT)"
 
 submit-qwen7b-update-wave: verify-qwen7b-update-canary
 	@case "$(QWEN7B_UPDATE_WAVE)" in qwen7b-update-controls-2gpu|qwen7b-update-controls-4gpu) ;; *) echo "Unknown Qwen update wave"; exit 1;; esac
@@ -232,7 +236,7 @@ retry-qwen7b-update-wave: verify-qwen7b-update-canary
 	HPC_AI_QWEN_UPDATE_RESULT_ROOT="$(abspath $(QWEN7B_TRAINING_RESULT_ROOT))" $(MAKE) retry-platform-wave PLATFORM=h100 PLATFORM_WAVE=$(QWEN7B_UPDATE_WAVE)
 
 verify-h100-energy-anchors:
-	PYTHONPATH="$(CURDIR)/src" "$(PYTHON)" scripts/verify_h100_energy_anchors.py
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" "$(PYTHON)" scripts/verify_h100_energy_anchors.py
 
 submit-vllm-wave:
 	test -r "$(VLLM_ENV)/bin/activate" || (echo "Run make submit-vllm-build and make submit-vllm-acceptance first" && exit 1)
@@ -334,7 +338,7 @@ submit-scaling-canary:
 	$(MAKE) submit-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=scaling-batch-canary
 
 verify-scaling-acceptance:
-	PYTHONPATH="$(CURDIR)/src" $(PYTHON) scripts/verify_scaling_acceptance.py --platform $(PLATFORM) --result-root results/raw/$(PLATFORM)
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/verify_scaling_acceptance.py --platform $(PLATFORM) --result-root results/raw/$(PLATFORM)
 
 submit-scaling-wave: verify-scaling-acceptance
 	$(MAKE) submit-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=scaling-batch-crossover

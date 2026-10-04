@@ -440,3 +440,11 @@ def test_controlled_strong_curve_pools_accumulation_diagonal_but_legacy_does_not
     assert len({r["series_id"] for r in pooled if r["scaling_type"] == "strong"}) == 1
     legacy = build_scaling_summary([row(1, 8, ""), row(2, 4, "")])
     assert len({r["series_id"] for r in legacy if r["scaling_type"] == "strong"}) == 2
+
+
+def test_project_venv_make_targets_keep_the_module_pythonpath():
+    # The project .venv relies on Spack module packages (Torch, fsspec) from the inherited PYTHONPATH.
+    recipes = [line for line in Path("Makefile").read_text().splitlines() if line.startswith("\tPYTHONPATH=")]
+    project = [line for line in recipes if "$(PYTHON)" in line]
+    assert project and all('PYTHONPATH="$(PROJECT_PYTHONPATH)"' in line for line in project)
+    assert "PROJECT_PYTHONPATH = $(CURDIR)/src$(if $(PYTHONPATH),:$(PYTHONPATH),)" in Path("Makefile").read_text()
