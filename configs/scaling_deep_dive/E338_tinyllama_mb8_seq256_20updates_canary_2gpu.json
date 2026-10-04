@@ -1,0 +1,95 @@
+{
+  "experiment_id": "E338",
+  "experiment": "scaling_deep_dive_tinyllama_mb8_seq256_20updates_canary_2gpu",
+  "mode": "training",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+    "dataset": "synthetic_global_batches_v1",
+    "parameters": {
+      "scaling_study_id": "scaling_deep_dive_v1",
+      "scaling_role": "canary",
+      "scaling_type": "strong",
+      "fixed_workload": true,
+      "input_protocol": "synthetic_global_batches_v1",
+      "stack": "ddp",
+      "per_gpu_batch_size": 8,
+      "global_batch_size": 16,
+      "gradient_accumulation_steps": 1,
+      "sequence_length": 256,
+      "warmup_steps": 10,
+      "learning_rate": 5e-05,
+      "model_load_dtype": "fp32",
+      "attention_backend": "sdpa",
+      "activation_checkpointing": false,
+      "training_update_diagnostics": true,
+      "capture_gpu_topology": true,
+      "scaling_weak_per_gpu_batch_size": 8
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 2,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 20,
+    "seed": 1337,
+    "output_dir": "results/raw",
+    "environment": {
+      "OMP_NUM_THREADS": "1"
+    }
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory",
+      "nccl"
+    ],
+    "parameters": {
+      "sample_interval_seconds": 0.1
+    }
+  },
+  "metadata": {
+    "matrix_id": "E338",
+    "phase": "Scaling deep dive",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.173,
+    "serial_submission": true,
+    "objective": "Verify memory headroom, backends and input protocols at the least-sharded GPU count before the waves",
+    "scaling_studies": [
+      "C:canary"
+    ],
+    "research_questions": [
+      "RQ1",
+      "RQ7"
+    ],
+    "analysis_tasks": [
+      "A01",
+      "A03",
+      "A04",
+      "A05",
+      "A07"
+    ],
+    "key_metrics": [
+      "throughput",
+      "scaling_efficiency",
+      "step_time_p95",
+      "gpu_hours",
+      "memory",
+      "input_identity"
+    ],
+    "estimated_peak_memory_gb": 27.9,
+    "comparison_scope": "controlled_scaling_deep_dive_v1_not_legacy_static_input"
+  }
+}
