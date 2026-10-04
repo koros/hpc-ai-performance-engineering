@@ -46,6 +46,11 @@ def scaling_contract(row: dict[str, Any]) -> str:
         "scaling_type",
         "scaling_weak_per_gpu_batch_size",
     }
+    if not weak and row.get("parameter_scaling_study_id"):
+        # A controlled strong curve fixes the global batch and its exact inputs
+        # (digest and token count below), so how GPUs and accumulation split that
+        # batch is the derived shape, as the local micro-batch already is.
+        varying.add("gradient_accumulation_steps")
     fixed = {
         key: str(value)
         for key, value in row.items()

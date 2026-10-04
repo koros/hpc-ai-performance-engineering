@@ -10,11 +10,21 @@ from typing import Any
 
 from hpc_ai_perf.analysis.lowbit import LOWBIT_COLUMNS, build_lowbit_summary
 from hpc_ai_perf.analysis.scaling import scaling_contract, scaling_rows
+from hpc_ai_perf.analysis.scaling_deep_dive import (
+    CONDITION_COLUMNS,
+    EFFECT_COLUMNS,
+    build_scaling_deep_dive_conditions,
+    build_scaling_deep_dive_effects,
+    public_rows,
+    render_scaling_deep_dive_report,
+)
 from hpc_ai_perf.config.traceability import PHASE_TRACEABILITY, RESEARCH_QUESTIONS
 from hpc_ai_perf.result_identity import COMPARABILITY_VALUES, MATRIX_PLATFORMS, is_matrix_experiment_id
 
 ANALYSIS_TABLES = {
     "lowbit_summary": LOWBIT_COLUMNS,
+    "scaling_deep_dive_conditions": CONDITION_COLUMNS,
+    "scaling_deep_dive_effects": EFFECT_COLUMNS,
     "phase_summary": [
         "platform_id",
         "comparability",
@@ -381,6 +391,13 @@ def analyze_results(
         _write_table(table_path, ANALYSIS_TABLES[table_name], table_rows)
         written_paths.append(table_path)
 
+    deep_dive = build_scaling_deep_dive_conditions(rows)
+    if deep_dive:
+        report_path = output_root / "scaling_deep_dive_report.md"
+        report_path.write_text(
+            render_scaling_deep_dive_report(deep_dive, build_scaling_deep_dive_effects(deep_dive)), encoding="utf-8"
+        )
+        written_paths.append(report_path)
     return written_paths
 
 
@@ -415,6 +432,10 @@ def build_analysis_tables(rows: list[dict[str, str]]) -> dict[str, list[dict[str
     lowbit_rows = build_lowbit_summary(rows)
     if lowbit_rows:
         tables["lowbit_summary"] = lowbit_rows
+    deep_dive = build_scaling_deep_dive_conditions(rows)
+    if deep_dive:
+        tables["scaling_deep_dive_conditions"] = public_rows(deep_dive, CONDITION_COLUMNS)
+        tables["scaling_deep_dive_effects"] = build_scaling_deep_dive_effects(deep_dive)
     return tables
 
 
