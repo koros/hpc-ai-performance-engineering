@@ -1,0 +1,99 @@
+{
+  "experiment_id": "E306",
+  "experiment": "tinyllama_scaling_performance_batch4_2gpu",
+  "mode": "training",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+    "dataset": "synthetic_global_batches_v1",
+    "parameters": {
+      "scaling_study_id": "tinyllama_batch_crossover_v1",
+      "scaling_role": "performance",
+      "scaling_type": "strong",
+      "fixed_workload": true,
+      "input_protocol": "synthetic_global_batches_v1",
+      "stack": "ddp",
+      "per_gpu_batch_size": 2,
+      "global_batch_size": 4,
+      "gradient_accumulation_steps": 1,
+      "sequence_length": 512,
+      "warmup_steps": 10,
+      "learning_rate": 0.00005,
+      "model_load_dtype": "fp32",
+      "attention_backend": "sdpa",
+      "activation_checkpointing": false,
+      "training_update_diagnostics": true,
+      "capture_gpu_topology": true,
+      "scaling_weak_per_gpu_batch_size": 4
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 2,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 200,
+    "seed": 1337,
+    "output_dir": "results/raw",
+    "environment": {
+      "OMP_NUM_THREADS": "1"
+    }
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory"
+    ],
+    "parameters": {
+      "sample_interval_seconds": 0.1
+    }
+  },
+  "metadata": {
+    "matrix_id": "E306",
+    "phase": "Strong scaling",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.5,
+    "serial_submission": true,
+    "objective": "Locate throughput and GPU-hour crossover as global batch and GPU count change",
+    "source_experiment_ids": [
+      "E044",
+      "E045",
+      "E046"
+    ],
+    "research_questions": [
+      "RQ1",
+      "RQ4",
+      "RQ5",
+      "RQ6",
+      "RQ7"
+    ],
+    "analysis_tasks": [
+      "A01",
+      "A03",
+      "A04",
+      "A05",
+      "A06",
+      "A07"
+    ],
+    "key_metrics": [
+      "throughput",
+      "scaling_efficiency",
+      "gpu_hours",
+      "memory",
+      "energy",
+      "input_identity"
+    ],
+    "comparison_scope": "controlled_scaling_v1_not_legacy_static_input"
+  }
+}

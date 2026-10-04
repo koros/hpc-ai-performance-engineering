@@ -1,0 +1,88 @@
+{
+  "experiment_id": "E319",
+  "experiment": "tinyllama_l40s_weak_scaling_trace",
+  "mode": "profiling",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+    "dataset": "synthetic_tokens_v1",
+    "parameters": {
+      "scaling_role": "diagnostic",
+      "scaling_type": "weak",
+      "per_gpu_batch_size": 2,
+      "global_batch_size": 4,
+      "sequence_length": 1024,
+      "fixed_workload": false,
+      "stack": "ddp",
+      "capture_gpu_topology": true
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpus": 2,
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 20,
+    "seed": 1337,
+    "output_dir": "results/raw",
+    "environment": {
+      "OMP_NUM_THREADS": "1"
+    }
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory",
+      "torch_profiler"
+    ],
+    "parameters": {
+      "sample_interval_seconds": 0.2
+    }
+  },
+  "metadata": {
+    "matrix_id": "E319",
+    "phase": "Baseline profiling",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.5,
+    "serial_submission": true,
+    "objective": "Capture a short labelled training trace for the E291 shape; exclude profiled timings from scaling curves",
+    "source_experiment_ids": [
+      "E291"
+    ],
+    "research_questions": [
+      "RQ1",
+      "RQ4",
+      "RQ5",
+      "RQ6",
+      "RQ7"
+    ],
+    "analysis_tasks": [
+      "A01",
+      "A03",
+      "A04",
+      "A05",
+      "A06",
+      "A07"
+    ],
+    "key_metrics": [
+      "throughput",
+      "scaling_efficiency",
+      "gpu_hours",
+      "memory",
+      "energy",
+      "input_identity"
+    ],
+    "comparison_scope": "diagnostic_only_legacy_static_inputs"
+  }
+}
