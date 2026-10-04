@@ -63,6 +63,7 @@ DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
 .PHONY: check-cuda-toolchain
 .PHONY: submit-lowbit-acceptance verify-lowbit-acceptance submit-lowbit-wave retry-lowbit-wave
 .PHONY: prefetch-lowbit-assets prefetch-long-context-assets
+.PHONY: generate-scaling-deep-dive check-scaling-deep-dive prefetch-scaling-deep-dive-assets
 .PHONY: submit-long-context-acceptance verify-long-context-acceptance submit-long-context-wave retry-long-context-wave
 .PHONY: submit-qwen7b-training-canary verify-qwen7b-training-canary submit-qwen7b-training-wave retry-qwen7b-training-wave
 .PHONY: submit-qwen7b-update-canary verify-qwen7b-update-canary submit-qwen7b-update-wave retry-qwen7b-update-wave
@@ -148,6 +149,19 @@ prefetch-lowbit-assets:
 
 prefetch-long-context-assets:
 	PYTHONPATH="$(CURDIR)/src" "$(LONG_CONTEXT_ENV)/bin/python" scripts/prefetch_long_context_assets.py
+
+# Scaling deep dive (docs/scaling_deep_dive_runbook.md): configs and scaling-dd-* waves are generated.
+generate-scaling-deep-dive:
+	PYTHONPATH="$(CURDIR)/src" $(PYTHON) scripts/generate_scaling_deep_dive.py
+
+check-scaling-deep-dive:
+	PYTHONPATH="$(CURDIR)/src" $(PYTHON) scripts/generate_scaling_deep_dive.py --check
+
+prefetch-scaling-deep-dive-assets:
+	PYTHONPATH="$(CURDIR)/src" $(PYTHON) scripts/prefetch_scaling_deep_dive_assets.py
+
+verify-scaling-deep-dive-canaries:
+	PYTHONPATH="$(CURDIR)/src" $(PYTHON) scripts/verify_scaling_deep_dive_canaries.py --platform "$(PLATFORM)"
 
 submit-lowbit-acceptance:
 	@case "$(PLATFORM)" in l40s|h100) ;; *) echo "PLATFORM must be l40s or h100"; exit 1;; esac

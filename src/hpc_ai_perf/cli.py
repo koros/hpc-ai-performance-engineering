@@ -1023,7 +1023,8 @@ def _render_platform_slurm(
             raise ValueError(f"{config.experiment_id} is not research-ready: {'; '.join(semantic_issues)}")
         _verify_profile_platform(config, slurm_options.get("platform"), slurm_profile)
         condition = condition_by_id[config.experiment_id]
-        requested_cpus = cpus_per_task or profile.cpus_per_gpu * max(1, config.hardware.gpus)
+        allocated_gpus = max(1, config.hardware.gpus, int(config.metadata.get("allocation_gpus", 0)))
+        requested_cpus = cpus_per_task or profile.cpus_per_gpu * allocated_gpus
         pre_run_command = None
         if submission_manifest is not None and submission_manifest_sha256 is not None:
             pre_run_command = (
@@ -1183,6 +1184,14 @@ def _submit_platform_wave(args: argparse.Namespace):
         from hpc_ai_perf.validation.scaling_acceptance import verify_scaling_canaries
 
         verify_scaling_canaries(
+            Path("results/raw") / profile.platform_id,
+            profile.platform_id,
+            execution_matrix=args.execution_matrix,
+        )
+    if args.wave.startswith("scaling-dd-") and args.wave != "scaling-dd-canary":
+        from hpc_ai_perf.validation.scaling_deep_dive import verify_deep_dive_canaries
+
+        verify_deep_dive_canaries(
             Path("results/raw") / profile.platform_id,
             profile.platform_id,
             execution_matrix=args.execution_matrix,
