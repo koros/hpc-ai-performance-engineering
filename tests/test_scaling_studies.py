@@ -2,7 +2,7 @@ from copy import deepcopy
 
 import pytest
 
-from hpc_ai_perf.analysis.summaries import build_scaling_summary
+from hpc_ai_perf.analysis.summaries import build_experiment_rankings, build_scaling_summary
 
 
 def row(gpus=1, batch=8, **changes):
@@ -83,6 +83,13 @@ def test_scaling_excludes_diagnostic_and_acceptance_runs():
     )
     assert len(summaries) == 1
     assert summaries[0]["trials"] == 1
+
+
+def test_acceptance_and_trace_runs_do_not_enter_throughput_rankings():
+    rankings = build_experiment_rankings(
+        [row(), row(parameter_scaling_role="canary"), row(parameter_scaling_role="diagnostic")]
+    )
+    assert len(rankings) == 1
 
 
 def test_scaling_keeps_full_trial_uncertainty_and_explicit_missing_one_gpu_baseline():

@@ -726,7 +726,7 @@ def build_experiment_rankings(rows: list[dict[str, str]]) -> list[dict[str, Any]
     """
     rankings: list[dict[str, Any]] = []
     for row in rows:
-        if row.get("status") != "completed":
+        if row.get("status") != "completed" or row.get("parameter_scaling_role") in {"canary", "diagnostic"}:
             continue
         gpus = _float(row.get("gpus"))
         gpu_hours = _float(row.get("gpu_hours_estimate"))
