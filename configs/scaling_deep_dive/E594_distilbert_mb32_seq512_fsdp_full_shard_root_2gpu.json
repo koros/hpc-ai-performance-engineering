@@ -1,0 +1,101 @@
+{
+  "experiment_id": "E594",
+  "experiment": "scaling_deep_dive_distilbert_mb32_seq512_fsdp_full_shard_root_2gpu",
+  "mode": "training",
+  "workload": {
+    "name": "distilbert",
+    "model": "distilbert-base-uncased",
+    "model_revision": "12040accade4e8a0f71eabdb258fecc2e7e948be",
+    "dataset": "synthetic_global_batches_v1",
+    "parameters": {
+      "scaling_study_id": "scaling_deep_dive_v1",
+      "scaling_role": "performance",
+      "scaling_type": "strong",
+      "fixed_workload": true,
+      "input_protocol": "synthetic_global_batches_v1",
+      "stack": "fsdp",
+      "per_gpu_batch_size": 32,
+      "global_batch_size": 64,
+      "gradient_accumulation_steps": 1,
+      "sequence_length": 512,
+      "warmup_steps": 10,
+      "learning_rate": 5e-05,
+      "model_load_dtype": "fp32",
+      "attention_backend": "sdpa",
+      "activation_checkpointing": false,
+      "training_update_diagnostics": true,
+      "capture_gpu_topology": true,
+      "scaling_weak_per_gpu_batch_size": 32,
+      "num_labels": 2,
+      "strategy_detail": "full_shard",
+      "fsdp_wrap_policy": "root"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 2,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "fsdp",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 200,
+    "seed": 1337,
+    "output_dir": "results/raw",
+    "environment": {
+      "OMP_NUM_THREADS": "1"
+    }
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory",
+      "nccl"
+    ],
+    "parameters": {
+      "sample_interval_seconds": 0.1
+    }
+  },
+  "metadata": {
+    "matrix_id": "E594",
+    "phase": "Scaling deep dive",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.233,
+    "serial_submission": true,
+    "objective": "Compare DDP with FSDP sharding modes and wrapping as GPUs are added under identical inputs",
+    "scaling_studies": [
+      "S5:stacks"
+    ],
+    "research_questions": [
+      "RQ1",
+      "RQ2",
+      "RQ4",
+      "RQ5",
+      "RQ7"
+    ],
+    "analysis_tasks": [
+      "A01",
+      "A03",
+      "A04",
+      "A05",
+      "A07"
+    ],
+    "key_metrics": [
+      "throughput",
+      "scaling_efficiency",
+      "step_time_p95",
+      "gpu_hours",
+      "memory",
+      "input_identity"
+    ],
+    "estimated_peak_memory_gb": 6.0,
+    "comparison_scope": "controlled_scaling_deep_dive_v1_not_legacy_static_input"
+  }
+}
