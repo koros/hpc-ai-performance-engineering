@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import os
 import shutil
 import subprocess
@@ -332,7 +333,7 @@ def _summarize_nvidia_smi_window(
 
 
 def visible_cuda_device_uuids(expected_gpu_count: int | None = None) -> tuple[str, ...]:
-    """Return UUIDs for CUDA-visible devices in CUDA runtime order when exposed by Torch."""
+    """Return UUIDs in CUDA device order, including when Torch omits them."""
     try:
         import torch
     except ImportError:
@@ -350,9 +351,52 @@ def visible_cuda_device_uuids(expected_gpu_count: int | None = None) -> tuple[st
         value = getattr(torch.cuda.get_device_properties(index), "uuid", None)
         normalized = _format_cuda_uuid(value)
         if normalized is None:
+            driver_uuids = _cuda_driver_visible_uuids(visible_count)
+            if driver_uuids:
+                return driver_uuids[:requested_count]
             return _uuid_tokens_from_cuda_visible_devices(requested_count)
         uuids.append(normalized)
     return tuple(uuids)
+
+
+class _CudaUuid(ctypes.Structure):
+    _fields_ = [("bytes", ctypes.c_ubyte * 16)]
+
+
+def _cuda_driver_visible_uuids(visible_count: int) -> tuple[str, ...]:
+    """Read the masked CUDA device UUIDs; never infer them from nvidia-smi row order."""
+    try:
+        driver = ctypes.CDLL("libcuda.so.1")
+        initialize = driver.cuInit
+        initialize.argtypes = [ctypes.c_uint]
+        initialize.restype = ctypes.c_int
+        get_count = driver.cuDeviceGetCount
+        get_count.argtypes = [ctypes.POINTER(ctypes.c_int)]
+        get_count.restype = ctypes.c_int
+        get_device = driver.cuDeviceGet
+        get_device.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.c_int]
+        get_device.restype = ctypes.c_int
+        get_uuid = getattr(driver, "cuDeviceGetUuid_v2", None) or driver.cuDeviceGetUuid
+        get_uuid.argtypes = [ctypes.POINTER(_CudaUuid), ctypes.c_int]
+        get_uuid.restype = ctypes.c_int
+        if initialize(0) != 0:
+            return ()
+        count = ctypes.c_int()
+        if get_count(ctypes.byref(count)) != 0 or count.value != visible_count:
+            return ()
+        uuids: list[str] = []
+        for ordinal in range(visible_count):
+            device = ctypes.c_int()
+            uuid = _CudaUuid()
+            if get_device(ctypes.byref(device), ordinal) != 0 or get_uuid(ctypes.byref(uuid), device.value) != 0:
+                return ()
+            normalized = _format_cuda_uuid(bytes(uuid.bytes))
+            if normalized is None:
+                return ()
+            uuids.append(normalized)
+        return tuple(uuids) if len(set(uuids)) == visible_count else ()
+    except (AttributeError, OSError):
+        return ()
 
 
 def query_nvidia_smi_rows(query: str, *, timeout: int = 5) -> list[str]:
