@@ -91,6 +91,38 @@ waves.
    - The pinned-placement canaries (L40S only): check `training_rank_placement` reports the
      requested GPUs.
 
+   **L40S placement recovery (E368/E369):** These two-rank conditions reserve all eight GPUs,
+   while `nvidia-smi` may report all eight even when `CUDA_VISIBLE_DEVICES` exposes only two to
+   PyTorch. The profiler now queries the CUDA driver for the two visible UUIDs when PyTorch does
+   not expose them, then selects matching `nvidia-smi` rows. It still fails closed if the driver
+   and PyTorch visible-device counts differ or the UUIDs cannot be matched; it never assumes the
+   first two `nvidia-smi` rows are the requested GPUs. Check the mapping on an eight-GPU allocation
+   before retrying the failed canaries:
+
+   ```bash
+   srun -p gpu_l40s --gres=gpu:8 --cpus-per-task=8 --time=00:05:00 bash -lc '
+   source slurm/modules_for_hpc_ai
+   source .venv/bin/activate
+   export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0,1
+   python - <<PY
+   from hpc_ai_perf.profiling.system import (
+       NvidiaSmiProfiler, query_nvidia_smi_rows, select_nvidia_smi_rows,
+       visible_cuda_device_uuids,
+   )
+   uuids = visible_cuda_device_uuids(2)
+   rows = query_nvidia_smi_rows(NvidiaSmiProfiler._QUERY)
+   selected, method = select_nvidia_smi_rows(rows, target_gpu_uuids=uuids, expected_gpu_count=2)
+   print("CUDA UUIDs:", uuids, "nvidia-smi rows:", len(rows), "mapping:", method)
+   assert len(uuids) == len(selected) == 2 and method == "cuda_uuid"
+   PY
+   '
+   ```
+
+   Use `make retry-platform-wave PLATFORM=l40s PLATFORM_WAVE=scaling-dd-canary` only after this
+   probe passes, with the same runtime activation used in the original submission. Collect the
+   recovery attempt and rerun the canary gate; preserve the original failed bundle as diagnostic
+   evidence.
+
    If a canary OOMs or fails, preserve its failed evidence and adjust the design and regenerate.
    Deferring a canary alone does not open the performance waves: the gate requires the full
    declared canary set, so the matching performance condition must also be removed or deferred
