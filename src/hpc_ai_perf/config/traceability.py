@@ -16,6 +16,7 @@ PHASE_TRACEABILITY: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "Workload characterisation": (("RQ4", "RQ5", "RQ7"), ("A01", "A02", "A03", "A04", "A05", "A07")),
     "Strong scaling": (("RQ1", "RQ5", "RQ7"), ("A01", "A03", "A04", "A05", "A07")),
     "Weak scaling": (("RQ1", "RQ5", "RQ7"), ("A01", "A03", "A04", "A05", "A07")),
+    "Scaling deep dive": (("RQ1", "RQ4", "RQ5", "RQ7"), ("A01", "A03", "A04", "A05", "A07")),
     "Distributed training strategy": (
         ("RQ2", "RQ5", "RQ7"),
         ("A01", "A03", "A04", "A05", "A07"),

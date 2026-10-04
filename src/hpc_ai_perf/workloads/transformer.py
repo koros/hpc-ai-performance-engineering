@@ -12,11 +12,16 @@ from functools import partial
 from typing import Any
 
 from hpc_ai_perf.config import ExperimentConfig
-from hpc_ai_perf.config.scaling import INPUT_PROTOCOL, scaling_issues
+from hpc_ai_perf.config.scaling import INPUT_PROTOCOLS, REAL_TEXT_PROTOCOL, scaling_issues
 from hpc_ai_perf.profiling import measured_region
 from hpc_ai_perf.runtime_checks import disable_deepspeed_nvtx_annotations, prepare_deepspeed_import_environment
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
-from hpc_ai_perf.workloads.scaling import GlobalTrainingInputs, capture_training_placement, scaling_runtime_sha256
+from hpc_ai_perf.workloads.scaling import (
+    GlobalTrainingInputs,
+    capture_training_placement,
+    load_real_text_inputs,
+    scaling_runtime_sha256,
+)
 
 
 @dataclass(frozen=True)
@@ -70,6 +75,20 @@ class GPT2SmallWorkload(TransformerWorkload):
         if config.mode == "inference":
             return _run_causal_lm_inference(config)
         return super().run(config)
+
+
+class GPT2MediumWorkload(GPT2SmallWorkload):
+    """GPT-2 Medium (355M): the middle rung of the scaling study's model-size ladder."""
+
+    def __init__(self) -> None:
+        TransformerWorkload.__init__(self, name="gpt2_medium", display_name="GPT-2 Medium")
+
+
+class GPT2LargeWorkload(GPT2SmallWorkload):
+    """GPT-2 Large (774M): same architecture and tokenizer as GPT-2 Small, six times the parameters."""
+
+    def __init__(self) -> None:
+        TransformerWorkload.__init__(self, name="gpt2_large", display_name="GPT-2 Large")
 
 
 class DistilBERTWorkload(TransformerWorkload):
@@ -162,6 +181,8 @@ class Qwen25SevenBServingWorkload(TransformerWorkload):
 def transformer_workloads() -> list[TransformerWorkload]:
     return [
         GPT2SmallWorkload(),
+        GPT2MediumWorkload(),
+        GPT2LargeWorkload(),
         DistilBERTWorkload(),
         TinyLlamaWorkload(),
         Qwen25SevenBTrainingWorkload(),
@@ -195,12 +216,16 @@ def _run_classification_training(config: ExperimentConfig) -> WorkloadRunOutput:
     model_name = str(parameters.get("hf_model_name", config.workload.model))
     num_labels = int(parameters.get("num_labels", 2))
     model_dtype = _training_model_dtype(torch, config)
+    attention_kwargs = (
+        {"attn_implementation": parameters["attention_backend"]} if "attention_backend" in parameters else {}
+    )
     model = auto_model.from_pretrained(
         model_name,
         revision=_selected_model_revision(config, model_name),
         num_labels=num_labels,
         torch_dtype=model_dtype,
         ignore_mismatched_sizes=True,
+        **attention_kwargs,
     )
     return _run_training_loop(
         torch,
@@ -244,7 +269,8 @@ def _run_training_loop(
 ) -> WorkloadRunOutput:
     parameters = config.workload.parameters
     steps = int(config.runtime.max_steps or parameters.get("steps", 1))
-    controlled_inputs = parameters.get("input_protocol") == INPUT_PROTOCOL
+    input_protocol = parameters.get("input_protocol")
+    controlled_inputs = input_protocol in INPUT_PROTOCOLS
     if issues := scaling_issues(config):
         raise ValueError("Invalid scaling contract: " + "; ".join(issues))
     if controlled_inputs:
@@ -315,8 +341,26 @@ def _run_training_loop(
     )
     static_batch = None
     global_inputs = None
-    if controlled_inputs:
-        global_inputs = GlobalTrainingInputs(torch, config, runtime, device, int(_model_config(model).vocab_size))
+    if input_protocol == REAL_TEXT_PROTOCOL:
+        global_inputs = load_real_text_inputs(
+            torch,
+            config,
+            runtime,
+            device,
+            model_name,
+            _selected_model_revision(config, model_name),
+            measured_updates=steps,
+        )
+    elif controlled_inputs:
+        global_inputs = GlobalTrainingInputs(
+            torch,
+            config,
+            runtime,
+            device,
+            int(_model_config(model).vocab_size),
+            task=task,
+            num_labels=num_labels,
+        )
     elif data_iterator is None:
         static_batch = _make_device_batch(
             torch,
@@ -436,6 +480,19 @@ def _run_training_loop(
 
     total_samples = steps * accumulation_steps * batch_size * runtime.world_size
     total_tokens = total_samples * sequence_length
+    real_text_metrics: dict[str, int | float | str | bool | None] = {}
+    if input_protocol == REAL_TEXT_PROTOCOL:
+        # Throughput counts real (non-padding) tokens so batching modes compare fairly.
+        real_text_metrics = {
+            "nominal_tokens": total_tokens,
+            "processed_tokens": global_inputs.processed_tokens,
+            "padding_fraction": 1 - global_inputs.useful_tokens / global_inputs.processed_tokens,
+            "rank_token_imbalance": global_inputs.imbalance,
+            "truncated_documents": global_inputs.truncated_documents,
+            "text_batching": global_inputs.mode,
+            "processed_tokens_sec": global_inputs.processed_tokens / measured_seconds,
+        }
+        total_tokens = global_inputs.useful_tokens
     final_loss = _distributed_mean(torch, final_loss, device, runtime)
     metrics: dict[str, int | float | str | bool | None] = {
         "steps": steps,
@@ -487,7 +544,8 @@ def _run_training_loop(
             raise RuntimeError("Controlled input consumption differs from declared optimizer updates")
         metrics.update(
             {
-                "dataset_execution": INPUT_PROTOCOL,
+                **real_text_metrics,
+                "dataset_execution": input_protocol,
                 "global_input_sha256": global_inputs.sha256,
                 "input_micro_batches_consumed": global_inputs.index,
                 "scaling_runtime_sha256": scaling_runtime_sha256(),
@@ -1212,7 +1270,22 @@ def _configure_training_strategy(
     if strategy == "ddp" and runtime.world_size > 1:
         from torch.nn.parallel import DistributedDataParallel
 
-        model = DistributedDataParallel(model, device_ids=[runtime.local_rank], output_device=runtime.local_rank)
+        ddp_kwargs, comm_hook = _ddp_options(parameters)
+        # Device ids are only valid for CUDA modules; CPU (gloo) smoke runs pass none.
+        placement = (
+            {"device_ids": [runtime.local_rank], "output_device": runtime.local_rank} if device.type == "cuda" else {}
+        )
+        model = DistributedDataParallel(model, **placement, **ddp_kwargs)
+        if comm_hook != "none":
+            from torch.distributed.algorithms.ddp_comm_hooks import default_hooks
+
+            model.register_comm_hook(state=None, hook=getattr(default_hooks, f"{comm_hook}_hook"))
+        strategy_metadata = {
+            "ddp_bucket_cap_mb_observed": ddp_kwargs.get("bucket_cap_mb", 25),
+            "ddp_comm_hook_observed": comm_hook,
+            "ddp_gradient_as_bucket_view_observed": ddp_kwargs.get("gradient_as_bucket_view", False),
+            "ddp_static_graph_observed": ddp_kwargs.get("static_graph", False),
+        }
     elif strategy == "fsdp" and runtime.world_size > 1:
         from torch.distributed.fsdp import FullyShardedDataParallel, MixedPrecision, ShardingStrategy
 
@@ -1256,6 +1329,18 @@ def _configure_training_strategy(
                 "fsdp_limit_all_gathers": True,
                 "fsdp_forward_prefetch": False,
             }
+        elif parameters.get("fsdp_wrap_policy") == "transformer_layer":
+            # Shard and all-gather one transformer block at a time, so communication
+            # can overlap compute; a root-only wrapper gathers the whole model at once.
+            from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+
+            fsdp_kwargs["auto_wrap_policy"] = partial(
+                transformer_auto_wrap_policy,
+                transformer_layer_cls={_transformer_layer_class(model)},
+            )
+            strategy_metadata = {"fsdp_auto_wrap_policy": "transformer_layer"}
+        else:
+            strategy_metadata = {"fsdp_auto_wrap_policy": "root"}
         model = FullyShardedDataParallel(
             model,
             **fsdp_kwargs,
@@ -1263,7 +1348,36 @@ def _configure_training_strategy(
     elif strategy not in {"none", "ddp", "fsdp"}:
         raise ValueError(f"Unsupported training strategy: {strategy}")
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-    return model, optimizer, None, False, strategy_metadata if strategy == "fsdp" else {}
+    return model, optimizer, None, False, strategy_metadata
+
+
+def _ddp_options(parameters: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    """Translate validated DDP communication settings into constructor arguments.
+
+    Only settings a config states explicitly are passed, so legacy DDP runs keep
+    PyTorch's defaults (25 MB buckets, no hook) exactly as before.
+    """
+    kwargs: dict[str, Any] = {}
+    if "ddp_bucket_cap_mb" in parameters:
+        kwargs["bucket_cap_mb"] = int(parameters["ddp_bucket_cap_mb"])
+    if "ddp_gradient_as_bucket_view" in parameters:
+        kwargs["gradient_as_bucket_view"] = bool(parameters["ddp_gradient_as_bucket_view"])
+    if "ddp_static_graph" in parameters:
+        kwargs["static_graph"] = bool(parameters["ddp_static_graph"])
+    return kwargs, str(parameters.get("ddp_comm_hook", "none"))
+
+
+def _transformer_layer_class(model: Any) -> type[Any]:
+    """Find the repeated block type for GPT-2, Llama-family and DistilBERT models."""
+    for path in ("transformer.h", "model.layers", "distilbert.transformer.layer"):
+        layers: Any = model
+        for name in path.split("."):
+            layers = getattr(layers, name, None)
+            if layers is None:
+                break
+        if layers is not None and len(layers) > 0:
+            return type(layers[0])
+    raise RuntimeError(f"No known transformer layer stack on {type(model).__name__} for FSDP auto-wrap")
 
 
 def _qwen_decoder_layer_class(model: Any) -> type[Any]:

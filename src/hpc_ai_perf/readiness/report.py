@@ -12,6 +12,8 @@ WORKLOAD_STATUS = {
     "synthetic": "Ready",
     "environment_validation": "Implemented; cluster verification required",
     "gpt2_small": "PyTorch training/inference and vLLM routing implemented",
+    "gpt2_medium": "PyTorch controlled-scaling training implemented; model-size ladder",
+    "gpt2_large": "PyTorch controlled-scaling training implemented; model-size ladder",
     "distilbert": "PyTorch training/inference implemented",
     "tinyllama": "PyTorch training/inference and vLLM routing implemented",
     "qwen2_5_7b": "vLLM low-bit serving implemented",

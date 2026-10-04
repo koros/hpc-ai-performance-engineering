@@ -12,6 +12,8 @@ SUPPORTED_WORKLOADS = {
     "distilbert",
     "environment_validation",
     "gpt2_small",
+    "gpt2_medium",
+    "gpt2_large",
     "synthetic",
     "tinyllama",
     "qwen2_5_7b",
@@ -30,6 +32,14 @@ SUPPORTED_ENVIRONMENT_TARGETS = {
 }
 TRANSFORMER_PARAMETER_KEYS = {
     "attention_backend",
+    "dataset_revision",
+    "dataset_subset",
+    "ddp_bucket_cap_mb",
+    "ddp_comm_hook",
+    "ddp_gradient_as_bucket_view",
+    "ddp_static_graph",
+    "fsdp_wrap_policy",
+    "text_batching",
     "input_protocol",
     "scaling_study_id",
     "scaling_role",
@@ -114,6 +124,8 @@ WORKLOAD_PARAMETER_KEYS = {
     "qwen2_5_7b_bf16_serving": TRANSFORMER_PARAMETER_KEYS,
     "distilbert": TRANSFORMER_PARAMETER_KEYS,
     "gpt2_small": TRANSFORMER_PARAMETER_KEYS,
+    "gpt2_medium": TRANSFORMER_PARAMETER_KEYS,
+    "gpt2_large": TRANSFORMER_PARAMETER_KEYS,
     "tinyllama": TRANSFORMER_PARAMETER_KEYS,
     "environment_validation": {
         "allreduce_bytes",
@@ -234,6 +246,9 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
             and not parameters.get("hf_model_revision")
         ):
             issues.append("matrix hf_model_name override must pin workload.parameters.hf_model_revision")
+        # The controlled scaling contract validates its own Transformer Engine stack (DDP,
+        # GPT-2/DistilBERT only); its multi-GPU runs are gated by a canary wave instead.
+        controlled_scaling = bool(parameters.get("scaling_study_id"))
         if config.runtime.precision == "fp8" and config.mode == "training":
             if parameters.get("precision_backend") != "transformer_engine":
                 issues.append("FP8 training requires precision_backend=transformer_engine")
@@ -245,18 +260,18 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
                 issues.append("FP8 training requires a BF16 comparison_control_id")
             if int(parameters.get("fp8_amax_history_len", 0)) < 1:
                 issues.append("FP8 training requires fp8_amax_history_len of at least 1")
-            if parameters.get("stack") != "pytorch_transformer_engine":
+            if not controlled_scaling and parameters.get("stack") != "pytorch_transformer_engine":
                 issues.append("FP8 training requires stack=pytorch_transformer_engine")
-            if config.distributed.strategy != "none" or config.hardware.gpus != 1:
+            if not controlled_scaling and (config.distributed.strategy != "none" or config.hardware.gpus != 1):
                 issues.append("validated Transformer Engine FP8 training currently supports one GPU")
         elif config.mode == "training" and parameters.get("precision_backend") == "transformer_engine":
             if config.runtime.precision != "bf16":
                 issues.append("Transformer Engine training controls must use BF16 or the validated FP8 path")
             if parameters.get("base_compute_dtype") != "bf16":
                 issues.append("Transformer Engine BF16 controls require base_compute_dtype=bf16")
-            if parameters.get("stack") != "pytorch_transformer_engine":
+            if not controlled_scaling and parameters.get("stack") != "pytorch_transformer_engine":
                 issues.append("Transformer Engine BF16 controls require stack=pytorch_transformer_engine")
-            if config.distributed.strategy != "none" or config.hardware.gpus != 1:
+            if not controlled_scaling and (config.distributed.strategy != "none" or config.hardware.gpus != 1):
                 issues.append("validated Transformer Engine BF16 controls currently support one GPU")
         elif config.runtime.precision == "fp8" and config.mode == "inference" and parameters.get("framework") == "vllm":
             if parameters.get("precision_backend") != "vllm_fp8_online":
