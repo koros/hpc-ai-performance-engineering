@@ -108,9 +108,18 @@ def submit_job_scripts(
     if limit is not None:
         scripts = scripts[:limit]
 
+    serial_flags = ["# HPC_AI_SERIAL_WAVE=1" in script.read_text().splitlines() for script in scripts]
+    serial = bool(serial_flags) and all(serial_flags)
+    if any(serial_flags) and not serial:
+        raise ValueError("A serial wave cannot mix serial and concurrent submission scripts")
+    if serial and runner is not None:
+        raise ValueError("The single-argument custom runner cannot enforce serial Slurm dependencies")
+
     submissions: list[dict[str, str]] = []
+    previous_job = ""
     for script in scripts:
-        command = f"sbatch {script}"
+        dependency = previous_job if serial else ""
+        command = f"sbatch --dependency=afterany:{dependency} {script}" if dependency else f"sbatch {script}"
         if dry_run:
             submissions.append(
                 {
@@ -122,9 +131,10 @@ def submit_job_scripts(
                     "output": "",
                 }
             )
+            previous_job = f"<job-id-for-{script.stem}>"
             continue
 
-        output = (runner or _run_sbatch)(script)
+        output = _run_sbatch(script, dependency=dependency) if serial else (runner or _run_sbatch)(script)
         job_id = _parse_sbatch_job_id(output)
         if not job_id:
             raise ValueError(f"Could not parse Slurm job ID from sbatch output for {script}: {output}")
@@ -132,7 +142,9 @@ def submit_job_scripts(
             status_path,
             experiment_id=script.stem,
             sbatch_output=output,
+            notes=f"afterany:{dependency}" if dependency else None,
         )
+        previous_job = job_id
         submissions.append(
             {
                 "experiment_id": script.stem,
@@ -256,10 +268,15 @@ def _parse_sbatch_job_id(output: str) -> str:
     return match.group("job_id") if match else ""
 
 
-def _run_sbatch(script: Path) -> str:
+def _run_sbatch(script: Path, *, dependency: str = "") -> str:
     """Submit one script with `sbatch` and return stdout for job-ID parsing."""
+    command = ["sbatch"]
+    if dependency:
+        if not dependency.isdigit():
+            raise ValueError("Slurm dependency must be a numeric job ID")
+        command.append(f"--dependency=afterany:{dependency}")
     completed = subprocess.run(
-        ["sbatch", str(script)],
+        [*command, str(script)],
         check=True,
         capture_output=True,
         text=True,

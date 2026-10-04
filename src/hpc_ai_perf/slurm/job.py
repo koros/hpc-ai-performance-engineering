@@ -33,6 +33,7 @@ class SlurmJob:
     run_output_dir: str | None = None
     log_dir: str = "results/raw"
     pre_run_command: str | None = None
+    serial_wave: bool = False
 
     @classmethod
     def from_config(
@@ -64,6 +65,11 @@ class SlurmJob:
         if repetitions < 1:
             raise ValueError("repetitions must be at least 1")
         gpus_per_node = config.distributed.gpus_per_node or config.hardware.gpus
+        # Placement studies reserve a whole node but start fewer ranks, so they can
+        # pin specific GPUs with CUDA_VISIBLE_DEVICES and exclude co-tenant jobs.
+        allocation_gpus = int(config.metadata.get("allocation_gpus", gpus_per_node))
+        if allocation_gpus < gpus_per_node:
+            raise ValueError("allocation_gpus cannot be smaller than the GPUs the experiment uses")
         if config.distributed.nodes != 1 and config.hardware.gpus > 0:
             raise ValueError("Multi-node rendering is outside this project's validated single-node scope")
         base_command = f"-m hpc_ai_perf.cli run --config {quote(str(config_path))}"
@@ -94,7 +100,7 @@ class SlurmJob:
             command=command,
             partition=partition,
             nodes=config.distributed.nodes,
-            gpus_per_node=gpus_per_node,
+            gpus_per_node=allocation_gpus,
             cpus_per_task=required_cpus,
             time_limit=time_limit or _time_limit(config),
             account=account,
@@ -105,6 +111,7 @@ class SlurmJob:
             run_output_dir=str(run_output_dir) if run_output_dir else None,
             log_dir=str(log_dir),
             pre_run_command=pre_run_command,
+            serial_wave=config.metadata.get("serial_submission") is True,
         )
 
     def render(self) -> str:
@@ -127,13 +134,16 @@ class SlurmJob:
             f"#SBATCH --error={self.log_dir}/%x-{array_log_suffix}.err",
         ]
         if self.repetitions > 1:
-            lines.insert(3, f"#SBATCH --array=1-{self.repetitions}")
+            throttle = "%1" if self.serial_wave else ""
+            lines.insert(3, f"#SBATCH --array=1-{self.repetitions}{throttle}")
         if self.gpus_per_node > 0:
             lines.insert(4, f"#SBATCH --gres=gpu:{self.gpus_per_node}")
         if self.partition:
             lines.append(f"#SBATCH --partition={self.partition}")
         if self.account:
             lines.append(f"#SBATCH --account={self.account}")
+        if self.serial_wave:
+            lines.append("# HPC_AI_SERIAL_WAVE=1")
         lines.append("")
         lines.append("set -euo pipefail")
         for command in self.setup_commands:
