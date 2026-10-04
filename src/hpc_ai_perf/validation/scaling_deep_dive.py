@@ -102,6 +102,8 @@ def _canary_issues(record: dict[str, Any], config: Any, condition_id: str, platf
         and metrics.get("backward_calls") == updates * p["gradient_accumulation_steps"],
         "batch accounting": metrics.get("effective_global_batch_size") == p["global_batch_size"],
         "strategy": metrics.get("strategy_observed") == config.distributed.strategy,
+        "compute precision": metrics.get("compute_dtype_observed")
+        == ("fp8_mixed_bf16" if config.runtime.precision == "fp8" else config.runtime.precision),
         "attention backend": metrics.get("attention_backend_observed") == "sdpa"
         and metrics.get("training_use_cache") is False,
         "throughput": _positive(metrics.get("throughput_tokens_sec")),
@@ -117,6 +119,10 @@ def _canary_issues(record: dict[str, Any], config: Any, condition_id: str, platf
         checks["Transformer Engine"] = metrics.get("precision_backend") == backend
         if config.runtime.precision == "fp8":
             checks["FP8 execution"] = metrics.get("fp8_forward_enabled") is True
+    if config.distributed.strategy == "ddp" and gpus > 1:
+        checks["DDP communication hook"] = metrics.get("ddp_comm_hook_observed") == p.get("ddp_comm_hook", "none")
+    if config.distributed.strategy == "fsdp" and gpus > 1:
+        checks["FSDP wrap policy"] = metrics.get("fsdp_auto_wrap_policy") == p.get("fsdp_wrap_policy")
     if config.metadata.get("allocation_gpus"):
         try:
             placement = json.loads(metrics.get("training_rank_placement", ""))
@@ -127,6 +133,10 @@ def _canary_issues(record: dict[str, Any], config: Any, condition_id: str, platf
             and len(placement) == gpus
             and {item.get("rank") for item in placement if isinstance(item, dict)} == set(range(gpus))
             and all(item.get("gpu_uuid") not in (None, "", "unavailable") for item in placement)
+            and all(
+                item.get("cuda_visible_devices") == config.runtime.environment.get("CUDA_VISIBLE_DEVICES")
+                for item in placement
+            )
         )
     return [name for name, passed in checks.items() if not passed]
 

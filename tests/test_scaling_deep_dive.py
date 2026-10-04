@@ -153,6 +153,8 @@ def test_deep_dive_canary_checks_memory_updates_and_backend():
             "backward_calls": updates * p["gradient_accumulation_steps"],
             "effective_global_batch_size": p["global_batch_size"],
             "strategy_observed": config.distributed.strategy,
+            "compute_dtype_observed": "bf16",
+            "ddp_comm_hook_observed": "none",
             "attention_backend_observed": "sdpa",
             "training_use_cache": False,
             "throughput_tokens_sec": 100.0,

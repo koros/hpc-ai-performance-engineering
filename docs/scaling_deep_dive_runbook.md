@@ -91,8 +91,10 @@ waves.
    - The pinned-placement canaries (L40S only): check `training_rank_placement` reports the
      requested GPUs.
 
-   If a canary OOMs or fails, record it as a capacity deferral in `platforms/execution_matrix.json`,
-   as for E044. Then either adjust the design and regenerate, or leave that condition deferred.
+   If a canary OOMs or fails, preserve its failed evidence and adjust the design and regenerate.
+   Deferring a canary alone does not open the performance waves: the gate requires the full
+   declared canary set, so the matching performance condition must also be removed or deferred
+   through a reviewed design change. Never bypass the gate to submit the original risky shape.
 4. **Run the studies in order**, collecting each wave before the next. S1 and S2 come first,
    because S3's reading depends on S2's split results:
 
