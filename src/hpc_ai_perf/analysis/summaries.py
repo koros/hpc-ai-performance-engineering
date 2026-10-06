@@ -243,10 +243,42 @@ ANALYSIS_TABLES = {
         "avg_throughput_samples_sec",
         "avg_latency_p50_ms",
         "avg_latency_p95_ms",
+        "avg_latency_p99_ms",
         "avg_ttft_p50_ms",
+        "avg_ttft_p95_ms",
+        "avg_ttft_p99_ms",
         "avg_queueing_p50_ms",
+        "avg_queueing_p95_ms",
+        "avg_queueing_p99_ms",
+        "avg_goodput_requests_sec",
         "avg_memory_used_gb",
         "avg_energy_joules",
+    ],
+    "inference_tp_crossover_summary": [
+        "platform_id",
+        "comparability",
+        "workload",
+        "model",
+        "precision",
+        "prompt_length",
+        "max_new_tokens",
+        "batch_size",
+        "concurrent_requests",
+        "serving_layout",
+        "tp_degree",
+        "baseline_tp_degree",
+        "gpus",
+        "trials",
+        "source_condition_ids",
+        "avg_throughput_tokens_sec",
+        "avg_throughput_per_gpu",
+        "avg_latency_p95_ms",
+        "avg_latency_p99_ms",
+        "avg_ttft_p95_ms",
+        "avg_goodput_requests_sec",
+        "throughput_change_pct_vs_baseline",
+        "latency_p95_change_pct_vs_baseline",
+        "goodput_change_pct_vs_baseline",
     ],
     "hardware_summary": [
         "condition_id",
@@ -425,6 +457,7 @@ def build_analysis_tables(rows: list[dict[str, str]]) -> dict[str, list[dict[str
         "data_movement_summary": build_data_movement_summary(rows),
         "memory_summary": build_memory_summary(rows),
         "inference_summary": build_inference_summary(rows),
+        "inference_tp_crossover_summary": build_inference_tp_crossover_summary(rows),
         "hardware_summary": build_hardware_summary(rows),
         "research_question_summary": build_research_question_summary(rows),
         "research_finding_summary": build_research_finding_summary(rows),
@@ -1180,12 +1213,102 @@ def build_inference_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
                 "avg_throughput_samples_sec": _mean(_metric_values(group_rows, "throughput_samples_sec")),
                 "avg_latency_p50_ms": _mean(_metric_values(group_rows, "latency_p50_ms")),
                 "avg_latency_p95_ms": _mean(_metric_values(group_rows, "latency_p95_ms")),
+                "avg_latency_p99_ms": _mean(_metric_values(group_rows, "latency_p99_ms")),
                 "avg_ttft_p50_ms": _mean(_metric_values(group_rows, "time_to_first_token_p50_ms")),
+                "avg_ttft_p95_ms": _mean(_metric_values(group_rows, "time_to_first_token_p95_ms")),
+                "avg_ttft_p99_ms": _mean(_metric_values(group_rows, "time_to_first_token_p99_ms")),
                 "avg_queueing_p50_ms": _mean(_metric_values(group_rows, "queueing_time_p50_ms")),
+                "avg_queueing_p95_ms": _mean(_metric_values(group_rows, "queueing_time_p95_ms")),
+                "avg_queueing_p99_ms": _mean(_metric_values(group_rows, "queueing_time_p99_ms")),
+                "avg_goodput_requests_sec": _mean(_metric_values(group_rows, "goodput_requests_sec")),
                 "avg_memory_used_gb": _mean(_metric_values(group_rows, "memory_used_gb")),
                 "avg_energy_joules": _mean(_metric_values(group_rows, "energy_joules")),
             }
         )
+    return summaries
+
+
+def build_inference_tp_crossover_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
+    """Compare tensor-parallel degrees without pooling unlike request shapes.
+
+    The new-wave hypothesis is a crossover, not a universal TP winner. This
+    table keeps prompt length, output length, batch semantics, platform, and
+    comparability fixed, then reports each observed TP degree relative to the
+    smallest degree in that matched group.
+    """
+    selected = [
+        row
+        for row in rows
+        if row.get("status") == "completed"
+        and row.get("mode") == "inference"
+        and (
+            _first_float(row, "parameter_tensor_parallel_size", "metric_tensor_parallel_size_observed") is not None
+            or _value(row, "framework") == "vllm"
+            or _float(row.get("gpus")) == 1
+        )
+    ]
+    grouped = _group_rows(
+        selected,
+        "platform_id",
+        "comparability",
+        "workload",
+        "model",
+        "precision",
+        "parameter_prompt_length",
+        "parameter_max_new_tokens",
+        "batch_size",
+        "parameter_concurrent_requests",
+    )
+    summaries: list[dict[str, Any]] = []
+    for key, group_rows in sorted(grouped.items()):
+        by_tp: dict[float, list[dict[str, str]]] = defaultdict(list)
+        for row in group_rows:
+            tp = _first_float(row, "parameter_tensor_parallel_size", "metric_tensor_parallel_size_observed")
+            if tp is None and _float(row.get("gpus")) == 1:
+                tp = 1.0
+            if tp is not None:
+                by_tp[tp].append(row)
+        if not by_tp:
+            continue
+
+        baseline_tp = min(by_tp)
+        baseline_rows = by_tp[baseline_tp]
+        baseline_throughput = _mean(_metric_values(baseline_rows, "throughput_tokens_sec"))
+        baseline_latency = _mean(_metric_values(baseline_rows, "latency_p95_ms"))
+        baseline_goodput = _mean(_metric_values(baseline_rows, "goodput_requests_sec"))
+        for tp_degree, tp_rows in sorted(by_tp.items()):
+            throughput = _mean(_metric_values(tp_rows, "throughput_tokens_sec"))
+            latency = _mean(_metric_values(tp_rows, "latency_p95_ms"))
+            goodput = _mean(_metric_values(tp_rows, "goodput_requests_sec"))
+            gpus = _mean(_metric_values(tp_rows, "gpus"))
+            summaries.append(
+                {
+                    "platform_id": key[0],
+                    "comparability": key[1],
+                    "workload": key[2],
+                    "model": key[3],
+                    "precision": key[4],
+                    "prompt_length": key[5],
+                    "max_new_tokens": key[6],
+                    "batch_size": key[7],
+                    "concurrent_requests": key[8],
+                    "serving_layout": _value(tp_rows[0], "parameter_serving_layout") or f"tp{int(tp_degree)}",
+                    "tp_degree": int(tp_degree) if tp_degree.is_integer() else tp_degree,
+                    "baseline_tp_degree": int(baseline_tp) if baseline_tp.is_integer() else baseline_tp,
+                    "gpus": gpus,
+                    "trials": len(tp_rows),
+                    "source_condition_ids": "; ".join(sorted({_value(row, "condition_id") for row in tp_rows})),
+                    "avg_throughput_tokens_sec": throughput,
+                    "avg_throughput_per_gpu": _divide(throughput, gpus),
+                    "avg_latency_p95_ms": latency,
+                    "avg_latency_p99_ms": _mean(_metric_values(tp_rows, "latency_p99_ms")),
+                    "avg_ttft_p95_ms": _mean(_metric_values(tp_rows, "time_to_first_token_p95_ms")),
+                    "avg_goodput_requests_sec": goodput,
+                    "throughput_change_pct_vs_baseline": _percent_change(throughput, baseline_throughput),
+                    "latency_p95_change_pct_vs_baseline": _percent_change(latency, baseline_latency),
+                    "goodput_change_pct_vs_baseline": _percent_change(goodput, baseline_goodput),
+                }
+            )
     return summaries
 
 
@@ -1635,6 +1758,13 @@ def _divide(numerator: float | None, denominator: float | None) -> float | None:
     if numerator is None or denominator in {None, 0}:
         return None
     return numerator / denominator
+
+
+def _percent_change(value: float | None, baseline: float | None) -> float | None:
+    """Return percentage change from a positive baseline, or missing."""
+    if value is None or baseline in {None, 0}:
+        return None
+    return (value - baseline) / baseline * 100
 
 
 def _value(row: dict[str, str], name: str) -> str:
