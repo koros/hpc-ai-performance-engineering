@@ -736,6 +736,15 @@ def _run_causal_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "compute_dtype_observed": str(dtype),
         "parameter_dtype_observed": str(next(model.parameters()).dtype),
     }
+    metrics.update(
+        _serving_tail_metrics(
+            latencies,
+            ttft_samples,
+            [],
+            measured_seconds,
+            parameters.get("latency_slo_p95_ms"),
+        )
+    )
     if cuda_event_seconds is not None:
         metrics["cuda_event_seconds"] = cuda_event_seconds
     if bool(parameters.get("quality_sanity_check", False)):
@@ -1134,6 +1143,15 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "hf_model_name": model_name,
         "hf_model_revision": _selected_model_revision(config, model_name),
     }
+    metrics.update(
+        _serving_tail_metrics(
+            latencies,
+            ttft_samples,
+            queueing_samples,
+            measured_seconds,
+            parameters.get("latency_slo_p95_ms"),
+        )
+    )
     if quantization is not None:
         metrics.update(
             {
@@ -1902,6 +1920,67 @@ def _percentile(values: list[float], percentile: float) -> float:
         return ordered[lower]
     fraction = position - lower
     return ordered[lower] * (1 - fraction) + ordered[upper] * fraction
+
+
+def _serving_tail_metrics(
+    latencies: list[float],
+    ttft_samples: list[float],
+    queueing_samples: list[float],
+    measured_seconds: float,
+    latency_slo_p95_ms: object,
+) -> dict[str, int | float | str | bool | None]:
+    """Return tail metrics shared by eager and vLLM serving adapters.
+
+    Latency samples are seconds while the public metrics are milliseconds. A
+    configured SLO is optional; when present, goodput counts requests whose
+    observed end-to-end latency is within that SLO. No SLO is inferred from a
+    benchmark configuration because that would turn a performance probe into
+    an undocumented service objective.
+    """
+    metrics: dict[str, int | float | str | bool | None] = {}
+    if latencies:
+        metrics.update(
+            {
+                "latency_p50_ms": _percentile(latencies, 50) * 1000,
+                "latency_p95_ms": _percentile(latencies, 95) * 1000,
+                "latency_p99_ms": _percentile(latencies, 99) * 1000,
+            }
+        )
+    if ttft_samples:
+        metrics.update(
+            {
+                "time_to_first_token_p50_ms": _percentile(ttft_samples, 50) * 1000,
+                "time_to_first_token_p95_ms": _percentile(ttft_samples, 95) * 1000,
+                "time_to_first_token_p99_ms": _percentile(ttft_samples, 99) * 1000,
+            }
+        )
+    if queueing_samples:
+        metrics.update(
+            {
+                "queueing_time_p50_ms": _percentile(queueing_samples, 50) * 1000,
+                "queueing_time_p95_ms": _percentile(queueing_samples, 95) * 1000,
+                "queueing_time_p99_ms": _percentile(queueing_samples, 99) * 1000,
+            }
+        )
+    if latency_slo_p95_ms is not None:
+        try:
+            slo = float(latency_slo_p95_ms)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("latency_slo_p95_ms must be a positive finite number") from exc
+        if not math.isfinite(slo) or slo <= 0:
+            raise ValueError("latency_slo_p95_ms must be a positive finite number")
+        if not latencies:
+            raise RuntimeError("latency_slo_p95_ms requires at least one measured latency sample")
+        met = sum(sample * 1000 <= slo for sample in latencies)
+        metrics.update(
+            {
+                "latency_slo_p95_ms": slo,
+                "goodput_requests_sec": met / max(measured_seconds, 1e-12),
+                "goodput_slo_met_requests": met,
+                "goodput_slo_met_fraction": met / len(latencies),
+            }
+        )
+    return metrics
 
 
 def _precision_backend(precision: str, *, managed_by_deepspeed: bool = False) -> str:

@@ -219,6 +219,8 @@ def _validate_result_mapping(path: Path, data: dict[str, Any]) -> list[Validatio
         "memory_used_gb",
         "latency_p50_ms",
         "latency_p95_ms",
+        "latency_p99_ms",
+        "goodput_requests_sec",
     ]:
         if field in data and not _is_optional_non_negative_number(data[field]):
             issues.append(ValidationIssue(path, f"{field} must be null or a non-negative number"))

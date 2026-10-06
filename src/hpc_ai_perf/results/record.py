@@ -59,6 +59,8 @@ class ExperimentResult:
     memory_used_gb: float | None = None
     latency_p50_ms: float | None = None
     latency_p95_ms: float | None = None
+    latency_p99_ms: float | None = None
+    goodput_requests_sec: float | None = None
     error: str | None = None
 
     @classmethod
@@ -129,6 +131,8 @@ class ExperimentResult:
             memory_used_gb=_optional_float(metrics.get("memory_used_gb")),
             latency_p50_ms=_optional_float(metrics.get("latency_p50_ms")),
             latency_p95_ms=_optional_float(metrics.get("latency_p95_ms")),
+            latency_p99_ms=_optional_float(metrics.get("latency_p99_ms")),
+            goodput_requests_sec=_optional_float(metrics.get("goodput_requests_sec")),
             metrics=metrics,
             environment=environment,
             config=config.to_dict(),

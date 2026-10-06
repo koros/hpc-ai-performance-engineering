@@ -47,6 +47,8 @@
     "memory_used_gb": { "type": ["number", "null"], "minimum": 0 },
     "latency_p50_ms": { "type": ["number", "null"], "minimum": 0 },
     "latency_p95_ms": { "type": ["number", "null"], "minimum": 0 },
+    "latency_p99_ms": { "type": ["number", "null"], "minimum": 0 },
+    "goodput_requests_sec": { "type": ["number", "null"], "minimum": 0 },
     "metrics": {
       "type": "object",
       "additionalProperties": { "type": ["number", "integer", "string", "boolean", "null"] }

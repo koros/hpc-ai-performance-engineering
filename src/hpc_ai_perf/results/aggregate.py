@@ -60,6 +60,8 @@ BASE_COLUMNS = [
     "memory_used_gb",
     "latency_p50_ms",
     "latency_p95_ms",
+    "latency_p99_ms",
+    "goodput_requests_sec",
     "gpu_hours_estimate",
     "actual_gpu_hours",
     "energy_joules",
@@ -189,6 +191,8 @@ def flatten_result_record(record: dict[str, Any], source_path: str | Path | None
         "memory_used_gb": record.get("memory_used_gb"),
         "latency_p50_ms": record.get("latency_p50_ms"),
         "latency_p95_ms": record.get("latency_p95_ms"),
+        "latency_p99_ms": record.get("latency_p99_ms"),
+        "goodput_requests_sec": record.get("goodput_requests_sec"),
         "gpu_hours_estimate": metadata.get("gpu_hours_estimate"),
         "actual_gpu_hours": metrics.get("gpu_hours"),
         "energy_joules": (
