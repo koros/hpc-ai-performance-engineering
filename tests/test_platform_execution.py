@@ -335,6 +335,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     # Controlled scaling: the TinyLlama batch crossover and its canaries run on both platforms,
     # its E318/E319 diagnostics on L40S only; the deep dive routes per its design module.
     shared_scaling_ids = {f"E{index:03d}" for index in range(305, 318)}
+    shared_inference_ids = {"E702", "E703"}
     l40s_scaling_diagnostic_ids = {"E318", "E319"}
     deep_dive = scaling_deep_dive.design()
     l40s_deep_dive_ids = {eid for eid, condition, _ in deep_dive if "l40s" in condition.run_platforms}
@@ -354,7 +355,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         | l40s_scaling_diagnostic_ids
         | l40s_deep_dive_ids
     )
-    assert len(h100_conditions) == 267 + len(shared_scaling_ids) + len(h100_deep_dive_ids)
+    assert len(h100_conditions) == 267 + len(shared_scaling_ids) + len(h100_deep_dive_ids) + len(shared_inference_ids)
     assert {condition.matrix_id for condition in h100_conditions} == (
         source_ids
         | shared_telemetry_ids
@@ -362,6 +363,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         | shared_lowbit_ids
         | shared_long_context_ids
         | shared_scaling_ids
+        | shared_inference_ids
         | h100_deep_dive_ids
     )
     l40s_planned_source_count = sum(
