@@ -20,6 +20,7 @@ from hpc_ai_perf.config import (
     load_platform_profile,
     materialize_platform_configs,
 )
+from hpc_ai_perf.planning import plan_sweep
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import aggregate_results, audit_telemetry, import_result_evidence, verify_result_evidence
 from hpc_ai_perf.runners import LocalBenchmarkRunner
@@ -96,6 +97,25 @@ def main() -> None:
             print(entries_to_json(entries), end="")
         else:
             print(entries_to_table(entries), end="")
+        return
+
+    if args.command == "plan-sweep":
+        base_config = load_experiment_config(args.base_config)
+        axes = _parse_sweep_axes(args.axis)
+        candidates = plan_sweep(base_config, plan_id=args.plan_id, axes=axes)
+        payload = {
+            "plan_id": args.plan_id,
+            "base_config": str(Path(args.base_config)),
+            "candidates": [candidate.to_dict() for candidate in candidates],
+        }
+        rendered = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+        if args.output:
+            output_path = Path(args.output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(rendered, encoding="utf-8")
+            LOGGER.info("Wrote %d sweep candidates to %s", len(candidates), output_path)
+        else:
+            print(rendered, end="")
         return
 
     if args.command == "run":
@@ -470,6 +490,21 @@ def _build_parser() -> argparse.ArgumentParser:
     list_parser.add_argument("--experiment-id", default=None, help="Filter by experiment ID, such as E001.")
     list_parser.add_argument("--format", choices=["table", "json"], default="table")
 
+    sweep_parser = subparsers.add_parser(
+        "plan-sweep",
+        help="Dry-run a deterministic, capability-filtered parameter sweep without writing experiment configs.",
+    )
+    sweep_parser.add_argument("--base-config", required=True, help="Existing config to copy and vary.")
+    sweep_parser.add_argument("--plan-id", required=True, help="Stable name for this planned sweep.")
+    sweep_parser.add_argument(
+        "--axis",
+        action="append",
+        required=True,
+        metavar="PATH=JSON_ARRAY",
+        help="Dotted config path and JSON array, for example workload.parameters.prompt_length=[128,512].",
+    )
+    sweep_parser.add_argument("--output", default=None, help="Optional JSON output path; stdout is used otherwise.")
+
     materialize_parser = subparsers.add_parser(
         "materialize-platform-configs",
         help="Resolve matrix experiments for an L40S or H100 execution profile.",
@@ -841,6 +876,28 @@ def _add_slurm_options(parser: argparse.ArgumentParser) -> None:
         default=[],
         help="Environment variable KEY=VALUE; can be repeated.",
     )
+
+
+def _parse_sweep_axes(raw_axes: list[str]) -> dict[str, list[Any]]:
+    """Parse repeated PATH=JSON_ARRAY arguments for ``plan-sweep``."""
+    axes: dict[str, list[Any]] = {}
+    for raw_axis in raw_axes:
+        if "=" not in raw_axis:
+            raise ValueError(f"Sweep axis must use PATH=JSON_ARRAY syntax: {raw_axis}")
+        path, raw_values = raw_axis.split("=", 1)
+        path = path.strip()
+        if not path:
+            raise ValueError(f"Sweep axis path must not be empty: {raw_axis}")
+        try:
+            values = json.loads(raw_values)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Sweep axis values must be valid JSON: {raw_axis}") from exc
+        if not isinstance(values, list):
+            raise ValueError(f"Sweep axis values must be a JSON array: {raw_axis}")
+        if path in axes:
+            raise ValueError(f"Sweep axis is repeated: {path}")
+        axes[path] = values
+    return axes
 
 
 def _add_platform_options(parser: argparse.ArgumentParser) -> None:
