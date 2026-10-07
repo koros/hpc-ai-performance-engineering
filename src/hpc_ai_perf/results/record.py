@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from hpc_ai_perf.config import ExperimentConfig, Precision
+from hpc_ai_perf.results.contract import OutcomeClass, SampleSeries, classify_outcome
 
 ResultStatus = Literal["completed", "failed"]
 
@@ -38,6 +39,7 @@ class ExperimentResult:
     gpus: int
     precision: Precision
     status: ResultStatus
+    outcome: OutcomeClass
     started_at: str
     completed_at: str
     runtime_seconds: float
@@ -51,6 +53,7 @@ class ExperimentResult:
     config_sha256: str | None
     command: str | None
     metrics: dict[str, int | float | str | bool | None] = field(default_factory=dict)
+    samples: dict[str, SampleSeries] = field(default_factory=dict)
     environment: dict[str, int | float | str | bool | None] = field(default_factory=dict)
     config: dict[str, Any] = field(default_factory=dict)
     throughput_tokens_sec: float | None = None
@@ -76,6 +79,8 @@ class ExperimentResult:
         environment: dict[str, int | float | str | bool | None] | None = None,
         repetition_number: int | None = None,
         error: str | None = None,
+        outcome: OutcomeClass | None = None,
+        samples: dict[str, SampleSeries] | None = None,
     ) -> ExperimentResult:
         """Build a result record by combining config metadata with run outputs.
 
@@ -85,10 +90,12 @@ class ExperimentResult:
         file is moved or edited later.
         """
         metrics = metrics or {}
+        samples = samples or {}
         environment = environment or {}
         resolved_repetition = _repetition_number(config, environment, repetition_number)
+        resolved_outcome = outcome or classify_outcome(status, error)
         return cls(
-            schema_version="1.3.0",
+            schema_version="1.4.0",
             run_id=_run_id(config.experiment_id, started_at, resolved_repetition),
             repetition_number=resolved_repetition,
             experiment_id=config.experiment_id,
@@ -102,6 +109,7 @@ class ExperimentResult:
             gpus=config.hardware.gpus,
             precision=config.runtime.precision,
             status=status,
+            outcome=resolved_outcome,
             started_at=started_at,
             completed_at=completed_at,
             runtime_seconds=runtime_seconds,
@@ -134,6 +142,7 @@ class ExperimentResult:
             latency_p99_ms=_optional_float(metrics.get("latency_p99_ms")),
             goodput_requests_sec=_optional_float(metrics.get("goodput_requests_sec")),
             metrics=metrics,
+            samples=samples,
             environment=environment,
             config=config.to_dict(),
             error=error,

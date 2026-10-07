@@ -14,6 +14,7 @@ from hpc_ai_perf.validation.capabilities import capability_issues, unknown_param
 CONFIG_MODES = {"training", "inference", "profiling"}
 PRECISIONS = {"fp32", "fp16", "bf16", "fp8", "int8", "int4", "nf4"}
 RESULT_STATUSES = {"completed", "failed"}
+OUTCOME_CLASSES = {"success", "oom", "unsupported", "failed"}
 EXECUTION_STATUSES = {"ready", "deferred"}
 STRATEGIES = {"none", "ddp", "fsdp", "deepspeed_zero1", "deepspeed_zero2", "deepspeed_zero3"}
 THROUGHPUT_UNITS = {
@@ -203,6 +204,12 @@ def _validate_result_mapping(path: Path, data: dict[str, Any]) -> list[Validatio
         issues.append(ValidationIssue(path, f"unsupported precision: {data['precision']}"))
     if "status" in data and data["status"] not in RESULT_STATUSES:
         issues.append(ValidationIssue(path, f"unsupported status: {data['status']}"))
+    if "outcome" in data and data["outcome"] not in OUTCOME_CLASSES:
+        issues.append(ValidationIssue(path, f"unsupported outcome: {data['outcome']}"))
+    if data.get("status") == "completed" and data.get("outcome") not in {None, "success"}:
+        issues.append(ValidationIssue(path, "completed result must have outcome=success when outcome is present"))
+    if data.get("status") == "failed" and data.get("outcome") == "success":
+        issues.append(ValidationIssue(path, "failed result cannot have outcome=success"))
     if "gpus" in data and not _is_non_negative_int(data["gpus"]):
         issues.append(ValidationIssue(path, "gpus must be a non-negative integer"))
     if "runtime_seconds" in data and not _is_non_negative_number(data["runtime_seconds"]):
@@ -229,6 +236,8 @@ def _validate_result_mapping(path: Path, data: dict[str, Any]) -> list[Validatio
         issues.append(ValidationIssue(path, "gpu_utilization must be null or a percentage from 0 to 100"))
     if "metrics" in data and not _is_scalar_mapping(data["metrics"]):
         issues.append(ValidationIssue(path, "metrics must be an object containing scalar values"))
+    if "samples" in data and not _is_sample_mapping(data["samples"]):
+        issues.append(ValidationIssue(path, "samples must map names to arrays of scalar values"))
     if "environment" in data and not _is_scalar_mapping(data["environment"]):
         issues.append(ValidationIssue(path, "environment must be an object containing scalar values"))
     if "config" in data and not isinstance(data["config"], dict):
@@ -379,6 +388,16 @@ def _is_scalar_mapping(value: object) -> bool:
     if not isinstance(value, dict):
         return False
     return all(item is None or isinstance(item, int | float | str | bool) for item in value.values())
+
+
+def _is_sample_mapping(value: object) -> bool:
+    """Return whether a sample mapping contains only scalar-valued series."""
+    if not isinstance(value, dict):
+        return False
+    return all(
+        isinstance(series, list) and all(item is None or isinstance(item, int | float | str | bool) for item in series)
+        for series in value.values()
+    )
 
 
 def _is_known_identifier_list(value: object, allowed: set[str]) -> bool:

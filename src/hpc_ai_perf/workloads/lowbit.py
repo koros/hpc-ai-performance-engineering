@@ -167,7 +167,10 @@ class LowBitServingWorkload(Workload):
             "memory_scope": "worker_allocator_including_fixed_kv_cache;weights_from_vllm_loader",
             **quality,
         }
-        return WorkloadRunOutput(metrics=metrics)
+        return WorkloadRunOutput(
+            metrics=metrics,
+            samples={"latency_seconds": latencies, "time_to_first_token_seconds": ttfts},
+        )
 
 
 def engine_kwargs(config: ExperimentConfig) -> dict[str, Any]:

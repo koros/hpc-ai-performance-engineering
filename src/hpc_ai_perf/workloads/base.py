@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 from hpc_ai_perf.config import ExperimentConfig
+from hpc_ai_perf.results.contract import OutcomeClass, SampleSeries
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,8 @@ class WorkloadRunOutput:
 
     metrics: dict[str, int | float | str | bool | None] = field(default_factory=dict)
     artifacts: dict[str, str] = field(default_factory=dict)
+    samples: dict[str, SampleSeries] = field(default_factory=dict)
+    outcome: OutcomeClass | None = None
 
 
 class Workload(ABC):

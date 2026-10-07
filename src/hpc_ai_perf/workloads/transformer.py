@@ -755,7 +755,10 @@ def _run_causal_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         metrics["quality_perplexity"] = math.exp(min(20.0, quality_value))
     if torch.cuda.is_available():
         metrics["memory_used_gb"] = torch.cuda.max_memory_allocated(device) / (1024**3)
-    return WorkloadRunOutput(metrics=metrics)
+    return WorkloadRunOutput(
+        metrics=metrics,
+        samples={"latency_seconds": latencies, "time_to_first_token_seconds": ttft_samples},
+    )
 
 
 def _run_classification_inference(config: ExperimentConfig) -> WorkloadRunOutput:
@@ -888,7 +891,7 @@ def _run_classification_inference(config: ExperimentConfig) -> WorkloadRunOutput
                 int(parameters.get("quality_eval_samples", 64)),
             )
         )
-    return WorkloadRunOutput(metrics=metrics)
+    return WorkloadRunOutput(metrics=metrics, samples={"latency_seconds": latencies})
 
 
 def _classification_round(
@@ -1181,7 +1184,14 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     if queueing_samples:
         metrics["queueing_time_p50_ms"] = _percentile(queueing_samples, 50) * 1000
         metrics["queueing_time_p95_ms"] = _percentile(queueing_samples, 95) * 1000
-    return WorkloadRunOutput(metrics=metrics)
+    return WorkloadRunOutput(
+        metrics=metrics,
+        samples={
+            "latency_seconds": latencies,
+            "time_to_first_token_seconds": ttft_samples,
+            "queueing_time_seconds": queueing_samples,
+        },
+    )
 
 
 def _prepare_runtime(

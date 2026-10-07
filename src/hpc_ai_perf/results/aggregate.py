@@ -32,6 +32,7 @@ BASE_COLUMNS = [
     "runtime_environment",
     "mode",
     "status",
+    "outcome",
     "gpus",
     "gpu_model",
     "platform",
@@ -125,6 +126,7 @@ def flatten_result_record(record: dict[str, Any], source_path: str | Path | None
     workload_config = _mapping(config.get("workload"))
     workload_parameters = _mapping(workload_config.get("parameters"))
     metrics = _mapping(record.get("metrics"))
+    samples = _mapping(record.get("samples"))
     environment = _mapping(record.get("environment"))
     experiment_id = str(record.get("experiment_id") or "")
     if is_matrix_experiment_id(experiment_id):
@@ -161,6 +163,7 @@ def flatten_result_record(record: dict[str, Any], source_path: str | Path | None
         "runtime_environment": json.dumps(_mapping(config.get("runtime")).get("environment", {}), sort_keys=True),
         "mode": record.get("mode"),
         "status": record.get("status"),
+        "outcome": record.get("outcome"),
         "gpus": record.get("gpus"),
         "gpu_model": hardware.get("gpu_model"),
         "platform": hardware.get("platform"),
@@ -219,6 +222,9 @@ def flatten_result_record(record: dict[str, Any], source_path: str | Path | None
         row[f"metric_{_slugify(key)}"] = value
     for key, value in environment.items():
         row[f"environment_{_slugify(key)}"] = value
+    for key, value in samples.items():
+        if isinstance(value, list):
+            row[f"sample_count_{_slugify(key)}"] = len(value)
 
     return row
 

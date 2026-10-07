@@ -38,6 +38,7 @@
     "gpus": { "type": "integer", "minimum": 0 },
     "precision": { "enum": ["fp32", "fp16", "bf16", "fp8", "int8", "int4", "nf4"] },
     "status": { "enum": ["completed", "failed"] },
+    "outcome": { "enum": ["success", "oom", "unsupported", "failed"] },
     "started_at": { "type": "string", "format": "date-time" },
     "completed_at": { "type": "string", "format": "date-time" },
     "runtime_seconds": { "type": "number", "minimum": 0 },
@@ -52,6 +53,13 @@
     "metrics": {
       "type": "object",
       "additionalProperties": { "type": ["number", "integer", "string", "boolean", "null"] }
+    },
+    "samples": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": ["number", "integer", "string", "boolean", "null"] }
+      }
     },
     "environment": {
       "type": "object",

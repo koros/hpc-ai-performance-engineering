@@ -150,7 +150,8 @@ class QwenLongContextWorkload(Workload):
                 "memory_worker_peak_allocated_gb": after_memory["peak_allocated_bytes"] / 1024**3,
                 "memory_worker_peak_reserved_gb": after_memory["peak_reserved_bytes"] / 1024**3,
                 "memory_scope": "worker_allocator_including_fixed_kv_cache;weights_from_vllm_loader",
-            }
+            },
+            samples={"latency_seconds": latencies, "time_to_first_token_seconds": ttfts},
         )
 
 

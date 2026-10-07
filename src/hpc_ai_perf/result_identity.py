@@ -113,7 +113,7 @@ def is_matrix_experiment_id(experiment_id: object) -> bool:
 
 def _uses_explicit_contract(record: dict[str, Any]) -> bool:
     schema_version = str(record.get("schema_version", ""))
-    return schema_version.startswith("1.3.") or any(
+    return schema_version.startswith(("1.3.", "1.4.")) or any(
         field in record for field in ["condition_id", "platform_id", "comparability"]
     )
 

@@ -19,6 +19,7 @@ from hpc_ai_perf.profiling import (
     reset_measurement_profiler,
 )
 from hpc_ai_perf.results import ExperimentResult
+from hpc_ai_perf.results.contract import OutcomeClass, classify_outcome
 from hpc_ai_perf.workloads import WorkloadRegistry, default_registry
 
 
@@ -70,8 +71,10 @@ class LocalBenchmarkRunner:
         started_at = _now()
         start = time.perf_counter()
         metrics: dict[str, int | float | str | bool | None] = {}
+        samples: dict[str, list[int | float | str | bool | None]] = {}
         error: str | None = None
         status = "completed"
+        outcome: OutcomeClass | None = None
         profiler = self._profiler
         measurement_token = None
 
@@ -89,11 +92,14 @@ class LocalBenchmarkRunner:
                 reset_measurement_profiler(measurement_token)
                 measurement_token = None
             metrics.update(output.metrics)
+            samples.update(output.samples)
+            outcome = output.outcome or "success"
             missing_profiler_metrics = missing_workload_profiler_metrics(config, metrics)
             if missing_profiler_metrics:
                 raise RuntimeError("; ".join(missing_profiler_metrics))
         except Exception as exc:
             status = "failed"
+            outcome = classify_outcome(status, exc)
             error = f"{type(exc).__name__}: {exc}"
         finally:
             if measurement_token is not None:
@@ -107,11 +113,13 @@ class LocalBenchmarkRunner:
                     _promote_standard_profiler_metrics(metrics, profiler_metrics)
                 except Exception as exc:
                     status = "failed"
+                    outcome = classify_outcome(status, exc)
                     profiler_error = f"{type(exc).__name__}: {exc}"
                     error = f"{error}; profiler stop failed: {profiler_error}" if error else profiler_error
             cleanup_error = _cleanup_process_group()
             if cleanup_error is not None:
                 status = "failed"
+                outcome = classify_outcome(status, cleanup_error)
                 error = f"{error}; distributed cleanup failed: {cleanup_error}" if error else cleanup_error
 
         completed_at = _now()
@@ -124,8 +132,10 @@ class LocalBenchmarkRunner:
             completed_at=completed_at,
             runtime_seconds=runtime_seconds,
             metrics=metrics,
+            samples=samples,
             environment=environment,
             repetition_number=repetition_number,
+            outcome=outcome,
             error=error,
         )
 
