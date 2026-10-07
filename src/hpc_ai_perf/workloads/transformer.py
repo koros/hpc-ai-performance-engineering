@@ -14,7 +14,9 @@ from typing import Any
 from hpc_ai_perf.config import ExperimentConfig
 from hpc_ai_perf.config.scaling import INPUT_PROTOCOLS, REAL_TEXT_PROTOCOL, scaling_issues
 from hpc_ai_perf.profiling import measured_region
+from hpc_ai_perf.results.contract import UnsupportedWorkloadError
 from hpc_ai_perf.runtime_checks import disable_deepspeed_nvtx_annotations, prepare_deepspeed_import_environment
+from hpc_ai_perf.serving_layout import REPLICA_LAYOUT, declared_serving_layout
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
 from hpc_ai_perf.workloads.scaling import (
     GlobalTrainingInputs,
@@ -977,6 +979,17 @@ def _classification_quality_metrics(
 
 
 def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
+    parameters = config.workload.parameters
+    serving_layout = declared_serving_layout(parameters)
+    if (
+        serving_layout == REPLICA_LAYOUT
+        or int(parameters.get("data_parallel_size", 1)) > 1
+        or int(parameters.get("replica_count", 1)) > 1
+    ):
+        raise UnsupportedWorkloadError(
+            f"serving_layout={serving_layout} requires an executable multi-process replica router; "
+            "the current vLLM adapter supports one engine process with tensor parallelism only"
+        )
     if importlib.util.find_spec("vllm") is None:
         raise RuntimeError("vLLM framework requested, but vllm is not installed")
     import torch
@@ -987,7 +1000,6 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     if config.runtime.precision not in {"fp16", "bf16", "fp8"}:
         raise RuntimeError(f"Generic vLLM adapter does not support precision: {config.runtime.precision}")
 
-    parameters = config.workload.parameters
     quantization: str | None = None
     quantization_method: str | None = None
     base_compute_dtype: str | None = None
@@ -1135,6 +1147,9 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "latency_p95_ms": _percentile(latencies, 95) * 1000,
         "framework_observed": "vllm",
         "tensor_parallel_size_observed": tensor_parallel_size,
+        "serving_layout_observed": serving_layout,
+        "data_parallel_size_observed": 1,
+        "replica_count_observed": 1,
         "vllm_execution_mode": "eager_no_inductor" if inductor_disabled else "eager",
         "vllm_inductor_disabled": inductor_disabled,
         "vllm_torchdynamo_disabled": torchdynamo_disabled,

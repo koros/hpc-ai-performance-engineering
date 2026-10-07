@@ -46,6 +46,29 @@ def test_tp_crossover_keeps_prompt_lengths_separate_and_reports_relative_change(
     assert len([row for row in summaries if row["prompt_length"] == "128"]) == 1
 
 
+def test_tp_crossover_does_not_pool_replica_layout_with_single_engine_tp() -> None:
+    replica = _row(2, throughput=240.0, latency=0.4)
+    replica.update(
+        {
+            "condition_id": "E708@h100",
+            "gpus": "4",
+            "parameter_serving_layout": "tp2_dp2",
+            "parameter_data_parallel_size": "2",
+            "parameter_replica_count": "2",
+            "parameter_request_routing": "round_robin",
+        }
+    )
+
+    summaries = build_inference_tp_crossover_summary([_row(1), _row(2), replica])
+
+    tp2_rows = [row for row in summaries if row["tp_degree"] == 2]
+    assert {row["serving_layout"] for row in tp2_rows} == {"tp2", "tp2_dp2"}
+    assert {row["trials"] for row in tp2_rows} == {1}
+    replica_row = next(row for row in tp2_rows if row["serving_layout"] == "tp2_dp2")
+    assert replica_row["data_parallel_size"] == "2"
+    assert replica_row["request_routing"] == "round_robin"
+
+
 def test_serving_tail_metrics_reports_p99_and_explicit_goodput() -> None:
     metrics = _serving_tail_metrics(
         [0.10, 0.20, 0.30, 0.40],

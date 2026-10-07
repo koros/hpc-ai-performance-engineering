@@ -265,6 +265,9 @@ ANALYSIS_TABLES = {
         "batch_size",
         "concurrent_requests",
         "serving_layout",
+        "data_parallel_size",
+        "replica_count",
+        "request_routing",
         "tp_degree",
         "baseline_tp_degree",
         "gpus",
@@ -1261,22 +1264,28 @@ def build_inference_tp_crossover_summary(rows: list[dict[str, str]]) -> list[dic
     )
     summaries: list[dict[str, Any]] = []
     for key, group_rows in sorted(grouped.items()):
-        by_tp: dict[float, list[dict[str, str]]] = defaultdict(list)
+        by_layout_tp: dict[tuple[str, float], list[dict[str, str]]] = defaultdict(list)
         for row in group_rows:
             tp = _first_float(row, "parameter_tensor_parallel_size", "metric_tensor_parallel_size_observed")
             if tp is None and _float(row.get("gpus")) == 1:
                 tp = 1.0
             if tp is not None:
-                by_tp[tp].append(row)
-        if not by_tp:
+                layout = _value(row, "parameter_serving_layout") or f"tp{int(tp)}"
+                by_layout_tp[(layout, tp)].append(row)
+        if not by_layout_tp:
             continue
 
-        baseline_tp = min(by_tp)
-        baseline_rows = by_tp[baseline_tp]
+        baseline_tp = min(tp for _, tp in by_layout_tp)
+        baseline_rows = [
+            row
+            for (layout, tp), rows_for_layout in by_layout_tp.items()
+            if tp == baseline_tp
+            for row in rows_for_layout
+        ]
         baseline_throughput = _mean(_metric_values(baseline_rows, "throughput_tokens_sec"))
         baseline_latency = _mean(_metric_values(baseline_rows, "latency_p95_ms"))
         baseline_goodput = _mean(_metric_values(baseline_rows, "goodput_requests_sec"))
-        for tp_degree, tp_rows in sorted(by_tp.items()):
+        for (serving_layout, tp_degree), tp_rows in sorted(by_layout_tp.items()):
             throughput = _mean(_metric_values(tp_rows, "throughput_tokens_sec"))
             latency = _mean(_metric_values(tp_rows, "latency_p95_ms"))
             goodput = _mean(_metric_values(tp_rows, "goodput_requests_sec"))
@@ -1292,7 +1301,10 @@ def build_inference_tp_crossover_summary(rows: list[dict[str, str]]) -> list[dic
                     "max_new_tokens": key[6],
                     "batch_size": key[7],
                     "concurrent_requests": key[8],
-                    "serving_layout": _value(tp_rows[0], "parameter_serving_layout") or f"tp{int(tp_degree)}",
+                    "serving_layout": serving_layout,
+                    "data_parallel_size": _value(tp_rows[0], "parameter_data_parallel_size") or "1",
+                    "replica_count": _value(tp_rows[0], "parameter_replica_count") or "1",
+                    "request_routing": _value(tp_rows[0], "parameter_request_routing") or "single_process",
                     "tp_degree": int(tp_degree) if tp_degree.is_integer() else tp_degree,
                     "baseline_tp_degree": int(baseline_tp) if baseline_tp.is_integer() else baseline_tp,
                     "gpus": gpus,

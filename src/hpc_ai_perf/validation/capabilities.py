@@ -7,6 +7,11 @@ from hpc_ai_perf.config.lowbit import PARAMETERS as LOWBIT_PARAMETERS
 from hpc_ai_perf.config.lowbit import lowbit_issues
 from hpc_ai_perf.config.scaling import scaling_issues
 from hpc_ai_perf.profiling import SUPPORTED_PROFILERS
+from hpc_ai_perf.serving_layout import (
+    REPLICA_LAYOUT,
+    declared_serving_layout,
+    serving_layout_issues,
+)
 
 SUPPORTED_WORKLOADS = {
     "distilbert",
@@ -63,6 +68,8 @@ TRANSFORMER_PARAMETER_KEYS = {
     "concurrent_requests",
     "data_movement_study_type",
     "data_parallel_size",
+    "replica_count",
+    "request_routing",
     "deepspeed_config",
     "deepspeed_accumulation_mode",
     "device",
@@ -114,6 +121,7 @@ TRANSFORMER_PARAMETER_KEYS = {
     "strategy_detail",
     "study_protocol",
     "tensor_parallel_size",
+    "serving_layout",
     "training_update_diagnostics",
     "text",
     "warmup_steps",
@@ -183,6 +191,7 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
         return issues
     parameters = config.workload.parameters
     issues.extend(scaling_issues(config))
+    issues.extend(serving_layout_issues(config))
     workload = config.workload.name
     if workload == "qwen2_5_7b":
         issues.extend(lowbit_issues(config))
@@ -201,7 +210,16 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
 
     if config.hardware.gpus != expected_gpus:
         tensor_parallel = int(parameters.get("tensor_parallel_size", 0))
-        is_managed_tensor_parallel = config.mode == "inference" and tensor_parallel == config.hardware.gpus
+        data_parallel = int(parameters.get("data_parallel_size", 1))
+        replica_count = int(parameters.get("replica_count", 1))
+        serving_layout = declared_serving_layout(parameters)
+        is_managed_tensor_parallel = config.mode == "inference" and (
+            tensor_parallel == config.hardware.gpus
+            or (
+                serving_layout == REPLICA_LAYOUT
+                and tensor_parallel * data_parallel * replica_count == config.hardware.gpus
+            )
+        )
         if not is_managed_tensor_parallel:
             issues.append(f"hardware.gpus={config.hardware.gpus} does not match nodes*gpus_per_node={expected_gpus}")
 
@@ -322,7 +340,16 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
         if config.hardware.gpus > 1:
             tensor_parallel = int(parameters.get("tensor_parallel_size", 0))
             data_parallel = int(parameters.get("data_parallel_size", 0))
+            serving_layout = declared_serving_layout(parameters)
             valid_tensor_parallel = selected_framework == "vllm" and tensor_parallel == config.hardware.gpus
+            valid_replica_layout = (
+                selected_framework == "vllm"
+                and serving_layout == REPLICA_LAYOUT
+                and tensor_parallel == 2
+                and data_parallel == 2
+                and int(parameters.get("replica_count", 1)) == 2
+                and config.hardware.gpus == 4
+            )
             valid_environment_vllm_tensor_parallel = (
                 workload == "environment_validation"
                 and str(parameters.get("validation_target", "")) == "vllm_serving"
@@ -335,6 +362,7 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
             )
             if (
                 not valid_tensor_parallel
+                and not valid_replica_layout
                 and not valid_environment_vllm_tensor_parallel
                 and not valid_classification_data_parallel
             ):
