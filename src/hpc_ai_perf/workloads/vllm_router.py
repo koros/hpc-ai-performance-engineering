@@ -116,6 +116,16 @@ class VLLMReplicaRouter:
         self.observed_quantization: str | None = None
         self.observed_dtype = dtype
         self._routing_cursor = 0
+        self._routed_request_counts = [0] * len(gpu_groups)
+
+    @property
+    def routed_request_counts(self) -> tuple[int, ...]:
+        """Return requests assigned to each replica since the last reset."""
+        return tuple(self._routed_request_counts)
+
+    def reset_routing_counts(self) -> None:
+        """Exclude warmup traffic from the measured routing distribution."""
+        self._routed_request_counts = [0] * len(self._gpu_groups)
 
     def __enter__(self) -> VLLMReplicaRouter:
         self.start()
@@ -173,6 +183,8 @@ class VLLMReplicaRouter:
         )
         if self._request_routing == "round_robin":
             self._routing_cursor = (self._routing_cursor + len(prompts)) % len(self._connections)
+        for replica_index, prompt_indices in enumerate(assignments):
+            self._routed_request_counts[replica_index] += len(prompt_indices)
         outputs: list[RoutedOutput | None] = [None] * len(prompts)
         for connection, prompt_indices in zip(self._connections, assignments, strict=True):
             if prompt_indices:

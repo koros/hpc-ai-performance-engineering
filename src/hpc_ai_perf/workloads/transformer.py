@@ -1268,6 +1268,7 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         prompts = [{"prompt_token_ids": token_ids} for token_ids in prompt_token_ids]
         for _ in range(warmup_rounds):
             router.generate(prompts, max_new_tokens=max_new_tokens)
+        router.reset_routing_counts()
         torch.cuda.synchronize()
 
         latencies: list[float] = []
@@ -1302,6 +1303,7 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
             measured_seconds = max(time.perf_counter() - start_all, 1e-12)
 
     request_count = measured_rounds * requests_per_round
+    routing_counts = router.routed_request_counts
     metrics: dict[str, int | float | str | bool | None] = {
         "requests": request_count,
         "rounds": measured_rounds,
@@ -1324,6 +1326,10 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "data_parallel_size_observed": data_parallel_size,
         "replica_count_observed": replica_count,
         "serving_layout_observed": REPLICA_LAYOUT,
+        "request_routing_observed": request_routing,
+        "replica_request_counts": ",".join(str(count) for count in routing_counts),
+        "replica_request_count_min": min(routing_counts),
+        "replica_request_count_max": max(routing_counts),
         "vllm_execution_mode": "replica_eager_no_inductor",
         "vllm_inductor_disabled": True,
         "vllm_torchdynamo_disabled": False,
