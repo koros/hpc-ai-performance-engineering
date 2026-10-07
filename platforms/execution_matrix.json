@@ -695,6 +695,14 @@
     },
     {
       "platform": "h100",
+      "wave": "tinyllama-tp-prompt-sweep",
+      "name": "H100 TinyLlama tensor-parallel prompt-length crossover",
+      "experiment_ids": ["E704-E707"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
       "wave": "scaling-dd-canary",
       "name": "H100 scaling deep dive C: Deep-dive acceptance canaries",
       "experiment_ids": ["E320-E367", "E370-E384"],
