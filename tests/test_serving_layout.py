@@ -1,13 +1,10 @@
 from dataclasses import replace
 from pathlib import Path
 
-import pytest
-
 from hpc_ai_perf.config import load_experiment_config
-from hpc_ai_perf.results.contract import UnsupportedWorkloadError
 from hpc_ai_perf.serving_layout import declared_serving_layout, serving_layout_issues
 from hpc_ai_perf.validation import capability_issues
-from hpc_ai_perf.workloads.transformer import _run_vllm_inference
+from hpc_ai_perf.workloads import transformer as transformer_module
 
 
 def test_explicit_tensor_parallel_layout_is_validated_without_changing_legacy_config() -> None:
@@ -21,7 +18,7 @@ def test_explicit_tensor_parallel_layout_is_validated_without_changing_legacy_co
     assert capability_issues(explicit) == []
 
 
-def test_tp2_dp2_is_structurally_checked_and_marked_deferred() -> None:
+def test_tp2_dp2_is_structurally_checked() -> None:
     config = load_experiment_config(Path("configs/inference/E702_tinyllama_tp2_long_prompt.json"))
     parameters = dict(config.workload.parameters)
     parameters.update(
@@ -41,11 +38,11 @@ def test_tp2_dp2_is_structurally_checked_and_marked_deferred() -> None:
 
     issues = capability_issues(four_gpu)
 
-    assert any("multi-process replica router is deferred" in issue for issue in issues)
+    assert issues == []
     assert not any("requires hardware.gpus=4" in issue for issue in issues)
 
 
-def test_tp2_dp2_runner_fails_loudly_before_engine_startup() -> None:
+def test_tp2_dp2_runner_delegates_to_replica_adapter(monkeypatch) -> None:
     config = load_experiment_config(Path("configs/inference/E702_tinyllama_tp2_long_prompt.json"))
     parameters = dict(config.workload.parameters)
     parameters.update(
@@ -63,5 +60,15 @@ def test_tp2_dp2_runner_fails_loudly_before_engine_startup() -> None:
         workload=replace(config.workload, parameters=parameters),
     )
 
-    with pytest.raises(UnsupportedWorkloadError, match="multi-process replica router"):
-        _run_vllm_inference(four_gpu)
+    calls = []
+
+    def fake_replica_runner(dispatched_config):
+        calls.append(dispatched_config.experiment_id)
+        return transformer_module.WorkloadRunOutput(metrics={"serving_layout_observed": "tp2_dp2"})
+
+    monkeypatch.setattr(transformer_module, "_run_vllm_replica_inference", fake_replica_runner)
+
+    output = transformer_module._run_vllm_inference(four_gpu)
+
+    assert calls == ["E702"]
+    assert output.metrics["serving_layout_observed"] == "tp2_dp2"

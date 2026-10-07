@@ -32,7 +32,7 @@ def serving_layout_contract_requested(parameters: dict[str, Any]) -> bool:
 
 
 def serving_layout_issues(config: ExperimentConfig) -> list[str]:
-    """Validate explicit serving layouts, including the deferred replica shape."""
+    """Validate explicit serving layouts, including the multi-replica shape."""
     parameters = config.workload.parameters
     if config.mode != "inference" or not serving_layout_contract_requested(parameters):
         return []
@@ -59,7 +59,6 @@ def serving_layout_issues(config: ExperimentConfig) -> list[str]:
             issues.append("serving_layout=tp2_dp2 requires hardware.gpus=4")
         if request_routing not in SUPPORTED_REQUEST_ROUTING:
             issues.append("serving_layout=tp2_dp2 requires request_routing=round_robin or request_routing=least_loaded")
-        issues.append("serving_layout=tp2_dp2 is not executable yet: the multi-process replica router is deferred")
         return issues
 
     match = TP_LAYOUT_RE.fullmatch(layout)

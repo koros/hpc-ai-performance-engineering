@@ -24,6 +24,7 @@ from hpc_ai_perf.workloads.scaling import (
     load_real_text_inputs,
     scaling_runtime_sha256,
 )
+from hpc_ai_perf.workloads.vllm_router import VLLMReplicaRouter, build_gpu_groups
 
 
 @dataclass(frozen=True)
@@ -981,14 +982,11 @@ def _classification_quality_metrics(
 def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     parameters = config.workload.parameters
     serving_layout = declared_serving_layout(parameters)
-    if (
-        serving_layout == REPLICA_LAYOUT
-        or int(parameters.get("data_parallel_size", 1)) > 1
-        or int(parameters.get("replica_count", 1)) > 1
-    ):
+    if serving_layout == REPLICA_LAYOUT:
+        return _run_vllm_replica_inference(config)
+    if int(parameters.get("data_parallel_size", 1)) > 1 or int(parameters.get("replica_count", 1)) > 1:
         raise UnsupportedWorkloadError(
-            f"serving_layout={serving_layout} requires an executable multi-process replica router; "
-            "the current vLLM adapter supports one engine process with tensor parallelism only"
+            f"serving_layout={serving_layout} requires an explicit executable replica layout"
         )
     if importlib.util.find_spec("vllm") is None:
         raise RuntimeError("vLLM framework requested, but vllm is not installed")
@@ -1193,6 +1191,167 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         )
     if cuda_event_seconds is not None:
         metrics["cuda_event_seconds"] = cuda_event_seconds
+    if ttft_samples:
+        metrics["time_to_first_token_p50_ms"] = _percentile(ttft_samples, 50) * 1000
+        metrics["time_to_first_token_p95_ms"] = _percentile(ttft_samples, 95) * 1000
+    if queueing_samples:
+        metrics["queueing_time_p50_ms"] = _percentile(queueing_samples, 50) * 1000
+        metrics["queueing_time_p95_ms"] = _percentile(queueing_samples, 95) * 1000
+    return WorkloadRunOutput(
+        metrics=metrics,
+        samples={
+            "latency_seconds": latencies,
+            "time_to_first_token_seconds": ttft_samples,
+            "queueing_time_seconds": queueing_samples,
+        },
+    )
+
+
+def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
+    """Serve TP2×DP2 through two isolated vLLM TP2 engine processes."""
+    if importlib.util.find_spec("vllm") is None:
+        raise RuntimeError("vLLM framework requested, but vllm is not installed")
+    import torch
+
+    _prepare_runtime(torch, config, allow_distributed_strategy_none=True)
+    if not torch.cuda.is_available():
+        raise RuntimeError("vLLM replica serving requires CUDA")
+    if config.runtime.precision != "bf16":
+        raise RuntimeError("TP2×DP2 replica serving currently requires precision=bf16")
+
+    parameters = config.workload.parameters
+    tensor_parallel_size = int(parameters.get("tensor_parallel_size", 2))
+    data_parallel_size = int(parameters.get("data_parallel_size", 2))
+    replica_count = int(parameters.get("replica_count", 2))
+    if tensor_parallel_size != 2 or data_parallel_size != 2 or replica_count != 2:
+        raise ValueError(
+            "serving_layout=tp2_dp2 requires tensor_parallel_size=2, data_parallel_size=2, replica_count=2"
+        )
+    request_routing = str(parameters.get("request_routing", "round_robin"))
+    model_name = str(parameters.get("hf_model_name", config.workload.model))
+    model_revision = _selected_model_revision(config, model_name)
+    gpu_groups = build_gpu_groups(
+        gpu_count=config.hardware.gpus,
+        tensor_parallel_size=tensor_parallel_size,
+        replica_count=replica_count,
+        visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES"),
+    )
+    batch_size = int(parameters.get("batch_size", 1))
+    concurrency = int(parameters.get("concurrent_requests", 1))
+    prompt_length = int(parameters.get("prompt_length", 128))
+    max_new_tokens = int(parameters.get("max_new_tokens", 32))
+    _validate_context_window(config.workload.name, prompt_length, max_new_tokens)
+    requests_per_round = batch_size * concurrency
+    measured_rounds = int(config.runtime.max_steps or 10)
+    warmup_rounds = _warmup_steps(parameters, measured_rounds)
+
+    with VLLMReplicaRouter(
+        model_name=model_name,
+        model_revision=model_revision,
+        dtype="bfloat16",
+        tensor_parallel_size=tensor_parallel_size,
+        gpu_groups=gpu_groups,
+        request_routing=request_routing,
+        llm_kwargs={"compilation_config": {"level": 0, "use_inductor": False}},
+    ) as router:
+        if router.observed_quantization is not None:
+            raise RuntimeError(
+                f"replica vLLM engine unexpectedly activated quantization={router.observed_quantization!r}"
+            )
+        generator = torch.Generator().manual_seed(config.runtime.seed)
+        prompt_token_ids = torch.randint(
+            0,
+            router.vocab_size,
+            (requests_per_round, prompt_length),
+            generator=generator,
+        ).tolist()
+        prompts = [{"prompt_token_ids": token_ids} for token_ids in prompt_token_ids]
+        for _ in range(warmup_rounds):
+            router.generate(prompts, max_new_tokens=max_new_tokens)
+        torch.cuda.synchronize()
+
+        latencies: list[float] = []
+        ttft_samples: list[float] = []
+        queueing_samples: list[float] = []
+        generated_tokens = 0
+        nonempty_outputs = 0
+        with measured_region():
+            start_all = time.perf_counter()
+            for _ in range(measured_rounds):
+                start = time.perf_counter()
+                outputs = router.generate(prompts, max_new_tokens=max_new_tokens)
+                elapsed = time.perf_counter() - start
+                for output in outputs:
+                    output_tokens = sum(len(candidate.token_ids) for candidate in output.outputs)
+                    generated_tokens += output_tokens
+                    nonempty_outputs += int(output_tokens > 0)
+                    request_metrics = output.metrics
+                    arrival = getattr(request_metrics, "arrival_time", None)
+                    first = getattr(request_metrics, "first_token_time", None)
+                    finished = getattr(request_metrics, "finished_time", None)
+                    scheduled = getattr(request_metrics, "first_scheduled_time", None)
+                    if arrival is not None and first is not None:
+                        ttft_samples.append(float(first - arrival))
+                    if arrival is not None and finished is not None:
+                        latencies.append(float(finished - arrival))
+                    else:
+                        latencies.append(elapsed)
+                    if arrival is not None and scheduled is not None:
+                        queueing_samples.append(float(scheduled - arrival))
+            torch.cuda.synchronize()
+            measured_seconds = max(time.perf_counter() - start_all, 1e-12)
+
+    request_count = measured_rounds * requests_per_round
+    metrics: dict[str, int | float | str | bool | None] = {
+        "requests": request_count,
+        "rounds": measured_rounds,
+        "warmup_rounds": warmup_rounds,
+        "batch_size": batch_size,
+        "concurrent_requests": concurrency,
+        "prompt_tokens_per_request": prompt_length,
+        "generated_tokens": generated_tokens,
+        "total_tokens": generated_tokens,
+        "throughput_unit": "generated_tokens_per_second",
+        "measured_seconds": measured_seconds,
+        "gpu_seconds": measured_seconds * config.hardware.gpus,
+        "gpu_hours": measured_seconds * config.hardware.gpus / 3600,
+        "throughput_tokens_sec": generated_tokens / measured_seconds,
+        "throughput_requests_sec": request_count / measured_seconds,
+        "latency_p50_ms": _percentile(latencies, 50) * 1000,
+        "latency_p95_ms": _percentile(latencies, 95) * 1000,
+        "framework_observed": "vllm",
+        "tensor_parallel_size_observed": tensor_parallel_size,
+        "data_parallel_size_observed": data_parallel_size,
+        "replica_count_observed": replica_count,
+        "serving_layout_observed": REPLICA_LAYOUT,
+        "vllm_execution_mode": "replica_eager_no_inductor",
+        "vllm_inductor_disabled": True,
+        "vllm_torchdynamo_disabled": False,
+        "precision_backend": "vllm_bfloat16",
+        "compute_dtype_observed": "bfloat16",
+        "parameter_dtype_observed": "bfloat16",
+        "hf_model_name": model_name,
+        "hf_model_revision": model_revision,
+    }
+    metrics.update(
+        _serving_tail_metrics(
+            latencies,
+            ttft_samples,
+            queueing_samples,
+            measured_seconds,
+            parameters.get("latency_slo_p95_ms"),
+        )
+    )
+    if bool(parameters.get("quality_sanity_check", False)):
+        metrics.update(
+            {
+                "quality_protocol": "fixed_synthetic_generation_sanity_v1",
+                "quality_requests": request_count,
+                "quality_nonempty_outputs": nonempty_outputs,
+                "quality_request_success_rate": nonempty_outputs / max(request_count, 1),
+                "quality_generated_tokens_positive": generated_tokens > 0,
+            }
+        )
     if ttft_samples:
         metrics["time_to_first_token_p50_ms"] = _percentile(ttft_samples, 50) * 1000
         metrics["time_to_first_token_p95_ms"] = _percentile(ttft_samples, 95) * 1000
