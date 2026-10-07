@@ -697,7 +697,7 @@
       "platform": "h100",
       "wave": "tinyllama-tp-prompt-sweep",
       "name": "H100 TinyLlama tensor-parallel prompt-length crossover",
-      "experiment_ids": ["E704-E707"],
+      "experiment_ids": ["E704-E709"],
       "required_trials": 3,
       "comparability": "exact"
     },
