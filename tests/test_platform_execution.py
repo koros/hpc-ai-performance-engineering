@@ -335,7 +335,18 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     # Controlled scaling: the TinyLlama batch crossover and its canaries run on both platforms,
     # its E318/E319 diagnostics on L40S only; the deep dive routes per its design module.
     shared_scaling_ids = {f"E{index:03d}" for index in range(305, 318)}
-    shared_inference_ids = {"E702", "E703", "E704", "E705", "E706", "E707", "E708", "E709"}
+    shared_inference_ids = {
+        "E702",
+        "E703",
+        "E704",
+        "E705",
+        "E706",
+        "E707",
+        "E708",
+        "E709",
+        "E710",
+        "E711",
+    }
     l40s_scaling_diagnostic_ids = {"E318", "E319"}
     deep_dive = scaling_deep_dive.design()
     l40s_deep_dive_ids = {eid for eid, condition, _ in deep_dive if "l40s" in condition.run_platforms}
@@ -940,11 +951,18 @@ def test_execution_matrix_schedules_accepted_vllm_scope_in_platform_separated_wa
     assert {condition.required_trials for condition in prompt_sweep} == {3}
     assert {condition.comparability for condition in prompt_sweep} == {"exact"}
 
+    concurrency_layout = load_platform_conditions(
+        "platforms/execution_matrix.json", "h100", wave="tinyllama-tp-concurrency-layout"
+    )
+    assert {condition.matrix_id for condition in concurrency_layout} == {"E710", "E711"}
+    assert {condition.required_trials for condition in concurrency_layout} == {3}
+    assert {condition.comparability for condition in concurrency_layout} == {"exact"}
+
     all_vllm_ids = {"E006"}
     for expected_ids in later_waves.values():
         all_vllm_ids.update(expected_ids)
-    all_vllm_ids.update({"E704", "E705", "E706", "E707", "E708", "E709"})
-    assert len(all_vllm_ids) == 45
+    all_vllm_ids.update({"E704", "E705", "E706", "E707", "E708", "E709", "E710", "E711"})
+    assert len(all_vllm_ids) == 47
     assert {"E148", "E196"} <= all_vllm_ids
 
 

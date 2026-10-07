@@ -35,6 +35,10 @@ PHASE_TRACEABILITY: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("RQ1", "RQ3", "RQ4", "RQ5", "RQ7"),
         ("A01", "A02", "A03", "A04", "A05", "A07"),
     ),
+    "Inference TP concurrency crossover": (
+        ("RQ1", "RQ4", "RQ5", "RQ7"),
+        ("A01", "A02", "A03", "A04", "A05", "A07"),
+    ),
     "Inference precision/quantization": (("RQ3", "RQ5", "RQ7"), ("A02", "A04", "A05", "A07")),
 }
 

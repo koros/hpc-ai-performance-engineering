@@ -703,6 +703,14 @@
     },
     {
       "platform": "h100",
+      "wave": "tinyllama-tp-concurrency-layout",
+      "name": "H100 TinyLlama TP4 versus TP2xDP2 concurrency crossover",
+      "experiment_ids": ["E710-E711"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
       "wave": "scaling-dd-canary",
       "name": "H100 scaling deep dive C: Deep-dive acceptance canaries",
       "experiment_ids": ["E320-E367", "E370-E384"],
