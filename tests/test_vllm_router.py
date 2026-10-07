@@ -24,6 +24,11 @@ def test_route_prompt_indices_balances_requests_across_replicas(routing: str) ->
     assert route_prompt_indices(5, 2, request_routing=routing) == ((0, 2, 4), (1, 3))
 
 
+def test_route_prompt_indices_can_continue_round_robin_across_generation_rounds() -> None:
+    assert route_prompt_indices(1, 2, starting_replica=0) == ((0,), ())
+    assert route_prompt_indices(1, 2, starting_replica=1) == ((), (0,))
+
+
 def test_replica_router_rejects_unknown_routing_policy() -> None:
     with pytest.raises(ValueError, match="unsupported request_routing"):
         route_prompt_indices(1, 2, request_routing="random")

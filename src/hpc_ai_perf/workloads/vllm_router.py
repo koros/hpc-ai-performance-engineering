@@ -58,19 +58,27 @@ def route_prompt_indices(
     replica_count: int,
     *,
     request_routing: str = "round_robin",
+    starting_replica: int = 0,
 ) -> tuple[tuple[int, ...], ...]:
     """Return deterministic prompt assignments for the configured replica policy."""
     if prompt_count < 0 or replica_count < 1:
         raise ValueError("prompt_count must be non-negative and replica_count must be positive")
     if request_routing not in {"round_robin", "least_loaded"}:
         raise ValueError(f"unsupported request_routing={request_routing!r}")
+    if starting_replica < 0:
+        raise ValueError("starting_replica must be non-negative")
+    starting_replica %= replica_count
     assignments = [[] for _ in range(replica_count)]
     for prompt_index in range(prompt_count):
         if request_routing == "round_robin":
-            replica_index = prompt_index % replica_count
+            replica_index = (starting_replica + prompt_index) % replica_count
         else:
             lowest_load = min(len(items) for items in assignments)
-            replica_index = next(index for index, items in enumerate(assignments) if len(items) == lowest_load)
+            replica_index = next(
+                (starting_replica + offset) % replica_count
+                for offset in range(replica_count)
+                if len(assignments[(starting_replica + offset) % replica_count]) == lowest_load
+            )
         assignments[replica_index].append(prompt_index)
     return tuple(tuple(items) for items in assignments)
 
@@ -107,6 +115,7 @@ class VLLMReplicaRouter:
         self.vocab_size = 0
         self.observed_quantization: str | None = None
         self.observed_dtype = dtype
+        self._routing_cursor = 0
 
     def __enter__(self) -> VLLMReplicaRouter:
         self.start()
@@ -160,7 +169,10 @@ class VLLMReplicaRouter:
             len(prompts),
             len(self._connections),
             request_routing=self._request_routing,
+            starting_replica=self._routing_cursor,
         )
+        if self._request_routing == "round_robin":
+            self._routing_cursor = (self._routing_cursor + len(prompts)) % len(self._connections)
         outputs: list[RoutedOutput | None] = [None] * len(prompts)
         for connection, prompt_indices in zip(self._connections, assignments, strict=True):
             if prompt_indices:
@@ -179,6 +191,8 @@ class VLLMReplicaRouter:
                 raise RuntimeError(message.get("error", "vLLM replica failed during generation"))
             for prompt_index, output in zip(prompt_indices, message["outputs"], strict=True):
                 outputs[prompt_index] = _deserialize_output(output)
+        if any(output is None for output in outputs):
+            raise RuntimeError("vLLM replica router returned an incomplete response batch")
         return [output for output in outputs if output is not None]
 
     def close(self) -> None:
@@ -206,6 +220,7 @@ def _vllm_replica_worker(
     llm_kwargs: dict[str, Any],
 ) -> None:
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(gpu_group)
+    os.environ["TORCHDYNAMO_DISABLE"] = "1"
     try:
         from vllm import LLM, SamplingParams
 
