@@ -20,7 +20,7 @@ from hpc_ai_perf.config import (
     load_platform_profile,
     materialize_platform_configs,
 )
-from hpc_ai_perf.planning import plan_sweep
+from hpc_ai_perf.planning import plan_serving_layout, plan_sweep
 from hpc_ai_perf.readiness import write_readiness_report
 from hpc_ai_perf.results import aggregate_results, audit_telemetry, import_result_evidence, verify_result_evidence
 from hpc_ai_perf.runners import LocalBenchmarkRunner
@@ -116,6 +116,13 @@ def main() -> None:
             LOGGER.info("Wrote %d sweep candidates to %s", len(candidates), output_path)
         else:
             print(rendered, end="")
+        return
+
+    if args.command == "plan-serving-layout":
+        config = load_experiment_config(args.config)
+        payload = plan_serving_layout(config, visible_devices=args.visible_devices)
+        payload["config"] = str(Path(args.config))
+        print(json.dumps(payload, indent=2, sort_keys=True) + "\n", end="")
         return
 
     if args.command == "run":
@@ -504,6 +511,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Dotted config path and JSON array, for example workload.parameters.prompt_length=[128,512].",
     )
     sweep_parser.add_argument("--output", default=None, help="Optional JSON output path; stdout is used otherwise.")
+
+    serving_plan_parser = subparsers.add_parser(
+        "plan-serving-layout",
+        help="Dry-run serving GPU groups and routing without importing or launching vLLM.",
+    )
+    serving_plan_parser.add_argument("--config", required=True, help="Serving experiment config to inspect.")
+    serving_plan_parser.add_argument(
+        "--visible-devices",
+        default=None,
+        help="Optional scheduler-visible GPU identifiers, such as 0,1,2,3.",
+    )
 
     materialize_parser = subparsers.add_parser(
         "materialize-platform-configs",
