@@ -346,6 +346,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         "E709",
         "E710",
         "E711",
+        "E712",
     }
     l40s_scaling_diagnostic_ids = {"E318", "E319"}
     deep_dive = scaling_deep_dive.design()
@@ -958,11 +959,16 @@ def test_execution_matrix_schedules_accepted_vllm_scope_in_platform_separated_wa
     assert {condition.required_trials for condition in concurrency_layout} == {3}
     assert {condition.comparability for condition in concurrency_layout} == {"exact"}
 
+    precision_wave = load_platform_conditions("platforms/execution_matrix.json", "h100", wave="tinyllama-tp-precision")
+    assert {condition.matrix_id for condition in precision_wave} == {"E712"}
+    assert {condition.required_trials for condition in precision_wave} == {3}
+    assert {condition.comparability for condition in precision_wave} == {"exact"}
+
     all_vllm_ids = {"E006"}
     for expected_ids in later_waves.values():
         all_vllm_ids.update(expected_ids)
-    all_vllm_ids.update({"E704", "E705", "E706", "E707", "E708", "E709", "E710", "E711"})
-    assert len(all_vllm_ids) == 47
+    all_vllm_ids.update({"E704", "E705", "E706", "E707", "E708", "E709", "E710", "E711", "E712"})
+    assert len(all_vllm_ids) == 48
     assert {"E148", "E196"} <= all_vllm_ids
 
 

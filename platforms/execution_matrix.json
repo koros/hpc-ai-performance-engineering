@@ -711,6 +711,14 @@
     },
     {
       "platform": "h100",
+      "wave": "tinyllama-tp-precision",
+      "name": "H100 TinyLlama TP4 BF16 versus FP8 concurrency comparison",
+      "experiment_ids": ["E712"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
       "wave": "scaling-dd-canary",
       "name": "H100 scaling deep dive C: Deep-dive acceptance canaries",
       "experiment_ids": ["E320-E367", "E370-E384"],
