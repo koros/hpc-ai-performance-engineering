@@ -1,6 +1,6 @@
 import pytest
 
-from hpc_ai_perf.workloads.vllm_router import build_gpu_groups, route_prompt_indices
+from hpc_ai_perf.workloads.vllm_router import build_gpu_groups, route_prompt_indices, routing_distribution_metrics
 
 
 def test_build_gpu_groups_partitions_four_gpus_into_two_tp2_replicas() -> None:
@@ -33,6 +33,11 @@ def test_route_prompt_indices_distributes_a_concurrent_batch_evenly() -> None:
     assignments = route_prompt_indices(4, 2)
 
     assert assignments == ((0, 2), (1, 3))
+
+
+def test_routing_distribution_metrics_reports_balanced_and_imbalanced_counts() -> None:
+    assert routing_distribution_metrics((2, 2))["replica_request_count_imbalance_pct"] == 0.0
+    assert routing_distribution_metrics((3, 1))["replica_request_count_imbalance_pct"] == pytest.approx(66.6666667)
 
 
 def test_replica_router_rejects_unknown_routing_policy() -> None:

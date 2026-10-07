@@ -83,6 +83,22 @@ def route_prompt_indices(
     return tuple(tuple(items) for items in assignments)
 
 
+def routing_distribution_metrics(counts: tuple[int, ...]) -> dict[str, int | float | str]:
+    """Summarize measured request balance across replica engines."""
+    if not counts or any(count < 0 for count in counts):
+        raise ValueError("routing counts must contain at least one non-negative value")
+    minimum = min(counts)
+    maximum = max(counts)
+    imbalance = 0.0 if maximum == 0 else (maximum - minimum) / maximum * 100
+    return {
+        "replica_request_counts": ",".join(str(count) for count in counts),
+        "replica_request_count_total": sum(counts),
+        "replica_request_count_min": minimum,
+        "replica_request_count_max": maximum,
+        "replica_request_count_imbalance_pct": imbalance,
+    }
+
+
 class VLLMReplicaRouter:
     """Own one vLLM engine process per replica and route request batches to them."""
 
@@ -122,6 +138,11 @@ class VLLMReplicaRouter:
     def routed_request_counts(self) -> tuple[int, ...]:
         """Return requests assigned to each replica since the last reset."""
         return tuple(self._routed_request_counts)
+
+    @property
+    def gpu_groups(self) -> tuple[tuple[str, ...], ...]:
+        """Return the scheduler-visible GPU identifiers assigned to each replica."""
+        return self._gpu_groups
 
     def reset_routing_counts(self) -> None:
         """Exclude warmup traffic from the measured routing distribution."""

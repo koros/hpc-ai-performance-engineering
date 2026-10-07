@@ -24,7 +24,11 @@ from hpc_ai_perf.workloads.scaling import (
     load_real_text_inputs,
     scaling_runtime_sha256,
 )
-from hpc_ai_perf.workloads.vllm_router import VLLMReplicaRouter, build_gpu_groups
+from hpc_ai_perf.workloads.vllm_router import (
+    VLLMReplicaRouter,
+    build_gpu_groups,
+    routing_distribution_metrics,
+)
 
 
 @dataclass(frozen=True)
@@ -1304,6 +1308,7 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
 
     request_count = measured_rounds * requests_per_round
     routing_counts = router.routed_request_counts
+    routing_metrics = routing_distribution_metrics(routing_counts)
     metrics: dict[str, int | float | str | bool | None] = {
         "requests": request_count,
         "rounds": measured_rounds,
@@ -1327,9 +1332,7 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "replica_count_observed": replica_count,
         "serving_layout_observed": REPLICA_LAYOUT,
         "request_routing_observed": request_routing,
-        "replica_request_counts": ",".join(str(count) for count in routing_counts),
-        "replica_request_count_min": min(routing_counts),
-        "replica_request_count_max": max(routing_counts),
+        "replica_gpu_groups_observed": ";".join(",".join(group) for group in router.gpu_groups),
         "vllm_execution_mode": "replica_eager_no_inductor",
         "vllm_inductor_disabled": True,
         "vllm_torchdynamo_disabled": False,
@@ -1339,6 +1342,7 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "hf_model_name": model_name,
         "hf_model_revision": model_revision,
     }
+    metrics.update(routing_metrics)
     metrics.update(
         _serving_tail_metrics(
             latencies,
