@@ -283,6 +283,33 @@ ANALYSIS_TABLES = {
         "latency_p95_change_pct_vs_baseline",
         "goodput_change_pct_vs_baseline",
     ],
+    "inference_tp_precision_summary": [
+        "platform_id",
+        "comparability",
+        "workload",
+        "model",
+        "serving_layout",
+        "tp_degree",
+        "precision",
+        "baseline_precision",
+        "prompt_length",
+        "max_new_tokens",
+        "batch_size",
+        "concurrent_requests",
+        "gpus",
+        "trials",
+        "source_condition_ids",
+        "avg_throughput_tokens_sec",
+        "avg_throughput_per_gpu",
+        "avg_latency_p95_ms",
+        "avg_latency_p99_ms",
+        "avg_goodput_requests_sec",
+        "avg_memory_used_gb",
+        "avg_quality_request_success_rate",
+        "throughput_change_pct_vs_baseline",
+        "latency_p95_change_pct_vs_baseline",
+        "goodput_change_pct_vs_baseline",
+    ],
     "hardware_summary": [
         "condition_id",
         "experiment_id",
@@ -472,6 +499,9 @@ def build_analysis_tables(rows: list[dict[str, str]]) -> dict[str, list[dict[str
     if deep_dive:
         tables["scaling_deep_dive_conditions"] = public_rows(deep_dive, CONDITION_COLUMNS)
         tables["scaling_deep_dive_effects"] = build_scaling_deep_dive_effects(deep_dive)
+    tp_precision_rows = build_inference_tp_precision_summary(rows)
+    if tp_precision_rows:
+        tables["inference_tp_precision_summary"] = tp_precision_rows
     return tables
 
 
@@ -997,6 +1027,85 @@ def build_precision_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
             }
         )
 
+    return summaries
+
+
+def build_inference_tp_precision_summary(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
+    """Compare precision treatments at a matched tensor-parallel serving shape."""
+    selected = [
+        row
+        for row in rows
+        if row.get("status") == "completed"
+        and row.get("mode") == "inference"
+        and (
+            row.get("phase") == "Inference TP precision crossover"
+            or row.get("parameter_inference_study_type") == "tp_precision_concurrency"
+        )
+    ]
+    grouped = _group_rows(
+        selected,
+        "platform_id",
+        "comparability",
+        "workload",
+        "model",
+        "parameter_serving_layout",
+        "parameter_tensor_parallel_size",
+        "parameter_prompt_length",
+        "parameter_max_new_tokens",
+        "parameter_batch_size",
+        "parameter_concurrent_requests",
+    )
+    summaries: list[dict[str, Any]] = []
+    for key, group_rows in sorted(grouped.items()):
+        by_precision: dict[str, list[dict[str, str]]] = defaultdict(list)
+        for row in group_rows:
+            precision = _value(row, "precision")
+            if precision:
+                by_precision[precision].append(row)
+        if not by_precision:
+            continue
+        baseline_precision = "bf16" if "bf16" in by_precision else sorted(by_precision)[0]
+        baseline_rows = by_precision[baseline_precision]
+        baseline_throughput = _mean(_metric_values(baseline_rows, "throughput_tokens_sec"))
+        baseline_latency = _mean(_metric_values(baseline_rows, "latency_p95_ms"))
+        baseline_goodput = _mean(_metric_values(baseline_rows, "goodput_requests_sec"))
+        for precision, precision_rows in sorted(by_precision.items()):
+            throughput = _mean(_metric_values(precision_rows, "throughput_tokens_sec"))
+            latency = _mean(_metric_values(precision_rows, "latency_p95_ms"))
+            goodput = _mean(_metric_values(precision_rows, "goodput_requests_sec"))
+            gpus = _mean(_metric_values(precision_rows, "gpus"))
+            tp = _first_float(precision_rows[0], "parameter_tensor_parallel_size")
+            summaries.append(
+                {
+                    "platform_id": key[0],
+                    "comparability": key[1],
+                    "workload": key[2],
+                    "model": key[3],
+                    "serving_layout": key[4] or (f"tp{int(tp)}" if tp is not None else ""),
+                    "tp_degree": int(tp) if tp is not None and tp.is_integer() else tp,
+                    "precision": precision,
+                    "baseline_precision": baseline_precision,
+                    "prompt_length": key[6],
+                    "max_new_tokens": key[7],
+                    "batch_size": key[8],
+                    "concurrent_requests": key[9],
+                    "gpus": gpus,
+                    "trials": len(precision_rows),
+                    "source_condition_ids": "; ".join(sorted({_value(row, "condition_id") for row in precision_rows})),
+                    "avg_throughput_tokens_sec": throughput,
+                    "avg_throughput_per_gpu": _divide(throughput, gpus),
+                    "avg_latency_p95_ms": latency,
+                    "avg_latency_p99_ms": _mean(_metric_values(precision_rows, "latency_p99_ms")),
+                    "avg_goodput_requests_sec": goodput,
+                    "avg_memory_used_gb": _mean(_metric_values(precision_rows, "memory_used_gb")),
+                    "avg_quality_request_success_rate": _mean(
+                        _metric_values(precision_rows, "quality_request_success_rate")
+                    ),
+                    "throughput_change_pct_vs_baseline": _percent_change(throughput, baseline_throughput),
+                    "latency_p95_change_pct_vs_baseline": _percent_change(latency, baseline_latency),
+                    "goodput_change_pct_vs_baseline": _percent_change(goodput, baseline_goodput),
+                }
+            )
     return summaries
 
 

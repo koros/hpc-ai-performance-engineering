@@ -1,6 +1,9 @@
 import pytest
 
-from hpc_ai_perf.analysis.summaries import build_inference_tp_crossover_summary
+from hpc_ai_perf.analysis.summaries import (
+    build_inference_tp_crossover_summary,
+    build_inference_tp_precision_summary,
+)
 from hpc_ai_perf.workloads.transformer import _serving_tail_metrics
 
 
@@ -67,6 +70,40 @@ def test_tp_crossover_does_not_pool_replica_layout_with_single_engine_tp() -> No
     replica_row = next(row for row in tp2_rows if row["serving_layout"] == "tp2_dp2")
     assert replica_row["data_parallel_size"] == "2"
     assert replica_row["request_routing"] == "round_robin"
+
+
+def test_tp_precision_summary_compares_fp8_with_matched_bf16_control() -> None:
+    bf16 = _row(4, prompt=1280, throughput=100.0, latency=0.4)
+    bf16.update(
+        {
+            "condition_id": "E710@h100",
+            "experiment_id": "E710",
+            "phase": "Inference TP precision crossover",
+            "parameter_concurrent_requests": "4",
+            "parameter_serving_layout": "tp4",
+            "precision": "bf16",
+        }
+    )
+    fp8 = dict(bf16)
+    fp8.update(
+        {
+            "condition_id": "E712@h100",
+            "experiment_id": "E712",
+            "precision": "fp8",
+            "throughput_tokens_sec": "125",
+            "latency_p95_ms": "500",
+            "latency_p99_ms": "550",
+            "quality_request_success_rate": "1.0",
+        }
+    )
+
+    summaries = build_inference_tp_precision_summary([bf16, fp8])
+
+    assert {row["precision"] for row in summaries} == {"bf16", "fp8"}
+    fp8_summary = next(row for row in summaries if row["precision"] == "fp8")
+    assert fp8_summary["baseline_precision"] == "bf16"
+    assert fp8_summary["throughput_change_pct_vs_baseline"] == 25.0
+    assert fp8_summary["latency_p95_change_pct_vs_baseline"] == 25.0
 
 
 def test_serving_tail_metrics_reports_p99_and_explicit_goodput() -> None:
