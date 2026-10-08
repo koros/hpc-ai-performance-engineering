@@ -1,6 +1,7 @@
 import pytest
 
 from hpc_ai_perf.analysis.summaries import (
+    build_inference_summary,
     build_inference_tp_crossover_summary,
     build_inference_tp_precision_summary,
 )
@@ -35,6 +36,9 @@ def _row(tp: int, prompt: int = 1920, throughput: float = 100.0, latency: float 
         "latency_p95_ms": str(latency * 1000),
         "latency_p99_ms": str(latency * 1100),
         "time_to_first_token_p95_ms": str(latency * 500),
+        "time_per_output_token_p95_ms": "12",
+        "time_per_output_token_p99_ms": "15",
+        "decode_time_p95_ms": "1500",
         "goodput_requests_sec": "10",
     }
 
@@ -51,6 +55,16 @@ def test_tp_crossover_keeps_prompt_lengths_separate_and_reports_relative_change(
     assert long_prompt[1]["throughput_change_pct_vs_baseline"] == 80.0
     assert long_prompt[2]["latency_p95_change_pct_vs_baseline"] == 50.0
     assert len([row for row in summaries if row["prompt_length"] == "128"]) == 1
+    assert long_prompt[1]["avg_tpot_p95_ms"] == 12.0
+    assert long_prompt[1]["avg_decode_time_p95_ms"] == 1500.0
+
+
+def test_inference_summary_exports_decode_timing_fields() -> None:
+    summary = build_inference_summary([_row(4)])
+
+    assert summary[0]["avg_tpot_p95_ms"] == 12.0
+    assert summary[0]["avg_tpot_p99_ms"] == 15.0
+    assert summary[0]["avg_decode_time_p95_ms"] == 1500.0
 
 
 def test_tp_crossover_does_not_pool_replica_layout_with_single_engine_tp() -> None:
