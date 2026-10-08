@@ -4,7 +4,11 @@ from hpc_ai_perf.analysis.summaries import (
     build_inference_tp_crossover_summary,
     build_inference_tp_precision_summary,
 )
-from hpc_ai_perf.workloads.transformer import _serving_tail_metrics
+from hpc_ai_perf.workloads.transformer import (
+    _decode_timing_metrics,
+    _decode_timing_samples,
+    _serving_tail_metrics,
+)
 
 
 def _row(tp: int, prompt: int = 1920, throughput: float = 100.0, latency: float = 0.2) -> dict[str, str]:
@@ -120,3 +124,26 @@ def test_serving_tail_metrics_reports_p99_and_explicit_goodput() -> None:
     assert metrics["queueing_time_p99_ms"] == pytest.approx(39.7)
     assert metrics["goodput_requests_sec"] == 2.0
     assert metrics["goodput_slo_met_fraction"] == 0.5
+
+
+def test_decode_timing_uses_backend_last_token_timestamp() -> None:
+    metrics = type("Metrics", (), {"first_token_time": 10.0, "last_token_time": 13.0})()
+
+    tpot, decode_time = _decode_timing_samples(metrics, 4)
+
+    assert tpot == pytest.approx(1.0)
+    assert decode_time == pytest.approx(3.0)
+    summary = _decode_timing_metrics([tpot], [decode_time])
+    assert summary["decode_timing_available"] is True
+    assert summary["decode_timing_source"] == "vllm_last_token_time"
+    assert summary["time_per_output_token_p95_ms"] == pytest.approx(1_000.0)
+    assert summary["decode_time_p95_ms"] == pytest.approx(3_000.0)
+
+
+def test_decode_timing_is_unavailable_without_last_token_timestamp() -> None:
+    metrics = type("Metrics", (), {"first_token_time": 10.0})()
+
+    assert _decode_timing_samples(metrics, 4) == (None, None)
+    summary = _decode_timing_metrics([], [])
+    assert summary["decode_timing_available"] is False
+    assert summary["decode_timing_source"] is None

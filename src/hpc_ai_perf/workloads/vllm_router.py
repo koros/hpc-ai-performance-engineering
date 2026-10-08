@@ -13,6 +13,7 @@ from typing import Any
 class RoutedMetrics:
     arrival_time: float | None = None
     first_token_time: float | None = None
+    last_token_time: float | None = None
     finished_time: float | None = None
     first_scheduled_time: float | None = None
 
@@ -296,6 +297,7 @@ def _serialize_output(output: Any) -> dict[str, Any]:
         "metrics": {
             "arrival_time": getattr(request_metrics, "arrival_time", None),
             "first_token_time": getattr(request_metrics, "first_token_time", None),
+            "last_token_time": getattr(request_metrics, "last_token_time", None),
             "finished_time": getattr(request_metrics, "finished_time", None),
             "first_scheduled_time": getattr(request_metrics, "first_scheduled_time", None),
         }

@@ -1100,6 +1100,8 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     latencies: list[float] = []
     ttft_samples: list[float] = []
     queueing_samples: list[float] = []
+    tpot_samples: list[float] = []
+    decode_time_samples: list[float] = []
     generated_tokens = 0
     nonempty_outputs = 0
     with measured_region():
@@ -1118,6 +1120,10 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
                 first = getattr(request_metrics, "first_token_time", None)
                 finished = getattr(request_metrics, "finished_time", None)
                 scheduled = getattr(request_metrics, "first_scheduled_time", None)
+                tpot, decode_time = _decode_timing_samples(request_metrics, output_tokens)
+                if tpot is not None and decode_time is not None:
+                    tpot_samples.append(tpot)
+                    decode_time_samples.append(decode_time)
                 if arrival is not None and first is not None:
                     ttft_samples.append(float(first - arrival))
                 if arrival is not None and finished is not None:
@@ -1172,6 +1178,7 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
             parameters.get("latency_slo_p95_ms"),
         )
     )
+    metrics.update(_decode_timing_metrics(tpot_samples, decode_time_samples))
     if quantization is not None:
         metrics.update(
             {
@@ -1207,6 +1214,8 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
             "latency_seconds": latencies,
             "time_to_first_token_seconds": ttft_samples,
             "queueing_time_seconds": queueing_samples,
+            "time_per_output_token_seconds": tpot_samples,
+            "decode_time_seconds": decode_time_samples,
         },
     )
 
@@ -1278,6 +1287,8 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         latencies: list[float] = []
         ttft_samples: list[float] = []
         queueing_samples: list[float] = []
+        tpot_samples: list[float] = []
+        decode_time_samples: list[float] = []
         generated_tokens = 0
         nonempty_outputs = 0
         with measured_region():
@@ -1295,6 +1306,10 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
                     first = getattr(request_metrics, "first_token_time", None)
                     finished = getattr(request_metrics, "finished_time", None)
                     scheduled = getattr(request_metrics, "first_scheduled_time", None)
+                    tpot, decode_time = _decode_timing_samples(request_metrics, output_tokens)
+                    if tpot is not None and decode_time is not None:
+                        tpot_samples.append(tpot)
+                        decode_time_samples.append(decode_time)
                     if arrival is not None and first is not None:
                         ttft_samples.append(float(first - arrival))
                     if arrival is not None and finished is not None:
@@ -1352,6 +1367,7 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
             parameters.get("latency_slo_p95_ms"),
         )
     )
+    metrics.update(_decode_timing_metrics(tpot_samples, decode_time_samples))
     if bool(parameters.get("quality_sanity_check", False)):
         metrics.update(
             {
@@ -1374,6 +1390,8 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
             "latency_seconds": latencies,
             "time_to_first_token_seconds": ttft_samples,
             "queueing_time_seconds": queueing_samples,
+            "time_per_output_token_seconds": tpot_samples,
+            "decode_time_seconds": decode_time_samples,
         },
     )
 
@@ -2114,6 +2132,53 @@ def _percentile(values: list[float], percentile: float) -> float:
         return ordered[lower]
     fraction = position - lower
     return ordered[lower] * (1 - fraction) + ordered[upper] * fraction
+
+
+def _decode_timing_samples(request_metrics: Any, output_tokens: int) -> tuple[float | None, float | None]:
+    """Return TPOT and total decode duration when vLLM exposes final-token timing.
+
+    TPOT is computed over generated tokens after the first token, matching the
+    usual decode-interval definition.  We intentionally do not infer decode
+    duration from ``finished_time``: that would fold post-generation cleanup
+    into a metric that is meant to describe token generation.
+    """
+    if output_tokens < 2 or request_metrics is None:
+        return None, None
+    first = getattr(request_metrics, "first_token_time", None)
+    last = getattr(request_metrics, "last_token_time", None)
+    if first is None or last is None:
+        return None, None
+    decode_time = float(last - first)
+    if not math.isfinite(decode_time) or decode_time < 0:
+        return None, None
+    return decode_time / max(output_tokens - 1, 1), decode_time
+
+
+def _decode_timing_metrics(
+    tpot_samples: list[float], decode_time_samples: list[float]
+) -> dict[str, int | float | str | bool | None]:
+    """Summarize backend-provided per-token and total decode timings."""
+    metrics: dict[str, int | float | str | bool | None] = {
+        "decode_timing_available": bool(tpot_samples),
+        "decode_timing_source": "vllm_last_token_time" if tpot_samples else None,
+    }
+    if tpot_samples:
+        metrics.update(
+            {
+                "time_per_output_token_p50_ms": _percentile(tpot_samples, 50) * 1000,
+                "time_per_output_token_p95_ms": _percentile(tpot_samples, 95) * 1000,
+                "time_per_output_token_p99_ms": _percentile(tpot_samples, 99) * 1000,
+            }
+        )
+    if decode_time_samples:
+        metrics.update(
+            {
+                "decode_time_p50_ms": _percentile(decode_time_samples, 50) * 1000,
+                "decode_time_p95_ms": _percentile(decode_time_samples, 95) * 1000,
+                "decode_time_p99_ms": _percentile(decode_time_samples, 99) * 1000,
+            }
+        )
+    return metrics
 
 
 def _serving_tail_metrics(
