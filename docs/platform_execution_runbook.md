@@ -389,6 +389,47 @@ make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-pilot
 make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-pilot
 ```
 
+### New TinyLlama TP crossover waves
+
+The handoff-derived E702-E714 serving extension is split into four independent H100 waves. This keeps prompt length,
+concurrency, precision, output length, and TP2×DP2 routing comparisons auditable:
+
+| Wave | Conditions | Required trials |
+| --- | --- | ---: |
+| `tinyllama-tp-prompt-sweep` | E704-E709 | 3 |
+| `tinyllama-tp-concurrency-layout` | E710-E711 | 3 |
+| `tinyllama-tp-precision` | E712 | 3 |
+| `tinyllama-tp-output-length` | E713-E714 | 3 |
+
+Run the software preflight and layout dry run first:
+
+```bash
+PYTHONPATH=.:src python3 -m hpc_ai_perf.cli validate --skip-results
+PYTHONPATH=.:src python3 -m hpc_ai_perf.cli plan-serving-layout \
+  --config configs/inference/E711_tinyllama_tp2dp2_concurrency4.json \
+  --visible-devices 4,6,7,9
+```
+
+Render the selected wave from the tracked execution matrix, then submit it through the immutable bundle workflow:
+
+```bash
+make check-slurm-profile SLURM_PROFILE=slurm/profiles/cluster_h100.json
+make render-h100-wave PLATFORM_WAVE=tinyllama-tp-concurrency-layout \
+  SLURM_PROFILE=slurm/profiles/cluster_h100.json
+make plan-platform-wave PLATFORM=h100 PLATFORM_WAVE=tinyllama-tp-concurrency-layout
+make submit-platform-wave PLATFORM=h100 PLATFORM_WAVE=tinyllama-tp-concurrency-layout \
+  SLURM_PROFILE=slurm/profiles/cluster_h100.json \
+  VENV_ACTIVATE=/path/to/vllm-0.10.2-gloo/bin/activate
+make status-platform-wave PLATFORM=h100 PLATFORM_WAVE=tinyllama-tp-concurrency-layout
+make collect-platform-wave PLATFORM=h100 PLATFORM_WAVE=tinyllama-tp-concurrency-layout
+make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=tinyllama-tp-concurrency-layout
+```
+
+Repeat the commands with the other three wave names as capacity permits. The private vLLM environment must be used;
+the repository environment is not the certified serving runtime. The adapter records TPOT/decode samples only when
+vLLM exposes `last_token_time`, records raw latency/TTFT/queueing samples, and explicitly marks request-path
+NCCL/NVLink attribution as unavailable. Local validation and dry runs do not create H100 evidence.
+
 Then use `make submit-vllm-wave PLATFORM=h100 PLATFORM_WAVE=<wave>` in this order: `vllm-framework`,
 `vllm-fp8`, `vllm-batching`, `vllm-concurrency`, `vllm-prompt`, `vllm-tp2`, and canary-gated `vllm-tp4`.
 Run the separate Qwen `vllm-long-context` continuation through `make submit-long-context-acceptance` and
