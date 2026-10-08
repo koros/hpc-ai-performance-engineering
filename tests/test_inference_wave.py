@@ -8,6 +8,7 @@ from hpc_ai_perf.analysis.summaries import (
 from hpc_ai_perf.workloads.transformer import (
     _decode_timing_metrics,
     _decode_timing_samples,
+    _serving_provenance_metrics,
     _serving_tail_metrics,
 )
 
@@ -161,3 +162,15 @@ def test_decode_timing_is_unavailable_without_last_token_timestamp() -> None:
     summary = _decode_timing_metrics([], [])
     assert summary["decode_timing_available"] is False
     assert summary["decode_timing_source"] is None
+
+
+def test_serving_provenance_declares_memory_source_and_missing_collective_attribution() -> None:
+    profiling = type("Profiling", (), {"enabled": True, "profilers": ["nvidia_smi"]})()
+    config = type("Config", (), {"profiling": profiling})()
+
+    provenance = _serving_provenance_metrics(config, replica_layout=True)
+
+    assert provenance["communication_metrics_available"] is False
+    assert "routing_counts_available" in provenance["communication_metrics_limitation"]
+    assert provenance["memory_metrics_source"] == "nvidia_smi_measured_region"
+    assert provenance["memory_metrics_scope"] == "device_telemetry_measured_region"

@@ -1178,6 +1178,7 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
             parameters.get("latency_slo_p95_ms"),
         )
     )
+    metrics.update(_serving_provenance_metrics(config, replica_layout=False))
     metrics.update(_decode_timing_metrics(tpot_samples, decode_time_samples))
     if quantization is not None:
         metrics.update(
@@ -1367,6 +1368,7 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
             parameters.get("latency_slo_p95_ms"),
         )
     )
+    metrics.update(_serving_provenance_metrics(config, replica_layout=True))
     metrics.update(_decode_timing_metrics(tpot_samples, decode_time_samples))
     if bool(parameters.get("quality_sanity_check", False)):
         metrics.update(
@@ -2179,6 +2181,41 @@ def _decode_timing_metrics(
             }
         )
     return metrics
+
+
+def _serving_provenance_metrics(
+    config: ExperimentConfig, *, replica_layout: bool
+) -> dict[str, int | float | str | bool | None]:
+    """Declare what the serving adapter can and cannot attribute.
+
+    vLLM exposes request timing and routing metadata, but this adapter does
+    not expose request-path NCCL/NVLink collective counters.  Memory source is
+    stated from the configured profiler so downstream reports can distinguish
+    device telemetry from allocator-only observations.
+    """
+    profiler_names = set(config.profiling.profilers) if config.profiling.enabled else set()
+    if "nvidia_smi" in profiler_names:
+        memory_source = "nvidia_smi_measured_region"
+        memory_scope = "device_telemetry_measured_region"
+    elif "torch_memory" in profiler_names:
+        memory_source = "torch_memory_allocator"
+        memory_scope = "process_allocator"
+    else:
+        memory_source = "unavailable"
+        memory_scope = "not_configured"
+    if replica_layout:
+        communication_scope = "inter_replica_routing"
+        communication_limitation = "routing_counts_available; NCCL/NVLink collective attribution unavailable"
+    else:
+        communication_scope = "tensor_parallel_request_path"
+        communication_limitation = "NCCL/NVLink collective attribution unavailable"
+    return {
+        "communication_metrics_available": False,
+        "communication_metrics_scope": communication_scope,
+        "communication_metrics_limitation": communication_limitation,
+        "memory_metrics_source": memory_source,
+        "memory_metrics_scope": memory_scope,
+    }
 
 
 def _serving_tail_metrics(
