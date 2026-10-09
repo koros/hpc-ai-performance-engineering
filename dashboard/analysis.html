@@ -524,7 +524,7 @@
       train or run AI models.
     </p>
     <p class="snapshot-line" id="snapshotLine">Loading snapshot&hellip;</p>
-    <p class="snapshot-line">Base findings snapshot through 27 September 2026; the TinyLlama strategy study below adds evidence from 30 September, and the TinyLlama weak-scaling wave (L40S 30 September, H100 1 October) adds a second update below it. The L40S hardware-energy anchors collected on 28 September are listed in the catalog but are not yet included in the findings.</p>
+    <p class="snapshot-line">Base findings snapshot through 27 September 2026; later sections add the TinyLlama strategy study, the two-platform TinyLlama weak-scaling wave, and the L40S scaling deep dive collected 6&ndash;7 October. The L40S hardware-energy anchors collected on 28 September are listed in the catalog but are not yet included in the findings.</p>
   </div>
 </header>
 
@@ -532,6 +532,7 @@
   <div class="wrap">
     <a href="#glance">At a glance</a>
     <a href="#scaling">More chips</a>
+    <a href="#scaling-deep-dive">Scaling deep dive</a>
     <a href="#strategy">Splitting the work</a>
     <a href="#precision">Number formats</a>
     <a href="#communication">Chips talking</a>
@@ -640,6 +641,66 @@
       </p>
       <p class="note">TinyLlama-1.1B, BF16, 1,024-token sequences; three trials per chip count on each chip. The two chips used different per-chip batches (8 on H100, 2 on L40S), so their percentages are not a like-for-like contest.</p>
       <a class="see-stats" href="#nerd-tinyllama-weak-scaling">Supporting evidence: per-chip figures &amp; the contention caveat &rarr;</a>
+    </div>
+  </section>
+
+  <section id="scaling-deep-dive">
+    <p class="section-kicker">Scaling deep dive</p>
+    <h2>When does adding chips work, and when does it fail?</h2>
+    <p class="section-intro">
+      The earlier scaling studies showed the outcome. This controlled L40S study tests the cause:
+      how much useful computation each chip performs before all chips must stop and exchange
+      gradients. The model, batch per chip, sequence length, precision and DDP implementation stay
+      fixed while only the number of gradient-accumulation steps changes.
+    </p>
+    <div class="nerd-table-wrap" style="margin-bottom: 22px;"><table class="nerd-table">
+      <thead><tr><th>Lever</th><th>What we change</th><th>What we compare it against</th><th>Why it may influence scaling</th><th>Current evidence</th></tr></thead>
+      <tbody>
+        <tr><td>Synchronization frequency</td><td>Gradient accumulation: 1, 2, 4 or 8 micro-batches per exchange</td><td>Same model, batch/GPU, sequence length, precision and DDP settings</td><td>More computation is performed for each gradient exchange</td><td><b>Completed on L40S.</b> Accumulation 8 raised 8-GPU efficiency from 88% to 97% for GPT-2, 79% to 95% for DistilBERT and 54% to 87% for TinyLlama.</td></tr>
+        <tr><td>Work allocation</td><td>Weak scaling versus a fixed global batch</td><td>Growing total work with GPU count versus splitting one fixed job</td><td>Fixed work leaves less computation on each GPU as more GPUs are added</td><td><b>Completed for GPT-2.</b> Fixed-batch efficiency fell to 82% at 8 GPUs even though matched weak scaling reached 97%.</td></tr>
+        <tr><td>Batch/sequence split</td><td>Different micro-batch and sequence-length combinations at the same tokens/GPU</td><td>Equal token counts per GPU and the same model</td><td>Attention cost and kernel shape may matter beyond token count alone</td><td>Designed as S2; results not collected yet.</td></tr>
+        <tr><td>Model size</td><td>66M to 1.1B parameters at matched work/GPU</td><td>Same token workload, precision and scaling method</td><td>Larger models exchange more gradient data</td><td>S1 already shows different sensitivity across three models; the controlled size-ladder S3 is pending.</td></tr>
+        <tr><td>Communication settings</td><td>DDP bucket size, bucket views, static graph and BF16 gradient compression</td><td>Default DDP at the same workload and GPU count</td><td>Changes when and how many gradient bytes are exchanged</td><td>Designed as S4; results not collected yet.</td></tr>
+        <tr><td>Training stack</td><td>DDP versus FSDP shard-grad and full-shard</td><td>Same inputs and per-GPU workload</td><td>Sharding saves memory but changes communication volume and pattern</td><td>Designed as S5; scaling curves not collected yet.</td></tr>
+        <tr><td>GPU placement/topology</td><td>Same-switch, same-socket and cross-socket GPU placement; P2P on/off</td><td>Same job on different L40S links</td><td>PCIe path and socket crossings can change communication latency</td><td>Designed as S6; current S1 placement records are unknown.</td></tr>
+        <tr><td>Input balance</td><td>Padded, bucketed, packed and variable-length real text</td><td>Fixed-length synthetic inputs</td><td>Uneven work makes faster ranks wait for the slowest rank</td><td>Designed as S7; results not collected yet.</td></tr>
+        <tr><td>Compute precision</td><td>FP32, BF16 and H100 FP8</td><td>Same workload and communication pattern</td><td>Faster compute can expose a larger communication bottleneck</td><td>Designed as S8; results not collected yet.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="chart-panel" style="margin-bottom: 22px;">
+      <p class="chart-title">Eight-chip scaling efficiency before and after communication is amortized</p>
+      <p class="chart-sub">L40S, default DDP &middot; 100% is perfect weak scaling &middot; higher is better</p>
+      <div id="chartScalingDeepDive"></div>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Finding</span> The same hardware can scale well or badly depending on synchronization frequency</p>
+      <p>
+        With a gradient exchange after every micro-batch, eight-chip efficiency was 88% for GPT-2,
+        79% for DistilBERT and only 54% for TinyLlama. Waiting for eight micro-batches before each
+        exchange raised those figures to 97%, 95% and 87%. TinyLlama therefore does scale on L40S
+        when each synchronization is backed by enough computation; its earlier failure was not a
+        permanent property of the model or the chip.
+      </p>
+      <p class="note">L40S, BF16, default DDP, three trials per condition; 144 successful trials across E386&ndash;E433.</p>
+      <a class="see-stats" href="#nerd-scaling-deep-dive">Supporting evidence: efficiency curves, communication time &amp; source runs &rarr;</a>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Why</span> Accumulation hides communication; it does not make the network faster</p>
+      <p>
+        TinyLlama still exposed roughly 0.35 seconds of extra multi-chip time per optimizer update
+        at eight chips. What changed was its share of the update: about 46% at accumulation 1 and
+        13% at accumulation 8. The communication cost stayed broadly fixed while useful computation
+        grew around it. GPT-2 and DistilBERT show the same pattern at smaller absolute costs.
+      </p>
+    </div>
+    <div class="finding-card">
+      <p class="headline"><span class="tag">Boundary</span> Fixed-work scaling still breaks when the per-chip work becomes too small</p>
+      <p>
+        A controlled GPT-2 global-batch-64 path reached 97% efficiency at two chips and 91% at four,
+        but fell to 82% at eight. That path progressively reduces accumulation from 8 to 1 as chips
+        are added. It is a direct counterexample to the idea that a workload which weak-scales well
+        must also strong-scale well.
+      </p>
     </div>
   </section>
 
@@ -1049,6 +1110,7 @@
 
     <div class="nerd-toc">
       <a href="#nerd-scaling">RQ1 &middot; Scaling</a>
+      <a href="#nerd-scaling-deep-dive">Scaling deep dive</a>
       <a href="#nerd-strategy">RQ2 &middot; Strategy</a>
       <a href="#nerd-precision">RQ3 &middot; Precision</a>
       <a href="#nerd-communication">RQ4 &middot; Communication</a>
@@ -1056,6 +1118,54 @@
       <a href="#nerd-batching">Batching</a>
       <a href="#nerd-power">RQ5 &middot; Power &amp; energy</a>
       <a href="#nerd-lowbit">7B model</a>
+    </div>
+
+    <div class="nerd-block" id="nerd-scaling-deep-dive">
+      <h3>Scaling deep dive &middot; synchronization frequency (L40S, controlled S1 wave)</h3>
+      <p class="nerd-method">
+        Weak scaling holds each workload's micro-batch and sequence length fixed while GPU count and
+        global batch grow together. Each accumulation setting uses its own matched one-GPU baseline,
+        so the efficiency figures remove the single-GPU speedup that accumulation itself produces.
+        Efficiency = throughput at N GPUs &divide; (N &times; matched one-GPU throughput). Every listed
+        condition completed three trials with no failures or OOMs.
+      </p>
+      <div class="chart-panel" style="margin-bottom: 14px;">
+        <p class="chart-title">Weak-scaling efficiency by model and accumulation</p>
+        <p class="chart-sub">Solid lines: synchronize every micro-batch &middot; dashed lines: synchronize every eight micro-batches</p>
+        <div id="chartScalingDeepDiveLines"></div>
+      </div>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th>Workload</th><th class="num">Accum.</th><th class="num">2-GPU eff.</th><th class="num">4-GPU eff.</th><th class="num">8-GPU eff.</th><th class="num">8-GPU comm. share</th><th class="num">Peak mem. at max GPUs</th><th>Source conditions</th></tr></thead>
+        <tbody>
+          <tr><td>GPT-2 Small</td><td class="num">1</td><td class="num">89.166%</td><td class="num">89.354%</td><td class="num">87.704%</td><td class="num">12.074%</td><td class="num">15.236 GB</td><td>E386&ndash;E389</td></tr>
+          <tr><td>GPT-2 Small</td><td class="num">8</td><td class="num">98.327%</td><td class="num">97.585%</td><td class="num">96.878%</td><td class="num">3.102%</td><td class="num">16.893 GB</td><td>E398&ndash;E401</td></tr>
+          <tr><td>DistilBERT</td><td class="num">1</td><td class="num">83.782%</td><td class="num">80.122%</td><td class="num">78.604%</td><td class="num">21.383%</td><td class="num">5.613 GB</td><td>E402&ndash;E405</td></tr>
+          <tr><td>DistilBERT</td><td class="num">8</td><td class="num">97.016%</td><td class="num">96.161%</td><td class="num">95.173%</td><td class="num">4.853%</td><td class="num">5.832 GB</td><td>E414&ndash;E417</td></tr>
+          <tr><td>TinyLlama</td><td class="num">1</td><td class="num">71.924%</td><td class="num">58.189%</td><td class="num">54.171%</td><td class="num">45.839%</td><td class="num">31.385 GB</td><td>E418&ndash;E421</td></tr>
+          <tr><td>TinyLlama</td><td class="num">8</td><td class="num">93.723%</td><td class="num">89.105%</td><td class="num">87.392%*</td><td class="num">12.566%*</td><td class="num">36.410 GB*</td><td>E430&ndash;E433</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-method" style="margin-top:16px;">Fixed-global-batch-64 GPT-2 strong-scaling diagonal:</p>
+      <div class="nerd-table-wrap"><table class="nerd-table">
+        <thead><tr><th class="num">GPUs</th><th class="num">Accum.</th><th class="num">Mean tok/s</th><th class="num">Speedup</th><th class="num">Efficiency</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td class="num">8</td><td class="num">42,412.64</td><td class="num">1.000&times;</td><td class="num">100.000%</td><td>E398</td></tr>
+          <tr><td class="num">2</td><td class="num">4</td><td class="num">81,885.94</td><td class="num">1.931&times;</td><td class="num">96.534%</td><td>E395</td></tr>
+          <tr><td class="num">4</td><td class="num">2</td><td class="num">155,142.88</td><td class="num">3.658&times;</td><td class="num">91.447%</td><td>E392</td></tr>
+          <tr><td class="num">8</td><td class="num">1</td><td class="num">279,008.47</td><td class="num">6.578&times;</td><td class="num">82.229%</td><td>E389</td></tr>
+        </tbody>
+      </table></div>
+      <p class="nerd-limitation">
+        * E433's three raw trials were pulled after the checked-in derived deep-dive CSV/report was
+        generated. Their mean throughput is 92,872.79 tok/s, yielding 87.392% efficiency against
+        E430; the communication share uses their mean p50 step time against E430. The other figures
+        come from <code>scaling_deep_dive_conditions.csv</code>. Multi-GPU placement is recorded as
+        <code>unknown</code> for this wave, so topology cannot yet be separated from the aggregate
+        L40S result. S2&ndash;S8 and the H100 side of the deep dive have not been collected; these are
+        L40S, default-DDP, fixed-shape S1 conclusions only. TinyLlama accumulation 8 peaks at 81.8%
+        of the observed usable L40S capacity, inside the study's 85% memory rule but with modest
+        headroom.
+      </p>
     </div>
 
     <div class="nerd-block" id="nerd-scaling">
@@ -1977,6 +2087,17 @@
       refLine: { value: 100, label: 'perfect (100%)' }
     });
 
+    renderBars('chartScalingDeepDive', {
+      categories: ['GPT-2 Small', 'DistilBERT', 'TinyLlama'],
+      series: [
+        { name: 'Exchange every micro-batch', color: ORANGE, values: [87.704, 78.604, 54.171] },
+        { name: 'Exchange every 8 micro-batches', color: BLUE, values: [96.878, 95.173, 87.392] }
+      ],
+      valueFmt: function (v) { return fmt(v, 1) + '%'; },
+      max: 110,
+      refLine: { value: 100, label: 'perfect (100%)' }
+    });
+
     // --- Strategy (RQ2) ---------------------------------------------------
     renderBars('chartStrategySpeed', {
       categories: ['Full-copy (DDP)', 'Memory-smart (FSDP)', 'Deep memory-save (DeepSpeed)'],
@@ -2151,6 +2272,19 @@
       series: [
         { name: 'H100 · batch 8 per chip', color: BLUE, points: [{ x: 1, y: 100 }, { x: 2, y: 92.386 }, { x: 4, y: 92.150 }] },
         { name: 'L40S · batch 2 per chip', color: VIOLET, points: [{ x: 1, y: 100 }, { x: 2, y: 7.065 }, { x: 4, y: 32.545 }, { x: 8, y: 40.009 }] }
+      ]
+    });
+
+    renderLineChart('chartScalingDeepDiveLines', {
+      xTicks: [1, 2, 4, 8],
+      yMax: 110,
+      series: [
+        { name: 'GPT-2 · accum 1', color: BLUE, points: [{ x: 1, y: 100 }, { x: 2, y: 89.166 }, { x: 4, y: 89.354 }, { x: 8, y: 87.704 }] },
+        { name: 'GPT-2 · accum 8', color: BLUE, dashed: true, points: [{ x: 1, y: 100 }, { x: 2, y: 98.327 }, { x: 4, y: 97.585 }, { x: 8, y: 96.878 }] },
+        { name: 'DistilBERT · accum 1', color: ORANGE, points: [{ x: 1, y: 100 }, { x: 2, y: 83.782 }, { x: 4, y: 80.122 }, { x: 8, y: 78.604 }] },
+        { name: 'DistilBERT · accum 8', color: ORANGE, dashed: true, points: [{ x: 1, y: 100 }, { x: 2, y: 97.016 }, { x: 4, y: 96.161 }, { x: 8, y: 95.173 }] },
+        { name: 'TinyLlama · accum 1', color: VIOLET, points: [{ x: 1, y: 100 }, { x: 2, y: 71.924 }, { x: 4, y: 58.189 }, { x: 8, y: 54.171 }] },
+        { name: 'TinyLlama · accum 8', color: VIOLET, dashed: true, points: [{ x: 1, y: 100 }, { x: 2, y: 93.723 }, { x: 4, y: 89.105 }, { x: 8, y: 87.392 }] }
       ]
     });
 

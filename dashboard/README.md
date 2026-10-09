@@ -325,3 +325,22 @@ status column, drawn with the same badges. The status key above the tree uses th
 "Tok/s · H100". The % change against the reference condition appears only on the headline
 metric; secondary metrics such as memory show plain values. A new "Results for: Both / H100 /
 L40S" switch in the toolbar shows only one platform's columns and takeaway, halving the width.
+
+**2026-10-08** — Added a dedicated scaling deep-dive section to `analysis.html` for the completed
+L40S S1 synchronization-frequency wave (E386-E433, 144 successful trials). The plain-language
+section separates parameter regimes where scaling works from those where it fails: at 8 GPUs,
+accumulation 1 reaches 87.7% efficiency for GPT-2 Small, 78.6% for DistilBERT and 54.2% for
+TinyLlama, while accumulation 8 reaches 96.9%, 95.2% and 87.4%. A matching Supporting Evidence
+block adds the complete efficiency curves, communication fractions, memory peaks, exact source
+conditions, and the fixed-global-batch-64 GPT-2 counterexample, where efficiency falls from 96.5%
+at 2 GPUs to 82.2% at 8 GPUs as accumulation falls from 4 to 1.
+
+E433 arrived after the checked-in derived deep-dive tables were generated, so its three raw trials
+are incorporated explicitly and labelled in the page: mean throughput 92,872.79 tok/s and 87.392%
+8-GPU efficiency against E430. The page also preserves the current scope limits: L40S only,
+default DDP, unknown multi-GPU placement, and no S2-S8 or H100 deep-dive results yet.
+
+The plain-language section also includes a study-lever table showing what each deep-dive study
+changes, what it compares against, why the parameter could affect scaling, and whether evidence has
+been collected. It explicitly separates the completed S1 synchronization/work-allocation results
+from the still-pending S2-S8 levers.

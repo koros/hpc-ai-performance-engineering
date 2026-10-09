@@ -69,6 +69,17 @@ for (const id of ["E287", "E288", "E289"]) {
 assert.match(findings, /id="nerd-tinyllama-weak-scaling"/);
 assert.match(findings, /different per-chip batches \(8 on H100, 2 on L40S\)/);
 assert.match(findings, /id="chartTinyllamaStrategyMemory"/);
+assert.match(findings, /id="scaling-deep-dive"/);
+assert.match(findings, /id="nerd-scaling-deep-dive"/);
+assert.match(findings, /id="chartScalingDeepDive"/);
+assert.match(findings, /id="chartScalingDeepDiveLines"/);
+assert.match(findings, /144 successful trials across E386&ndash;E433/);
+assert.match(findings, /87\.392%\*/);
+assert.match(findings, /82\.229%/);
+assert.match(findings, /checked-in derived deep-dive CSV\/report/);
+assert.match(findings, /Synchronization frequency/);
+assert.match(findings, /Designed as S8; results not collected yet/);
+assert.match(findings, /Fixed-batch efficiency fell to 82% at 8 GPUs/);
 for (let number = 277; number <= 286; number++) {
   const id = `E${number}`;
   const platform = number >= 285 ? "l40s" : "h100";
