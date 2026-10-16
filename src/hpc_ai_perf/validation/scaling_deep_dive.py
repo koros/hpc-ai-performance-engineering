@@ -16,6 +16,22 @@ from hpc_ai_perf.validation.qwen7b_training import canary_contract_sha256
 from hpc_ai_perf.validation.scaling_acceptance import _manifest_entries
 from hpc_ai_perf.workloads.scaling import scaling_runtime_sha256
 
+# Audited training compatibility, deliberately bound to exact source hashes.
+# fa85a91d -> 2f86c47 changes only inference definitions in transformer.py;
+# the other three fingerprinted files and existing training definitions match.
+# Keep the recorded fingerprints intact. Any subsequent runtime edit requires
+# fresh canaries or another explicit source audit, even for inference changes.
+_AUDITED_CANARY_RUNTIMES = {
+    "2b3d8e4d0c702d0def2b6ff8defc6eda5f19d106d8946e4c98b043ed2e479bec": frozenset(
+        {"c3485b1978e83f4175ebd27d76f9a80216d06c5bbf729fe959c6421b09d1b8b8"}
+    ),
+}
+
+
+def _compatible_canary_runtime(observed: object) -> bool:
+    current = scaling_runtime_sha256()
+    return isinstance(observed, str) and (observed == current or observed in _AUDITED_CANARY_RUNTIMES.get(current, ()))
+
 
 def verify_deep_dive_canaries(
     result_root: str | Path,
@@ -98,7 +114,7 @@ def _canary_issues(record: dict[str, Any], config: Any, condition_id: str, platf
         "clean source": record.get("git_dirty") is False and environment.get("git_dirty") is False,
         "GPU model": platform in str(environment.get("observed_gpu_model", "")).lower(),
         "GPU count": record.get("gpus") == gpus and metrics.get("world_size") == gpus,
-        "runtime fingerprint": metrics.get("scaling_runtime_sha256") == scaling_runtime_sha256(),
+        "runtime fingerprint": _compatible_canary_runtime(metrics.get("scaling_runtime_sha256")),
         "input protocol": metrics.get("dataset_execution") == p["input_protocol"],
         "input digest": isinstance(metrics.get("global_input_sha256"), str)
         and len(metrics["global_input_sha256"]) == 64

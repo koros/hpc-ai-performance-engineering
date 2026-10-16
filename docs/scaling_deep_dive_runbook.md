@@ -193,3 +193,36 @@ accumulation may vary along it) and a weak curve (fixed micro-batch and accumula
 
   What a CPU smoke run can't show: BF16 compression (needs NCCL), FSDP and Transformer Engine
   (need CUDA), and true memory figures. The canary wave covers those.
+
+## Audited canary runtime compatibility (16 October 2026)
+
+The collected L40S E320–E385 canaries from source `fa85a91d` use runtime fingerprint
+`c3485b1978e83f4175ebd27d76f9a80216d06c5bbf729fe959c6421b09d1b8b8`.
+The current runtime at `2f86c47` has fingerprint
+`2b3d8e4d0c702d0def2b6ff8defc6eda5f19d106d8946e4c98b043ed2e479bec`.
+The four-file fingerprint includes all of `workloads/transformer.py`, so inference
+changes invalidated these training canaries despite unchanged training definitions.
+
+The source audit found `workloads/scaling.py`, `config/scaling.py`, and
+`profiling/measurement.py` byte-identical between those commits. Comparing the ASTs
+of existing top-level functions/classes in `workloads/transformer.py` found changes
+only in `_run_causal_inference`, `_run_classification_inference`, and
+`_run_vllm_inference`; additions support inference routing and metrics.
+The gate now accepts that one historical fingerprint only while the current
+four-file runtime fingerprint exactly equals the audited current hash. Future
+runtime changes automatically disable this compatibility entry. Result JSON,
+SHA256SUMS, config matching, provenance checks and all measurement checks remain
+unchanged. All 66 latest collected L40S canaries pass the other measurement checks.
+
+After updating the clean HPC checkout, run:
+
+```bash
+make verify-scaling-deep-dive-canaries PLATFORM=l40s
+# Submit one selected performance wave after the gate passes:
+make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=scaling-dd-accumulation
+```
+
+Choose a wave that still needs evidence; submission of a complete wave creates
+new trials. H100 still requires its own collected canaries. Any wave containing
+Transformer Engine conditions needs the dedicated runtime, for example
+`VENV_ACTIVATE="$HOME/.local/share/hpc-ai-performance-engineering/fp8-training-te2.8.0/bin/activate_hpc_ai_fp8"`.
