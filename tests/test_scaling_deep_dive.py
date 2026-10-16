@@ -115,22 +115,6 @@ def test_deep_dive_gate_rejects_missing_collected_evidence(tmp_path):
         verify_deep_dive_canaries(tmp_path, "l40s")
 
 
-def test_audited_canary_runtime_compatibility_is_bound_to_exact_current_source(monkeypatch):
-    from hpc_ai_perf.validation import scaling_deep_dive as gate
-
-    current = "2b3d8e4d0c702d0def2b6ff8defc6eda5f19d106d8946e4c98b043ed2e479bec"
-    legacy = "c3485b1978e83f4175ebd27d76f9a80216d06c5bbf729fe959c6421b09d1b8b8"
-    monkeypatch.setattr(gate, "scaling_runtime_sha256", lambda: current)
-    assert gate._compatible_canary_runtime(current)
-    assert gate._compatible_canary_runtime(legacy)
-    assert not gate._compatible_canary_runtime(None)
-    assert not gate._compatible_canary_runtime("0" * 64)
-    monkeypatch.setattr(gate, "scaling_runtime_sha256", lambda: "1" * 64)
-    assert not gate._compatible_canary_runtime(legacy)
-    assert not gate._compatible_canary_runtime(current)
-    assert gate._compatible_canary_runtime("1" * 64)
-
-
 def test_performance_submission_checks_deep_dive_gate_before_creating_bundle(monkeypatch):
     from hpc_ai_perf.validation import scaling_deep_dive
 
@@ -147,7 +131,11 @@ def test_performance_submission_checks_deep_dive_gate_before_creating_bundle(mon
         _submit_platform_wave(args)
 
 
-def test_deep_dive_canary_checks_memory_updates_and_backend():
+@pytest.mark.parametrize(
+    "rejected_fingerprint",
+    [None, "0" * 64, "c3485b1978e83f4175ebd27d76f9a80216d06c5bbf729fe959c6421b09d1b8b8"],
+)
+def test_deep_dive_canary_checks_memory_updates_and_backend(rejected_fingerprint):
     config = load_experiment_config(config_path("E320"))
     p = config.workload.parameters
     updates = p["warmup_steps"] + config.runtime.max_steps
@@ -180,7 +168,7 @@ def test_deep_dive_canary_checks_memory_updates_and_backend():
         },
     }
     assert _canary_issues(record, config, "E320@l40s", "l40s") == []
-    record["metrics"]["scaling_runtime_sha256"] = "0" * 64
+    record["metrics"]["scaling_runtime_sha256"] = rejected_fingerprint
     assert _canary_issues(record, config, "E320@l40s", "l40s") == ["runtime fingerprint"]
     record["metrics"]["scaling_runtime_sha256"] = scaling_runtime_sha256()
     record["metrics"]["memory_used_gb"] = 40.0

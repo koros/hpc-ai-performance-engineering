@@ -194,35 +194,41 @@ accumulation may vary along it) and a weak curve (fixed micro-batch and accumula
   What a CPU smoke run can't show: BF16 compression (needs NCCL), FSDP and Transformer Engine
   (need CUDA), and true memory figures. The canary wave covers those.
 
-## Audited canary runtime compatibility (16 October 2026)
+## Fresh canaries for reproducible campaigns (16 October 2026)
 
-The collected L40S E320–E385 canaries from source `fa85a91d` use runtime fingerprint
-`c3485b1978e83f4175ebd27d76f9a80216d06c5bbf729fe959c6421b09d1b8b8`.
-The current runtime at `2f86c47` has fingerprint
-`2b3d8e4d0c702d0def2b6ff8defc6eda5f19d106d8946e4c98b043ed2e479bec`.
-The four-file fingerprint includes all of `workloads/transformer.py`, so inference
-changes invalidated these training canaries despite unchanged training definitions.
+The canary gate requires an exact match to the current four-file runtime
+fingerprint. There are no historical-runtime exceptions. Inference changes in the
+shared `workloads/transformer.py` file can change this fingerprint even when the
+training definitions are unchanged. Preserve previous results and their original
+SHA256SUMS as historical evidence; never relabel them with the current fingerprint.
 
-The source audit found `workloads/scaling.py`, `config/scaling.py`, and
-`profiling/measurement.py` byte-identical between those commits. Comparing the ASTs
-of existing top-level functions/classes in `workloads/transformer.py` found changes
-only in `_run_causal_inference`, `_run_classification_inference`, and
-`_run_vllm_inference`; additions support inference routing and metrics.
-The gate now accepts that one historical fingerprint only while the current
-four-file runtime fingerprint exactly equals the audited current hash. Future
-runtime changes automatically disable this compatibility entry. Result JSON,
-SHA256SUMS, config matching, provenance checks and all measurement checks remain
-unchanged. All 66 latest collected L40S canaries pass the other measurement checks.
-
-After updating the clean HPC checkout, run:
+For the new campaign, commit and freeze the benchmark source before submission.
+Use a clean HPC checkout and the dedicated Transformer Engine activation wrapper
+for the full canary wave, including its BF16 controls. Do not change fingerprinted
+runtime files between canaries and the performance waves they authorize.
 
 ```bash
+git pull --ff-only
+git status --short  # Review any changes before creating the frozen bundle.
+FP8_ACTIVATE="$HOME/.local/share/hpc-ai-performance-engineering/fp8-training-te2.8.0/bin/activate_hpc_ai_fp8"
+test -r "$FP8_ACTIVATE"
+make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=scaling-dd-canary \
+  VENV_ACTIVATE="$FP8_ACTIVATE"
+# After all jobs finish:
+make status-platform-wave PLATFORM=l40s PLATFORM_WAVE=scaling-dd-canary
+make collect-platform-wave PLATFORM=l40s PLATFORM_WAVE=scaling-dd-canary
 make verify-scaling-deep-dive-canaries PLATFORM=l40s
-# Submit one selected performance wave after the gate passes:
-make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=scaling-dd-accumulation
 ```
 
-Choose a wave that still needs evidence; submission of a complete wave creates
-new trials. H100 still requires its own collected canaries. Any wave containing
-Transformer Engine conditions needs the dedicated runtime, for example
-`VENV_ACTIVATE="$HOME/.local/share/hpc-ai-performance-engineering/fp8-training-te2.8.0/bin/activate_hpc_ai_fp8"`.
+Use `submit-platform-wave`, without experiment filters, to deliberately rerun all
+66 L40S canaries. `retry-platform-wave` can reuse historical completed evidence
+and is unsuitable for requesting this fresh campaign. Collection preserves earlier
+attempts and imports the new completed evidence. Submission of performance waves
+remains gated until the collected current-runtime canaries pass all checks.
+H100 needs its own full set of 63 collected canaries; L40S does not authorize H100.
+Use the dedicated runtime for subsequent Transformer Engine conditions too.
+
+Run unfinished performance waves one at a time after acceptance. Existing trials
+remain historical evidence; obtain fresh matched trials when comparisons require
+a consistent implementation/environment. Publish source commit, runtime fingerprint,
+resolved configs, environment manifests, original JSON and checksums with the results.
