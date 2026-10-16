@@ -164,6 +164,9 @@ def test_deep_dive_canary_checks_memory_updates_and_backend():
         },
     }
     assert _canary_issues(record, config, "E320@l40s", "l40s") == []
+    record["metrics"]["scaling_runtime_sha256"] = "0" * 64
+    assert _canary_issues(record, config, "E320@l40s", "l40s") == ["runtime fingerprint"]
+    record["metrics"]["scaling_runtime_sha256"] = scaling_runtime_sha256()
     record["metrics"]["memory_used_gb"] = 40.0
     record["metrics"]["optimizer_step_calls"] = updates - 1
     record["metrics"]["attention_backend_observed"] = "eager"

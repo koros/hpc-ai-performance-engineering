@@ -87,7 +87,7 @@ def build_readiness_report(
     completed_environment_ids = CORE_ENVIRONMENT_IDS & valid_completed.keys()
     baseline_ids = {
         entry.config.experiment_id
-        for entry in entries
+        for entry in source_entries
         if entry.phase == "Baseline profiling" and entry.priority == "Must Have"
     }
     sufficient_baseline_ids = {

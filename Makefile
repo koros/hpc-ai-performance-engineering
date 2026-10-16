@@ -59,6 +59,7 @@ LONG_CONTEXT_ACCEPTANCE_ROOT ?= build/long_context_acceptance/$(PLATFORM)/$(LONG
 QWEN7B_TRAINING_RESULT_ROOT ?= results/raw/h100
 QWEN7B_UPDATE_WAVE ?= qwen7b-update-controls-2gpu
 NCCL_HOME ?=
+WEEKEND_PREP_DIR ?= build/weekend_h100
 
 DEV_CONFIGS := $(sort $(wildcard configs/dev/*.json))
 DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
@@ -67,6 +68,7 @@ DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
 .PHONY: check-cuda-toolchain
 .PHONY: submit-lowbit-acceptance verify-lowbit-acceptance submit-lowbit-wave retry-lowbit-wave
 .PHONY: prefetch-lowbit-assets prefetch-long-context-assets
+.PHONY: prepare-h100-weekend prefetch-h100-weekend-models verify-h100-weekend-model-cache
 .PHONY: generate-scaling-deep-dive check-scaling-deep-dive prefetch-scaling-deep-dive-assets
 .PHONY: submit-long-context-acceptance verify-long-context-acceptance submit-long-context-wave retry-long-context-wave
 .PHONY: submit-qwen7b-training-canary verify-qwen7b-training-canary submit-qwen7b-training-wave retry-qwen7b-training-wave
@@ -155,6 +157,15 @@ prefetch-long-context-assets:
 	PYTHONPATH="$(CURDIR)/src" "$(LONG_CONTEXT_ENV)/bin/python" scripts/prefetch_long_context_assets.py
 
 # Scaling deep dive (docs/scaling_deep_dive_runbook.md): configs and scaling-dd-* waves are generated.
+prepare-h100-weekend:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/prepare_h100_weekend.py --output-dir "$(WEEKEND_PREP_DIR)"
+
+prefetch-h100-weekend-models:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/prepare_h100_weekend.py --output-dir "$(WEEKEND_PREP_DIR)" --prefetch
+
+verify-h100-weekend-model-cache:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/prepare_h100_weekend.py --output-dir "$(WEEKEND_PREP_DIR)" --verify-model-cache
+
 generate-scaling-deep-dive:
 	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/generate_scaling_deep_dive.py
 

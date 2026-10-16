@@ -5,7 +5,7 @@
   "workload": {
     "name": "qwen2_5_3b",
     "model": "Qwen/Qwen2.5-3B-Instruct",
-    "model_revision": null,
+    "model_revision": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
     "dataset": "synthetic_token_prompts_v1",
     "parameters": {
       "inference_study_type": "multi_gpu",

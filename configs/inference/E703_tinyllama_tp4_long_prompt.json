@@ -48,6 +48,7 @@
     }
   },
   "metadata": {
+    "serial_submission": true,
     "matrix_id": "E703",
     "template": "inference_serving",
     "phase": "Inference multi-GPU",

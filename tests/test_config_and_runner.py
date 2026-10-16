@@ -2320,7 +2320,9 @@ def test_readiness_report_writes_submission_summary(tmp_path: Path) -> None:
     assert "`gpt2_small`" in report
     assert "slurm/smoke/gpt2_small_smoke.sbatch" in report
     assert "Submission Gate" in report
-    assert "Research-readiness blockers: 7" in report
+    assert "Research-readiness blockers: 0" in report
+    assert "Baseline definitions with at least 3 trials: 10/10" in report
+    assert "Pilot evidence gate: READY" in report
     assert "Deferred scope rows: 11" in report
 
 
@@ -2527,29 +2529,17 @@ def test_research_preflight_has_only_documented_execution_blockers() -> None:
         "E176",
         "E179",
         "E200",
-        "E294",
-        "E295",
-        "E296",
-        "E297",
-        "E298",
-        "E299",
-        "E300",
     }
 
 
 def test_research_preflight_excludes_explicitly_deferred_scope() -> None:
     issues = validate_experiment_configs("configs", research_ready=True)
-    assert {issue.path.stem[:4] for issue in issues} == {f"E{index}" for index in range(294, 301)}
-    assert all(issue.message == "matrix transformer config must pin workload.model_revision" for issue in issues)
+    assert issues == []
 
 
 def test_matrix_transformer_models_are_pinned() -> None:
-    awaiting_revision = {f"E{index}" for index in range(294, 301)}
     for entry in discover_experiment_configs():
         if entry.config.workload.name == "environment_validation":
-            continue
-        if entry.config.experiment_id in awaiting_revision:
-            assert entry.config.workload.model_revision is None
             continue
         assert entry.config.workload.model_revision is not None
         assert len(entry.config.workload.model_revision) == 40

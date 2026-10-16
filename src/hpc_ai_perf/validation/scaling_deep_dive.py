@@ -52,6 +52,7 @@ def verify_deep_dive_canaries(
             continue
         expected_contract = canary_contract_sha256(config)
         matched = False
+        measurement_failures: set[str] = set()
         for path in sorted((root / eid).glob("*.json")):
             try:
                 record = json.loads(path.read_text(encoding="utf-8"))
@@ -68,12 +69,17 @@ def verify_deep_dive_canaries(
             if validate_result_file(path):
                 issues.append(f"{eid}: matching result fails evidence validation")
                 continue
-            if not _canary_issues(record, config, condition.condition_id, platform):
+            failed_checks = _canary_issues(record, config, condition.condition_id, platform)
+            if not failed_checks:
                 accepted[eid] = str(path)
                 matched = True
                 break
+            measurement_failures.update(failed_checks)
         if not matched:
-            issues.append(f"{eid}: no completed, collected canary passes the current contract and measurements")
+            detail = ""
+            if measurement_failures:
+                detail = "; matching evidence failed: " + ", ".join(sorted(measurement_failures))
+            issues.append(f"{eid}: no completed, collected canary passes the current contract and measurements{detail}")
     if issues:
         raise ValueError("Scaling deep-dive acceptance failed:\n- " + "\n- ".join(issues))
     return accepted

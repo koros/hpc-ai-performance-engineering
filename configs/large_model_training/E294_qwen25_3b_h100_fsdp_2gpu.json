@@ -5,7 +5,7 @@
   "workload": {
     "name": "qwen2_5_3b",
     "model": "Qwen/Qwen2.5-3B-Instruct",
-    "model_revision": null,
+    "model_revision": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
     "dataset": "synthetic_tokens_v1",
     "parameters": {
       "study_protocol": "qwen25_3b_h100_sharding_v1",
@@ -81,6 +81,6 @@
       "quality_loss"
     ],
     "comparison_scope": "within_platform_2_gpu_strategy_comparison",
-    "limitation": "Identical batch/sequence/accumulation settings to the Qwen2.5-7B sharding study (E250-E255) by design, so results isolate model size as the only changed variable; model_revision is not yet pinned -- see handoff notes before running."
+    "limitation": "Identical batch/sequence/accumulation settings to the Qwen2.5-7B sharding study (E250-E255) by design, so results isolate model size as the only changed variable; Model and tokenizer revision is pinned; cache this exact snapshot before running. Cross-model comparisons also change architecture and must not be interpreted as a pure model-size effect."
   }
 }

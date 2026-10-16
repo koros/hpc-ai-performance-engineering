@@ -34,6 +34,7 @@
     "parameters": {"collect_latency_distribution": true, "collect_time_to_first_token": true, "collect_memory_trace": true, "collect_quality_sanity_check": true, "collect_tensor_parallel_scaling": true}
   },
   "metadata": {
+    "serial_submission": true,
     "matrix_id": "E712",
     "template": "inference_serving",
     "phase": "Inference TP precision crossover",
