@@ -2,8 +2,8 @@
 
 This is the first step toward NVLink instrumentation, not a performance study or
 an acceptance gate for the existing experiment matrix. It checks whether the
-allocated H100 GPUs expose readable DCGM GPU-level NVLink TX/RX rates to the
-current user. It does not generate transfers, calibrate bandwidth, measure
+allocated H100 GPUs expose readable NVLink TX/RX telemetry through DCGM or
+the NVIDIA driver's direct NVML field API to the current user. It does not generate transfers, calibrate bandwidth, measure
 per-link traffic or attribute bytes to requests/collectives.
 
 ## Run on the cluster
@@ -24,8 +24,10 @@ intervals. Sampling is limited to DCGM GPU IDs joined by allocated UUIDs; neithe
 CUDA ordinals nor NVIDIA SMI indices are assumed to equal DCGM IDs. If identity
 cannot be established, sampling stops and the reason is recorded.
 
-The probe requires the existing NVIDIA driver tools and `dcgmi` in PATH, with
-access to the local DCGM host engine/profiling fields. It does not install
+The probe first tries `dcgmi` and the local DCGM host engine/profiling fields.
+If DCGM is missing, inaccessible or inconclusive, it automatically tries the
+installed driver library `libnvidia-ml.so.1` through ctypes. No Python NVML
+package or DCGM installation is required for the fallback. It does not install
 packages, start a host engine, reset counters, run privileged commands or
 pause/resume monitoring. Temporary DCGM watches end when its dmon client exits.
 The CUDA identity lookup can initialize CUDA contexts but launches no transfer
@@ -51,7 +53,8 @@ PYTHONPATH=src python scripts/probe_h100_nvlink.py \
 ## Interpretation
 
 - `readable_requires_calibration` (exit 0): every allocated GPU returned at least
-  two numeric, nonnegative TX and RX samples. Zero is a valid idle reading. This
+  two numeric, nonnegative TX and RX samples (for NVML, with distinct driver
+  timestamps). Zero is a valid idle reading. This
   establishes access to numeric telemetry only, not transfer accuracy or
   performance suitability. Positive traffic is reported without attributing it.
 - `blocked_or_inconclusive` (exit 2): missing tools, unknown GPU mapping, failed
@@ -64,6 +67,15 @@ JSON includes tool paths, commands, command timestamps, timeout/error output,
 source commit/status, probe script checksum, GPU identity, driver version,
 Slurm job ID, sample coverage and raw sampled rates. NaN, infinity, negative
 values and implausible/sentinel values are never treated as valid throughput.
+The selected backend appears in `assessment.backend`. Direct NVML results
+are under `nvml`, and its bounded subprocess output under `commands.nvml_fallback`.
+Original DCGM failures remain visible even when the NVML fallback succeeds.
+The fallback resolves handles by allocated UUID, verifies each returned UUID,
+and queries fields 138/139 with UINT_MAX scope (aggregate across links). It saves
+per-field return codes, error messages, value types, driver timestamps and latency.
+Cached readings with identical timestamps do not count as independent samples.
+Native calls are bounded by a subprocess timeout. No counters are reset.
+
 The requested sample interval is recorded; this capability probe does not
 construct a precisely timestamped benchmark time series or integrate byte totals.
 
@@ -89,6 +101,15 @@ References checked 18 October 2026:
 - [dcgmi dmon](https://docs.nvidia.com/datacenter/dcgm/latest/reference/command-line-reference/dcgmi/dcgmi-dmon.html)
 - [dcgmi discovery](https://docs.nvidia.com/datacenter/dcgm/latest/reference/command-line-reference/dcgmi/dcgmi-discovery.html)
 
-Fields 1011/1012 are profiling rates (bytes/second), not cumulative counters.
+DCGM fields 1011/1012 are profiling rates (bytes/second), not cumulative counters.
+NVML fields 138/139 are documented as data throughput in KiB. Their original
+units/values are retained separately, without asserting equivalence to DCGM
+rates or deriving transferred-byte totals before calibration. NVML field/API
+support and permissions still depend on the installed driver and GPU.
 Local field catalogue presence alone does not prove hardware/access support.
 Per-link or NVLink5-specific fields are outside this initial H100 probe.
+
+Direct NVML references:
+
+- [Field definitions and aggregate scope](https://docs.nvidia.com/deploy/nvml-api/latest/api/group__nvmlFieldValueEnums.html)
+- [Field sample structure and return codes](https://docs.nvidia.com/deploy/nvml-api/api/structnvmlFieldValue__t.html)

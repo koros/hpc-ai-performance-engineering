@@ -117,3 +117,47 @@ def test_cli_saves_report_and_refuses_overwrite(probe_module, monkeypatch, tmp_p
     assert (output / "SUMMARY.md").is_file()
     with pytest.raises(FileExistsError):
         probe_module.main()
+
+
+def test_missing_dcgm_can_succeed_through_nvml(probe_module, monkeypatch):
+    fake_commands(probe_module, monkeypatch, discovery_error=True)
+    original = probe_module.run_command
+
+    def run(command, **kwargs):
+        if "hpc_ai_perf.profiling.nvlink_probe" in command:
+            return {
+                "command": command,
+                "returncode": 0,
+                "stdout": json.dumps(
+                    {
+                        "issues": [],
+                        "samples": [],
+                        "assessment": {"status": "readable_requires_calibration", "bandwidth_calibrated": False},
+                    }
+                ),
+            }
+        return original(command, **kwargs)
+
+    monkeypatch.setattr(probe_module, "run_command", run)
+    report = probe_module.probe(2, 5, 1000)
+    assert report["assessment"]["backend"] == "nvml_field_values"
+    assert report["assessment"]["status"] == "readable_requires_calibration"
+    assert report["commands"]["dcgm_discovery"]["returncode"] == 1
+    assert report["issues"]  # Original DCGM failure remains visible.
+
+
+def test_nvml_fallback_timeout_keeps_probe_blocked(probe_module, monkeypatch):
+    fake_commands(probe_module, monkeypatch, discovery_error=True)
+    original = probe_module.run_command
+    monkeypatch.setattr(
+        probe_module,
+        "run_command",
+        lambda command, **kwargs: (
+            {"command": command, "returncode": None, "stdout": "", "status": "timeout"}
+            if "hpc_ai_perf.profiling.nvlink_probe" in command
+            else original(command, **kwargs)
+        ),
+    )
+    report = probe_module.probe(2, 5, 1000)
+    assert report["assessment"]["status"] == "blocked_or_inconclusive"
+    assert "timed out" in report["issues"][-1]

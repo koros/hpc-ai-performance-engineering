@@ -1,4 +1,4 @@
-"""Read-only, allocation-scoped DCGM NVLink capability probe; no benchmark load."""
+"""Read-only, allocation-scoped DCGM/NVML NVLink capability probe; no benchmark load."""
 
 from __future__ import annotations
 
@@ -131,9 +131,40 @@ def allocated_gpu_uuids(expected: int) -> tuple[str, ...]:
     return uuids
 
 
+def with_nvml_fallback(report: dict, uuids: tuple[str, ...], samples: int, interval_ms: int) -> dict:
+    """Bound native-library calls in a subprocess and preserve DCGM diagnostics."""
+    command = [
+        sys.executable,
+        "-m",
+        "hpc_ai_perf.profiling.nvlink_probe",
+        "--samples",
+        str(samples),
+        "--interval-ms",
+        str(interval_ms),
+    ]
+    for uuid in uuids:
+        command.extend(["--gpu-uuid", uuid])
+    result = run_command(command, timeout=samples * interval_ms / 1000 + 20)
+    report["commands"]["nvml_fallback"] = result
+    if result["returncode"] == 0:
+        try:
+            nvml = json.loads(result["stdout"])
+            if nvml["assessment"]["status"] not in ("readable_requires_calibration", "blocked_or_inconclusive"):
+                raise ValueError("Invalid NVML assessment")
+            report["nvml"] = nvml
+            report["assessment"] = nvml["assessment"]
+            report["assessment"]["backend"] = "nvml_field_values"
+            report["issues"].extend(nvml["issues"])
+        except (ValueError, KeyError, TypeError) as exc:
+            report["issues"].append(f"NVML helper returned an invalid report: {exc}")
+    else:
+        report["issues"].append("NVML helper failed or timed out; inspect nvml_fallback command output")
+    return report
+
+
 def probe(expected_gpus: int, samples: int, interval_ms: int) -> dict:
     report = {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "created_at": datetime.now(UTC).isoformat(),
         "hostname": socket.gethostname(),
         "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
@@ -141,7 +172,7 @@ def probe(expected_gpus: int, samples: int, interval_ms: int) -> dict:
         "python_executable": sys.executable,
         "expected_gpus": expected_gpus,
         "scope": "capability_probe_not_experiment_evidence",
-        "fields": FIELDS,
+        "dcgm_fields": FIELDS,
         "requested_samples": samples,
         "interval_ms": interval_ms,
         "probe_source_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
@@ -191,17 +222,17 @@ def probe(expected_gpus: int, samples: int, interval_ms: int) -> dict:
     discovery = commands["dcgm_discovery"]
     if discovery["returncode"] != 0:
         report["issues"].append(
-            "DCGM discovery failed: missing tool, unavailable host engine or permissions; inspect raw output"
+            "DCGM discovery failed: missing tool, unavailable host engine or permissions; trying direct NVML"
         )
-        return report
+        return with_nvml_fallback(report, uuids, samples, interval_ms)
     try:
         mapping = dcgm_uuid_mapping(discovery["stdout"])
         gpu_ids = {mapping[u.lower()] for u in uuids}
         if len(gpu_ids) != expected_gpus:
             raise ValueError("Allocated GPUs do not map to distinct DCGM IDs")
     except (KeyError, ValueError) as exc:
-        report["issues"].append(f"Cannot safely map allocated UUIDs to DCGM IDs: {exc}")
-        return report
+        report["issues"].append(f"Cannot safely map allocated UUIDs to DCGM IDs: {exc}; trying direct NVML")
+        return with_nvml_fallback(report, uuids, samples, interval_ms)
     report["dcgm_gpu_ids"] = sorted(gpu_ids)
     for gpu in sorted(gpu_ids):
         commands[f"profile_groups_{gpu}"] = run_command(["dcgmi", "profile", "-l", "-i", str(gpu)])
@@ -224,9 +255,9 @@ def probe(expected_gpus: int, samples: int, interval_ms: int) -> dict:
     report["samples"] = parse_dmon(result["stdout"], gpu_ids)
     report["assessment"] = assess_samples(report["samples"], gpu_ids, command_ok=result["returncode"] == 0)
     if report["assessment"]["status"] != "readable_requires_calibration":
-        report["issues"].append(
-            "Need >=2 numeric TX and RX samples on every allocated GPU; N/A does not identify the cause"
-        )
+        report["issues"].append("Need >=2 numeric TX and RX samples on every allocated GPU; trying direct NVML")
+        return with_nvml_fallback(report, uuids, samples, interval_ms)
+    report["assessment"]["backend"] = "dcgm"
     return report
 
 
