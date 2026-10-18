@@ -181,3 +181,100 @@ def test_analysis_separates_acceptance_legacy_and_controlled_trials():
     assert controlled["trials"] == 3
     assert controlled["avg_throughput_tokens_sec"] == 11
     assert controlled["throughput_ci95_low"] < 11 < controlled["throughput_ci95_high"]
+
+
+def collected_resolved_canaries(root, platform):
+    """Build bundle-resolved records; schema/provenance validation is tested separately."""
+    import hashlib
+    import json
+
+    from hpc_ai_perf.config import discover_experiment_configs
+    from hpc_ai_perf.config.platform import load_platform_profile, resolve_platform_config
+    from hpc_ai_perf.validation.qwen7b_training import canary_contract_sha256
+
+    entries = {e.matrix_id: e for e in discover_experiment_configs("configs/inference_crossover")}
+    profile = load_platform_profile(f"platforms/{platform}.json")
+    paths = []
+    sums = []
+    for condition in load_platform_conditions("platforms/execution_matrix.json", platform, wave=CANARY_WAVE):
+        entry = entries[condition.matrix_id]
+        resolved = resolve_platform_config(entry, profile, condition)
+        # This is the actual mismatch: the submitted resolved contract differs from the source config.
+        assert canary_contract_sha256(resolved) != canary_contract_sha256(entry.config)
+        payload = resolved.to_dict()
+        payload["metadata"]["source_config_path"] = f"/frozen/bundle/repo/configs/{condition.matrix_id}.json"
+        params = resolved.workload.parameters
+        requests = resolved.runtime.max_steps * params["concurrent_requests"]
+        record = {
+            "status": "completed",
+            "error": None,
+            "config": payload,
+            "platform_id": platform,
+            "gpus": resolved.hardware.gpus,
+            "git_dirty": False,
+            "environment": {"git_dirty": False},
+            "metrics": {
+                "serving_runtime_sha256": serving_runtime_sha256(),
+                "serving_layout_observed": params["serving_layout"],
+                "tensor_parallel_size_observed": params["tensor_parallel_size"],
+                "replica_count_observed": params["replica_count"],
+                "requests": requests,
+                "generated_tokens": requests * params["max_new_tokens"],
+                "throughput_tokens_sec": 100,
+                "time_to_first_token_p95_ms": 20,
+                "time_per_output_token_p95_ms": 5,
+                "memory_used_gb": 6,
+                "replica_request_count_total": requests,
+                "replica_request_count_imbalance_pct": 0,
+            },
+        }
+        path = root / condition.matrix_id / "run.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(record))
+        paths.append(path)
+        sums.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(root).as_posix()}\n")
+    (root / "SHA256SUMS").write_text("".join(sums))
+    return paths
+
+
+@pytest.mark.parametrize("platform,count", [("h100", 3), ("l40s", 4)])
+def test_collected_bundle_resolved_canaries_match_current_resolved_contract(tmp_path, monkeypatch, platform, count):
+    from hpc_ai_perf.validation import inference_crossover as gate
+
+    collected_resolved_canaries(tmp_path, platform)
+    monkeypatch.setattr(gate, "validate_result_file", lambda path: [])
+    assert len(gate.verify_inference_canaries(tmp_path, platform)) == count
+
+
+@pytest.mark.parametrize("failure", ["checksum", "runtime", "contract", "TTFT", "evidence"])
+def test_resolved_canary_fix_keeps_acceptance_checks_strict(tmp_path, monkeypatch, failure):
+    import hashlib
+    import json
+
+    from hpc_ai_perf.validation import inference_crossover as gate
+
+    paths = collected_resolved_canaries(tmp_path, "h100")
+    monkeypatch.setattr(gate, "validate_result_file", lambda path: [])
+    record = json.loads(paths[0].read_text())
+    expected = failure
+    if failure == "runtime":
+        record["metrics"]["serving_runtime_sha256"] = "stale"
+    elif failure == "contract":
+        record["config"]["workload"]["parameters"]["prompt_length"] += 1
+        expected = "resolved configuration contract"
+    elif failure == "TTFT":
+        record["metrics"]["time_to_first_token_p95_ms"] = None
+    elif failure == "evidence":
+        monkeypatch.setattr(gate, "validate_result_file", lambda path: ["invalid evidence"] if path == paths[0] else [])
+    else:
+        record["status"] = "failed"
+    paths[0].write_text(json.dumps(record))
+    if failure != "checksum":
+        (tmp_path / "SHA256SUMS").write_text(
+            "".join(
+                f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(tmp_path).as_posix()}\n"
+                for path in paths
+            )
+        )
+    with pytest.raises(ValueError, match=expected):
+        gate.verify_inference_canaries(tmp_path, "h100")

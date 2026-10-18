@@ -8,7 +8,7 @@ from pathlib import Path
 
 from hpc_ai_perf.config import discover_experiment_configs
 from hpc_ai_perf.config.inference_crossover import CANARY_WAVE, serving_runtime_sha256
-from hpc_ai_perf.config.platform import load_platform_conditions
+from hpc_ai_perf.config.platform import load_platform_conditions, load_platform_profile, resolve_platform_config
 from hpc_ai_perf.serving_layout import declared_serving_layout
 from hpc_ai_perf.validation import validate_result_file
 from hpc_ai_perf.validation.qwen7b_training import canary_contract_sha256
@@ -18,27 +18,44 @@ from hpc_ai_perf.validation.scaling_acceptance import _manifest_entries
 def verify_inference_canaries(result_root: str | Path, platform: str) -> dict[str, str]:
     root = Path(result_root)
     checksums = _manifest_entries(root / "SHA256SUMS")
-    entries = {e.matrix_id: e.config for e in discover_experiment_configs("configs/inference_crossover")}
+    entries = {e.matrix_id: e for e in discover_experiment_configs("configs/inference_crossover")}
+    profile = load_platform_profile(f"platforms/{platform}.json")
     conditions = load_platform_conditions("platforms/execution_matrix.json", platform, wave=CANARY_WAVE)
     if not conditions:
         raise ValueError(f"No inference crossover canary policy for {platform}")
     accepted = {}
+    rejected = {}
     for condition in conditions:
-        config = entries[condition.matrix_id]
+        config = resolve_platform_config(entries[condition.matrix_id], profile, condition)
+        reasons = set()
         for path in sorted((root / condition.matrix_id).glob("*.json")):
-            record = json.loads(path.read_text())
+            try:
+                record = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError):
+                reasons.add("unreadable result JSON")
+                continue
+            if not isinstance(record, dict):
+                reasons.add("result is not an object")
+                continue
             if checksums.get(path.relative_to(root).as_posix()) != hashlib.sha256(path.read_bytes()).hexdigest():
+                reasons.add("checksum")
                 continue
             if validate_result_file(path) or not isinstance(record.get("config"), dict):
+                reasons.add("evidence validation or missing config")
                 continue
             if canary_contract_sha256(record["config"]) != canary_contract_sha256(config):
+                reasons.add("resolved configuration contract")
                 continue
-            if not canary_issues(record, config, platform):
+            failed_checks = canary_issues(record, config, platform)
+            if not failed_checks:
                 accepted[condition.matrix_id] = str(path)
                 break
+            reasons.update(failed_checks)
+        rejected[condition.matrix_id] = ", ".join(sorted(reasons)) or "no collected result files"
     missing = sorted({c.matrix_id for c in conditions} - accepted.keys())
     if missing:
-        raise ValueError("Current-runtime inference canaries missing or invalid: " + ", ".join(missing))
+        detail = "\n".join(f"- {eid}: {rejected[eid]}" for eid in missing)
+        raise ValueError("Current-runtime inference canaries missing or invalid: " + ", ".join(missing) + "\n" + detail)
     return accepted
 
 
