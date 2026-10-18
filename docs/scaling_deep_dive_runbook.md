@@ -232,3 +232,24 @@ Run unfinished performance waves one at a time after acceptance. Existing trials
 remain historical evidence; obtain fresh matched trials when comparisons require
 a consistent implementation/environment. Publish source commit, runtime fingerprint,
 resolved configs, environment manifests, original JSON and checksums with the results.
+
+## Queue a wave behind another wave
+
+`submit-platform-wave --after-job JOB_ID` adds a Slurm `afterany` dependency.
+For a serial study wave, its first job waits for the supplied job/array and all
+subsequent jobs retain their normal serial chain. Use the final submitted parent
+array ID from the preceding serial wave's `SLURM_STATUS.csv`, not an individual
+array task. Confirm that all preceding scripts were submitted before chaining.
+The dependency is recorded in the new submission CSV. Do not submit the same
+follow-on wave twice.
+
+For example, queue `scaling-dd-ddp-comm` behind the final
+`scaling-dd-model-size` array using the CLI's `--after-job` option and the usual
+`--platform-profile platforms/l40s.json --wave scaling-dd-ddp-comm
+--venv-activate /absolute/path/to/bin/activate_hpc_ai_fp8` arguments.
+This schedules S4 after S3 terminates regardless of success; it prevents overlap
+but does not establish that S3 benchmark JSON passed validation. Review and
+collect both waves after completion. The full collected canary gate still runs
+before performance submission. Changing this scheduler option does not change
+the training runtime fingerprint. Slurm must still know the predecessor job ID
+when the new wave is submitted.

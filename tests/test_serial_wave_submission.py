@@ -74,3 +74,59 @@ def test_legacy_submission_and_custom_runner_are_unchanged(tmp_path):
     result = submit_job_scripts(tmp_path, status, runner=lambda script: "Submitted batch job 101")
     assert all("--dependency" not in r["command"] for r in result)
     assert "#SBATCH --array=1-3\n" in (tmp_path / "E305.sbatch").read_text()
+
+
+@pytest.mark.parametrize("serial", [True, False])
+def test_wave_waits_for_predecessor_array_and_records_dependency(tmp_path, monkeypatch, serial):
+    status = scripts(tmp_path, serial=serial)
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(command)
+        return SimpleNamespace(stdout=f"Submitted batch job {100 + len(calls)}\n")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    submit_job_scripts(tmp_path, status, after_job="900")
+    expected = ["900", "101", "102"] if serial else ["900"] * 3
+    assert [command[1] for command in calls] == [f"--dependency=afterany:{job}" for job in expected]
+    with status.open() as handle:
+        assert [row["notes"] for row in csv.DictReader(handle)] == [f"afterany:{job}" for job in expected]
+
+
+def test_invalid_predecessor_fails_before_any_submission(tmp_path, monkeypatch):
+    status = scripts(tmp_path)
+    original = status.read_bytes()
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: pytest.fail("must not call sbatch"))
+    with pytest.raises(ValueError, match="numeric job ID"):
+        submit_job_scripts(tmp_path, status, after_job="900;invalid")
+    assert status.read_bytes() == original
+
+
+def test_platform_submission_parses_predecessor_before_creating_bundle():
+    from hpc_ai_perf.cli import _build_parser
+
+    parser = _build_parser()
+    args = parser.parse_args(
+        [
+            "submit-platform-wave",
+            "--platform-profile",
+            "platforms/l40s.json",
+            "--wave",
+            "scaling-dd-ddp-comm",
+            "--after-job",
+            "900",
+        ]
+    )
+    assert args.after_job == "900"
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "submit-platform-wave",
+                "--platform-profile",
+                "platforms/l40s.json",
+                "--wave",
+                "scaling-dd-ddp-comm",
+                "--after-job",
+                "invalid",
+            ]
+        )

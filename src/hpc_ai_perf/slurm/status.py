@@ -96,6 +96,7 @@ def submit_job_scripts(
     dry_run: bool = False,
     limit: int | None = None,
     runner: Callable[[Path], str] | None = None,
+    after_job: str = "",
 ) -> list[dict[str, str]]:
     """Submit generated sbatch scripts and update the matching status CSV rows.
 
@@ -104,6 +105,8 @@ def submit_job_scripts(
     injected by tests so job-ID parsing and status updates are covered without a
     real cluster.
     """
+    if after_job and not after_job.isdigit():
+        raise ValueError("Slurm predecessor must be a numeric job ID")
     scripts = sorted(Path(script_dir).glob("*.sbatch"))
     if limit is not None:
         scripts = scripts[:limit]
@@ -112,13 +115,13 @@ def submit_job_scripts(
     serial = bool(serial_flags) and all(serial_flags)
     if any(serial_flags) and not serial:
         raise ValueError("A serial wave cannot mix serial and concurrent submission scripts")
-    if serial and runner is not None:
+    if (serial or after_job) and runner is not None:
         raise ValueError("The single-argument custom runner cannot enforce serial Slurm dependencies")
 
     submissions: list[dict[str, str]] = []
-    previous_job = ""
+    previous_job = after_job
     for script in scripts:
-        dependency = previous_job if serial else ""
+        dependency = previous_job if serial else after_job
         command = f"sbatch --dependency=afterany:{dependency} {script}" if dependency else f"sbatch {script}"
         if dry_run:
             submissions.append(
@@ -134,7 +137,7 @@ def submit_job_scripts(
             previous_job = f"<job-id-for-{script.stem}>"
             continue
 
-        output = _run_sbatch(script, dependency=dependency) if serial else (runner or _run_sbatch)(script)
+        output = _run_sbatch(script, dependency=dependency) if serial or after_job else (runner or _run_sbatch)(script)
         job_id = _parse_sbatch_job_id(output)
         if not job_id:
             raise ValueError(f"Could not parse Slurm job ID from sbatch output for {script}: {output}")

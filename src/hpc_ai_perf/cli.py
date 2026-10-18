@@ -939,6 +939,12 @@ def _add_platform_options(parser: argparse.ArgumentParser) -> None:
 def _add_bundle_submission_options(parser: argparse.ArgumentParser) -> None:
     """Attach the scheduler settings needed to freeze and submit a bundle."""
     parser.add_argument(
+        "--after-job",
+        default="",
+        type=_numeric_predecessor,
+        help="Wait for this Slurm job/array to terminate before starting the wave (afterany).",
+    )
+    parser.add_argument(
         "--bundle-root",
         default=None,
         help="Parent for immutable bundles; defaults to ../hpc-ai-submissions beside the repository.",
@@ -1250,6 +1256,12 @@ def _bundle_snapshot_path(bundle, source_path: str) -> Path:
     return snapshot_path
 
 
+def _numeric_predecessor(value: str) -> str:
+    if value and not value.isdigit():
+        raise argparse.ArgumentTypeError("Slurm predecessor must be a numeric job ID")
+    return value
+
+
 def _submit_platform_wave(args: argparse.Namespace):
     """Create a bundle, persist its location, and submit its scripts in one action."""
     if not args.wave:
@@ -1332,7 +1344,7 @@ def _submit_platform_wave(args: argparse.Namespace):
         status_path=status_path,
         experiment_ids=sorted(str(experiment_id) for experiment_id in config_entries),
     )
-    submissions = submit_job_scripts(bundle.script_dir, status_path)
+    submissions = submit_job_scripts(bundle.script_dir, status_path, after_job=getattr(args, "after_job", ""))
     return bundle, state_path, submissions
 
 
