@@ -503,3 +503,7 @@ serve-dashboard:
 .PHONY: submit-h100-nvlink-probe
 submit-h100-nvlink-probe:
 	sbatch slurm/smoke/h100_nvlink_probe.sbatch
+
+.PHONY: submit-h100-nvlink-calibration
+submit-h100-nvlink-calibration:
+	sbatch slurm/smoke/h100_nvlink_calibration.sbatch

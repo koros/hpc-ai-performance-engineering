@@ -128,3 +128,47 @@ large readings are retained without calling them validated bandwidth. Explicit
 NVML unavailable values (-1/all-bits-set for the returned type) remain rejected.
 Old reports cannot recover rejected values that were not saved; rerun this small
 probe to distinguish those cases. Rejection details now appear in SUMMARY.md.
+
+## Controlled-transfer follow-up
+
+After obtaining readable counters and an idle baseline, run the bounded active
+diagnostic when the H100 is free of other benchmark work:
+
+```bash
+make submit-h100-nvlink-calibration
+```
+
+This requests two H100s for at most ten minutes. It allocates one 64 MiB buffer
+per GPU, checks bidirectional CUDA peer accessibility, warms up both directions,
+records an idle window, then copies for two seconds in each direction. The copy
+count and payload size establish known application payload bytes. Both GPU
+streams are synchronized around the copy loop and destination contents checked.
+Snapshots bracket each phase, include settling/readout time, and preserve the
+original NVML readings and timestamps. No counters or GPU settings are reset.
+This is a transfer diagnostic, not a model benchmark or an E-number result.
+
+Read `build/nvlink_calibration/h100/job-JOBID/SUMMARY.md` and
+`CALIBRATION.json` after completion. Logs use the name
+`slurm/h100-nvlink-calibration-JOBID.out` and `.err`. Replace JOBID with the
+actual submitted ID.
+
+`responsive_requires_unit_validation` requires a quiet idle baseline, correct
+copy contents, advancing counter timestamps, nondecreasing counters and positive
+source TX/destination RX deltas in both directions. Otherwise the result is
+`inconclusive` and the report retains errors and any partial evidence.
+
+The analysis reports raw delta divided by known application payload bytes for
+each endpoint separately. Do not add endpoint TX and RX: that would double-count
+the same transfer. Compare the two directions and their ratios to establish
+field units and whether the counter behaves cumulatively. A ratio near 1/1024
+would be consistent with KiB-counted payload, but is not assumed or used as an
+automatic pass criterion. Nonzero background traffic or delayed updates must
+be resolved before quantitative claims.
+
+The tool deliberately does not claim calibrated bandwidth, link saturation,
+per-link path, or exact physical-wire bytes. CUDA peer access alone does not
+prove transport selection; the observed NVLink response is additional evidence.
+The copy-loop time excludes readout/settling while the counter interval includes
+them, so these durations must not be substituted for each other. Repeat with
+several known payload volumes and establish instrumentation overhead before
+using these counters in the planned inference study.
