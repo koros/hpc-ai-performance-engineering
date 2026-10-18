@@ -66,7 +66,7 @@ PYTHONPATH=src python scripts/probe_h100_nvlink.py \
 JSON includes tool paths, commands, command timestamps, timeout/error output,
 source commit/status, probe script checksum, GPU identity, driver version,
 Slurm job ID, sample coverage and raw sampled rates. NaN, infinity, negative
-values and implausible/sentinel values are never treated as valid throughput.
+values and explicit unavailable sentinels are never treated as valid telemetry.
 The selected backend appears in `assessment.backend`. Direct NVML results
 are under `nvml`, and its bounded subprocess output under `commands.nvml_fallback`.
 Original DCGM failures remain visible even when the NVML fallback succeeds.
@@ -113,3 +113,18 @@ Direct NVML references:
 
 - [Field definitions and aggregate scope](https://docs.nvidia.com/deploy/nvml-api/latest/api/group__nvmlFieldValueEnums.html)
 - [Field sample structure and return codes](https://docs.nvidia.com/deploy/nvml-api/api/structnvmlFieldValue__t.html)
+
+## Diagnosing successful calls with rejected values
+
+A successful per-field return code and fresh timestamp establish API access,
+not that its value is usable. The NVML decoder retains `raw_value`, `value_type`,
+`raw_union_hex`, timestamp and a specific rejection reason. Non-finite raw values
+are strings so the JSON remains standards-compliant. For nonzero per-field API
+errors, the union is undefined and is not interpreted.
+
+An earlier probe version discarded values above an assumed 1e13 ceiling. That
+ceiling was not justified for the raw NVML KiB fields and has been removed;
+large readings are retained without calling them validated bandwidth. Explicit
+NVML unavailable values (-1/all-bits-set for the returned type) remain rejected.
+Old reports cannot recover rejected values that were not saved; rerun this small
+probe to distinguish those cases. Rejection details now appear in SUMMARY.md.

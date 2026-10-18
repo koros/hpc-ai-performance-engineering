@@ -108,3 +108,48 @@ def test_no_native_library_calls_outside_allocation(monkeypatch):
     monkeypatch.delenv("SLURM_JOB_ID", raising=False)
     monkeypatch.setattr(ctypes, "CDLL", lambda name: pytest.fail("must not load native library"))
     assert nvml.probe_nvml(UUIDS, 3, 1000)["issues"] == ["Slurm allocation required"]
+
+
+@pytest.mark.parametrize(
+    "value_type,member,value,error",
+    [
+        (3, "ull", 18_000_000_000_000, None),
+        (3, "ull", 2**64 - 1, "NVML unavailable sentinel"),
+        (1, "uint", 2**32 - 1, "NVML unavailable sentinel"),
+        (4, "sll", -1, "NVML unavailable sentinel"),
+        (4, "sll", -2, "Negative driver value"),
+        (0, "double", float("nan"), "Non-finite driver value"),
+        (0, "double", float("inf"), "Non-finite driver value"),
+    ],
+)
+def test_decoder_retains_driver_values_and_separates_failure_reasons(value_type, member, value, error):
+    import json
+
+    field = nvml._Field()
+    field.field_id, field.scope_id, field.timestamp = 138, 0xFFFFFFFF, 12345
+    field.value_type = value_type
+    setattr(field.value, member, value)
+    decoded = nvml.decode_field(field, lambda code: "error")
+    assert decoded["error"] == error
+    assert decoded["raw_value"] == (value if value == value and value != float("inf") else str(value))
+    assert decoded["raw_union_hex"] == bytes(field.value).hex()
+    assert decoded["value"] == (value if error is None else None)
+    json.dumps(decoded, allow_nan=False)
+
+
+def test_decoder_retains_successful_value_when_timestamp_is_missing():
+    field = nvml._Field()
+    field.value_type = 3
+    field.value.ull = 7
+    decoded = nvml.decode_field(field, lambda code: "error")
+    assert decoded["raw_value"] == 7
+    assert decoded["error"] == "Missing driver timestamp"
+
+
+def test_failed_api_field_never_interprets_undefined_union():
+    field = nvml._Field()
+    field.return_code = 4
+    field.value.ull = 123
+    decoded = nvml.decode_field(field, lambda code: "permission denied")
+    assert decoded["value"] is decoded["raw_value"] is decoded["raw_union_hex"] is None
+    assert decoded["error"] == "permission denied"

@@ -50,21 +50,38 @@ def decode_field(field: _Field, error_string) -> dict:
         "latency_us": field.latency_us,
         "return_code": field.return_code,
         "value_type": field.value_type,
+        "raw_value": None,
+        "raw_union_hex": None,
         "value": None,
         "error": None,
     }
     if field.return_code != 0:
         result["error"] = error_string(field.return_code)
         return result
+    result["raw_union_hex"] = bytes(field.value).hex()
     member = {0: "double", 1: "uint", 2: "ulong", 3: "ull", 4: "sll", 5: "int"}.get(field.value_type)
     if member is None:
         result["error"] = "Unrecognized NVML value type"
         return result
     value = getattr(field.value, member)
-    if math.isfinite(value) and 0 <= value < 1e13 and field.timestamp > 0:
-        result["value"] = value
+    result["raw_value"] = value if math.isfinite(value) else str(value)
+    # NVML_VALUE_NOT_AVAILABLE is -1 (all bits set in an unsigned value).
+    # Do not apply a guessed bandwidth ceiling to these raw KiB fields.
+    unavailable = {
+        1: ctypes.c_uint(-1).value,
+        2: ctypes.c_ulong(-1).value,
+        3: ctypes.c_ulonglong(-1).value,
+    }
+    if value == -1 or value == unavailable.get(field.value_type):
+        result["error"] = "NVML unavailable sentinel"
+    elif not math.isfinite(value):
+        result["error"] = "Non-finite driver value"
+    elif value < 0:
+        result["error"] = "Negative driver value"
+    elif field.timestamp <= 0:
+        result["error"] = "Missing driver timestamp"
     else:
-        result["error"] = "Invalid value, sentinel or missing driver timestamp"
+        result["value"] = value
     return result
 
 
@@ -167,6 +184,13 @@ def probe_nvml(uuids: list[str], samples: int, interval_ms: int) -> dict:
         report["assessment"] = assess(report["samples"], uuids)
         if report["assessment"]["status"] != "readable_requires_calibration":
             report["issues"].append("Need two distinct driver-timestamped successful TX/RX readings per GPU")
+            rejected = {
+                f"Field {f['field_id']}: {f['error']}; raw={f['raw_value']}, type={f['value_type']}"
+                for sample in report["samples"]
+                for f in sample["fields"]
+                if f["error"]
+            }
+            report["issues"].extend(sorted(rejected))
     except (OSError, AttributeError, RuntimeError) as exc:
         report["issues"].append(f"{type(exc).__name__}: {exc}")
     finally:
