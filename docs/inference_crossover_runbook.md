@@ -86,3 +86,20 @@ Preserve raw request samples and failures. Backend request timestamps do not inc
 Cross-platform results compare complete hardware platforms. NVLink/PCIe is not the sole changed variable: compute and memory also differ. Within a platform, the fixed-budget layouts isolate the practical choice of splitting versus replication more cleanly.
 
 Local verification: full suite passed (1,160 tests, 21 skipped), and the added analysis-isolation regression passes. Ruff, semantic validation, both matrix design checks and shell syntax checks for all 35 previews pass. New canary gates reject missing evidence on both platforms as expected. These checks do not establish CUDA or multi-engine startup readiness.
+
+### Request timestamps with vLLM 0.10.2
+
+The crossover configurations explicitly select `VLLM_USE_V1=0` for every
+canary and performance condition. The 0.10.2 V1 offline output path omits
+`RequestOutput.metrics`; the V0 sequence-group output path attaches those
+metrics. See the tagged [V0 output implementation](https://github.com/vllm-project/vllm/blob/v0.10.2/vllm/outputs.py)
+and [V1 output implementation](https://github.com/vllm-project/vllm/blob/v0.10.2/vllm/v1/engine/output_processor.py).
+
+`require_request_timestamps` checks each warmup and measured request for finite,
+ordered arrival, first-token, last-token and finish timestamps. Missing timings
+fail the trial before completing the measurement budget. The acceptance gate
+still requires TTFT and decode metrics; no timestamps are inferred from round
+latency. Original V1 records remain historical evidence and must not be pooled
+with the newly pinned V0 campaign. Hardware validation is required: first rerun
+only H100 E719, inspect its timing samples, then run E720 and E721 if successful.
+The NVLink diagnostic is independent of this engine selection.

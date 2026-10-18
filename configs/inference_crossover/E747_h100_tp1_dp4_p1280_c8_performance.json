@@ -22,6 +22,7 @@
       "comparison_scope": "inference_layout_crossover_v1_h100_performance",
       "warmup_steps": 5,
       "ignore_eos": true,
+      "require_request_timestamps": true,
       "max_model_len": 2048,
       "enable_prefix_caching": false,
       "gpu_memory_utilization": 0.85
@@ -43,7 +44,10 @@
     "precision": "bf16",
     "max_steps": 30,
     "seed": 1337,
-    "output_dir": "results/raw"
+    "output_dir": "results/raw",
+    "environment": {
+      "VLLM_USE_V1": "0"
+    }
   },
   "profiling": {
     "enabled": true,

@@ -1098,7 +1098,8 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     measured_rounds = int(config.runtime.max_steps or 10)
     warmup_rounds = _warmup_steps(parameters, measured_rounds)
     for _ in range(warmup_rounds):
-        llm.generate(prompts, sampling_params=sampling, use_tqdm=False)
+        warmup_outputs = llm.generate(prompts, sampling_params=sampling, use_tqdm=False)
+        _require_request_timestamps(config, warmup_outputs)
     torch.cuda.synchronize()
 
     latencies: list[float] = []
@@ -1114,6 +1115,7 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         for _ in range(measured_rounds):
             start = time.perf_counter()
             outputs = llm.generate(prompts, sampling_params=sampling, use_tqdm=False)
+            _require_request_timestamps(config, outputs)
             elapsed = time.perf_counter() - start
             for output in outputs:
                 output_tokens = sum(len(candidate.token_ids) for candidate in output.outputs)
@@ -1288,7 +1290,8 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         ).tolist()
         prompts = [{"prompt_token_ids": token_ids} for token_ids in prompt_token_ids]
         for _ in range(warmup_rounds):
-            router.generate(prompts, max_new_tokens=max_new_tokens)
+            warmup_outputs = router.generate(prompts, max_new_tokens=max_new_tokens)
+            _require_request_timestamps(config, warmup_outputs)
         router.reset_routing_counts()
         torch.cuda.synchronize()
 
@@ -1305,6 +1308,7 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
                 start = time.perf_counter()
                 outputs = router.generate(prompts, max_new_tokens=max_new_tokens)
                 elapsed = time.perf_counter() - start
+                _require_request_timestamps(config, outputs)
                 for output in outputs:
                     output_tokens = sum(len(candidate.token_ids) for candidate in output.outputs)
                     generated_tokens += output_tokens
@@ -2191,6 +2195,31 @@ def _decode_timing_metrics(
             }
         )
     return metrics
+
+
+def _require_request_timestamps(config: ExperimentConfig, outputs: list[Any]) -> None:
+    """Reject missing backend timings before spending the full measurement budget."""
+    if not config.workload.parameters.get("require_request_timestamps", False):
+        return
+    import math
+
+    if not outputs:
+        raise RuntimeError("vLLM returned no requests for timestamp validation")
+    for output in outputs:
+        metrics = getattr(output, "metrics", None)
+        values = [
+            getattr(metrics, key, None)
+            for key in ("arrival_time", "first_token_time", "last_token_time", "finished_time")
+        ]
+        if (
+            any(value is None or not math.isfinite(value) for value in values)
+            or not values[0] < values[1] < values[2] <= values[3]
+        ):
+            raise RuntimeError(
+                "vLLM request timestamps are missing or invalid; this study requires "
+                "arrival/first/last/finished timestamps. With vLLM 0.10.2 use "
+                "VLLM_USE_V1=0; do not launch performance waves until the canaries pass."
+            )
 
 
 def _serving_engine_settings(config: ExperimentConfig) -> dict[str, Any]:

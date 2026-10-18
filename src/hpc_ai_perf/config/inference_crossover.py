@@ -66,6 +66,7 @@ def design() -> list[tuple[str, str, str, dict]]:
                 "max_new_tokens": 128,
                 "warmup_steps": 2 if canary else 5,
                 "ignore_eos": True,
+                "require_request_timestamps": True,
                 "max_model_len": 2048,
                 "enable_prefix_caching": False,
                 "gpu_memory_utilization": 0.85,
@@ -87,6 +88,8 @@ def design() -> list[tuple[str, str, str, dict]]:
         }
         data["distributed"]["gpus_per_node"] = gpus
         data["runtime"]["max_steps"] = 2 if canary else 30
+        # vLLM 0.10.2 V1 offline outputs omit RequestMetrics.
+        data["runtime"].setdefault("environment", {})["VLLM_USE_V1"] = "0"
         data["metadata"].update(
             {
                 "matrix_id": eid,

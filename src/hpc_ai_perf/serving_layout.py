@@ -46,7 +46,7 @@ def serving_layout_issues(config: ExperimentConfig) -> list[str]:
     request_routing = str(parameters.get("request_routing", "")).strip().lower()
     issues: list[str] = []
 
-    for key in ("ignore_eos", "enable_prefix_caching"):
+    for key in ("ignore_eos", "enable_prefix_caching", "require_request_timestamps"):
         if key in parameters and type(parameters[key]) is not bool:
             issues.append(f"{key} must be boolean")
     if "max_model_len" in parameters:

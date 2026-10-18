@@ -39,6 +39,7 @@ TRANSFORMER_PARAMETER_KEYS = {
     "ignore_eos",
     "max_model_len",
     "enable_prefix_caching",
+    "require_request_timestamps",
     "gpu_memory_utilization",
     "attention_backend",
     "dataset_revision",

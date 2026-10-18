@@ -278,3 +278,46 @@ def test_resolved_canary_fix_keeps_acceptance_checks_strict(tmp_path, monkeypatc
         )
     with pytest.raises(ValueError, match=expected):
         gate.verify_inference_canaries(tmp_path, "h100")
+
+
+def test_crossover_pins_timing_capable_engine_for_every_layout():
+    for _, _, _, data in design():
+        assert data["runtime"]["environment"]["VLLM_USE_V1"] == "0"
+        assert data["workload"]["parameters"]["require_request_timestamps"] is True
+
+
+@pytest.mark.parametrize(
+    "metrics",
+    [
+        None,
+        SimpleNamespace(arrival_time=1),
+        SimpleNamespace(arrival_time=1, first_token_time=2, last_token_time=2, finished_time=3),
+        SimpleNamespace(arrival_time=1, first_token_time=2, last_token_time=float("nan"), finished_time=3),
+    ],
+)
+def test_required_request_timestamps_reject_missing_or_invalid_backend_metrics(metrics):
+    from hpc_ai_perf.workloads.transformer import _require_request_timestamps
+
+    with pytest.raises(RuntimeError, match="timestamps are missing or invalid"):
+        _require_request_timestamps(config("E719"), [SimpleNamespace(metrics=metrics)])
+
+
+def test_required_request_timestamps_accept_real_request_boundaries():
+    from hpc_ai_perf.workloads.transformer import _require_request_timestamps
+
+    _require_request_timestamps(
+        config("E719"),
+        [
+            SimpleNamespace(
+                metrics=SimpleNamespace(arrival_time=1, first_token_time=2, last_token_time=3, finished_time=3.1)
+            )
+        ],
+    )
+
+
+def test_timestamp_requirement_does_not_change_legacy_workloads():
+    from hpc_ai_perf.workloads.transformer import _require_request_timestamps
+
+    c = config("E719")
+    c.workload.parameters.pop("require_request_timestamps")
+    _require_request_timestamps(c, [SimpleNamespace(metrics=None)])
