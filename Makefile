@@ -507,3 +507,10 @@ submit-h100-nvlink-probe:
 .PHONY: submit-h100-nvlink-calibration
 submit-h100-nvlink-calibration:
 	sbatch slurm/smoke/h100_nvlink_calibration.sbatch
+
+.PHONY: submit-h100-nvlink-validation verify-h100-nvlink-calibration
+submit-h100-nvlink-validation:
+	sbatch slurm/smoke/h100_nvlink_validation.sbatch
+
+verify-h100-nvlink-calibration:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/verify_nvlink_calibration.py --result-root build/nvlink_calibration/h100 --output build/nvlink_calibration/h100/VALIDATED_CALIBRATION.json

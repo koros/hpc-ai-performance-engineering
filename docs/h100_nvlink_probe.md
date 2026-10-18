@@ -172,3 +172,71 @@ The copy-loop time excludes readout/settling while the counter interval includes
 them, so these durations must not be substituted for each other. Repeat with
 several known payload volumes and establish instrumentation overhead before
 using these counters in the planned inference study.
+
+## Validate additional payload sizes and preserve evidence
+
+The first 64 MiB test transferred 240 GiB in each direction, with exactly one
+raw counter unit per 1,024 payload bytes at both endpoints and zero reverse
+traffic. That supports cumulative KiB semantics on the tested H100 pair; keep
+the original `job-1793641/CALIBRATION.json` as the 64 MiB evidence.
+
+When no H100 benchmark is running, submit only the two missing payload sizes:
+
+```bash
+make submit-h100-nvlink-validation
+```
+
+This is a two-task Slurm array with concurrency limited to one. It runs 16 MiB
+and 128 MiB buffers using the same diagnostic, with two active seconds in each
+direction. It does not repeat the completed 64 MiB test. Each task writes under
+`build/nvlink_calibration/h100/job-ARRAYID_TASKID/`. The two tasks must not
+overlap other H100 performance measurements; do not submit them concurrently
+with the four-GPU inference campaign.
+
+After both tasks finish:
+
+```bash
+make verify-h100-nvlink-calibration
+```
+
+The verifier reads the latest report for each of 16/64/128 MiB, independently
+recomputes deltas from the saved raw snapshots, checks idle/reverse traffic,
+driver timestamps, copy correctness, payload accounting and both endpoints.
+Converted bytes must match the known payload within 2%. A newer failed report
+is not bypassed in favour of an older success. The output manifest records
+original report checksums and GPU/runtime metadata; it is scoped to those
+recorded setups and does not assert overhead, saturation or per-link attribution.
+The original 64 MiB report predates driver-inventory capture: its absent
+driver metadata remains explicitly unknown rather than being invented.
+
+Preserve this diagnostic evidence separately from canonical E-number trials:
+
+```bash
+mkdir -p results/diagnostics/nvlink/h100
+cp -R build/nvlink_calibration/h100/job-* results/diagnostics/nvlink/h100/
+cp build/nvlink_calibration/h100/VALIDATED_CALIBRATION.json results/diagnostics/nvlink/h100/
+```
+
+Review and commit the JSON reports and manifest through the usual Git workflow.
+The manifest retains original cluster paths plus content checksums; archive
+copies should be matched by checksum, since paths differ between machines.
+No existing experiment config, serving fingerprint or training fingerprint is
+changed by these diagnostic additions.
+
+## Productive H100 work while collector development continues
+
+Run the existing unprofiled `inference-crossover-canary` wave on H100 (E719–E721,
+three single trials) using the certified private vLLM environment. Collect and
+verify it, then run `inference-crossover-short` (18 trials), followed by
+`inference-crossover-long` (18 trials), collecting between waves. These trials
+provide layout/latency/throughput evidence without NVLink measurements. They
+remain separate from later instrumented overhead controls and traffic trials.
+Do not run both the legacy E702–E714 campaign and the new crossover grid
+automatically; prefer the new equal-budget grid for this study.
+
+The next implementation stage is an opt-in measured-region NVLink collector
+with its own provenance and separate instrumented configurations. It must use
+validated cumulative-counter deltas and preserve counter-window duration
+separately from workload time. An overhead-on/off contrast is required before
+using instrumented timing for performance claims. The collector is not yet
+implemented or enabled by this validation update.

@@ -103,6 +103,24 @@ def run(report: dict, duration: float, payload_mib: int) -> None:
     if len(uuids) != 2 or len(set(uuids)) != 2:
         raise RuntimeError("Cannot identify two distinct allocated GPU UUIDs")
     report["gpu_uuids"] = uuids
+    inventory = subprocess.run(
+        [
+            "nvidia-smi",
+            "-i",
+            ",".join(uuids),
+            "--query-gpu=uuid,name,driver_version,pci.bus_id",
+            "--format=csv,noheader,nounits",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+    report["driver_inventory"] = {
+        "stdout": inventory.stdout,
+        "stderr": inventory.stderr,
+        "returncode": inventory.returncode,
+    }
     report["torch_version"] = str(torch.__version__)
     report["cuda_version"] = torch.version.cuda
     report["peer_access"] = [[torch.cuda.can_device_access_peer(i, j) for j in range(2) if j != i] for i in range(2)]
