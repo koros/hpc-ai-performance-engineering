@@ -480,3 +480,7 @@ build-dashboard-site: refresh test-dashboard
 
 serve-dashboard:
 	$(PYTHON) -m http.server 8000
+
+.PHONY: submit-h100-nvlink-probe
+submit-h100-nvlink-probe:
+	sbatch slurm/smoke/h100_nvlink_probe.sbatch
