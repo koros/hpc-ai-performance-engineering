@@ -49,6 +49,8 @@ def build_gpu_groups(
     )
     if len(devices) != gpu_count:
         raise ValueError(f"CUDA_VISIBLE_DEVICES exposes {len(devices)} devices, expected {gpu_count}")
+    if len(set(devices)) != len(devices):
+        raise ValueError("CUDA_VISIBLE_DEVICES must contain unique GPU identifiers")
     return tuple(
         tuple(devices[offset : offset + tensor_parallel_size]) for offset in range(0, gpu_count, tensor_parallel_size)
     )
@@ -114,6 +116,7 @@ class VLLMReplicaRouter:
         request_routing: str = "round_robin",
         llm_kwargs: dict[str, Any] | None = None,
         startup_timeout_seconds: float = 900.0,
+        ignore_eos: bool = False,
     ) -> None:
         if not gpu_groups:
             raise ValueError("at least one replica GPU group is required")
@@ -126,6 +129,7 @@ class VLLMReplicaRouter:
         self._gpu_groups = gpu_groups
         self._request_routing = request_routing
         self._llm_kwargs = dict(llm_kwargs or {})
+        self._ignore_eos = ignore_eos
         self._startup_timeout_seconds = startup_timeout_seconds
         self._processes: list[mp.Process] = []
         self._connections: list[Any] = []
@@ -174,7 +178,7 @@ class VLLMReplicaRouter:
                         self._tensor_parallel_size,
                         self._llm_kwargs,
                     ),
-                    daemon=True,
+                    daemon=False,
                 )
                 process.start()
                 child.close()
@@ -215,6 +219,7 @@ class VLLMReplicaRouter:
                         "kind": "generate",
                         "prompts": [prompts[index] for index in prompt_indices],
                         "max_new_tokens": max_new_tokens,
+                        "ignore_eos": self._ignore_eos,
                     }
                 )
         for connection, prompt_indices in zip(self._connections, assignments, strict=True):
@@ -282,7 +287,8 @@ def _vllm_replica_worker(
                 return
             if message.get("kind") != "generate":
                 raise RuntimeError(f"unknown replica command: {message.get('kind')}")
-            sampling = SamplingParams(temperature=0.0, max_tokens=int(message["max_new_tokens"]))
+            sampling_kwargs = {"ignore_eos": True} if message.get("ignore_eos") else {}
+            sampling = SamplingParams(temperature=0.0, max_tokens=int(message["max_new_tokens"]), **sampling_kwargs)
             outputs = llm.generate(message["prompts"], sampling_params=sampling, use_tqdm=False)
             connection.send({"kind": "result", "outputs": [_serialize_output(output) for output in outputs]})
     except Exception as exc:

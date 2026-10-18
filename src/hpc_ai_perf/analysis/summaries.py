@@ -265,6 +265,9 @@ ANALYSIS_TABLES = {
         "avg_energy_joules",
     ],
     "inference_tp_crossover_summary": [
+        "comparison_scope",
+        "throughput_ci95_low",
+        "throughput_ci95_high",
         "platform_id",
         "comparability",
         "workload",
@@ -1394,6 +1397,7 @@ def build_inference_tp_crossover_summary(rows: list[dict[str, str]]) -> list[dic
         for row in rows
         if row.get("status") == "completed"
         and row.get("mode") == "inference"
+        and row.get("phase") != "Inference layout acceptance"
         and (
             _first_float(row, "parameter_tensor_parallel_size", "metric_tensor_parallel_size_observed") is not None
             or _value(row, "framework") == "vllm"
@@ -1411,6 +1415,13 @@ def build_inference_tp_crossover_summary(rows: list[dict[str, str]]) -> list[dic
         "parameter_max_new_tokens",
         "batch_size",
         "parameter_concurrent_requests",
+        "parameter_comparison_scope",
+        "model_revision",
+        "environment_torch_version",
+        "environment_vllm_version",
+        "environment_cuda_version",
+        "metric_serving_runtime_sha256",
+        "metric_serving_input_sha256",
     )
     summaries: list[dict[str, Any]] = []
     for key, group_rows in sorted(grouped.items()):
@@ -1442,6 +1453,9 @@ def build_inference_tp_crossover_summary(rows: list[dict[str, str]]) -> list[dic
             gpus = _mean(_metric_values(tp_rows, "gpus"))
             summaries.append(
                 {
+                    "comparison_scope": key[9],
+                    "throughput_ci95_low": _ci95(_metric_values(tp_rows, "throughput_tokens_sec"))[0],
+                    "throughput_ci95_high": _ci95(_metric_values(tp_rows, "throughput_tokens_sec"))[1],
                     "platform_id": key[0],
                     "comparability": key[1],
                     "workload": key[2],

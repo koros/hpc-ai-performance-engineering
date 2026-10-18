@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
 import math
 import os
 import statistics
@@ -16,7 +18,7 @@ from hpc_ai_perf.config.scaling import INPUT_PROTOCOLS, REAL_TEXT_PROTOCOL, scal
 from hpc_ai_perf.profiling import measured_region
 from hpc_ai_perf.results.contract import UnsupportedWorkloadError
 from hpc_ai_perf.runtime_checks import disable_deepspeed_nvtx_annotations, prepare_deepspeed_import_environment
-from hpc_ai_perf.serving_layout import REPLICA_LAYOUT, declared_serving_layout
+from hpc_ai_perf.serving_layout import REPLICA_LAYOUTS, declared_serving_layout, serving_layout_issues
 from hpc_ai_perf.workloads.base import Workload, WorkloadRunOutput
 from hpc_ai_perf.workloads.scaling import (
     GlobalTrainingInputs,
@@ -986,7 +988,7 @@ def _classification_quality_metrics(
 def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     parameters = config.workload.parameters
     serving_layout = declared_serving_layout(parameters)
-    if serving_layout == REPLICA_LAYOUT:
+    if serving_layout in REPLICA_LAYOUTS:
         return _run_vllm_replica_inference(config)
     if int(parameters.get("data_parallel_size", 1)) > 1 or int(parameters.get("replica_count", 1)) > 1:
         raise UnsupportedWorkloadError(
@@ -1037,7 +1039,7 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         raise RuntimeError(
             f"tensor_parallel_size={tensor_parallel_size} does not match requested GPUs={config.hardware.gpus}"
         )
-    torchdynamo_disabled = tensor_parallel_size > 1
+    torchdynamo_disabled = tensor_parallel_size > 1 or bool(parameters.get("ignore_eos"))
     if torchdynamo_disabled:
         # vLLM 0.10.2 decorates its tensor-parallel vocabulary embedding
         # helper with ``torch.compile`` at module-import time. That direct
@@ -1063,7 +1065,8 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     }
     if quantization is not None:
         llm_kwargs["quantization"] = quantization
-    inductor_disabled = tensor_parallel_size > 1
+    llm_kwargs.update(_serving_engine_settings(config))
+    inductor_disabled = tensor_parallel_size > 1 or bool(parameters.get("ignore_eos"))
     if inductor_disabled:
         # vLLM 0.10.2 preserves ``use_inductor=True`` in its configuration
         # even when ``enforce_eager=True`` selects compilation level zero. The
@@ -1081,7 +1084,8 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
             "vLLM did not activate the requested quantization backend: "
             f"requested {quantization}, observed {observed_quantization!r}"
         )
-    sampling = SamplingParams(temperature=0.0, max_tokens=max_new_tokens)
+    sampling_kwargs = {"ignore_eos": True} if parameters.get("ignore_eos") else {}
+    sampling = SamplingParams(temperature=0.0, max_tokens=max_new_tokens, **sampling_kwargs)
     requests_per_round = batch_size * concurrency
     generator = torch.Generator().manual_seed(config.runtime.seed)
     prompt_token_ids = torch.randint(
@@ -1143,6 +1147,9 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "batch_size": batch_size,
         "concurrent_requests": concurrency,
         "prompt_tokens_per_request": prompt_length,
+        "serving_input_sha256": hashlib.sha256(
+            json.dumps(prompt_token_ids, separators=(",", ":")).encode()
+        ).hexdigest(),
         "generated_tokens": generated_tokens,
         "total_tokens": generated_tokens,
         "throughput_unit": "generated_tokens_per_second",
@@ -1222,7 +1229,7 @@ def _run_vllm_inference(config: ExperimentConfig) -> WorkloadRunOutput:
 
 
 def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
-    """Serve TP2×DP2 through two isolated vLLM TP2 engine processes."""
+    """Serve validated bounded TP/replica layouts through isolated engine processes."""
     if importlib.util.find_spec("vllm") is None:
         raise RuntimeError("vLLM framework requested, but vllm is not installed")
     import torch
@@ -1231,16 +1238,15 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
     if not torch.cuda.is_available():
         raise RuntimeError("vLLM replica serving requires CUDA")
     if config.runtime.precision != "bf16":
-        raise RuntimeError("TP2×DP2 replica serving currently requires precision=bf16")
+        raise RuntimeError("Replica serving currently requires precision=bf16")
 
     parameters = config.workload.parameters
     tensor_parallel_size = int(parameters.get("tensor_parallel_size", 2))
     data_parallel_size = int(parameters.get("data_parallel_size", 2))
     replica_count = int(parameters.get("replica_count", 2))
-    if tensor_parallel_size != 2 or data_parallel_size != 2 or replica_count != 2:
-        raise ValueError(
-            "serving_layout=tp2_dp2 requires tensor_parallel_size=2, data_parallel_size=2, replica_count=2"
-        )
+    issues = serving_layout_issues(config)
+    if declared_serving_layout(parameters) not in REPLICA_LAYOUTS or issues:
+        raise ValueError("Invalid replica layout: " + "; ".join(issues))
     request_routing = str(parameters.get("request_routing", "round_robin"))
     model_name = str(parameters.get("hf_model_name", config.workload.model))
     model_revision = _selected_model_revision(config, model_name)
@@ -1266,7 +1272,8 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         tensor_parallel_size=tensor_parallel_size,
         gpu_groups=gpu_groups,
         request_routing=request_routing,
-        llm_kwargs={"compilation_config": {"level": 0, "use_inductor": False}},
+        llm_kwargs={"compilation_config": {"level": 0, "use_inductor": False}, **_serving_engine_settings(config)},
+        ignore_eos=bool(parameters.get("ignore_eos", False)),
     ) as router:
         if router.observed_quantization is not None:
             raise RuntimeError(
@@ -1332,6 +1339,9 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "batch_size": batch_size,
         "concurrent_requests": concurrency,
         "prompt_tokens_per_request": prompt_length,
+        "serving_input_sha256": hashlib.sha256(
+            json.dumps(prompt_token_ids, separators=(",", ":")).encode()
+        ).hexdigest(),
         "generated_tokens": generated_tokens,
         "total_tokens": generated_tokens,
         "throughput_unit": "generated_tokens_per_second",
@@ -1346,12 +1356,12 @@ def _run_vllm_replica_inference(config: ExperimentConfig) -> WorkloadRunOutput:
         "tensor_parallel_size_observed": tensor_parallel_size,
         "data_parallel_size_observed": data_parallel_size,
         "replica_count_observed": replica_count,
-        "serving_layout_observed": REPLICA_LAYOUT,
+        "serving_layout_observed": declared_serving_layout(parameters),
         "request_routing_observed": request_routing,
         "replica_gpu_groups_observed": ";".join(",".join(group) for group in router.gpu_groups),
         "vllm_execution_mode": "replica_eager_no_inductor",
         "vllm_inductor_disabled": True,
-        "vllm_torchdynamo_disabled": False,
+        "vllm_torchdynamo_disabled": True,
         "precision_backend": "vllm_bfloat16",
         "compute_dtype_observed": "bfloat16",
         "parameter_dtype_observed": "bfloat16",
@@ -2183,6 +2193,11 @@ def _decode_timing_metrics(
     return metrics
 
 
+def _serving_engine_settings(config: ExperimentConfig) -> dict[str, Any]:
+    p = config.workload.parameters
+    return {key: p[key] for key in ("max_model_len", "enable_prefix_caching", "gpu_memory_utilization") if key in p}
+
+
 def _serving_provenance_metrics(
     config: ExperimentConfig, *, replica_layout: bool
 ) -> dict[str, int | float | str | bool | None]:
@@ -2209,7 +2224,10 @@ def _serving_provenance_metrics(
     else:
         communication_scope = "tensor_parallel_request_path"
         communication_limitation = "NCCL/NVLink collective attribution unavailable"
+    from hpc_ai_perf.config.inference_crossover import serving_runtime_sha256
+
     return {
+        "serving_runtime_sha256": serving_runtime_sha256(),
         "communication_metrics_available": False,
         "communication_metrics_scope": communication_scope,
         "communication_metrics_limitation": communication_limitation,

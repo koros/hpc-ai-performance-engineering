@@ -1,5 +1,12 @@
 # Current Project Status
 
+## Inference priority update — 18 October 2026
+
+The next campaign prioritises equal-budget inference layouts rather than additional training breadth. The independent E715–E749 study adds eight-GPU L40S TP8/TP4×DP2/TP2×DP4/TP1×DP8 and four-GPU H100 TP4/TP2×DP2/TP1×DP4 comparisons across two prompt lengths and two concurrency levels. Seven current-runtime serving canaries gate 28 three-trial performance conditions. These are configured, not measured results. Existing training evidence remains part of the dissertation; no historical evidence is replaced.
+
+See [the inference crossover runbook](inference_crossover_runbook.md) for scope, priorities, canary gates and launch commands. The dated snapshots below predate this extension.
+
+
 This snapshot describes repository capabilities. Archived result files and the generated platform tracker remain authoritative for completed trial coverage; a configured wave is not evidence that it has run.
 
 ## Long-context serving extension — 26 September 2026

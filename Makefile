@@ -60,6 +60,7 @@ QWEN7B_TRAINING_RESULT_ROOT ?= results/raw/h100
 QWEN7B_UPDATE_WAVE ?= qwen7b-update-controls-2gpu
 NCCL_HOME ?=
 WEEKEND_PREP_DIR ?= build/weekend_h100
+INFERENCE_CROSSOVER_WAVE ?= inference-crossover-short
 
 DEV_CONFIGS := $(sort $(wildcard configs/dev/*.json))
 DEV_BASELINE_CONFIGS := $(sort $(wildcard configs/dev/*baseline.json))
@@ -155,6 +156,24 @@ prefetch-lowbit-assets:
 
 prefetch-long-context-assets:
 	PYTHONPATH="$(CURDIR)/src" "$(LONG_CONTEXT_ENV)/bin/python" scripts/prefetch_long_context_assets.py
+
+# Equal-budget inference crossover (docs/inference_crossover_runbook.md).
+.PHONY: generate-inference-crossover check-inference-crossover verify-inference-crossover-canaries
+.PHONY: submit-inference-crossover-canary submit-inference-crossover-wave
+generate-inference-crossover:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/generate_inference_crossover.py
+
+check-inference-crossover:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/generate_inference_crossover.py --check
+
+verify-inference-crossover-canaries:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/verify_inference_crossover_canaries.py --platform $(PLATFORM)
+
+submit-inference-crossover-canary:
+	$(MAKE) submit-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=inference-crossover-canary
+
+submit-inference-crossover-wave: verify-inference-crossover-canaries
+	$(MAKE) submit-platform-wave PLATFORM=$(PLATFORM) PLATFORM_WAVE=$(INFERENCE_CROSSOVER_WAVE)
 
 # Scaling deep dive (docs/scaling_deep_dive_runbook.md): configs and scaling-dd-* waves are generated.
 prepare-h100-weekend:

@@ -727,6 +727,54 @@
     },
     {
       "platform": "h100",
+      "wave": "inference-crossover-canary",
+      "name": "H100 equal-budget inference inference-crossover-canary",
+      "experiment_ids": ["E719", "E720", "E721"],
+      "required_trials": 1,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "inference-crossover-short",
+      "name": "H100 equal-budget inference inference-crossover-short",
+      "experiment_ids": ["E738", "E739", "E740", "E741", "E742", "E743"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
+      "wave": "inference-crossover-long",
+      "name": "H100 equal-budget inference inference-crossover-long",
+      "experiment_ids": ["E744", "E745", "E746", "E747", "E748", "E749"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "inference-crossover-canary",
+      "name": "L40S equal-budget inference inference-crossover-canary",
+      "experiment_ids": ["E715", "E716", "E717", "E718"],
+      "required_trials": 1,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "inference-crossover-short",
+      "name": "L40S equal-budget inference inference-crossover-short",
+      "experiment_ids": ["E722", "E723", "E724", "E725", "E726", "E727", "E728", "E729"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "inference-crossover-long",
+      "name": "L40S equal-budget inference inference-crossover-long",
+      "experiment_ids": ["E730", "E731", "E732", "E733", "E734", "E735", "E736", "E737"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "h100",
       "wave": "scaling-dd-canary",
       "name": "H100 scaling deep dive C: Deep-dive acceptance canaries",
       "experiment_ids": ["E320-E367", "E370-E384"],

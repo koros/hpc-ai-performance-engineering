@@ -8,7 +8,7 @@ from hpc_ai_perf.config.lowbit import lowbit_issues
 from hpc_ai_perf.config.scaling import scaling_issues
 from hpc_ai_perf.profiling import SUPPORTED_PROFILERS
 from hpc_ai_perf.serving_layout import (
-    REPLICA_LAYOUT,
+    REPLICA_LAYOUTS,
     declared_serving_layout,
     serving_layout_issues,
 )
@@ -36,6 +36,10 @@ SUPPORTED_ENVIRONMENT_TARGETS = {
     "tensorrt_llm",
 }
 TRANSFORMER_PARAMETER_KEYS = {
+    "ignore_eos",
+    "max_model_len",
+    "enable_prefix_caching",
+    "gpu_memory_utilization",
     "attention_backend",
     "dataset_revision",
     "dataset_subset",
@@ -216,8 +220,9 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
         is_managed_tensor_parallel = config.mode == "inference" and (
             tensor_parallel == config.hardware.gpus
             or (
-                serving_layout == REPLICA_LAYOUT
-                and tensor_parallel * data_parallel * replica_count == config.hardware.gpus
+                serving_layout in REPLICA_LAYOUTS
+                and tensor_parallel * replica_count == config.hardware.gpus
+                and data_parallel == replica_count
             )
         )
         if not is_managed_tensor_parallel:
@@ -344,11 +349,10 @@ def capability_issues(config: ExperimentConfig, *, include_deferred: bool = True
             valid_tensor_parallel = selected_framework == "vllm" and tensor_parallel == config.hardware.gpus
             valid_replica_layout = (
                 selected_framework == "vllm"
-                and serving_layout == REPLICA_LAYOUT
-                and tensor_parallel == 2
-                and data_parallel == 2
-                and int(parameters.get("replica_count", 1)) == 2
-                and config.hardware.gpus == 4
+                and serving_layout in REPLICA_LAYOUTS
+                and (tensor_parallel, data_parallel) == REPLICA_LAYOUTS[serving_layout]
+                and int(parameters.get("replica_count", 1)) == data_parallel
+                and config.hardware.gpus == tensor_parallel * data_parallel
             )
             valid_environment_vllm_tensor_parallel = (
                 workload == "environment_validation"

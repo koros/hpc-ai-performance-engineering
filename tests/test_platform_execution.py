@@ -352,6 +352,11 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     }
     l40s_scaling_diagnostic_ids = {"E318", "E319"}
     deep_dive = scaling_deep_dive.design()
+    from hpc_ai_perf.config.inference_crossover import design as inference_design
+
+    inference_rows = inference_design()
+    l40s_inference_ids = {eid for eid, p, _, _ in inference_rows if p == "l40s"}
+    h100_inference_ids = {eid for eid, p, _, _ in inference_rows if p == "h100"}
     l40s_deep_dive_ids = {eid for eid, condition, _ in deep_dive if "l40s" in condition.run_platforms}
     h100_deep_dive_ids = {eid for eid, condition, _ in deep_dive if "h100" in condition.run_platforms}
 
@@ -368,8 +373,11 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         | shared_scaling_ids
         | l40s_scaling_diagnostic_ids
         | l40s_deep_dive_ids
+        | l40s_inference_ids
     )
-    assert len(h100_conditions) == 267 + len(shared_scaling_ids) + len(h100_deep_dive_ids) + len(shared_inference_ids)
+    assert len(h100_conditions) == 267 + len(shared_scaling_ids) + len(h100_deep_dive_ids) + len(
+        shared_inference_ids
+    ) + len(h100_inference_ids)
     assert {condition.matrix_id for condition in h100_conditions} == (
         source_ids
         | shared_telemetry_ids
@@ -379,6 +387,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         | shared_scaling_ids
         | shared_inference_ids
         | h100_deep_dive_ids
+        | h100_inference_ids
     )
     l40s_planned_source_count = sum(
         condition.status == "planned" for condition in l40s_conditions if condition.matrix_id in source_ids

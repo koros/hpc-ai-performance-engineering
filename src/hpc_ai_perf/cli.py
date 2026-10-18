@@ -1267,6 +1267,14 @@ def _submit_platform_wave(args: argparse.Namespace):
     if not args.wave:
         raise ValueError("submit-platform-wave requires --wave")
     profile = load_platform_profile(args.platform_profile)
+    if args.wave.startswith("inference-crossover-"):
+        from hpc_ai_perf.config.inference_crossover import CANARY_WAVE
+        from hpc_ai_perf.validation.inference_crossover import verify_inference_canaries
+
+        if not args.venv_activate:
+            raise ValueError("Inference crossover requires an explicit certified vLLM VENV_ACTIVATE")
+        if args.wave != CANARY_WAVE:
+            verify_inference_canaries(Path("results/raw") / profile.platform_id, profile.platform_id)
     if args.wave == "scaling-batch-crossover":
         from hpc_ai_perf.validation.scaling_acceptance import verify_scaling_canaries
 

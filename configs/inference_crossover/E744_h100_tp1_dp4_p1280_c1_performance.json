@@ -1,0 +1,97 @@
+{
+  "experiment_id": "E744",
+  "experiment": "inference_layout_crossover_v1_h100_tp1_dp4_p1280_c1_performance",
+  "mode": "inference",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+    "dataset": "synthetic_token_prompts_v1",
+    "parameters": {
+      "inference_study_type": "inference_layout_crossover_v1",
+      "framework": "vllm",
+      "serving_layout": "tp1_dp4",
+      "tensor_parallel_size": 1,
+      "data_parallel_size": 4,
+      "replica_count": 4,
+      "request_routing": "round_robin",
+      "batch_size": 1,
+      "concurrent_requests": 1,
+      "prompt_length": 1280,
+      "max_new_tokens": 128,
+      "comparison_scope": "inference_layout_crossover_v1_h100_performance",
+      "warmup_steps": 5,
+      "ignore_eos": true,
+      "max_model_len": 2048,
+      "enable_prefix_caching": false,
+      "gpu_memory_utilization": 0.85
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_h100",
+    "gpus": 4,
+    "gpu_model": "NVIDIA H100 SXM 80GB",
+    "interconnect": "NVLink"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 4,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 30,
+    "seed": 1337,
+    "output_dir": "results/raw"
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "serving_latency"
+    ],
+    "parameters": {
+      "collect_latency_distribution": true,
+      "collect_time_to_first_token": true,
+      "collect_memory_trace": true,
+      "collect_replica_scaling": true
+    }
+  },
+  "metadata": {
+    "serial_submission": true,
+    "matrix_id": "E744",
+    "template": "inference_serving",
+    "phase": "Inference layout crossover",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 2.0,
+    "matrix_stack_strategy": "vLLM tp1_dp4",
+    "objective": "Compare TP versus independent replicas at a fixed node GPU budget across prompt and concurrency levels",
+    "key_metrics": [
+      "throughput",
+      "latency_p95",
+      "latency_p99",
+      "goodput",
+      "replica_request_counts",
+      "memory"
+    ],
+    "source_experiment_ids": [],
+    "comparison_scope": "inference_layout_crossover_v1_h100_performance",
+    "study_family": "inference_layout_crossover_v1",
+    "platform_wave": "inference-crossover-long",
+    "research_questions": [
+      "RQ1",
+      "RQ4",
+      "RQ5",
+      "RQ6",
+      "RQ7"
+    ],
+    "analysis_tasks": [
+      "A02",
+      "A04",
+      "A06",
+      "A08"
+    ],
+    "limitation": "Planning allowance only; benchmark timings determine scheduling. Closed-round synthetic prompts; no production arrivals, quality or collective-time attribution."
+  }
+}
