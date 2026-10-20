@@ -130,3 +130,56 @@ Collect/validate/stage the six performance trials before analysis. Compare the
 three layouts within each matched prompt shape; preserve each independent trial.
 The extension is sequential in time, so inspect telemetry/clocks/runtime identity
 against the earlier controls before attributing differences to layout alone.
+
+## Concurrency-one gap study
+
+With all three layouts measured at concurrency 8, test whether the preference
+changes at concurrency 1. Use only 1,280-token prompts and 128 fixed output tokens,
+eight GPUs, the same pinned Qwen7B revision, BF16/V0/eager and cache settings.
+No completed inputs or serving-runtime fingerprint are changed.
+
+| Wave | IDs | Layouts | Trials |
+|---|---|---|---:|
+| qwen7b-layout-low-concurrency-canary | E759/E760/E761 | TP1×DP8 / TP2×DP4 / TP4×DP2 | 3 |
+| qwen7b-layout-low-concurrency-performance | E762/E763/E764 | Same three layouts | 9 |
+
+Acceptance uses two warmup and eight measured singleton rounds: eight requests
+exercise every replica and permit strict balanced-routing acceptance. Performance
+uses five warmup and thirty measured rounds, three repetitions per condition.
+Thirty singleton requests cannot divide equally over eight/four replicas: a
+one-request routing difference is expected, not a failure. Each trial emits
+3,840 output tokens. Trial-level p99 from thirty requests is exploratory.
+
+Within concurrency 1, E762 is the TP1 control. Existing E754/E755/E758 provide the
+matched concurrency-8 references; the new configs record these in metadata.
+The prompt/output/model/GPU budget remain fixed. Compare layout rankings and
+throughput, first-token latency, decode pace and measured-region J/output token.
+Do not describe lower whole-node utilisation at concurrency 1 as a software
+failure: idle replicas are part of the fixed-resource-budget comparison.
+
+Submit only the three serial acceptance jobs first, with the recovered activation:
+
+```bash
+export PYTHONPATH="$PWD/src"
+python scripts/prepare_qwen_layout_model.py
+python -m hpc_ai_perf.cli submit-platform-wave \
+  --platform-profile platforms/l40s.json --wave qwen7b-layout-low-concurrency-canary \
+  --venv-activate "$VIRTUAL_ENV/bin/activate_recovered_vllm"
+```
+
+After all three finish:
+
+```bash
+python -m hpc_ai_perf.cli collect-platform-wave \
+  --platform-profile platforms/l40s.json --wave qwen7b-layout-low-concurrency-canary
+python scripts/verify_qwen_layout_canaries.py --low-concurrency
+python -m hpc_ai_perf.cli verify-result-evidence --result-root results/raw
+```
+
+Stage/commit acceptance. The low-concurrency performance wave requires original,
+TP4-extension and all three singleton canaries (six accepted records total).
+Then submit `qwen7b-layout-low-concurrency-performance` using the same recovered
+activation; expect nine trials. Collect/validate/commit before deciding whether
+intermediate concurrency 2/4 would add useful evidence. Do not queue those
+follow-ups automatically. The sequential-in-time caveat for prior controls still
+applies; compare runtime identities, clock and telemetry before strong attribution.

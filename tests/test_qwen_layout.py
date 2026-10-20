@@ -15,7 +15,7 @@ from hpc_ai_perf.validation.inference_crossover import canary_issues, verify_inf
 
 def test_design_is_focused_and_supported():
     rows = design()
-    assert [r[0] for r in rows] == [f"E{i}" for i in range(750, 759)]
+    assert [r[0] for r in rows] == [f"E{i}" for i in range(750, 765)]
     assert len([r for r in rows if r[2] == CANARY_WAVE]) == 2
     assert len([r for r in rows if r[2] == PERFORMANCE_WAVE]) * 3 == 12
     entries = discover_experiment_configs(CONFIG_ROOT)
@@ -25,7 +25,7 @@ def test_design_is_focused_and_supported():
         assert entry.config.workload.model == "Qwen/Qwen2.5-7B-Instruct"
         p = entry.config.workload.parameters
         assert p["tensor_parallel_size"] * p["replica_count"] == 8
-        assert p["concurrent_requests"] == 8 and p["max_new_tokens"] == 128
+        assert p["concurrent_requests"] in (1, 8) and p["max_new_tokens"] == 128
         assert p["require_request_timestamps"] and p["ignore_eos"]
         assert entry.config.runtime.environment["VLLM_USE_V1"] == "0"
 
@@ -99,7 +99,7 @@ def test_qwen_requires_model_specific_collected_evidence(tmp_path, monkeypatch):
 
 def test_extension_preserves_existing_controls_and_valid_head_partitioning():
     rows = design()
-    extension = rows[6:]
+    extension = rows[6:9]
     assert [r[0] for r in extension] == ["E756", "E757", "E758"]
     assert [r[3]["workload"]["parameters"]["prompt_length"] for r in extension] == [1280, 128, 1280]
     for _, _, _, data in rows:
@@ -134,3 +134,57 @@ def test_extension_performance_requires_original_and_new_acceptance(monkeypatch)
             )
         )
     assert waves == [CANARY_WAVE, EXTENSION_CANARY_WAVE]
+
+
+def test_singleton_acceptance_exercises_every_replica_and_preserves_controls():
+    from collections import Counter
+
+    from hpc_ai_perf.config.qwen_layout import LOW_CONCURRENCY_CANARY_WAVE, LOW_CONCURRENCY_PERFORMANCE_WAVE
+    from hpc_ai_perf.workloads.vllm_router import route_prompt_indices
+
+    rows = design()
+    low = rows[9:]
+    assert [row[0] for row in low] == [f"E{i}" for i in range(759, 765)]
+    for eid, _, wave, data in low:
+        p = data["workload"]["parameters"]
+        assert p["concurrent_requests"] == 1 and p["prompt_length"] == 1280
+        assert p["max_new_tokens"] == 128
+        assert (
+            p["comparison_scope"] == rows[4][3]["workload"]["parameters"]["comparison_scope"]
+            if wave == LOW_CONCURRENCY_PERFORMANCE_WAVE
+            else p["comparison_scope"].endswith("_canary")
+        )
+        if wave == LOW_CONCURRENCY_CANARY_WAVE:
+            assert data["runtime"]["max_steps"] == 8
+            counts = Counter()
+            for round_number in range(8):
+                groups = route_prompt_indices(1, p["replica_count"], starting_replica=round_number % p["replica_count"])
+                counts.update({i: len(group) for i, group in enumerate(groups)})
+            assert len(set(counts.values())) == 1 and sum(counts.values()) == 8
+        else:
+            assert data["runtime"]["max_steps"] == 30
+            assert data["metadata"]["concurrency_reference_id"] in ("E754", "E755", "E758")
+            assert p.get("comparison_control_id") == (None if eid == "E762" else "E762")
+
+
+def test_singleton_performance_requires_shape_specific_acceptance(monkeypatch):
+    from hpc_ai_perf.config.qwen_layout import LOW_CONCURRENCY_CANARY_WAVE, LOW_CONCURRENCY_PERFORMANCE_WAVE
+    from hpc_ai_perf.validation import inference_crossover as gate
+
+    waves = []
+
+    def check(*args, **kwargs):
+        waves.append(kwargs["canary_wave"])
+        if kwargs["canary_wave"] == LOW_CONCURRENCY_CANARY_WAVE:
+            raise ValueError("Concurrency-one acceptance absent")
+
+    monkeypatch.setattr(gate, "verify_inference_canaries", check)
+    with pytest.raises(ValueError, match="Concurrency-one acceptance absent"):
+        _submit_platform_wave(
+            SimpleNamespace(
+                wave=LOW_CONCURRENCY_PERFORMANCE_WAVE,
+                platform_profile="platforms/l40s.json",
+                venv_activate="/private/activate",
+            )
+        )
+    assert len(waves) == 3 and waves[-1] == LOW_CONCURRENCY_CANARY_WAVE
