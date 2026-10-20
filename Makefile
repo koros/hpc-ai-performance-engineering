@@ -514,3 +514,11 @@ submit-h100-nvlink-validation:
 
 verify-h100-nvlink-calibration:
 	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/verify_nvlink_calibration.py --result-root build/nvlink_calibration/h100 --output build/nvlink_calibration/h100/VALIDATED_CALIBRATION.json
+
+# Focused L40S Qwen7B follow-up; independent model-specific serving acceptance.
+.PHONY: check-qwen7b-layout verify-qwen7b-layout-canaries
+check-qwen7b-layout:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/generate_qwen_layout.py --check
+
+verify-qwen7b-layout-canaries:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/verify_qwen_layout_canaries.py

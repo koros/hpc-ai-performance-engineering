@@ -1,0 +1,104 @@
+{
+  "experiment_id": "E753",
+  "experiment": "qwen7b_equal_budget_layout_v1_tp2_dp4_p128_c8_performance",
+  "mode": "inference",
+  "workload": {
+    "name": "qwen2_5_7b_bf16_serving",
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "model_revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+    "dataset": "synthetic_token_prompts_v1",
+    "parameters": {
+      "inference_study_type": "qwen7b_equal_budget_layout_v1",
+      "framework": "vllm",
+      "serving_layout": "tp2_dp4",
+      "tensor_parallel_size": 2,
+      "data_parallel_size": 4,
+      "replica_count": 4,
+      "request_routing": "round_robin",
+      "batch_size": 1,
+      "concurrent_requests": 8,
+      "prompt_length": 128,
+      "max_new_tokens": 128,
+      "comparison_scope": "qwen7b_equal_budget_layout_v1_performance",
+      "warmup_steps": 5,
+      "ignore_eos": true,
+      "require_request_timestamps": true,
+      "max_model_len": 2048,
+      "enable_prefix_caching": false,
+      "gpu_memory_utilization": 0.85,
+      "comparison_control_id": "E752"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpus": 8,
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe"
+  },
+  "distributed": {
+    "strategy": "none",
+    "nodes": 1,
+    "gpus_per_node": 8,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 30,
+    "seed": 1337,
+    "output_dir": "results/raw",
+    "environment": {
+      "VLLM_USE_V1": "0",
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1"
+    }
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "serving_latency"
+    ],
+    "parameters": {
+      "collect_latency_distribution": true,
+      "collect_time_to_first_token": true,
+      "collect_memory_trace": true,
+      "collect_replica_scaling": true
+    }
+  },
+  "metadata": {
+    "serial_submission": true,
+    "matrix_id": "E753",
+    "template": "inference_serving",
+    "phase": "Qwen7B layout follow-up",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 8.0,
+    "matrix_stack_strategy": "vLLM tp2_dp4",
+    "objective": "Test whether the TinyLlama throughput-energy trade-off persists with Qwen7B",
+    "key_metrics": [
+      "throughput",
+      "latency_p95",
+      "latency_p99",
+      "goodput",
+      "replica_request_counts",
+      "memory"
+    ],
+    "source_experiment_ids": [],
+    "comparison_scope": "qwen7b_equal_budget_layout_v1_performance",
+    "study_family": "qwen7b_equal_budget_layout_v1",
+    "platform_wave": "qwen7b-layout-performance",
+    "research_questions": [
+      "RQ1",
+      "RQ4",
+      "RQ5",
+      "RQ6",
+      "RQ7"
+    ],
+    "analysis_tasks": [
+      "A02",
+      "A04",
+      "A06",
+      "A08"
+    ],
+    "limitation": "Planning allowance only; benchmark timings determine scheduling. Closed-round synthetic prompts; no production arrivals, quality or collective-time attribution."
+  }
+}

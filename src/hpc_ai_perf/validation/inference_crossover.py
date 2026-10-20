@@ -15,12 +15,18 @@ from hpc_ai_perf.validation.qwen7b_training import canary_contract_sha256
 from hpc_ai_perf.validation.scaling_acceptance import _manifest_entries
 
 
-def verify_inference_canaries(result_root: str | Path, platform: str) -> dict[str, str]:
+def verify_inference_canaries(
+    result_root: str | Path,
+    platform: str,
+    *,
+    config_root: str = "configs/inference_crossover",
+    canary_wave: str = CANARY_WAVE,
+) -> dict[str, str]:
     root = Path(result_root)
     checksums = _manifest_entries(root / "SHA256SUMS")
-    entries = {e.matrix_id: e for e in discover_experiment_configs("configs/inference_crossover")}
+    entries = {e.matrix_id: e for e in discover_experiment_configs(config_root)}
     profile = load_platform_profile(f"platforms/{platform}.json")
-    conditions = load_platform_conditions("platforms/execution_matrix.json", platform, wave=CANARY_WAVE)
+    conditions = load_platform_conditions("platforms/execution_matrix.json", platform, wave=canary_wave)
     if not conditions:
         raise ValueError(f"No inference crossover canary policy for {platform}")
     accepted = {}
@@ -89,4 +95,4 @@ def canary_issues(record, config, platform) -> list[str]:
 def _positive(value):
     import math
 
-    return isinstance(value, (int, float)) and math.isfinite(value) and value > 0
+    return isinstance(value, int | float) and math.isfinite(value) and value > 0
