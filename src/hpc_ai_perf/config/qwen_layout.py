@@ -6,6 +6,8 @@ from pathlib import Path
 
 CANARY_WAVE = "qwen7b-layout-canary"
 PERFORMANCE_WAVE = "qwen7b-layout-performance"
+EXTENSION_CANARY_WAVE = "qwen7b-layout-extension-canary"
+EXTENSION_PERFORMANCE_WAVE = "qwen7b-layout-extension-performance"
 CONFIG_ROOT = "configs/qwen_layout"
 STUDY = "qwen7b_equal_budget_layout_v1"
 
@@ -48,6 +50,35 @@ def design():
             matrix_stack_strategy=f"vLLM tp{tp}_dp{8 // tp}",
             objective="Test whether the TinyLlama throughput-energy trade-off persists with Qwen7B",
             gpu_hours_estimate=8 * (0.25 if canary else 1.0),
+        )
+        rows.append((eid, "l40s", wave, data))
+    return rows + extension_design(rows)
+
+
+def extension_design(original_rows):
+    """Add valid TP4; 28 query heads rule out TP8 for this pinned model."""
+    rows = []
+    specifications = [(True, 1280)]
+    specifications += [(False, prompt) for prompt in (128, 1280)]
+    for number, (canary, prompt) in enumerate(specifications, 756):
+        original = original_rows[0 if canary else (2 if prompt == 128 else 4)][3]
+        data = copy.deepcopy(original)
+        template_id = "E717"
+        template = json.loads(next(Path("configs/inference_crossover").glob(f"{template_id}_*.json")).read_text())
+        p = data["workload"]["parameters"]
+        for key in ("serving_layout", "tensor_parallel_size", "data_parallel_size", "replica_count", "request_routing"):
+            p[key] = template["workload"]["parameters"][key]
+        if not canary:
+            p["comparison_control_id"] = "E752" if prompt == 128 else "E754"
+        eid = f"E{number}"
+        wave = EXTENSION_CANARY_WAVE if canary else EXTENSION_PERFORMANCE_WAVE
+        data["experiment_id"] = eid
+        data["experiment"] = f"{STUDY}_{p['serving_layout']}_p{prompt}_c8_{'canary' if canary else 'performance'}"
+        data["metadata"].update(
+            matrix_id=eid,
+            platform_wave=wave,
+            matrix_stack_strategy=f"vLLM {p['serving_layout']}",
+            objective="Extend the Qwen7B throughput-energy comparison with TP4 replicas",
         )
         rows.append((eid, "l40s", wave, data))
     return rows

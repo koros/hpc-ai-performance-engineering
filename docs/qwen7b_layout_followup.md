@@ -73,3 +73,60 @@ reserved GPU time separately. No direct PCIe/NVLink attribution or quality claim
 Local regeneration: `python scripts/generate_qwen_layout.py`; validation:
 `make check-qwen7b-layout`. The existing TinyLlama generator and serving fingerprint
 remain unchanged. Recovery diagnostics are not benchmark acceptance evidence.
+
+## TP4 extension after the completed TP1/TP2 campaign
+
+The twelve performance trials showed TP2 winning throughput/energy for Qwen7B,
+with a long-prompt TTFT trade-off. Add TP4 × DP2 at the same eight-GPU budget,
+concurrency 8, two prompt lengths and fixed output budget. Existing E750–E755
+configs, comparison scope and serving runtime remain unchanged; do not rerun them.
+
+**TP8 is unsupported for this model:** the [pinned model configuration](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/blob/a09a35458c702b33eeacc393d103063234e8bc28/config.json)
+has 28 query heads, which divide evenly by TP1/TP2/TP4 but not TP8.
+The extension covers all these valid equal-budget power-of-two TP layouts;
+it does not claim exhaustive coverage of arbitrary GPU counts or concurrency.
+
+| Wave | ID | Shape | Trials |
+|---|---|---|---:|
+| qwen7b-layout-extension-canary | E756 | TP4 × DP2, prompt 1280 | 1 |
+| qwen7b-layout-extension-performance | E757 | TP4 × DP2, prompt 128 | 3 |
+| qwen7b-layout-extension-performance | E758 | TP4 × DP2, prompt 1280 | 3 |
+
+Seven new trials total. Performance uses existing TP1 controls E752/E754 and
+can also be compared with matched TP2 E753/E755. Repeat the login-node cache
+verification from above; no new model download is needed if its cache is intact.
+Check HPC state before submitting to avoid duplicating an existing attempt.
+
+With the modules and recovered environment active, run from the project root:
+
+```bash
+export PYTHONPATH="$PWD/src"
+python scripts/prepare_qwen_layout_model.py
+python -m hpc_ai_perf.cli submit-platform-wave \
+  --platform-profile platforms/l40s.json --wave qwen7b-layout-extension-canary \
+  --experiment-id E756 --venv-activate "$VIRTUAL_ENV/bin/activate_recovered_vllm"
+```
+
+When E756 is complete:
+
+```bash
+python -m hpc_ai_perf.cli collect-platform-wave \
+  --platform-profile platforms/l40s.json --wave qwen7b-layout-extension-canary
+python scripts/verify_qwen_layout_canaries.py --extension
+python -m hpc_ai_perf.cli verify-result-evidence --result-root results/raw
+```
+
+Stage and commit this acceptance before performance submission. The extension
+performance gate requires both original Qwen acceptance and new TP4 acceptance;
+it does not require fresh TP1/TP2 trials. Then submit:
+
+```bash
+python -m hpc_ai_perf.cli submit-platform-wave \
+  --platform-profile platforms/l40s.json --wave qwen7b-layout-extension-performance \
+  --venv-activate "$VIRTUAL_ENV/bin/activate_recovered_vllm"
+```
+
+Collect/validate/stage the six performance trials before analysis. Compare the
+three layouts within each matched prompt shape; preserve each independent trial.
+The extension is sequential in time, so inspect telemetry/clocks/runtime identity
+against the earlier controls before attributing differences to layout alone.

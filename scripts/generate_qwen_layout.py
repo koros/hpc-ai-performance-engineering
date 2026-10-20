@@ -5,7 +5,14 @@ import json
 import re
 from pathlib import Path
 
-from hpc_ai_perf.config.qwen_layout import CANARY_WAVE, CONFIG_ROOT, PERFORMANCE_WAVE, design
+from hpc_ai_perf.config.qwen_layout import (
+    CANARY_WAVE,
+    CONFIG_ROOT,
+    EXTENSION_CANARY_WAVE,
+    EXTENSION_PERFORMANCE_WAVE,
+    PERFORMANCE_WAVE,
+    design,
+)
 
 
 def main():
@@ -16,7 +23,7 @@ def main():
     expected = {}
     for eid, platform, wave, data in rows:
         p = data["workload"]["parameters"]
-        role = "canary" if wave == CANARY_WAVE else "performance"
+        role = "canary" if wave in (CANARY_WAVE, EXTENSION_CANARY_WAVE) else "performance"
         stem = f"{eid}_{platform}_{p['serving_layout']}_p{p['prompt_length']}_c{p['concurrent_requests']}_{role}"
         expected[Path(CONFIG_ROOT) / f"{stem}.json"] = json.dumps(data, indent=2) + "\n"
     matrix_path = Path("platforms/execution_matrix.json")
@@ -28,7 +35,7 @@ def main():
     )
     blocks = []
     for platform in ("l40s",):
-        for wave in (CANARY_WAVE, PERFORMANCE_WAVE):
+        for wave in (CANARY_WAVE, PERFORMANCE_WAVE, EXTENSION_CANARY_WAVE, EXTENSION_PERFORMANCE_WAVE):
             ids = [eid for eid, p, w, _ in rows if p == platform and w == wave]
             blocks.append(
                 {
@@ -36,7 +43,7 @@ def main():
                     "wave": wave,
                     "name": f"{platform.upper()} equal-budget inference {wave}",
                     "experiment_ids": ids,
-                    "required_trials": 1 if wave == CANARY_WAVE else 3,
+                    "required_trials": 1 if wave in (CANARY_WAVE, EXTENSION_CANARY_WAVE) else 3,
                     "comparability": "exact",
                 }
             )
@@ -65,7 +72,10 @@ def main():
         for path, text in expected.items():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text)
-    print(f"Qwen layout design: {len(rows)} configs; 2 canaries and 12 performance trials")
+    print(
+        f"Qwen layout design: {len(rows)} configs; 3 canaries and 18 performance trials "
+        "(including completed original study)"
+    )
 
 
 if __name__ == "__main__":
