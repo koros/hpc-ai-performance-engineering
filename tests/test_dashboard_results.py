@@ -58,3 +58,11 @@ def test_dashboard_refresh_is_current_and_repeatable():
         actual = hashlib.sha256(path.read_bytes()).hexdigest()
         expected_hash = hashlib.sha256(content.encode()).hexdigest()
         assert actual == expected_hash, f"Refresh {path}"
+
+
+def test_training_followups_are_not_rendered_as_inference_layouts():
+    catalog, _ = build_catalog()
+    assert catalog["experiments"]["E779"]["mode"] == "training"
+    html = inference_section(catalog)
+    assert "E779@l40s" not in html
+    assert "E790@l40s" not in html

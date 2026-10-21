@@ -541,3 +541,10 @@ check-microbatch-accumulation:
 
 verify-microbatch-accumulation-canaries:
 	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/verify_microbatch_accumulation_canaries.py
+
+.PHONY: check-topology-recovery verify-topology-recovery-canaries
+check-topology-recovery:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/generate_topology_recovery.py --check
+
+verify-topology-recovery-canaries:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/verify_topology_recovery_canaries.py

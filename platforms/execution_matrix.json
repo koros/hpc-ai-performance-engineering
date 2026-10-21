@@ -83,6 +83,22 @@
     },
     {
       "platform": "l40s",
+      "wave": "topology-recovery-canary",
+      "name": "L40S topology-recovery-canary",
+      "experiment_ids": ["E791", "E792", "E793", "E794", "E795"],
+      "required_trials": 1,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "topology-recovery-performance",
+      "name": "L40S topology-recovery-performance",
+      "experiment_ids": ["E796", "E797", "E798", "E799", "E800", "E801", "E802", "E803", "E804", "E805", "E806", "E807", "E808", "E809"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
       "wave": "microbatch-accumulation-canary",
       "name": "L40S microbatch-accumulation-canary",
       "experiment_ids": ["E773", "E774", "E775", "E776", "E777", "E778"],

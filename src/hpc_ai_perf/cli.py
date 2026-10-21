@@ -1290,6 +1290,16 @@ def _submit_platform_wave(args: argparse.Namespace):
                 config_root=CONFIG_ROOT,
                 canary_wave=canary_wave,
             )
+    if args.wave.startswith("topology-recovery-"):
+        from hpc_ai_perf.config.topology_recovery import CANARY_WAVE, PERFORMANCE_WAVE
+        from hpc_ai_perf.validation.topology_recovery import verify_topology_canaries
+
+        if profile.platform_id != "l40s" or args.wave not in {CANARY_WAVE, PERFORMANCE_WAVE}:
+            raise ValueError("Topology recovery supports only its two L40S waves")
+        if not args.venv_activate:
+            raise ValueError("Topology recovery requires an explicit recovered runtime activation")
+        if args.wave == PERFORMANCE_WAVE:
+            verify_topology_canaries(Path("results/raw/l40s"), execution_matrix=args.execution_matrix)
     if args.wave.startswith("microbatch-accumulation-"):
         from hpc_ai_perf.config.microbatch_accumulation import CANARY_WAVE, PERFORMANCE_WAVE
         from hpc_ai_perf.validation.microbatch_accumulation import verify_microbatch_canaries

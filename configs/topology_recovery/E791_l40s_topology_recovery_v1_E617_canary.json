@@ -1,0 +1,112 @@
+{
+  "experiment_id": "E791",
+  "experiment": "l40s_topology_recovery_v1_E617_canary",
+  "mode": "training",
+  "workload": {
+    "name": "gpt2_small",
+    "model": "gpt2",
+    "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "dataset": "synthetic_global_batches_v1",
+    "parameters": {
+      "scaling_study_id": "l40s_topology_recovery_v1",
+      "scaling_role": "canary",
+      "scaling_type": "weak",
+      "fixed_workload": false,
+      "input_protocol": "synthetic_global_batches_v1",
+      "stack": "ddp",
+      "per_gpu_batch_size": 8,
+      "global_batch_size": 64,
+      "gradient_accumulation_steps": 1,
+      "sequence_length": 1024,
+      "warmup_steps": 10,
+      "learning_rate": 5e-05,
+      "model_load_dtype": "fp32",
+      "attention_backend": "sdpa",
+      "activation_checkpointing": false,
+      "training_update_diagnostics": true,
+      "capture_gpu_topology": true,
+      "scaling_weak_per_gpu_batch_size": 8,
+      "comparison_scope": "l40s_topology_recovery_v1"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpus": 8,
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 8,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 20,
+    "seed": 1337,
+    "output_dir": "results/raw",
+    "environment": {
+      "OMP_NUM_THREADS": "1",
+      "NCCL_ALGO": "allreduce:Tree",
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1",
+      "NCCL_DEBUG": "INFO",
+      "NCCL_DEBUG_SUBSYS": "INIT,ENV,GRAPH"
+    }
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory",
+      "nccl"
+    ],
+    "parameters": {
+      "sample_interval_seconds": 0.1
+    }
+  },
+  "metadata": {
+    "matrix_id": "E791",
+    "phase": "L40S topology recovery",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.4665,
+    "serial_submission": true,
+    "objective": "Recover interrupted topology comparisons with current-runtime matched controls",
+    "scaling_studies": [
+      "S6:topology"
+    ],
+    "research_questions": [
+      "RQ1",
+      "RQ4",
+      "RQ6",
+      "RQ7"
+    ],
+    "analysis_tasks": [
+      "A01",
+      "A03",
+      "A04",
+      "A05",
+      "A07"
+    ],
+    "key_metrics": [
+      "throughput",
+      "scaling_efficiency",
+      "step_time_p95",
+      "gpu_hours",
+      "memory",
+      "input_identity"
+    ],
+    "estimated_peak_memory_gb": 16.0,
+    "comparison_scope": "l40s_topology_recovery_v1",
+    "platform_wave": "topology-recovery-canary",
+    "study_family": "l40s_topology_recovery_v1",
+    "source_experiment_ids": [
+      "E617"
+    ],
+    "study_design_note": "recovery of interrupted S6; collective-scoped algorithm correction",
+    "historical_evidence_policy": "preserve separately; never pool across historical/current runtime cohorts",
+    "historical_source_config_sha256": "cfbf0f0c3f4f6e702c0f369bb46b075ac0a44eb45467648fd800e1f45c38ab1b",
+    "algorithm_scope": "allreduce only; other collectives use automatic selection"
+  }
+}

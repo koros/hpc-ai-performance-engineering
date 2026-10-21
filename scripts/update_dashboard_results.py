@@ -251,7 +251,7 @@ def inference_section(catalog):
     experiments = catalog["experiments"]
     groups = defaultdict(list)
     for eid, e in experiments.items():
-        if int(eid[1:]) < 715 or "canary" in e["phase"] or e["status"] != "Completed":
+        if e.get("mode") != "inference" or int(eid[1:]) < 715 or "canary" in e["phase"] or e["status"] != "Completed":
             continue
         for platform, m in e["platforms"].items():
             if m["coverage_status"] != "Completed":
