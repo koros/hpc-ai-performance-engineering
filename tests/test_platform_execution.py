@@ -353,8 +353,12 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
     l40s_scaling_diagnostic_ids = {"E318", "E319"}
     deep_dive = scaling_deep_dive.design()
     from hpc_ai_perf.config.inference_crossover import design as inference_design
+    from hpc_ai_perf.config.qwen_layout import design as qwen_design
 
     inference_rows = inference_design()
+    qwen_rows = qwen_design()
+    l40s_qwen_ids = {eid for eid, platform, _, _ in qwen_rows if platform == "l40s"}
+    assert all(platform == "l40s" for _, platform, _, _ in qwen_rows)
     l40s_inference_ids = {eid for eid, p, _, _ in inference_rows if p == "l40s"}
     h100_inference_ids = {eid for eid, p, _, _ in inference_rows if p == "h100"}
     l40s_deep_dive_ids = {eid for eid, condition, _ in deep_dive if "l40s" in condition.run_platforms}
@@ -362,6 +366,10 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
 
     l40s_conditions = load_platform_conditions("platforms/execution_matrix.json", "l40s")
     h100_conditions = load_platform_conditions("platforms/execution_matrix.json", "h100")
+
+    for conditions in (l40s_conditions, h100_conditions):
+        assert len(conditions) == len({condition.matrix_id for condition in conditions})
+    assert not l40s_qwen_ids & {condition.matrix_id for condition in h100_conditions}
 
     assert len([condition for condition in l40s_conditions if condition.matrix_id in source_ids]) == 200
     assert {condition.matrix_id for condition in l40s_conditions if condition.matrix_id in source_ids} == source_ids
@@ -374,6 +382,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         | l40s_scaling_diagnostic_ids
         | l40s_deep_dive_ids
         | l40s_inference_ids
+        | l40s_qwen_ids
     )
     assert len(h100_conditions) == 267 + len(shared_scaling_ids) + len(h100_deep_dive_ids) + len(
         shared_inference_ids
