@@ -82,6 +82,22 @@
       "comparability": "exact"
     },
     {
+      "platform": "l40s",
+      "wave": "microbatch-accumulation-canary",
+      "name": "L40S microbatch-accumulation-canary",
+      "experiment_ids": ["E773", "E774", "E775", "E776", "E777", "E778"],
+      "required_trials": 1,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "microbatch-accumulation-performance",
+      "name": "L40S microbatch-accumulation-performance",
+      "experiment_ids": ["E779", "E780", "E781", "E782", "E783", "E784", "E785", "E786", "E787", "E788", "E789", "E790"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
       "platform": "h100",
       "wave": "scaling-batch-canary",
       "name": "H100 controlled scaling input and capacity acceptance",

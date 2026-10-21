@@ -1,0 +1,132 @@
+{
+  "experiment_id": "E788",
+  "experiment": "tinyllama_microbatch_accumulation_v1_tinyllama_mb4_seq1024_ga4_2gpu",
+  "mode": "training",
+  "workload": {
+    "name": "tinyllama",
+    "model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "model_revision": "fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+    "dataset": "synthetic_global_batches_v1",
+    "parameters": {
+      "scaling_study_id": "tinyllama_microbatch_accumulation_v1",
+      "scaling_role": "performance",
+      "scaling_type": "weak",
+      "fixed_workload": false,
+      "input_protocol": "synthetic_global_batches_v1",
+      "stack": "ddp",
+      "per_gpu_batch_size": 4,
+      "global_batch_size": 32,
+      "gradient_accumulation_steps": 4,
+      "sequence_length": 1024,
+      "warmup_steps": 10,
+      "learning_rate": 5e-05,
+      "model_load_dtype": "fp32",
+      "attention_backend": "sdpa",
+      "activation_checkpointing": false,
+      "training_update_diagnostics": true,
+      "capture_gpu_topology": true,
+      "scaling_weak_per_gpu_batch_size": 4,
+      "comparison_scope": "tinyllama_microbatch_accumulation_v1"
+    }
+  },
+  "hardware": {
+    "platform": "lovelace_l40s",
+    "gpus": 2,
+    "gpu_model": "NVIDIA L40S 48GB",
+    "interconnect": "PCIe"
+  },
+  "distributed": {
+    "strategy": "ddp",
+    "nodes": 1,
+    "gpus_per_node": 2,
+    "backend": "nccl"
+  },
+  "runtime": {
+    "precision": "bf16",
+    "max_steps": 200,
+    "seed": 1337,
+    "output_dir": "results/raw",
+    "environment": {
+      "OMP_NUM_THREADS": "1",
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1"
+    }
+  },
+  "profiling": {
+    "enabled": true,
+    "profilers": [
+      "nvidia_smi",
+      "torch_memory",
+      "nccl"
+    ],
+    "parameters": {
+      "sample_interval_seconds": 0.1
+    }
+  },
+  "metadata": {
+    "matrix_id": "E788",
+    "phase": "Microbatch accumulation follow-up",
+    "priority": "Must Have",
+    "gpu_hours_estimate": 0.433,
+    "serial_submission": true,
+    "objective": "Measure microbatch versus accumulation at matched effective batch per GPU",
+    "scaling_studies": [
+      "MB:microbatch-accumulation"
+    ],
+    "research_questions": [
+      "RQ1",
+      "RQ4",
+      "RQ5",
+      "RQ7"
+    ],
+    "analysis_tasks": [
+      "A01",
+      "A03",
+      "A04",
+      "A05",
+      "A07"
+    ],
+    "key_metrics": [
+      "throughput",
+      "scaling_efficiency",
+      "step_time_p95",
+      "gpu_hours",
+      "memory",
+      "input_identity"
+    ],
+    "estimated_peak_memory_gb": 35.3,
+    "comparison_scope": "tinyllama_microbatch_accumulation_v1",
+    "study_family": "tinyllama_microbatch_accumulation_v1",
+    "platform_wave": "microbatch-accumulation-performance",
+    "study_design_note": "follow-up motivated by observed results",
+    "study_design": "exploratory_sequential_follow_up",
+    "motivating_experiment_ids": [
+      "E418",
+      "E419",
+      "E420",
+      "E421",
+      "E422",
+      "E423",
+      "E424",
+      "E425",
+      "E426",
+      "E427",
+      "E428",
+      "E429",
+      "E430",
+      "E431",
+      "E432",
+      "E433"
+    ],
+    "follow_up_planned_on": "2026-10-21",
+    "planned_after_results_commit": "11bdd72",
+    "effective_batch_per_gpu": 16,
+    "historical_control_ids": [
+      "E426",
+      "E427",
+      "E428",
+      "E429"
+    ],
+    "historical_control_reuse": "context only: historical runtime fingerprints differ"
+  }
+}

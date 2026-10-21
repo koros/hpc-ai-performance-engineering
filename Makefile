@@ -534,3 +534,10 @@ check-dashboard-data:
 .PHONY: export-plot-data
 export-plot-data:
 	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/export_plot_data.py
+
+.PHONY: check-microbatch-accumulation verify-microbatch-accumulation-canaries
+check-microbatch-accumulation:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/generate_microbatch_accumulation.py --check
+
+verify-microbatch-accumulation-canaries:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/verify_microbatch_accumulation_canaries.py

@@ -383,6 +383,7 @@ def test_execution_matrix_routes_every_experiment_once_per_platform() -> None:
         | l40s_deep_dive_ids
         | l40s_inference_ids
         | l40s_qwen_ids
+        | {f"E{index}" for index in range(773, 791)}
     )
     assert len(h100_conditions) == 267 + len(shared_scaling_ids) + len(h100_deep_dive_ids) + len(
         shared_inference_ids
