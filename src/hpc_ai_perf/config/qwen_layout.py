@@ -10,6 +10,8 @@ EXTENSION_CANARY_WAVE = "qwen7b-layout-extension-canary"
 EXTENSION_PERFORMANCE_WAVE = "qwen7b-layout-extension-performance"
 LOW_CONCURRENCY_CANARY_WAVE = "qwen7b-layout-low-concurrency-canary"
 LOW_CONCURRENCY_PERFORMANCE_WAVE = "qwen7b-layout-low-concurrency-performance"
+MID_CONCURRENCY_CANARY_WAVE = "qwen7b-layout-mid-concurrency-canary"
+MID_CONCURRENCY_PERFORMANCE_WAVE = "qwen7b-layout-mid-concurrency-performance"
 CONFIG_ROOT = "configs/qwen_layout"
 STUDY = "qwen7b_equal_budget_layout_v1"
 
@@ -55,7 +57,8 @@ def design():
         )
         rows.append((eid, "l40s", wave, data))
     completed = rows + extension_design(rows)
-    return completed + low_concurrency_design(completed)
+    completed += low_concurrency_design(completed)
+    return completed + mid_concurrency_design(completed)
 
 
 def extension_design(original_rows):
@@ -116,5 +119,36 @@ def low_concurrency_design(completed):
             phase="Qwen7B layout acceptance" if canary else "Qwen7B layout follow-up",
             gpu_hours_estimate=8 * (0.25 if canary else 1.0),
         )
+        rows.append((eid, "l40s", wave, data))
+    return rows
+
+
+def mid_concurrency_design(completed):
+    """Concurrency-four comparison targeting the observed TP2/TP4 energy reversal."""
+    by_id = {row[0]: row[3] for row in completed}
+    rows = []
+    for number, (canary, tp) in enumerate([(True, 2), (True, 4), (False, 2), (False, 4)], 765):
+        data = copy.deepcopy(by_id["E763" if tp == 2 else "E764"])
+        eid = f"E{number}"
+        wave = MID_CONCURRENCY_CANARY_WAVE if canary else MID_CONCURRENCY_PERFORMANCE_WAVE
+        p = data["workload"]["parameters"]
+        p.update(concurrent_requests=4, warmup_steps=2 if canary else 5)
+        p.pop("comparison_control_id", None)
+        if not canary and tp == 4:
+            p["comparison_control_id"] = "E767"
+        data["runtime"]["max_steps"] = 2 if canary else 30
+        p["comparison_scope"] = f"{STUDY}_{'canary' if canary else 'performance'}"
+        data["experiment_id"] = eid
+        data["experiment"] = f"{STUDY}_{p['serving_layout']}_p1280_c4_{'canary' if canary else 'performance'}"
+        data["metadata"].update(
+            matrix_id=eid,
+            platform_wave=wave,
+            comparison_scope=p["comparison_scope"],
+            concurrency_reference_ids=["E763", "E755"] if tp == 2 else ["E764", "E758"],
+            objective="Locate the TP2/TP4 energy-efficiency ranking change across concurrency",
+            gpu_hours_estimate=8 * (0.25 if canary else 1.0),
+            phase="Qwen7B layout acceptance" if canary else "Qwen7B layout follow-up",
+        )
+        data["metadata"].pop("concurrency_reference_id", None)
         rows.append((eid, "l40s", wave, data))
     return rows

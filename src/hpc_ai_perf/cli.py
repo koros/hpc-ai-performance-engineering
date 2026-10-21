@@ -1283,6 +1283,8 @@ def _submit_platform_wave(args: argparse.Namespace):
             EXTENSION_PERFORMANCE_WAVE,
             LOW_CONCURRENCY_CANARY_WAVE,
             LOW_CONCURRENCY_PERFORMANCE_WAVE,
+            MID_CONCURRENCY_CANARY_WAVE,
+            MID_CONCURRENCY_PERFORMANCE_WAVE,
             PERFORMANCE_WAVE,
         )
         from hpc_ai_perf.validation.inference_crossover import verify_inference_canaries
@@ -1290,6 +1292,8 @@ def _submit_platform_wave(args: argparse.Namespace):
         if profile.platform_id != "l40s" or args.wave not in {
             CANARY_WAVE,
             PERFORMANCE_WAVE,
+            MID_CONCURRENCY_CANARY_WAVE,
+            MID_CONCURRENCY_PERFORMANCE_WAVE,
             LOW_CONCURRENCY_CANARY_WAVE,
             LOW_CONCURRENCY_PERFORMANCE_WAVE,
             EXTENSION_CANARY_WAVE,
@@ -1298,26 +1302,42 @@ def _submit_platform_wave(args: argparse.Namespace):
             raise ValueError("Qwen layout follow-up supports only its L40S canary/performance waves")
         if not args.venv_activate:
             raise ValueError("Qwen layout follow-up requires an explicit certified vLLM environment")
-        if args.wave in {PERFORMANCE_WAVE, EXTENSION_PERFORMANCE_WAVE, LOW_CONCURRENCY_PERFORMANCE_WAVE}:
+        if args.wave in {
+            PERFORMANCE_WAVE,
+            EXTENSION_PERFORMANCE_WAVE,
+            LOW_CONCURRENCY_PERFORMANCE_WAVE,
+            MID_CONCURRENCY_PERFORMANCE_WAVE,
+        }:
             verify_inference_canaries(
                 Path("results/raw") / profile.platform_id,
                 profile.platform_id,
                 config_root=CONFIG_ROOT,
                 canary_wave=CANARY_WAVE,
             )
-        if args.wave in {EXTENSION_PERFORMANCE_WAVE, LOW_CONCURRENCY_PERFORMANCE_WAVE}:
+        if args.wave in {
+            EXTENSION_PERFORMANCE_WAVE,
+            LOW_CONCURRENCY_PERFORMANCE_WAVE,
+            MID_CONCURRENCY_PERFORMANCE_WAVE,
+        }:
             verify_inference_canaries(
                 Path("results/raw") / profile.platform_id,
                 profile.platform_id,
                 config_root=CONFIG_ROOT,
                 canary_wave=EXTENSION_CANARY_WAVE,
             )
-        if args.wave == LOW_CONCURRENCY_PERFORMANCE_WAVE:
+        if args.wave in {LOW_CONCURRENCY_PERFORMANCE_WAVE, MID_CONCURRENCY_PERFORMANCE_WAVE}:
             verify_inference_canaries(
                 Path("results/raw") / profile.platform_id,
                 profile.platform_id,
                 config_root=CONFIG_ROOT,
                 canary_wave=LOW_CONCURRENCY_CANARY_WAVE,
+            )
+        if args.wave == MID_CONCURRENCY_PERFORMANCE_WAVE:
+            verify_inference_canaries(
+                Path("results/raw") / profile.platform_id,
+                profile.platform_id,
+                config_root=CONFIG_ROOT,
+                canary_wave=MID_CONCURRENCY_CANARY_WAVE,
             )
     if args.wave == "scaling-batch-crossover":
         from hpc_ai_perf.validation.scaling_acceptance import verify_scaling_canaries

@@ -183,3 +183,50 @@ activation; expect nine trials. Collect/validate/commit before deciding whether
 intermediate concurrency 2/4 would add useful evidence. Do not queue those
 follow-ups automatically. The sequential-in-time caveat for prior controls still
 applies; compare runtime identities, clock and telemetry before strong attribution.
+
+## Concurrency-four energy ranking follow-up
+
+The concurrency-one performance trials slightly favoured TP2 throughput and
+used less J/output token than TP4. At concurrency 8, TP4 used less J/output token.
+Measure the intermediate concurrency **4**, retaining prompt 1,280, output 128,
+eight L40S GPUs, identical model revision, precision, seed, runtime and telemetry.
+This narrows the observed energy-ranking reversal; it does not measure an exact
+threshold or assume a monotonic relationship. Concurrency 2 remains unmeasured.
+
+| Wave | IDs | Layouts | Trials |
+|---|---|---|---:|
+| qwen7b-layout-mid-concurrency-canary | E765/E766 | TP2×DP4 / TP4×DP2 | 2 |
+| qwen7b-layout-mid-concurrency-performance | E767/E768 | Same | 6 |
+
+Canaries use two warmup and two measured rounds (eight requests total); both
+layouts receive perfectly balanced routing. Performance uses five warmup and
+thirty measured rounds, three repetitions: 120 requests / 15,360 output tokens
+per trial. E767 is the within-concurrency TP2 control for E768. Metadata records
+the matched concurrency-one and concurrency-eight reference IDs.
+Completed configurations and the serving runtime fingerprint remain unchanged;
+do not rerun prior trials. Keep the recovered runtime and private package tree
+fixed, and inspect telemetry against prior runs when interpreting comparisons.
+
+With modules/recovered activation loaded and `PYTHONPATH="$PWD/src"`:
+
+```bash
+python scripts/prepare_qwen_layout_model.py
+python -m hpc_ai_perf.cli submit-platform-wave \
+  --platform-profile platforms/l40s.json --wave qwen7b-layout-mid-concurrency-canary \
+  --venv-activate "$VIRTUAL_ENV/bin/activate_recovered_vllm"
+```
+
+After both finish, collect, then verify:
+
+```bash
+python -m hpc_ai_perf.cli collect-platform-wave \
+  --platform-profile platforms/l40s.json --wave qwen7b-layout-mid-concurrency-canary
+python scripts/verify_qwen_layout_canaries.py --mid-concurrency
+python -m hpc_ai_perf.cli verify-result-evidence --result-root results/raw
+```
+
+The verifier requires eight accepted Qwen canaries across all completed shapes.
+Stage/commit acceptance, then submit `qwen7b-layout-mid-concurrency-performance`
+with the same activation. Expect six performance trials. The CLI enforces the
+shape-specific acceptance gate before creating a bundle. Collect, validate and
+commit before choosing any further concurrency points.
