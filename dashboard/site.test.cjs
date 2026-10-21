@@ -38,8 +38,8 @@ assert.equal(
   catalogData.meta.completed + catalogData.meta.configured + catalogData.meta.deferred,
   catalogData.meta.total,
 );
-assert.equal(catalogData.meta.completed, 271);
-assert.equal(catalogData.meta.configured, 12);
+assert.equal(catalogData.meta.completed, Object.values(catalogData.experiments).filter((e) => e.status === "Completed").length);
+assert.equal(catalogData.meta.configured, Object.values(catalogData.experiments).filter((e) => e.status === "Configured").length);
 const energyPhase = catalogData.themes.flatMap((theme) => theme.phases)
   .find((phase) => phase.id === "hardware-energy-revalidation");
 assert.equal(energyPhase.totals.completed, 4);
@@ -218,7 +218,28 @@ const shownTotals = catalogContext.catalogTotals(Object.keys(catalogContext.DATA
 assert.equal(shownTotals.total, catalogData.meta.total);
 assert.equal(shownTotals.completed + shownTotals.configured + shownTotals.deferred + shownTotals.oom_limited, shownTotals.total);
 assert.equal(shownTotals.oom_limited, 8);
-assert.equal(shownTotals.configured, 2);
+assert.equal(shownTotals.configured, catalogData.meta.configured - 10);
 assert.equal(shownTotals.deferred, 12);
 
+// Current catalog and findings must expose the new evidence without claiming pending trials.
+const configRoot = path.join(root, "..", "configs");
+const configuredIds = new Set(fs.readdirSync(configRoot, { recursive: true })
+  .filter((name) => name.endsWith(".json"))
+  .map((name) => JSON.parse(fs.readFileSync(path.join(configRoot, name), "utf8")).experiment_id)
+  .filter((id) => /^E\d+$/.test(id)));
+assert.equal(catalogData.meta.total, configuredIds.size);
+for (const id of ["E722", "E737", "E752", "E758", "E762", "E763", "E764"]) {
+  assert.equal(catalogData.experiments[id].platforms.l40s.n, 3);
+  assert.equal(detailsData[id].platforms.lovelace_l40s.n, 3);
+  assert.match(findings, new RegExp(id + "@l40s"));
+}
+if (!fs.existsSync(path.join(root, "..", "results", "raw", "l40s", "E767"))) {
+  assert.equal(catalogData.experiments.E767.status, "Configured");
+  assert.deepEqual(catalogData.experiments.E767.platforms, {});
+}
+assert.match(catalogContext.renderExpCard("E764"), /tp4_dp2/);
+assert.match(catalogContext.renderExpCard("E764"), /Energy\/output token/);
+assert.match(findings, /id="inference-parallelization"/);
+assert.match(findings, /Acceptance trials are excluded/);
+assert.match(findings, /within-trial percentiles/);
 console.log("Dashboard catalog and findings checks passed.");

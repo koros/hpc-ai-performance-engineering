@@ -1,17 +1,15 @@
 # Research Dashboard — Experiment Catalog & plain-language summary
 
-This is the published dashboard. The catalog includes the verified L40S hardware-energy anchors
-E235–E238, the TinyLlama strategy sweep E277–E286, and the TinyLlama weak-scaling wave E287–E293
-(three trials per condition; E287–E289 on H100, completed 1 October, and E290–E293 on L40S).
-The main findings carry a base narrative snapshot through 27 September, plus two dated
-TinyLlama RQ1/RQ2 extensions from 30 September and 1 October (strategy sweep, then weak scaling). Matrix
-additions beyond this wave (the Qwen2.5-3B distributed-strategy study and the Qwen2.5-7B BF16
-serving study) are configured/blocked with no completed trials yet, so they are not in this
-catalog snapshot. The original `dashboard3/` files remain as the source reference.
+This is the published dashboard. The catalog now covers every checked-in E-number
+condition, including the collected scaling deep dives and the TinyLlama/Qwen7B
+inference layout campaigns. Both pages embed their JSON for offline use.
+The current inference tables are regenerated from checksum-verified raw evidence;
+older research-question cards retain their explicitly dated historical scope.
+Canaries are listed in the catalog but excluded from performance findings.
 
 Two self-contained pages (no build step, no dependencies), meant to be read in order:
 
-1. **`index.html` — Part 1, Experiment Catalog.** The current 286-condition catalog snapshot,
+1. **`index.html` — Part 1, Experiment Catalog.** The current full-matrix catalog,
    grouped by research theme and study, with filters and an automatic "held constant vs. varied"
    breakdown per comparison, plus a click-through details view. The catalog overlays platform-specific
    CUDA OOM deferrals from `platforms/execution_matrix.json`: a condition may be complete on H100
@@ -84,7 +82,22 @@ build step. It's kept alongside both pages for reference/regeneration but isn't 
 runtime. (Part 1's own, complete per-experiment dataset is embedded the same way in `index.html`,
 and also kept alongside as `experiments-data.json`.)
 
-## Regenerating it
+## Refreshing current results
+
+Run `make refresh-dashboard PYTHON=python` after pulling or collecting results.
+This updates both JSON files, the embedded catalog/details, current inference
+charts/tables and coverage counts. `make refresh` also runs this step, so the
+publication workflow refreshes the dashboard before its checks and build.
+Use `make check-dashboard-data PYTHON=python` to detect stale generated content.
+
+The updater retains the original E001–E293 narrative snapshot and adds subsequent
+configured conditions plus latest collected cohorts per platform. It never pools
+different config hashes or serving-runtime fingerprints. Platform statuses distinguish
+complete from partial collection. New performance tables use trial means, display
+throughput ranges, and report measured-region energy per generated output token.
+Click source IDs in the analysis tables to inspect exact condition/platform details.
+
+## Historical narrative sources
 
 The figures embedded in `analysis.html` (Part 2) were computed from these files as of the date in
 the page's snapshot line:
