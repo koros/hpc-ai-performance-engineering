@@ -7,6 +7,8 @@ from pathlib import Path
 
 from hpc_ai_perf.config.qwen_layout import (
     CANARY_WAVE,
+    CONCURRENCY_TWO_CANARY_WAVE,
+    CONCURRENCY_TWO_PERFORMANCE_WAVE,
     CONFIG_ROOT,
     EXTENSION_CANARY_WAVE,
     EXTENSION_PERFORMANCE_WAVE,
@@ -29,7 +31,14 @@ def main():
         p = data["workload"]["parameters"]
         role = (
             "canary"
-            if wave in (CANARY_WAVE, EXTENSION_CANARY_WAVE, LOW_CONCURRENCY_CANARY_WAVE, MID_CONCURRENCY_CANARY_WAVE)
+            if wave
+            in (
+                CANARY_WAVE,
+                EXTENSION_CANARY_WAVE,
+                LOW_CONCURRENCY_CANARY_WAVE,
+                MID_CONCURRENCY_CANARY_WAVE,
+                CONCURRENCY_TWO_CANARY_WAVE,
+            )
             else "performance"
         )
         stem = f"{eid}_{platform}_{p['serving_layout']}_p{p['prompt_length']}_c{p['concurrent_requests']}_{role}"
@@ -52,6 +61,8 @@ def main():
             LOW_CONCURRENCY_PERFORMANCE_WAVE,
             MID_CONCURRENCY_CANARY_WAVE,
             MID_CONCURRENCY_PERFORMANCE_WAVE,
+            CONCURRENCY_TWO_CANARY_WAVE,
+            CONCURRENCY_TWO_PERFORMANCE_WAVE,
         ):
             ids = [eid for eid, p, w, _ in rows if p == platform and w == wave]
             blocks.append(
@@ -62,7 +73,13 @@ def main():
                     "experiment_ids": ids,
                     "required_trials": 1
                     if wave
-                    in (CANARY_WAVE, EXTENSION_CANARY_WAVE, LOW_CONCURRENCY_CANARY_WAVE, MID_CONCURRENCY_CANARY_WAVE)
+                    in (
+                        CANARY_WAVE,
+                        EXTENSION_CANARY_WAVE,
+                        LOW_CONCURRENCY_CANARY_WAVE,
+                        MID_CONCURRENCY_CANARY_WAVE,
+                        CONCURRENCY_TWO_CANARY_WAVE,
+                    )
                     else 3,
                     "comparability": "exact",
                 }
@@ -93,7 +110,7 @@ def main():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text)
     print(
-        f"Qwen layout design: {len(rows)} configs; 8 canaries and 33 performance trials "
+        f"Qwen layout design: {len(rows)} configs; 10 canaries and 39 performance trials "
         "(including completed original study)"
     )
 

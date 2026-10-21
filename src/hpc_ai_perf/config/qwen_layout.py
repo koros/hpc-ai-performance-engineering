@@ -12,6 +12,8 @@ LOW_CONCURRENCY_CANARY_WAVE = "qwen7b-layout-low-concurrency-canary"
 LOW_CONCURRENCY_PERFORMANCE_WAVE = "qwen7b-layout-low-concurrency-performance"
 MID_CONCURRENCY_CANARY_WAVE = "qwen7b-layout-mid-concurrency-canary"
 MID_CONCURRENCY_PERFORMANCE_WAVE = "qwen7b-layout-mid-concurrency-performance"
+CONCURRENCY_TWO_CANARY_WAVE = "qwen7b-layout-concurrency2-canary"
+CONCURRENCY_TWO_PERFORMANCE_WAVE = "qwen7b-layout-concurrency2-performance"
 CONFIG_ROOT = "configs/qwen_layout"
 STUDY = "qwen7b_equal_budget_layout_v1"
 
@@ -58,7 +60,8 @@ def design():
         rows.append((eid, "l40s", wave, data))
     completed = rows + extension_design(rows)
     completed += low_concurrency_design(completed)
-    return completed + mid_concurrency_design(completed)
+    completed += mid_concurrency_design(completed)
+    return completed + concurrency_two_design(completed)
 
 
 def extension_design(original_rows):
@@ -152,3 +155,61 @@ def mid_concurrency_design(completed):
         data["metadata"].pop("concurrency_reference_id", None)
         rows.append((eid, "l40s", wave, data))
     return rows
+
+
+def concurrency_two_design(completed):
+    """Follow-up motivated by observed results, selected after the C1/C4 energy reversal."""
+    by_id = {row[0]: row[3] for row in completed}
+    rows = []
+    for number, (canary, tp) in enumerate([(True, 2), (True, 4), (False, 2), (False, 4)], 769):
+        data = copy.deepcopy(by_id["E767" if tp == 2 else "E768"])
+        eid = f"E{number}"
+        wave = CONCURRENCY_TWO_CANARY_WAVE if canary else CONCURRENCY_TWO_PERFORMANCE_WAVE
+        p = data["workload"]["parameters"]
+        p.update(concurrent_requests=2, warmup_steps=2 if canary else 5)
+        p.pop("comparison_control_id", None)
+        if not canary and tp == 4:
+            p["comparison_control_id"] = "E771"
+        data["runtime"]["max_steps"] = 2 if canary else 30
+        p["comparison_scope"] = f"{STUDY}_{'canary' if canary else 'performance'}"
+        data["experiment_id"] = eid
+        data["experiment"] = f"{STUDY}_{p['serving_layout']}_p1280_c2_{'canary' if canary else 'performance'}"
+        data["metadata"].update(
+            matrix_id=eid,
+            platform_wave=wave,
+            comparison_scope=p["comparison_scope"],
+            objective=(
+                "Follow-up motivated by observed results: measure concurrency two "
+                "after the TP2/TP4 energy-ranking reversal"
+            ),
+            phase="Qwen7B layout acceptance" if canary else "Qwen7B layout follow-up",
+            gpu_hours_estimate=8 * (0.25 if canary else 1.0),
+            study_design_note="follow-up motivated by observed results",
+            study_design_type="exploratory_sequential_follow_up",
+            motivating_experiment_ids=["E763", "E764", "E767", "E768"],
+            planned_after_results_commit="eee975d",
+            follow_up_planned_on="2026-10-21",
+            inference_limitation=(
+                "Not part of the original experiment plan; narrows sampled rankings, "
+                "not an exact crossover or mechanism"
+            ),
+            concurrency_reference_ids=["E763", "E767", "E755"] if tp == 2 else ["E764", "E768", "E758"],
+        )
+        rows.append((eid, "l40s", wave, data))
+    return rows
+
+
+CANARY_WAVES = (
+    CANARY_WAVE,
+    EXTENSION_CANARY_WAVE,
+    LOW_CONCURRENCY_CANARY_WAVE,
+    MID_CONCURRENCY_CANARY_WAVE,
+    CONCURRENCY_TWO_CANARY_WAVE,
+)
+PERFORMANCE_REQUIREMENTS = {
+    PERFORMANCE_WAVE: CANARY_WAVES[:1],
+    EXTENSION_PERFORMANCE_WAVE: CANARY_WAVES[:2],
+    LOW_CONCURRENCY_PERFORMANCE_WAVE: CANARY_WAVES[:3],
+    MID_CONCURRENCY_PERFORMANCE_WAVE: CANARY_WAVES[:4],
+    CONCURRENCY_TWO_PERFORMANCE_WAVE: CANARY_WAVES,
+}

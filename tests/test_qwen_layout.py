@@ -15,7 +15,7 @@ from hpc_ai_perf.validation.inference_crossover import canary_issues, verify_inf
 
 def test_design_is_focused_and_supported():
     rows = design()
-    assert [r[0] for r in rows] == [f"E{i}" for i in range(750, 769)]
+    assert [r[0] for r in rows] == [f"E{i}" for i in range(750, 773)]
     assert len([r for r in rows if r[2] == CANARY_WAVE]) == 2
     assert len([r for r in rows if r[2] == PERFORMANCE_WAVE]) * 3 == 12
     entries = discover_experiment_configs(CONFIG_ROOT)
@@ -25,7 +25,7 @@ def test_design_is_focused_and_supported():
         assert entry.config.workload.model == "Qwen/Qwen2.5-7B-Instruct"
         p = entry.config.workload.parameters
         assert p["tensor_parallel_size"] * p["replica_count"] == 8
-        assert p["concurrent_requests"] in (1, 4, 8) and p["max_new_tokens"] == 128
+        assert p["concurrent_requests"] in (1, 2, 4, 8) and p["max_new_tokens"] == 128
         assert p["require_request_timestamps"] and p["ignore_eos"]
         assert entry.config.runtime.environment["VLLM_USE_V1"] == "0"
 
@@ -194,7 +194,7 @@ def test_concurrency_four_preserves_shape_and_compares_tp2_with_tp4():
     from hpc_ai_perf.config.qwen_layout import MID_CONCURRENCY_CANARY_WAVE
 
     rows = design()
-    mid = rows[15:]
+    mid = rows[15:19]
     assert [r[0] for r in mid] == ["E765", "E766", "E767", "E768"]
     for eid, _, wave, data in mid:
         p = data["workload"]["parameters"]
@@ -229,3 +229,46 @@ def test_concurrency_four_performance_requires_new_acceptance(monkeypatch):
             )
         )
     assert len(waves) == 4 and waves[-1] == MID_CONCURRENCY_CANARY_WAVE
+
+
+def test_concurrency_two_is_explicit_observed_results_follow_up():
+    from hpc_ai_perf.config.qwen_layout import CONCURRENCY_TWO_CANARY_WAVE
+
+    rows = design()[19:]
+    assert [r[0] for r in rows] == ["E769", "E770", "E771", "E772"]
+    for eid, _, wave, data in rows:
+        p, metadata = data["workload"]["parameters"], data["metadata"]
+        assert p["concurrent_requests"] == 2 and p["prompt_length"] == 1280
+        assert p["max_new_tokens"] == 128 and data["hardware"]["gpus"] == 8
+        assert p["tensor_parallel_size"] in (2, 4)
+        assert data["runtime"]["max_steps"] == (2 if wave == CONCURRENCY_TWO_CANARY_WAVE else 30)
+        assert data["runtime"]["max_steps"] * 2 % p["replica_count"] == 0
+        assert p.get("comparison_control_id") == ("E771" if eid == "E772" else None)
+        assert metadata["study_design_note"] == "follow-up motivated by observed results"
+        assert metadata["study_design_type"] == "exploratory_sequential_follow_up"
+        assert metadata["motivating_experiment_ids"] == ["E763", "E764", "E767", "E768"]
+        assert metadata["planned_after_results_commit"] == "eee975d"
+        assert metadata["follow_up_planned_on"] == "2026-10-21"
+
+
+def test_concurrency_two_performance_requires_its_acceptance(monkeypatch):
+    from hpc_ai_perf.config.qwen_layout import CONCURRENCY_TWO_CANARY_WAVE, CONCURRENCY_TWO_PERFORMANCE_WAVE
+    from hpc_ai_perf.validation import inference_crossover as gate
+
+    waves = []
+
+    def check(*args, **kwargs):
+        waves.append(kwargs["canary_wave"])
+        if kwargs["canary_wave"] == CONCURRENCY_TWO_CANARY_WAVE:
+            raise ValueError("Concurrency-two acceptance absent")
+
+    monkeypatch.setattr(gate, "verify_inference_canaries", check)
+    with pytest.raises(ValueError, match="Concurrency-two acceptance absent"):
+        _submit_platform_wave(
+            SimpleNamespace(
+                wave=CONCURRENCY_TWO_PERFORMANCE_WAVE,
+                platform_profile="platforms/l40s.json",
+                venv_activate="/private/activate",
+            )
+        )
+    assert len(waves) == 5 and waves[-1] == CONCURRENCY_TWO_CANARY_WAVE

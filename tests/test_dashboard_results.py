@@ -27,6 +27,9 @@ def test_full_catalog_has_each_config_once_and_no_false_pending_results():
             assert details[eid]["platforms"] == {}
     assert catalog["experiments"]["E719"]["platforms"]["h100"]["n"] == 1
     assert catalog["experiments"]["E719"]["status"] == "Completed"
+    for eid in ("E769", "E770", "E771", "E772"):
+        assert catalog["experiments"][eid]["study_design_note"] == "follow-up motivated by observed results"
+        assert details[eid]["planned_after_results_commit"] == "eee975d"
 
 
 def test_current_inference_values_match_raw_per_platform_trial_means():

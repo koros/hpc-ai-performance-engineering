@@ -185,6 +185,15 @@ def build_catalog():
             statistics.mean(m["runtime_seconds"] for m in observed.values()) if observed else None
         )
         experiments[eid] = experiment
+        for key in (
+            "study_design_note",
+            "study_design_type",
+            "motivating_experiment_ids",
+            "planned_after_results_commit",
+            "follow_up_planned_on",
+        ):
+            if key in meta:
+                experiment[key] = meta[key]
         experiment["model_revision"] = c["workload"].get("model_revision")
         experiment["comparison_scope"] = p.get("comparison_scope")
         detail = {k: v for k, v in experiment.items() if k not in ("platforms", "theme_id", "theme_label")}
@@ -271,6 +280,10 @@ def inference_section(catalog):
         "Values are means across independent trials; throughput ranges show minimum–maximum across trials. "
         "p95 values are means of within-trial percentiles.</p>",
         '<p><a href="index.html">Browse every condition and its platform status →</a></p>',
+        "<p><strong>Study design:</strong> the concurrency-two extension is a "
+        "<strong>follow-up motivated by observed results</strong>, planned on 21 October 2026 "
+        "after E763/E764 and E767/E768. It is distinct from the original experiment plan; "
+        "only collected performance trials appear below.</p>",
         "<h3>New training and acceptance coverage</h3>",
         "<p>The catalog now includes every checked-in E-number condition. Completed means at least one "
         "platform has the required collected trials; it does not imply both platforms are complete. "

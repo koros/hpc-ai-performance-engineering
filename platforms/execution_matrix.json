@@ -66,6 +66,22 @@
       "comparability": "exact"
     },
     {
+      "platform": "l40s",
+      "wave": "qwen7b-layout-concurrency2-canary",
+      "name": "L40S equal-budget inference qwen7b-layout-concurrency2-canary",
+      "experiment_ids": ["E769", "E770"],
+      "required_trials": 1,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
+      "wave": "qwen7b-layout-concurrency2-performance",
+      "name": "L40S equal-budget inference qwen7b-layout-concurrency2-performance",
+      "experiment_ids": ["E771", "E772"],
+      "required_trials": 3,
+      "comparability": "exact"
+    },
+    {
       "platform": "h100",
       "wave": "scaling-batch-canary",
       "name": "H100 controlled scaling input and capacity acceptance",

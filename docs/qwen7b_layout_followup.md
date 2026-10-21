@@ -230,3 +230,63 @@ Stage/commit acceptance, then submit `qwen7b-layout-mid-concurrency-performance`
 with the same activation. Expect six performance trials. The CLI enforces the
 shape-specific acceptance gate before creating a bundle. Collect, validate and
 commit before choosing any further concurrency points.
+
+## Concurrency-two: follow-up motivated by observed results
+
+**Study design notation: follow-up motivated by observed results.**
+Planned on **21 October 2026**, after reviewing the collected concurrency-one
+and concurrency-four performance results (E763/E764 and E767/E768; results commit
+`eee975d`). This is an exploratory sequential extension, not a condition selected
+in the original study plan. Preserve that distinction in the dissertation.
+
+At concurrency 1, TP2 used less measured-region energy per output token than TP4;
+at concurrency 4 (and 8), TP4 used less. Test **concurrency 2** to narrow this
+observed ranking change, without assuming monotonicity, an exact threshold or a
+causal mechanism. Report all three repetitions, including unexpected outcomes;
+retain failures and the existing results unchanged.
+
+| Wave | IDs | Layouts | Trials |
+|---|---|---|---:|
+| qwen7b-layout-concurrency2-canary | E769/E770 | TP2×DP4 / TP4×DP2 | 2 |
+| qwen7b-layout-concurrency2-performance | E771/E772 | Same | 6 |
+
+Keep eight L40S GPUs, prompt 1,280, output 128, BF16/V0/eager, no prefix cache,
+the pinned model revision, seed, profiler and recovered runtime unchanged.
+Acceptance uses two warmup and two measured rounds: four requests distribute
+evenly over all replicas. Performance uses five warmup and thirty measured
+rounds: sixty requests / 7,680 output tokens per trial, three repetitions.
+E771 is the within-concurrency control. Metadata names the motivating IDs, the
+C1/C4/C8 comparison references, the planning date, and the preceding results commit.
+
+Before viewing the new results, the intended analysis is to compare per-trial
+measured-region J/output token, throughput, first-token and decode latency between
+TP2 and TP4 at concurrency 2, then display the measured 1/2/4/8 points together.
+Separate uncertainty across trials from within-trial latency percentiles.
+The sequential collection caveat remains: check clocks, telemetry and runtime
+identity before attributing differences to layout. No performance winner is
+predeclared and no new concurrency points are automatically queued.
+
+With modules and the recovered activation loaded:
+
+```bash
+export PYTHONPATH="$PWD/src"
+python scripts/prepare_qwen_layout_model.py
+python -m hpc_ai_perf.cli submit-platform-wave \
+  --platform-profile platforms/l40s.json --wave qwen7b-layout-concurrency2-canary \
+  --venv-activate "$VIRTUAL_ENV/bin/activate_recovered_vllm"
+```
+
+After two canaries complete:
+
+```bash
+python -m hpc_ai_perf.cli collect-platform-wave \
+  --platform-profile platforms/l40s.json --wave qwen7b-layout-concurrency2-canary
+python scripts/verify_qwen_layout_canaries.py --concurrency-two
+python -m hpc_ai_perf.cli verify-result-evidence --result-root results/raw
+```
+
+The gate checks ten collected Qwen canaries including prior shapes. Stage/commit
+acceptance, then submit `qwen7b-layout-concurrency2-performance` with the same
+activation. Expect six trials. The CLI enforces all required acceptance waves
+before creating the bundle. Existing experiment configs and serving fingerprint
+remain unchanged; no completed trial needs rerunning.
