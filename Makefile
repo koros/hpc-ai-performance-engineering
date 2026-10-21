@@ -530,3 +530,7 @@ refresh-dashboard:
 
 check-dashboard-data:
 	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/update_dashboard_results.py --check
+
+.PHONY: export-plot-data
+export-plot-data:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/export_plot_data.py

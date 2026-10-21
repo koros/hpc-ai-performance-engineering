@@ -1,3 +1,4 @@
+import hashlib
 import json
 import statistics
 from pathlib import Path
@@ -54,4 +55,6 @@ def test_current_inference_values_match_raw_per_platform_trial_means():
 def test_dashboard_refresh_is_current_and_repeatable():
     expected = update()
     for path, content in expected.items():
-        assert path.read_text() == content, f"Refresh {path}"
+        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        expected_hash = hashlib.sha256(content.encode()).hexdigest()
+        assert actual == expected_hash, f"Refresh {path}"

@@ -34,3 +34,8 @@ results/figures/*
 
 slurm/generated/
 slurm/profiles/*.local.json
+
+# Tidy R/JavaScript plotting exports: regenerate with make export-plot-data.
+results/plot_data/**/*.csv
+results/plot_data/**/*.json
+results/plot_data/manifest.json

@@ -80,3 +80,12 @@ results(l40s): add E123 GPT-2 training trials
 
 Git provides versioned redundancy but is not the only backup. Keep the original HPC copy until the commit has been
 pushed and verified on the remote repository, and retain a second archival copy for dissertation submission.
+
+## R and JavaScript plotting datasets
+
+`make export-plot-data PYTHON=python` creates study-specific CSV/JSON exports in
+[`results/plot_data/`](plot_data/README.md), with cohort selection, provenance,
+condition summaries, scaling contrasts and request distributions. The folder
+structure, examples and generator are tracked; the generated data remains ignored
+and reproducible from committed raw evidence. See its data dictionary before
+combining trials or selecting scaling baselines.
