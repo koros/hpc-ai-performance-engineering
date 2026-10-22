@@ -22,21 +22,38 @@ def verify_deep_dive_canaries(
     platform: str,
     *,
     execution_matrix: str | Path = "platforms/execution_matrix.json",
+    canary_wave: str = "scaling-dd-canary",
 ) -> dict[str, str]:
     """Require every planned platform canary to be collected and within its measured memory ceiling."""
     if platform not in CAPACITY_GB:
         raise ValueError("Scaling deep-dive platform must be h100 or l40s")
+    if canary_wave not in {"scaling-dd-canary", "s7-real-text-canary"}:
+        raise ValueError("Unknown deep-dive acceptance wave")
+    s7_only = canary_wave == "s7-real-text-canary"
+    if s7_only and platform != "l40s":
+        raise ValueError("Focused S7 acceptance is currently L40S-only")
     root = Path(result_root)
     checksums = _manifest_entries(root / "SHA256SUMS")
-    conditions = load_platform_conditions(execution_matrix, platform, wave="scaling-dd-canary")
+    conditions = load_platform_conditions(execution_matrix, platform, wave=canary_wave)
     expected_ids = {
-        eid for eid, condition, _ in design() if condition.role == "canary" and platform in condition.run_platforms
+        eid
+        for eid, condition, _ in design()
+        if condition.role == "canary"
+        and platform in condition.run_platforms
+        and (not s7_only or condition.text_batching)
     }
+    config_root = "configs/scaling_deep_dive"
+    if s7_only:
+        from hpc_ai_perf.config.s7_real_text import CONFIG_ROOT
+        from hpc_ai_perf.config.s7_real_text import design as s7_design
+
+        config_root = CONFIG_ROOT
+        expected_ids = {eid for eid, _ in s7_design()}
     if {condition.matrix_id for condition in conditions} != expected_ids or any(
         condition.required_trials != 1 for condition in conditions
     ):
         raise ValueError(f"{platform}: scaling deep-dive canary policy is incomplete or has incorrect trial counts")
-    entries = {entry.config.experiment_id: entry for entry in discover_experiment_configs("configs/scaling_deep_dive")}
+    entries = {entry.config.experiment_id: entry for entry in discover_experiment_configs(config_root)}
     profile = load_platform_profile(f"platforms/{platform}.json")
     accepted: dict[str, str] = {}
     issues: list[str] = []
@@ -53,7 +70,7 @@ def verify_deep_dive_canaries(
         expected_contract = canary_contract_sha256(config)
         matched = False
         measurement_failures: set[str] = set()
-        for path in sorted((root / eid).glob("*.json")):
+        for path in sorted((root / eid).glob("*.json"), reverse=s7_only):
             try:
                 record = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
@@ -65,21 +82,42 @@ def verify_deep_dive_canaries(
             relative = path.relative_to(root).as_posix()
             if checksums.get(relative) != hashlib.sha256(path.read_bytes()).hexdigest():
                 issues.append(f"{eid}: matching result is absent from or mismatches SHA256SUMS")
+                if s7_only:
+                    break
                 continue
             if validate_result_file(path):
                 issues.append(f"{eid}: matching result fails evidence validation")
+                if s7_only:
+                    break
                 continue
             failed_checks = _canary_issues(record, config, condition.condition_id, platform)
+            if s7_only:
+                failed_checks.extend(_real_text_issues(record, config))
             if not failed_checks:
                 accepted[eid] = str(path)
                 matched = True
                 break
             measurement_failures.update(failed_checks)
+            if s7_only:
+                break
         if not matched:
             detail = ""
             if measurement_failures:
                 detail = "; matching evidence failed: " + ", ".join(sorted(measurement_failures))
             issues.append(f"{eid}: no completed, collected canary passes the current contract and measurements{detail}")
+    if s7_only:
+        identities = set()
+        for filename in accepted.values():
+            env = json.loads(Path(filename).read_text()).get("environment", {})
+            versions = tuple(
+                env.get(k)
+                for k in ("torch_version", "cuda_version", "transformers_version", "nccl_version", "cudnn_version")
+            )
+            if not all(versions):
+                issues.append("S7 canary missing runtime library versions")
+            identities.add(versions)
+        if len(identities) > 1:
+            issues.append("S7 runtime library versions differ across canaries")
     if issues:
         raise ValueError("Scaling deep-dive acceptance failed:\n- " + "\n- ".join(issues))
     return accepted
@@ -153,3 +191,33 @@ def _finite(value: Any) -> bool:
 
 def _positive(value: Any) -> bool:
     return _finite(value) and value > 0
+
+
+def _real_text_issues(record, config):
+    m = record.get("metrics") or {}
+    p = config.workload.parameters
+    useful, processed, seconds = m.get("total_tokens"), m.get("processed_tokens"), m.get("measured_seconds")
+    padding, imbalance = m.get("padding_fraction"), m.get("rank_token_imbalance")
+    nominal = config.runtime.max_steps * p["global_batch_size"] * p["sequence_length"]
+    valid_counts = _positive(useful) and _positive(processed) and useful <= processed <= nominal
+    checks = {
+        "real-text measured window": _positive(seconds),
+        "real-text batching mode": m.get("text_batching") == p["text_batching"],
+        "real-text token accounting": valid_counts and m.get("nominal_tokens") == nominal,
+        "padding fraction": _finite(padding) and 0 <= padding < 1,
+        "rank token imbalance": _finite(imbalance) and imbalance >= 1 - 1e-9,
+        "step-time tails": _positive(m.get("step_time_p50_ms"))
+        and _positive(m.get("step_time_p95_ms"))
+        and m["step_time_p95_ms"] >= m["step_time_p50_ms"],
+    }
+    if valid_counts and _positive(seconds) and _finite(padding):
+        checks["real-text throughput accounting"] = math.isclose(
+            m.get("throughput_tokens_sec", 0), useful / seconds, rel_tol=1e-6
+        )
+        checks["processed throughput accounting"] = math.isclose(
+            m.get("processed_tokens_sec", 0), processed / seconds, rel_tol=1e-6
+        )
+        checks["padding accounting"] = math.isclose(padding, 1 - useful / processed, abs_tol=1e-6)
+        if p["text_batching"] == "pack":
+            checks["packed token accounting"] = useful == processed == nominal and abs(padding) < 1e-9
+    return [name for name, passed in checks.items() if not passed]

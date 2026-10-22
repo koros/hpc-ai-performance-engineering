@@ -83,6 +83,14 @@
     },
     {
       "platform": "l40s",
+      "wave": "s7-real-text-canary",
+      "name": "L40S S7 real-text acceptance",
+      "experiment_ids": ["E810", "E811", "E812", "E813", "E814", "E815", "E816", "E817"],
+      "required_trials": 1,
+      "comparability": "exact"
+    },
+    {
+      "platform": "l40s",
       "wave": "topology-recovery-canary",
       "name": "L40S topology-recovery-canary",
       "experiment_ids": ["E791", "E792", "E793", "E794", "E795"],

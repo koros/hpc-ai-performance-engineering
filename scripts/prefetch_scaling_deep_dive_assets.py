@@ -19,22 +19,37 @@ from hpc_ai_perf.workloads.scaling import MIN_DOCUMENT_TOKENS, wikitext_document
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--metadata-only", action="store_true", help="Fetch configs and tokenizers, not weights")
+    parser.add_argument("--real-text-only", action="store_true", help="Fetch only S7's GPT-2 and TinyLlama assets")
+    parser.add_argument("--platform", choices=("h100", "l40s"), help="Restrict corpus sizing to one platform")
+    parser.add_argument("--offline", action="store_true", help="Verify using only existing cached assets")
     args = parser.parse_args()
+    if args.offline:
+        import os
+
+        os.environ["HF_HUB_OFFLINE"] = "1"
+        os.environ["HF_DATASETS_OFFLINE"] = "1"
     from datasets import load_dataset
     from huggingface_hub import snapshot_download
     from transformers import AutoTokenizer
 
+    conditions = [
+        c for _, c, _ in design() if c.text_batching and (not args.platform or args.platform in c.run_platforms)
+    ]
+    selected = {c.workload for c in conditions} if args.real_text_only else set(WORKLOADS)
     patterns = ["*.json", "*.txt", "*.model"] + ([] if args.metadata_only else ["*.safetensors"])
-    for spec in WORKLOADS.values():
-        snapshot_download(spec["model"], revision=spec["revision"], allow_patterns=patterns)
+    for name in sorted(selected):
+        spec = WORKLOADS[name]
+        snapshot_download(
+            spec["model"], revision=spec["revision"], allow_patterns=patterns, local_files_only=args.offline
+        )
 
     data = load_dataset(REAL_TEXT_DATASET, REAL_TEXT_SUBSET, revision=REAL_TEXT_REVISION, split="train")
     documents = wikitext_documents(data["text"])
     report = {"dataset_revision": REAL_TEXT_REVISION, "documents": len(documents), "workloads": {}}
-    for workload in sorted({c.workload for _, c, _ in design() if c.text_batching}):
-        conditions = [c for _, c, _ in design() if c.workload == workload and c.text_batching]
-        need_docs = max((10 + c.updates) * c.global_batch for c in conditions)
-        need_tokens = max((10 + c.updates) * c.global_batch * c.sequence_length for c in conditions)
+    for workload in sorted({c.workload for c in conditions}):
+        shapes = [c for c in conditions if c.workload == workload]
+        need_docs = max((10 + c.updates) * c.global_batch for c in shapes)
+        need_tokens = max((10 + c.updates) * c.global_batch * c.sequence_length for c in shapes)
         spec = WORKLOADS[workload]
         tokenizer = AutoTokenizer.from_pretrained(spec["model"], revision=spec["revision"])
         usable, tokens = 0, 0

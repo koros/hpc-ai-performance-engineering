@@ -253,3 +253,12 @@ collect both waves after completion. The full collected canary gate still runs
 before performance submission. Changing this scheduler option does not change
 the training runtime fingerprint. Slurm must still know the predecessor job ID
 when the new wave is submitted.
+
+## Focused L40S S7 acceptance after environment recovery (22 October 2026)
+
+The original `scaling-dd-real-text` performance matrix now has its own fresh
+acceptance wave, `s7-real-text-canary` (E810–E817). Only L40S S7 uses this focused
+gate; other deep-dive waves retain the full acceptance policy above. See
+[S7 launch instructions](s7_real_text_launch.md) for two-model cache preparation,
+offline validation, collection and performance submission. This avoids rerunning
+unrelated FP8/FSDP canaries and leaves all original performance configs unchanged.

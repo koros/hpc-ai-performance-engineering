@@ -1318,7 +1318,20 @@ def _submit_platform_wave(args: argparse.Namespace):
             profile.platform_id,
             execution_matrix=args.execution_matrix,
         )
-    if args.wave.startswith("scaling-dd-") and args.wave != "scaling-dd-canary":
+    focused_s7 = profile.platform_id == "l40s" and args.wave == "scaling-dd-real-text"
+    if args.wave == "s7-real-text-canary" or focused_s7:
+        if profile.platform_id != "l40s" or not args.venv_activate:
+            raise ValueError("Focused S7 waves require L40S and an explicit recovered environment activation")
+        if focused_s7:
+            from hpc_ai_perf.validation.scaling_deep_dive import verify_deep_dive_canaries
+
+            verify_deep_dive_canaries(
+                Path("results/raw/l40s"),
+                "l40s",
+                execution_matrix=args.execution_matrix,
+                canary_wave="s7-real-text-canary",
+            )
+    if args.wave.startswith("scaling-dd-") and args.wave != "scaling-dd-canary" and not focused_s7:
         from hpc_ai_perf.validation.scaling_deep_dive import verify_deep_dive_canaries
 
         verify_deep_dive_canaries(

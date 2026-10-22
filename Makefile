@@ -548,3 +548,10 @@ check-topology-recovery:
 
 verify-topology-recovery-canaries:
 	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/verify_topology_recovery_canaries.py
+
+.PHONY: check-s7-acceptance verify-s7-canaries
+check-s7-acceptance:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/generate_s7_acceptance.py --check
+
+verify-s7-canaries:
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/verify_s7_canaries.py
