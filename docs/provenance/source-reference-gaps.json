@@ -1,0 +1,463 @@
+{
+  "description": "Source commits referenced by current evidence but absent from pre-rewrite reachable history and local objects; direct GitHub fetch attempts returned not our ref. Original result values are unchanged.",
+  "commits": {
+    "024f881d645ffadead3f5a8a5d4f2b98936e1e51": [
+      {
+        "record": "results/raw/h100/E269/E269-20260926195520617087-r002-e79da146.json",
+        "experiment_id": "E269",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E269/E269-20260926195336828883-r001-c11df554.json",
+        "experiment_id": "E269",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E269/E269-20260926195702030914-r003-aeb13ca1.json",
+        "experiment_id": "E269",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E268/E268-20260926195045800182-r002-94003a14.json",
+        "experiment_id": "E268",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E268/E268-20260926194921144130-r001-27b2df7e.json",
+        "experiment_id": "E268",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E268/E268-20260926195212040040-r003-ed05e557.json",
+        "experiment_id": "E268",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E265/E265-20260926195845620924-r002-d0308d4b.json",
+        "experiment_id": "E265",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E265/E265-20260926195845454484-r001-a79da251.json",
+        "experiment_id": "E265",
+        "git_dirty": false
+      }
+    ],
+    "2bfc258caec961bfebc054cf71a3bb4fa1e4dacc": [
+      {
+        "record": "results/raw/h100/E160/E160-20260912132556511966-r003-3cd16818.json",
+        "experiment_id": "E160",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E160/E160-20260912132456606162-r001-3f97538b.json",
+        "experiment_id": "E160",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E160/E160-20260912132557065893-r002-d2d00c06.json",
+        "experiment_id": "E160",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E167/E167-20260912133628001040-r001-31e70fe2.json",
+        "experiment_id": "E167",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E167/E167-20260912133727085467-r003-879d85eb.json",
+        "experiment_id": "E167",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E167/E167-20260912133628003414-r002-d8741cb5.json",
+        "experiment_id": "E167",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E158/E158-20260912132256829942-r002-c14cefb9.json",
+        "experiment_id": "E158",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E158/E158-20260912132156643396-r001-6ece5b40.json",
+        "experiment_id": "E158",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E158/E158-20260912132257010882-r003-b63d4708.json",
+        "experiment_id": "E158",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E156/E156-20260912131856395619-r001-c8861b48.json",
+        "experiment_id": "E156",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E156/E156-20260912131956889633-r002-405e5c57.json",
+        "experiment_id": "E156",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E156/E156-20260912131956670668-r003-a0d85cfb.json",
+        "experiment_id": "E156",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E169/E169-20260912133927240848-r002-1b8e4bf6.json",
+        "experiment_id": "E169",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E169/E169-20260912134027510878-r003-2339d87b.json",
+        "experiment_id": "E169",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E169/E169-20260912133927349350-r001-e1dab90f.json",
+        "experiment_id": "E169",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E157/E157-20260912132057012732-r002-905c62c2.json",
+        "experiment_id": "E157",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E157/E157-20260912132156311577-r003-a47d4b3f.json",
+        "experiment_id": "E157",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E157/E157-20260912132056865059-r001-629018c2.json",
+        "experiment_id": "E157",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E168/E168-20260912133827890272-r002-8f5df0e5.json",
+        "experiment_id": "E168",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E168/E168-20260912133727298025-r001-178c3005.json",
+        "experiment_id": "E168",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E168/E168-20260912133827681310-r003-51ba8700.json",
+        "experiment_id": "E168",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E150/E150-20260912131509017074-r001-99a26289.json",
+        "experiment_id": "E150",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E150/E150-20260912131509017214-r002-64dc75ed.json",
+        "experiment_id": "E150",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E150/E150-20260912131657124293-r003-ce091f41.json",
+        "experiment_id": "E150",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E166/E166-20260912133527477017-r002-d3d12d1c.json",
+        "experiment_id": "E166",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E166/E166-20260912133527423219-r003-9f354baa.json",
+        "experiment_id": "E166",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E166/E166-20260912133427262915-r001-3278e0ed.json",
+        "experiment_id": "E166",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E159/E159-20260912132356523144-r002-dd47aa6f.json",
+        "experiment_id": "E159",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E159/E159-20260912132356959101-r001-27e0558f.json",
+        "experiment_id": "E159",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E159/E159-20260912132457335128-r003-b655a38d.json",
+        "experiment_id": "E159",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E161/E161-20260912132756676706-r003-9231c903.json",
+        "experiment_id": "E161",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E161/E161-20260912132656361799-r001-80164617.json",
+        "experiment_id": "E161",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E161/E161-20260912132656983346-r002-b4b51ea5.json",
+        "experiment_id": "E161",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E174/E174-20260912134727399382-r002-951cc85c.json",
+        "experiment_id": "E174",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E174/E174-20260912134727324031-r003-b0636799.json",
+        "experiment_id": "E174",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E174/E174-20260912134627099975-r001-506fc72c.json",
+        "experiment_id": "E174",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E173/E173-20260912134627253270-r003-da09d57c.json",
+        "experiment_id": "E173",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E173/E173-20260912134526928954-r001-22b3049c.json",
+        "experiment_id": "E173",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E173/E173-20260912134527193577-r002-08ca5dac.json",
+        "experiment_id": "E173",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E129/E129-20260912131056457312-r003-45150c5a.json",
+        "experiment_id": "E129",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E129/E129-20260912130856980609-r001-53be32d7.json",
+        "experiment_id": "E129",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E129/E129-20260912130856980625-r002-14de1397.json",
+        "experiment_id": "E129",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E164/E164-20260912133227523871-r003-dca02f8e.json",
+        "experiment_id": "E164",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E164/E164-20260912133227139074-r002-68d4f717.json",
+        "experiment_id": "E164",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E164/E164-20260912133115640704-r001-45116b7a.json",
+        "experiment_id": "E164",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E197/E197-20260912135127759323-r001-bf5cef79.json",
+        "experiment_id": "E197",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E197/E197-20260912135427238938-r002-59580330.json",
+        "experiment_id": "E197",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E197/E197-20260912135456902311-r003-71352f22.json",
+        "experiment_id": "E197",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E163/E163-20260912132956590253-r001-b4d7e40e.json",
+        "experiment_id": "E163",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E163/E163-20260912132956811374-r002-2779ef92.json",
+        "experiment_id": "E163",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E163/E163-20260912133115909773-r003-23a2db23.json",
+        "experiment_id": "E163",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E153/E153-20260912131657124321-r001-2fc48424.json",
+        "experiment_id": "E153",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E153/E153-20260912131856816781-r003-75902946.json",
+        "experiment_id": "E153",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E153/E153-20260912131756528299-r002-856c65f8.json",
+        "experiment_id": "E153",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E198/E198-20260912135757464518-r001-0be84510.json",
+        "experiment_id": "E198",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E198/E198-20260912140057486279-r003-1b826e14.json",
+        "experiment_id": "E198",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E198/E198-20260912135826668425-r002-5bd69288.json",
+        "experiment_id": "E198",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E162/E162-20260912132756773428-r001-b044f840.json",
+        "experiment_id": "E162",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E162/E162-20260912132856507196-r003-70a41b68.json",
+        "experiment_id": "E162",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E162/E162-20260912132856752105-r002-8e9e1c84.json",
+        "experiment_id": "E162",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E165/E165-20260912133427392481-r003-19d792ab.json",
+        "experiment_id": "E165",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E165/E165-20260912133326793247-r002-ac3040f1.json",
+        "experiment_id": "E165",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E165/E165-20260912133327055192-r001-145add53.json",
+        "experiment_id": "E165",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E149/E149-20260912131256056178-r003-84474774.json",
+        "experiment_id": "E149",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E149/E149-20260912131056444932-r001-e0b00243.json",
+        "experiment_id": "E149",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E149/E149-20260912131255886486-r002-7fd65c3e.json",
+        "experiment_id": "E149",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E171/E171-20260912134327325258-r002-07a04867.json",
+        "experiment_id": "E171",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E171/E171-20260912134227467286-r001-1434e78d.json",
+        "experiment_id": "E171",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E171/E171-20260912134427414096-r003-2f681f19.json",
+        "experiment_id": "E171",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E170/E170-20260912134027424284-r001-2fadc171.json",
+        "experiment_id": "E170",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E170/E170-20260912134127359583-r002-056b109a.json",
+        "experiment_id": "E170",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E170/E170-20260912134127397090-r003-f1ce0ac7.json",
+        "experiment_id": "E170",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E177/E177-20260912135127767147-r003-8096c2c1.json",
+        "experiment_id": "E177",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E177/E177-20260912134827162761-r001-deef0765.json",
+        "experiment_id": "E177",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E177/E177-20260912134826833506-r002-c2bf6795.json",
+        "experiment_id": "E177",
+        "git_dirty": false
+      }
+    ],
+    "c9a35bb883756e34e46030410a5480ca1d71a6e0": [
+      {
+        "record": "results/raw/h100/E151/E151-20260912145528533043-r001-f363d943.json",
+        "experiment_id": "E151",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E151/E151-20260912145726084025-r003-5f7fdf24.json",
+        "experiment_id": "E151",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E151/E151-20260912145528537740-r002-836caec6.json",
+        "experiment_id": "E151",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E199/E199-20260912145726161786-r001-21ccfb64.json",
+        "experiment_id": "E199",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E199/E199-20260912145956258452-r003-f4e902bf.json",
+        "experiment_id": "E199",
+        "git_dirty": false
+      },
+      {
+        "record": "results/raw/h100/E199/E199-20260912145926188075-r002-96acb8eb.json",
+        "experiment_id": "E199",
+        "git_dirty": false
+      }
+    ],
+    "e79d665f682bfc072611d8da990e5763e6f3a64e": [
+      {
+        "record": "results/raw/h100/E250/E250-20260926151156811447-r001-966b7c06.json",
+        "experiment_id": "E250",
+        "git_dirty": false
+      }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+[
+  {
+    "ref": "refs/heads/codex/open-source-cleanup",
+    "old": "88d516b1da22d2e204989ac65e01fa0b1aea3066",
+    "new": "db400e2f723b8cd4b84ddd315c665c345901a823"
+  },
+  {
+    "ref": "refs/heads/feature/l-40s-matrix",
+    "old": "f359eca57905f6cca413520f7c4e8f2f6401c29e",
+    "new": "e414160a64963d7bf46c881ad13b610c36c24e0d"
+  },
+  {
+    "ref": "refs/heads/main",
+    "old": "137b4f9e8d37355898d71b6b5de7b53ae670a665",
+    "new": "ab583ad1c9348878dd9e6748c678decdbbda0490"
+  }
+]

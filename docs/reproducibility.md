@@ -54,6 +54,8 @@ permalink with line anchors; branch links and the live dashboard may change.
 Record experiment IDs, platform, cohort, and trial counts alongside figures.
 Archive the exact static dashboard used by the report.
 
-Before changing repository visibility, complete the history review described in
-[release preparation](open_source_release.md). Current-tree redaction does not
-remove earlier versions from Git history.
+The original source history has now been sanitized locally. Use the
+[old-to-new commit mapping](provenance/README.md) to resolve recorded experiment
+commits. Four pre-existing missing source commits are documented there. The remote
+still requires a reviewed history replacement before publication; see
+[release preparation](open_source_release.md).

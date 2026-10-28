@@ -1,0 +1,30 @@
+{
+  "reachable_commits": 565,
+  "reachable_blobs": 6626,
+  "metadata_findings": {},
+  "unique_historical_checksum_pairs": 101250,
+  "historical_checksum_problems": [],
+  "boundary": "Rewritten original history, before provenance-documentation commit",
+  "source_inputs": {
+    "commits_compared": 565,
+    "source_and_configuration_trees_identical": true,
+    "scope": [
+      "src/",
+      "scripts/",
+      "configs/",
+      "slurm/",
+      "platforms/",
+      "schemas/",
+      "tests/",
+      "Makefile",
+      "pyproject.toml"
+    ],
+    "exclusions": [
+      "Markdown documentation",
+      ".gitkeep placeholders"
+    ]
+  },
+  "topology_dates_and_author_names_preserved": true,
+  "dedicated_secret_scan": "Gitleaks all reachable history: no remaining findings with narrow reviewed false-positive rules",
+  "tests_passed": 1291
+}

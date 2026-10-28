@@ -1,75 +1,65 @@
 # Open source release preparation
 
-The cleanup branch prepares the public working tree. Repository visibility,
-remote history, tags, and publication have not been changed.
+The working tree and historical source have been sanitized locally. Repository
+visibility and remote refs have not been changed. The original Git repository,
+result records, operational notes, and pre-cleanup files are backed up privately.
 
 ## Publication inventory
 
-- Keep source, configurations, schema, tests, research methodology, limitations,
-  canonical evidence, and the canonical `dashboard/`.
+- Keep source, configurations, schemas, tests, research methodology, limitations,
+  sanitized canonical evidence, and the canonical `dashboard/`.
 - Keep `dashboard3/` and `results/report_data/` locally and ignored pending a
-  long-term export policy. They are not release inputs.
-- Remove obsolete `dashboard-2/`, empty requirements.txt, and unused placeholder
-  scaffolding. Generated result directories are created on demand.
-- Archive date-specific reservation, weekend priority, pending-work, and publication
-  brainstorming notes privately outside the repository. Preserve reusable runbooks.
-- Keep the original pre-cleanup files and evidence in a private external backup.
+  long-term export policy. They are excluded from release artifacts.
+- Obsolete `dashboard-2/`, empty requirements.txt, and unused placeholder scaffolding
+  were removed. Generators create their output directories on demand.
+- Date-specific reservation, priority, pending-work, and publication brainstorming
+  notes were privately archived and removed throughout public-facing history.
+- MIT was selected for project code; third-party models, datasets, and dependencies
+  retain their own rights and access requirements.
 
-## Remaining release gates
+## History and provenance
 
-1. Older commits contain original node names, infrastructure paths, archived notes,
-   and author email metadata. Do not make the existing history public without a
-   deliberate history-publication decision. A clean public snapshot is an option;
-   preserving history requires a scoped rewrite and a repeat audit of all public
-   refs. Keep the original repository privately either way. Do this before fixing
-   report permalinks; rewritten commit hashes will change.
-2. Review ownership and third-party redistribution rights before publication.
-   MIT was selected by the maintainer for project code; it grants no rights to
-   third-party models, datasets, or dependencies.
-3. Review the final diff, run documented checks from a clean export, and repeat a
-   dedicated secret scan over the final public tree and all intended public refs.
-   Pattern scans alone cannot certify that no sensitive content exists.
-4. Create the final release tag and update report citations only after these gates.
+See [the provenance record](provenance/README.md), including the 565-commit mapping,
+branch-tip mapping, metadata transformations, and four pre-existing missing source
+commits. Executable/configuration inputs are unchanged throughout mapped history.
+Internal installation/node metadata and author email were sanitized. Local application
+checkpoint refs were excluded from the public history copy.
 
-Validation and deployment are separate workflows. Dashboard deployment requires
-repository credentials and runs only from trusted main-branch pushes or manual
-invocation. Contributor validation does not require deployment secrets.
+## Validation
 
-## Audit results
-
-Gitleaks scanned 561 reachable commits (about 84.7 MB of changed content). Its
-123 initial findings were reviewed: 117 were SHA-256 fingerprints of tokenized
-research inputs and six were dashboard metric-name arrays. Narrow line-pattern
-allowlists in `.gitleaks.toml` document those false positives; no directories are
-excluded. A separate scan of 6,650 reachable blobs confirmed that historical
-personal paths and internal node metadata remain. Secret scanning does not
-remove this history-publication gate.
-
-To repeat the checks with Gitleaks installed:
+- 1,291 Python tests passed, including optional PyTorch paths.
+- Ruff, dashboard checks, configuration validation, current evidence verification,
+  refresh, freshness checks, and static-site build passed from a fresh sanitized clone.
+- All 101,250 distinct historical manifest/evidence checks passed, covering 127
+  affected historical manifest versions. Identified private metadata was absent
+  from all reachable rewritten objects.
+- The prior source cleanup verified all 3,139 current result records against the
+  private backup; changes are limited to documented metadata substitutions.
+- The wheel built, installed into an isolated target, and its CLI help ran outside
+  the checkout during source cleanup. Local Markdown links were checked.
+- Dedicated Gitleaks scans use narrow reviewed false-positive rules for scientific
+  input hashes and dashboard metric arrays; no result directories are excluded.
+  Repeat the scan after any changes or remote replacement.
 
 ```bash
 gitleaks git --redact --log-opts="--all"
-gitleaks dir build/public-release --redact
+make check validate validate-result-evidence
+make refresh check-dashboard-data build-dashboard-site
 ```
 
-A local source export under `build/public-release/` omits Git history, local
-dashboards, report exports, caches, and private archives. It is a review artifact,
-not a published release. Rebuild it after further source changes.
+Local validation uses Python 3.13 and Node.js 24; CI declares Python 3.11 and Node.js
+22 and requires its own run. GPU experiments were not rerun during repository cleanup.
 
-## Local validation completed
+## Remaining publication steps
 
-- 1,291 Python tests passed, including optional PyTorch paths.
-- Ruff, dashboard tests, configuration validation, and raw-evidence checks passed.
-- Refresh, dashboard freshness check, and static-site build passed from a source
-  export without Git history or local report/dashboard folders.
-- All 3,139 result files were compared against the private backup: differences
-  are limited to the documented metadata substitutions, including node names
-  inside serialized rank placement.
-- The wheel built, installed into an isolated target directory, and its CLI help
-  ran outside the checkout. Local Markdown destinations were checked.
-- Gitleaks reported no remaining findings in the source export or all reachable
-  history with the reviewed narrow false-positive rules. GPU execution was not
-  rerun as part of this cleanup.
+1. Review the sanitized diff and ownership/redistribution rights.
+2. Review the old/new remote branch tips and the remote history replacement. Keep
+   the remote private until all intended refs are sanitized and checked. This step
+   was not performed by the local rewrite.
+3. Publish the sanitized source, rerun CI, and address any GitHub-specific retained
+   refs or caches if necessary. Do not merge the original history back in.
+4. Freeze the release tag and report permalinks using the sanitized full commit IDs.
+   Cite mapped source commits for historical code and document provenance gaps.
 
-Validation used Python 3.13 and Node.js 24 locally; CI declares Python 3.11 and
-Node.js 22 and still requires its own run.
+Contributor validation is separate from credentialed dashboard publication. Only
+trusted main-branch pushes or manual invocation can run dashboard deployment.
