@@ -1,0 +1,16 @@
+title = "Research artifact secret scanning"
+
+[extend]
+useDefault = true
+
+# Exact scientific-data shapes reviewed during release preparation. Do not
+# allowlist result directories or generic token fields: they may contain secrets.
+[[allowlists]]
+description = "SHA-256 fingerprints of tokenized research inputs"
+regexTarget = "line"
+regexes = ['''^\s*"(?:performance|quality)_tokens_sha256": "[a-f0-9]{64}",?\s*$''']
+
+[[allowlists]]
+description = "Dashboard phase-to-metric names, not credentials"
+regexTarget = "line"
+regexes = ['''^\s*"inference-(?:batching|concurrency|prompt-length|framework|multi-gpu|precision-quantization)": \["throughput_tokens_sec", "latency_p50_ms"\],?\s*$''']

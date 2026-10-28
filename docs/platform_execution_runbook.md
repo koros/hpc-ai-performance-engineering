@@ -201,9 +201,8 @@ From a clean, current checkout on the login node:
 source slurm/modules_for_hpc_ai
 source .venv/bin/activate
 
-NCCL_HEADER="$(find "${SPACK_INSTALL_ROOT:?Set SPACK_INSTALL_ROOT to the site package root}" \
-  -type f -path '*/nccl-2.27.7-*/include/nccl.h' -print -quit)"
-export NCCL_HOME="${NCCL_HEADER%/include/nccl.h}"
+# Set this to the NCCL installation supplied by your cluster modules.
+export NCCL_HOME="${NCCL_HOME:?Set NCCL_HOME to your NCCL installation}"
 test -r "$NCCL_HOME/include/nccl.h"
 test -r "$NCCL_HOME/lib/libnccl.so"
 

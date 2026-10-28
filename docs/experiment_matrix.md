@@ -1,6 +1,6 @@
 # Comprehensive Experiment Matrix
 
-Source: `Appendix_A_Comprehensive_Experiment_Matrix.docx`.
+Source: `Appendix_A_Comprehensive_Experiment_Matrix.docx (original planning document; the matrix below is the public specification)`.
 
 This document is the planning source of truth for the dissertation experiment programme. Training remains the core scope; inference is retained as a high-impact secondary scope and protected by priority levels.
 

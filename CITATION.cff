@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "Please cite the exact release or commit used in your research."
+title: "Performance Engineering of Transformer Training and Inference on Multi-GPU H100 Systems"
+type: software
+authors:
+  - family-names: Koros
+    given-names: Geoff
+repository-code: "https://github.com/koros/hpc-ai-performance-engineering"
+license: MIT

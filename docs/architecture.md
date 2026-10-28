@@ -17,12 +17,10 @@ This repository is organised as a reproducible experiment platform rather than a
 configs/        Experiment configuration files.
 experiments/    Experiment group entry points and orchestration scripts.
 src/            Reusable Python framework.
-workloads/      Workload-specific adapters and assets.
 slurm/          Slurm templates and job scripts.
 results/        Raw outputs, processed summaries, and figures.
 schemas/        Machine-readable schemas for result validation.
 dashboard/      Visualisation application.
-notebooks/      Exploratory analysis.
 ```
 
 ## Execution Flow
@@ -36,4 +34,4 @@ notebooks/      Exploratory analysis.
 
 ## Current Scope
 
-The first executable path uses a synthetic workload to validate configuration, result writing, and local execution without requiring GPUs. Concrete NanoGPT, GPT-2, and Llama 3.2 adapters should be added next.
+The first executable path uses a synthetic workload to validate configuration, result writing, and local execution without requiring GPUs. Transformer training, inference, scaling and serving adapters live under `src/hpc_ai_perf/workloads/`; see [the workload catalog](workload_catalog.md) for their capabilities and acceptance requirements.

@@ -89,3 +89,10 @@ condition summaries, scaling contrasts and request distributions. The folder
 structure, examples and generator are tracked; the generated data remains ignored
 and reproducible from committed raw evidence. See its data dictionary before
 combining trials or selecting scaling baselines.
+
+## Public release metadata
+
+Internal node labels and two CUDA installation paths were generalized for release.
+See [the transformation record](../docs/reproducibility.md#public-metadata-transformation).
+The manifests verify the published records; privately archived originals retain
+their original bytes. Scientific measurements were not changed.

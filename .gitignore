@@ -39,3 +39,16 @@ slurm/profiles/*.local.json
 results/plot_data/**/*.csv
 results/plot_data/**/*.json
 results/plot_data/manifest.json
+
+# Local research work retained outside the public release.
+/dashboard3/
+/results/report_data/
+/docs/private/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.bak
+*.orig
+*.rej

@@ -69,9 +69,8 @@ PLATFORM_WAVE=vllm-framework` and the remaining dedicated wave names from the vL
 For L40S FP8 training, use the separate Transformer Engine environment and two-model gate:
 
 ```bash
-NCCL_HEADER="$(find "${SPACK_INSTALL_ROOT:?Set SPACK_INSTALL_ROOT to the site package root}" \
-  -type f -path '*/nccl-2.27.7-*/include/nccl.h' -print -quit)"
-export NCCL_HOME="${NCCL_HEADER%/include/nccl.h}"
+# Set this to the NCCL installation supplied by your cluster modules.
+export NCCL_HOME="${NCCL_HOME:?Set NCCL_HOME to your NCCL installation}"
 test -r "$NCCL_HOME/include/nccl.h"
 make submit-fp8-training-build NCCL_HOME="$NCCL_HOME"
 make submit-fp8-training-acceptance PLATFORM=l40s

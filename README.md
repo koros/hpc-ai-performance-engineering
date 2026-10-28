@@ -4,11 +4,11 @@ This repository contains the research artefacts, experiment framework, tracking 
 
 The project studies how transformer workloads behave on NVIDIA H100 systems in the Lovelace HPC facility, with selected NVIDIA L40S comparisons. Training is the core dissertation scope; inference is retained as a secondary high-impact scope because serving cost and latency often dominate long-term deployment.
 
-The evolving experiment evidence is available in the [public research dashboard](https://koros.github.io/hpc-ai-performance-engineering-dashboard/). The dashboard is published from a sanitized derived-data artifact while this complete research repository is prepared for open-source release.
+The evolving experiment evidence is available in the [public research dashboard](https://koros.github.io/hpc-ai-performance-engineering-dashboard/). The dashboard is published from derived research data. See [reproduction and evidence](docs/reproducibility.md) for validation, provenance, and publication details.
 
 ## Current Experiment Plan
 
-The latest plan is based on `Appendix_A_Comprehensive_Experiment_Matrix.docx` and uses a controlled factorial design across workload, GPU count, distributed strategy, precision, memory settings, data movement, inference framework, serving load, and hardware.
+The latest plan is based on the checked-in [experiment matrix](docs/experiment_matrix.md) and uses a controlled factorial design across workload, GPU count, distributed strategy, precision, memory settings, data movement, inference framework, serving load, and hardware.
 
 Matrix configs are normalized through a canonical phase map so every immutable result embeds validated `RQ1-RQ7` and `A01-A08` traceability identifiers alongside its source metadata.
 
@@ -113,14 +113,12 @@ hpc-ai-performance-engineering/
 ├── dashboard/                # Static dashboard for processed results
 ├── docs/                     # Project plan, matrix, tracker, architecture, hardware notes
 ├── experiments/              # Phase folders aligned with the proposal outline
-├── notebooks/                # Exploratory analysis notebooks
 ├── results/                  # Raw results, processed outputs, and figures
 ├── schemas/                  # Result schema definitions
 ├── scripts/                  # Utility scripts
 ├── slurm/                    # Slurm scripts, profiles, generated plans, and smoke presets
 ├── src/hpc_ai_perf/          # Experiment config, runner, profiling, results, workload code
-├── tests/                    # Local validation tests
-└── workloads/                # Workload-specific assets and notes
+└── tests/                    # Local validation tests
 ```
 
 ## Metrics
@@ -390,3 +388,16 @@ University of Plymouth
 ## License
 
 To be determined.
+
+## Reproduction and citation
+
+See [reproduction and evidence](docs/reproducibility.md) for the CPU quick start,
+result checksums, dashboard generation, and permanent report links. GPU execution
+requires a compatible cluster environment and the acceptance gates in the runbooks.
+
+## License and contributions
+
+Project code is available under the [MIT License](LICENSE). Third-party models,
+datasets, and software retain their own licenses and access requirements. See
+[contribution guidance](CONTRIBUTING.md) and [security reporting](SECURITY.md).
+Citation metadata is provided in [CITATION.cff](CITATION.cff).
