@@ -78,7 +78,7 @@ If one canary completes and the other fails, preserve the completed immutable re
 it. For example, if E251 completed while E250 needs a runtime repair:
 
 ```bash
-export BUNDLE=../hpc-ai-submissions/<qwen7b-canary-bundle>
+export BUNDLE=../hpc-ai-submissions/qwen7b-canary-bundle
 make import-result-evidence SOURCE="$BUNDLE/results/E251"
 make validate-result-evidence
 git add results/raw/h100/E251 results/raw/h100/SHA256SUMS

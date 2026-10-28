@@ -10,11 +10,13 @@ source-document path, and internal installation paths were generalized.
 
 ## Resolving recorded source commits
 
-[commit-map.txt](commit-map.txt) contains 565 original-to-sanitized commit pairs,
-including the source commits on both main and the feature branch and the cleanup
-commit. The header is `old new`; each later line contains two full Git commit IDs.
-No mapped original commit was dropped. [refs-map.json](refs-map.json) records branch
-tips at the rewrite boundary, before this provenance documentation was added.
+[commit-map.txt](commit-map.txt) contains 1,132 lookup rows: the 565 original
+commit IDs plus 567 intermediate local IDs from release preparation. The mapping
+is composed through both cleanup passes, so original experiment references continue
+to resolve directly to the final sanitized history. No historical commit was dropped.
+The header is `old new`; each later line contains two full Git commit IDs.
+[refs-map.json](refs-map.json) records original branch tips at the initial rewrite
+boundary, mapped through both passes; it does not describe current branch tips.
 
 Recorded `git_commit` values in experiment evidence were deliberately retained:
 they describe the original execution, not a rerun. Resolve a full recorded ID with:
@@ -31,20 +33,24 @@ The provenance-documentation commit itself has no original counterpart.
 
 ## Fingerprints and evidence checksums
 
-Executable/configuration trees were compared for every mapped commit: source,
-scripts, configs, Slurm execution files, platform profiles, schemas, tests, Makefile,
-and pyproject.toml are byte-identical to the originals (excluding Markdown and
-placeholder files). Source-file and workload/runtime fingerprints retain their original inputs.
-Resolved-config identities affected by later portable-path normalization are mapped
-in [config-hash-map.json](config-hash-map.json); see the
-[transformation record](../reproducibility.md#portable-paths-and-resolved-configuration-identities). A rewritten Git commit ID is a separate identifier.
+Executable source files and source configuration files were compared across every
+mapped historical commit. Their bytes and workload/runtime fingerprint inputs are
+unchanged. Commit dates, authorship, and merge topology are preserved.
 
-Historical result files and dashboard/documentation metadata were sanitized.
-The 127 affected historical checksum-manifest blob versions were updated to hash
-the published result bytes. All 101,250 distinct historical manifest/evidence checks
-passed. These manifests verify the sanitized files; they do not assert byte identity
-with privately archived originals. Numeric measurements and scientific cohort IDs
-were not changed. See [the release transformation](../reproducibility.md#public-metadata-transformation).
+Personal paths in embedded resolved configs are metadata but participate in the
+canonical config hash. Those configs now use relative paths: `config_sha256` hashes
+the public embedded config, and `original_config_sha256` retains the original
+recorded hash. [config-hash-map.json](config-hash-map.json) maps all 1,307 affected
+identities one-to-one. See the [path transformation record](../reproducibility.md#portable-paths-and-resolved-configuration-identities).
+Source-config file digests are unchanged. Original resolved configs remain in the
+private backup; original hashes cannot be recomputed from the sanitized config.
+
+Result-file checksum manifests were recalculated throughout history. All 101,250
+distinct historical manifest/evidence checks passed. The manifests verify the
+sanitized published bytes. Numeric measurements, experiment/trial IDs, timestamps,
+and recorded original Git IDs were retained. Across the 3,139 current records,
+only command strings, source-config paths, 90 profiler trace paths, and affected
+resolved-config hashes changed in this pass; original config hashes were retained.
 
 ## Pre-existing source-reference gaps
 

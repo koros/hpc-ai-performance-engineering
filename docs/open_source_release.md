@@ -19,7 +19,7 @@ result records, operational notes, and pre-cleanup files are backed up privately
 
 ## History and provenance
 
-See [the provenance record](provenance/README.md), including the 565-commit mapping,
+See [the provenance record](provenance/README.md), including the composed original/intermediate commit mapping,
 branch-tip mapping, metadata transformations, and four pre-existing missing source
 commits. Executable/configuration inputs are unchanged throughout mapped history.
 Internal installation/node metadata and author email were sanitized. Local application
@@ -27,7 +27,7 @@ checkpoint refs were excluded from the public history copy.
 
 ## Validation
 
-- 1,291 Python tests passed, including optional PyTorch paths.
+- 1,292 Python tests passed, including optional PyTorch paths.
 - Ruff, dashboard checks, configuration validation, current evidence verification,
   refresh, freshness checks, and static-site build passed from a fresh sanitized clone.
 - All 101,250 distinct historical manifest/evidence checks passed, covering 127
@@ -63,3 +63,13 @@ Local validation uses Python 3.13 and Node.js 24; CI declares Python 3.11 and No
 
 Contributor validation is separate from credentialed dashboard publication. Only
 trusted main-branch pushes or manual invocation can run dashboard deployment.
+
+## Additional personal-document review
+
+A second pass removed three further personal advice and handoff documents from all
+public branch histories. Retained study designs use neutral language; reusable
+commands use relative checkout and sibling-bundle paths. Personal home prefixes in
+result commands, profiler paths, and embedded resolved configs were normalized.
+See the provenance guide for original/public config hashes and composed commit IDs.
+All numeric measurements and workload/runtime fingerprints were retained.
+The publication-path checker covers home-prefix case variants and runs in CI.
