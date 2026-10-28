@@ -23,8 +23,7 @@ Primary planning documents:
 - [GPU telemetry revalidation](docs/gpu_telemetry_revalidation.md): UUID-bound device attribution, legacy evidence treatment, telemetry audit, and cross-platform anchor waves.
 - [Controlled low-bit inference](docs/lowbit_serving_runbook.md): fresh Qwen2.5-7B BF16/AWQ/GPTQ/NF4 comparisons, real-text quality, measured-region energy, and platform-specific acceptance gates.
 - [Controlled long-context serving](docs/long_context_serving_runbook.md): fresh Qwen2.5-7B BF16 4k/6k/8k real-text prompt points, strict prefill/latency timing, and platform-specific acceptance gates.
-- [New wave implementation notes](docs/new_wave_implementation_notes.md): handoff-derived serving crossover conditions, first H100 runs, commands, and interpretation gates.
-- [New serving crossover runbook](docs/new_wave_implementation_notes.md): E702-E714 prompt, concurrency, precision, output-length, and TP2×DP2 waves with dry-run and Slurm commands.
+- [Serving wave execution](docs/platform_execution_runbook.md): E702-E714 prompt, concurrency, precision, output-length, and TP2×DP2 waves with dry-run and Slurm commands.
 - [Comprehensive experiment matrix](docs/experiment_matrix.md): full source-of-truth matrix with `E001` to `E200`, priority levels, metrics, and GPU-hour estimates.
 - [Local dev runbook](docs/local_dev_runbook.md): Mac/local baseline-style runs for development while HPC access is unavailable.
 - [Dev experiment matrix](docs/dev_experiment_matrix.md): rationale, parameters, and local-dev versus HPC-only experiment boundaries.
@@ -317,7 +316,7 @@ PYTHONPATH=.:src python3 -m hpc_ai_perf.cli plan-serving-layout \
 ```
 
 The exact E702-E714 wave lifecycle, including H100 profile checks, three-trial rendering, submission, collection, and
-staging, is documented in [the new wave implementation notes](docs/new_wave_implementation_notes.md). These rows
+staging, is documented in [the platform execution runbook](docs/platform_execution_runbook.md). These rows
 remain unexecuted H100 plans until their physical vLLM runs are collected.
 
 Require semantic research readiness (implemented workload, strategy, profiler, precision, and framework):

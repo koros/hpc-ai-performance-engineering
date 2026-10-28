@@ -206,7 +206,7 @@ The selected diagnostic directory must include NF4 from an acceptance run with `
 Do not submit twice to check status. Each core wave is six three-task job arrays; each optional wave is
 two. Scheduler completion alone is not proof of valid workload results.
 
-## Analysis and handoff
+## Analysis outputs
 
 After collecting canonical evidence, the normal `make refresh` pipeline generates
 `results/analysis/lowbit_summary.csv` when low-bit results are present. It provides:

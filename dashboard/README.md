@@ -50,7 +50,7 @@ Each finding card also links to a **"Supporting Evidence & Analysis"** section a
 the page, which is the deliberate exception to the plain-language rule: exact experiment IDs,
 trial counts, comparability classes (`exact` / `platform_specific` / `capacity_adjusted`),
 unrounded figures, and the source pipeline's own methodology/limitation notes, quoted rather than
-paraphrased. It exists so a technical reader (a supervisor, an examiner, future-you) can verify
+paraphrased. It exists so a technical reader (a researcher or reviewer) can verify
 every rounded claim above against its exact source condition without leaving the page.
 
 That section opens with three at-a-glance charts before the detail tables:
@@ -219,7 +219,7 @@ parameters with an explicit "no completed trial yet" note instead of blank/misle
 
 Linked from the main report's top nav ("Experiment Catalog") and from the Supporting Evidence section
 intro. `experiments-data.json` is kept alongside as a plain data export of the same hierarchy (same
-source the page embeds inline), in case it's useful to hand to a supervisor or reuse elsewhere.
+source the page embeds inline), for independent verification and reuse.
 
 Verification: full-coverage stress test (every one of the 276 experiment cards and all 52 workload
 row-groups rendered through the actual page JS in Node with zero exceptions), tag-balance and CSS

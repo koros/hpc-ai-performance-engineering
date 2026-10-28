@@ -55,7 +55,7 @@ Before rerunning wave 0 after an environment failure, run the active-node checks
 
 ```bash
 srun -p gpu_l40s --gres=gpu:2 --cpus-per-task=8 --time=00:10:00 bash -lc '
-cd ./
+# Run from the repository root.
 source slurm/modules_for_hpc_ai
 source .venv/bin/activate
 python3 -m hpc_ai_perf.cli check-runtime --expected-gpu-model L40S --expected-torch-version 2.8.0 --expected-torch-cuda 12.4 --expected-gpus 2 --require-deepspeed
@@ -289,7 +289,7 @@ all changes to `src/`, `configs/`, `platforms/`, `slurm/`, and `pyproject.toml` 
 ignored build output may remain present: they are deliberately excluded from the source-snapshot cleanliness check.
 
 ```bash
-cd ./
+# Run from the repository root.
 source slurm/modules_for_hpc_ai
 make check-slurm-profile SLURM_PROFILE=slurm/profiles/cluster_l40s.json
 make submit-platform-wave PLATFORM=l40s PLATFORM_WAVE=0
@@ -390,7 +390,7 @@ make stage-platform-wave PLATFORM=h100 PLATFORM_WAVE=vllm-pilot
 
 ### New TinyLlama TP crossover waves
 
-The handoff-derived E702-E714 serving extension is split into four independent H100 waves. This keeps prompt length,
+The E702-E714 serving extension is split into four independent H100 waves. This keeps prompt length,
 concurrency, precision, output length, and TP2×DP2 routing comparisons auditable:
 
 | Wave | Conditions | Required trials |

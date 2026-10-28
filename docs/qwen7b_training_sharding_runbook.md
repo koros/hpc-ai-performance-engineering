@@ -41,7 +41,7 @@ controlled scaling sensitivity, not a fixed-accumulation speedup curve.
 On the login node, use the ordinary project environment (not the vLLM or Transformer Engine environment):
 
 ```bash
-cd ./
+# Run from the repository root.
 source slurm/modules_for_hpc_ai
 source .venv/bin/activate
 

@@ -34,8 +34,10 @@ The provenance-documentation commit itself has no original counterpart.
 Executable/configuration trees were compared for every mapped commit: source,
 scripts, configs, Slurm execution files, platform profiles, schemas, tests, Makefile,
 and pyproject.toml are byte-identical to the originals (excluding Markdown and
-placeholder files). Experiment/configuration/runtime fingerprints retain their
-original values and inputs. A rewritten Git commit ID is a separate identifier.
+placeholder files). Source-file and workload/runtime fingerprints retain their original inputs.
+Resolved-config identities affected by later portable-path normalization are mapped
+in [config-hash-map.json](config-hash-map.json); see the
+[transformation record](../reproducibility.md#portable-paths-and-resolved-configuration-identities). A rewritten Git commit ID is a separate identifier.
 
 Historical result files and dashboard/documentation metadata were sanitized.
 The 127 affected historical checksum-manifest blob versions were updated to hash

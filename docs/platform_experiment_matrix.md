@@ -2,7 +2,7 @@
 
 This matrix routes every source `E001-E200` experiment family to Mac M1, L40/L40S, and H100. It also records supplemental conditions `E201-E276`; these add capacity boundaries, telemetry, full-node evidence, backend-matched FP8 controls, low-bit/long-context serving, H100 Qwen sharding, and separately controlled follow-up studies without replacing the authoritative source matrix.
 
-The H100 follow-up waves are documented in [the targeted execution runbook](h100_followup_runbook.md).
+The H100 follow-up waves are documented in [the Qwen training runbook](qwen7b_training_sharding_runbook.md).
 E260 repeats the successful allocator shape; E261–E269 introduce DDP/update validation and separate two-/four-GPU
 Qwen controls; E270–E273 broaden the low-bit quality corpus with a fresh BF16 reference; E274–E276 are
 duration-controlled inference energy anchors. None changes existing source configurations or collected evidence.
@@ -84,7 +84,7 @@ replaced by a smaller batch.
 
 ## Directly Runnable Config Sets
 
-| Platform | Current configs you can run without changing target hardware labels | Important condition |
+| Platform | Runnable configs with unchanged target hardware labels | Important condition |
 | --- | --- | --- |
 | Mac M1 | `configs/local/*.json` (4 smoke configs) and `configs/dev/*.json` (15 dev configs) | Workflow validation only. Keep results out of the `E001-E200` evidence set. |
 | L40/L40S | 180 planned source `E###@l40s` conditions, 43 planned supplemental conditions, and 4 deferred supplemental capacity probes | Generated configs use `gpu_l40s`, 8 CPUs/GPU, PCIe, an eight-GPU node limit, and accepted evidence root `results/raw/l40s`. E215 must first prove the complete allocation and topology. E235-E238 are measured-region energy anchors for the hardware-comparison rows. Twenty source rows remain deferred: TensorRT-LLM/backend gaps, platform-specific comparison rows, and exact-shape E032/E033/E044/E067/E068 OOMs. E203/E204/E206/E207 are supplemental upper-bound OOM deferrals. |

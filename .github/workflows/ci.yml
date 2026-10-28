@@ -52,6 +52,7 @@ jobs:
       - name: Validate lint, dashboard, configuration and evidence
         run: |
           make lint
+          python scripts/check_publication_paths.py
           make test-dashboard
           make validate
           make validate-result-evidence

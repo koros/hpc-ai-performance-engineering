@@ -41,7 +41,7 @@ During release preparation on 28 October 2026, internal node names in 3,139
 canonical result records (including serialized rank-placement metadata) were replaced consistently with `research-node-a` and
 `research-node-b`. Two E005 records also had internal CUDA installation paths
 replaced with `/opt/site/cuda-12.4.1`, retaining the `bin/nvcc` suffix where present.
-All measurements, experiment IDs, trial identifiers, runtime/config fingerprints,
+All measurements, experiment IDs, trial identifiers, runtime fingerprints,
 and timestamps were retained. Platform SHA256SUMS manifests were regenerated for
 the published bytes. These checksums verify the public records, not the privately
 archived originals. Node labels preserve within-study grouping without publishing
@@ -59,3 +59,23 @@ The original source history has now been sanitized locally. Use the
 commits. Four pre-existing missing source commits are documented there. The remote
 still requires a reviewed history replacement before publication; see
 [release preparation](open_source_release.md).
+
+## Portable paths and resolved configuration identities
+
+A subsequent review removed personal advice notes and normalized personal workspace
+prefixes in runbooks and historical result metadata. Repository paths are relative
+to the checkout; submission bundles use `../hpc-ai-submissions/`. Run commands from
+the repository root and choose local bundle locations as needed.
+
+For affected embedded resolved configurations, `config_sha256` now hashes the public
+configuration and `original_config_sha256` retains its original recorded identity.
+The [configuration hash map](provenance/config-hash-map.json) links those identities.
+Source-config file digests, workload/runtime fingerprints, timestamps, measurements,
+experiment IDs and original recorded Git IDs are retained. Public file checksum
+manifests were updated again. The original resolved configuration can be verified
+against the private archive; the public embedded config verifies against its new
+public hash. These are documented metadata transformations, not new trials.
+
+Check tracked files with `python scripts/check_publication_paths.py`; add `--history`
+to inspect objects reachable from local branches and tags. The check covers both
+uppercase and lowercase home-directory prefixes and runs in contributor CI.
