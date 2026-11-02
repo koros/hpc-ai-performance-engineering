@@ -21,6 +21,26 @@ generated outputs; their directories are created by the generators. Plot exports
 can be regenerated with `make export-plot-data`. See
 [the data dictionary](../results/plot_data/DATA_DICTIONARY.md) before pooling trials.
 
+## Dashboard publication
+
+The canonical dashboard is published directly from this repository at
+<https://koros.github.io/hpc-ai-performance-engineering/>. The root opens the
+catalog; Part 3 is at `dashboard/studies.html` below that URL.
+
+`.github/workflows/dashboard-pages.yml` validates the repository, builds only the
+allowlisted static files under `build/pages/`, uploads a Pages artifact and
+deploys it to the `github-pages` environment. Deployment uses GitHub's job token
+and OIDC; no cross-repository SSH deploy key is needed. In the repository's
+Settings → Pages, the build source must be **GitHub Actions**.
+
+The required curated report CSV snapshots are included in `results/report_data/`
+so a fresh checkout can reproduce the studies. Plot exports are regenerated from
+verified raw evidence before dashboard checks. The external dissertation R
+pipeline is not needed to publish this validated snapshot.
+
+The former `hpc-ai-performance-engineering-dashboard` repository is no longer
+updated by this workflow. Its existing site is retained during the transition.
+
 ## GPU reproduction
 
 See [platform execution](platform_execution_runbook.md),

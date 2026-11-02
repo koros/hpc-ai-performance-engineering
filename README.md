@@ -4,7 +4,7 @@ This repository contains the research artefacts, experiment framework, tracking 
 
 The project studies how transformer workloads behave on NVIDIA H100 systems in the Lovelace HPC facility, with selected NVIDIA L40S comparisons. Training is the core dissertation scope; inference is retained as a secondary high-impact scope because serving cost and latency often dominate long-term deployment.
 
-The evolving experiment evidence is available in the [public research dashboard](https://koros.github.io/hpc-ai-performance-engineering-dashboard/). The dashboard is published from derived research data. See [reproduction and evidence](docs/reproducibility.md) for validation, provenance, and publication details.
+The evolving experiment evidence is available in the [public research dashboard](https://koros.github.io/hpc-ai-performance-engineering/). The dashboard is published from derived research data. See [reproduction and evidence](docs/reproducibility.md) for validation, provenance, and publication details.
 
 ## Current Experiment Plan
 

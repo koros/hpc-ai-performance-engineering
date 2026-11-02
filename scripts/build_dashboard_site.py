@@ -9,6 +9,8 @@ from pathlib import Path
 DASHBOARD_FILES = (
     "index.html",
     "analysis.html",
+    "studies.html",
+    "studies-data.json",
     "logo.svg",
     "README.md",
     "experiment-details.json",

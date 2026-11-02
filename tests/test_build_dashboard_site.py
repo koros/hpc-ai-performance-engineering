@@ -16,6 +16,23 @@ def test_publication_refreshes_derived_inputs_before_dashboard_checks() -> None:
     assert commands.index("make check PYTHON=python") < commands.index("make build-dashboard-site PYTHON=python")
 
 
+def test_pages_deploys_the_built_artifact_without_cross_repository_credentials():
+    import yaml
+
+    workflow = yaml.safe_load(Path(".github/workflows/dashboard-pages.yml").read_text())
+    publish = workflow["jobs"]["publish"]
+    upload = next(s for s in publish["steps"] if s.get("uses", "").startswith("actions/upload-pages-artifact@"))
+    assert upload["with"]["path"] == "build/pages"
+    deploy = workflow["jobs"]["deploy"]
+    assert deploy["needs"] == "publish"
+    assert deploy["permissions"] == {"pages": "write", "id-token": "write"}
+    assert deploy["environment"]["name"] == "github-pages"
+    assert any(s.get("uses", "").startswith("actions/deploy-pages@") for s in deploy["steps"])
+    text = Path(".github/workflows/dashboard-pages.yml").read_text()
+    assert "DASHBOARD_DEPLOY_KEY" not in text
+    assert "git clone" not in text
+
+
 def test_build_site_publishes_only_dashboard3_content(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     for name in DASHBOARD_FILES:

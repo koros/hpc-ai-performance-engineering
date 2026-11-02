@@ -7,7 +7,7 @@ name = "hpc-ai-performance-engineering"
 version = "0.1.0"
 description = "Reproducible benchmark framework for distributed transformer training and inference on H100 systems."
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["scipy>=1.11,<2"]
 
 [project.optional-dependencies]
 dev = [

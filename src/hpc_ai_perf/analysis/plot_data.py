@@ -481,7 +481,7 @@ def export_plot_data(source_root: Path, output: Path, matrix: Path):
             "no pooling across config/runtime identities."
         ),
         summary_policy=(
-            "Unweighted independent-trial means; metric-specific n; approximate Student t 95% intervals; "
+            "Unweighted independent-trial means; metric-specific n; Student t 95% intervals with numerical quantiles; "
             "unavailable intervals are null."
         ),
         datasets=tables,

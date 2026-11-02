@@ -243,3 +243,38 @@ assert.match(findings, /id="inference-parallelization"/);
 assert.match(findings, /Acceptance trials are excluded/);
 assert.match(findings, /within-trial percentiles/);
 console.log("Dashboard catalog and findings checks passed.");
+
+// Execute Part 3 with its complete dataset, including every chart and table.
+const studiesPage = fs.readFileSync(path.join(root, "studies.html"), "utf8");
+const studiesData = JSON.parse(fs.readFileSync(path.join(root, "studies-data.json"), "utf8"));
+assert.deepStrictEqual(embeddedJson(studiesPage, "STUDIES"), studiesData);
+const studyElements = new Map();
+function studyElement(id) {
+  if (!studyElements.has(id)) studyElements.set(id, {
+    value: "", innerHTML: "", textContent: "", hidden: false,
+    addEventListener() {},
+  });
+  return studyElements.get(id);
+}
+const studyContext = vm.createContext({
+  document: {
+    getElementById: studyElement,
+    querySelector: studyElement,
+    addEventListener() {},
+  },
+});
+for (const [, script] of studiesPage.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) {
+  vm.runInContext(script, studyContext);
+}
+assert.match(studyElement("kpis").innerHTML, /1,474/);
+assert.doesNotMatch(studyElement("kpis").innerHTML, /1,663/);
+assert.equal((studyElement("studies").innerHTML.match(/<section class="study"/g) || []).length, 17);
+assert.doesNotMatch(studyElement("studies").innerHTML, /NaN|undefined|Infinity/);
+assert.equal(studyElement("studyCount").textContent, "17 of 17 studies");
+studyElement("studySearch").value = "E589";
+studyContext.filterStudies();
+assert.equal(studyElement("s5-stacks").hidden, false);
+assert.equal(studyElement("core-lowbit").hidden, true);
+assert.match(catalog, /href="studies\.html"/);
+assert.match(findings, /href="studies\.html"/);
+console.log("Detailed studies rendering and filtering checks passed.");

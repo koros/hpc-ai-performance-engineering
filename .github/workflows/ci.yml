@@ -41,6 +41,9 @@ jobs:
           print(f"Validated PyTorch {torch.__version__} on CPU")
           PY
 
+      - name: Generate verified dashboard evidence
+        run: make export-plot-data PYTHON=python
+
       - name: Run Python tests including optional PyTorch coverage
         run: python -m pytest
 

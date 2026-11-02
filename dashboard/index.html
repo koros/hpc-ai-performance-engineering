@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Part 1 &middot; Experiment Catalog &middot; HPC AI Performance Engineering</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
 <link rel="icon" type="image/svg+xml" href="logo.svg" />
 <style>
   :root {
@@ -62,7 +65,7 @@
   body {
     background: var(--page);
     color: var(--text-primary);
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
     line-height: 1.5;
     padding-bottom: 64px;
   }
@@ -212,7 +215,7 @@
   .mini-meter-fill { display: block; height: 100%; border-radius: 999px; background: var(--good); }
   .mini-meter-fill.partial { background: var(--blue); }
   .mini-meter-count {
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     font-size: 11.5px; color: var(--text-muted); white-space: nowrap;
   }
 
@@ -261,7 +264,7 @@
   details.phase-block[open] > summary::before { transform: rotate(90deg); }
   .phase-title {
     font-size: 13.5px; font-weight: 700;
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   }
   .phase-body { padding: 2px 14px 14px; }
 
@@ -301,7 +304,7 @@
   .exp-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
   table.exp-table {
     border-collapse: collapse; width: 100%; min-width: 460px;
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     font-size: 11.5px;
   }
   table.exp-table th, table.exp-table td {
@@ -393,7 +396,7 @@
   .drawer-kicker { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin: 0 0 4px; }
   .drawer-header h3 {
     font-size: 16px; margin: 0;
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     word-break: break-word;
   }
   .drawer-close {
@@ -404,13 +407,13 @@
   .drawer-body { padding: 16px 20px 28px; overflow-y: auto; flex: 1 1 auto; }
   .exp-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; background: var(--surface-2); }
   .exp-card:last-child { margin-bottom: 0; }
-  .exp-card h4 { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 14px; margin: 0 0 2px; }
+  .exp-card h4 { font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 14px; margin: 0 0 2px; }
   .exp-card .exp-sub { font-size: 12.5px; color: var(--text-muted); margin: 0 0 10px; }
   .exp-meta, .exp-metric-grid {
     display: grid; grid-template-columns: 1fr 1fr; gap: 5px 14px; font-size: 12.5px; margin-bottom: 4px;
   }
   .exp-meta { margin-bottom: 10px; }
-  .exp-metric-grid { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .exp-metric-grid { font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
   .exp-meta .k, .exp-metric-grid .k { color: var(--text-muted); font-family: inherit; }
   .exp-platform { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
   .exp-platform:first-of-type { margin-top: 8px; }
@@ -426,7 +429,7 @@
   .capacity-note p { margin: 0; color: var(--text-secondary); }
   .exp-siblings { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
   .exp-sibling-chip {
-    font-size: 11px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px; font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
     padding: 3px 9px; cursor: pointer; color: var(--text-secondary);
   }
@@ -435,6 +438,7 @@
 
   footer.cat-footer { padding: 24px 0 10px; }
   footer.cat-footer p { font-size: 12px; color: var(--text-muted); max-width: 72ch; }
+  button, input, select, textarea { font-family: inherit; }
 </style>
 </head>
 <body>
@@ -445,6 +449,7 @@
     <nav class="part-nav" aria-label="Report sections">
       <a class="part-pill active" href="index.html">Part 1 &middot; Experiment Catalog</a>
       <a class="part-pill" href="analysis.html">Part 2 &middot; Analysis &amp; Findings</a>
+      <a class="part-pill" href="studies.html">Current findings &amp; studies</a>
     </nav>
     <h1>Experiment evidence catalog</h1>
     <p class="lede">
@@ -456,6 +461,13 @@
     <p class="snapshot-line">Includes verified L40S energy anchors E235–E238, the completed TinyLlama strategy sweep E277–E286, and the TinyLlama weak-scaling wave E287–E293 (H100 and L40S complete). Other newer matrix additions are not yet in this catalog snapshot.</p>
   </div>
 </header>
+<aside class="wrap" style="margin:24px auto;padding:20px;border:1px solid var(--border);border-radius:14px;background:var(--surface)">
+  <p class="eyebrow">Start with the results</p>
+  <h2 style="margin:6px 0">What worked, where, and how confidently?</h2>
+  <p>Explore the current study summaries: plain-language findings, matched comparisons, confidence intervals and downloadable evidence tables. H100 and L40S results stay separate.</p>
+  <a href="studies.html" style="color:var(--blue);font-weight:700">Explore current findings &rarr;</a>
+</aside>
+
 
 <div class="toolbar-wrap">
   <div class="wrap toolbar">
@@ -1326,6 +1338,14 @@ renderTree();
 buildFilterRow();
 initInteractions();
 applyFilters();
+</script>
+<script>
+var catalogQuery = new URLSearchParams(window.location.search).get("q");
+if (catalogQuery) {
+  var catalogSearch = document.getElementById("searchInput");
+  catalogSearch.value = catalogQuery;
+  catalogSearch.dispatchEvent(new Event("input", { bubbles: true }));
+}
 </script>
 </body>
 </html>

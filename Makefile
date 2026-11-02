@@ -493,7 +493,9 @@ readiness-report:
 
 refresh:
 	$(PYTHON) -m hpc_ai_perf.cli refresh
+	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/export_plot_data.py
 	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/update_dashboard_results.py
+	$(PYTHON) scripts/build_dashboard_studies.py
 
 build-dashboard-site: refresh test-dashboard
 	$(PYTHON) scripts/build_dashboard_site.py --output-dir build/pages
@@ -525,11 +527,13 @@ verify-qwen7b-layout-canaries:
 	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/verify_qwen_layout_canaries.py
 
 .PHONY: refresh-dashboard check-dashboard-data
-refresh-dashboard:
+refresh-dashboard: export-plot-data
 	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/update_dashboard_results.py
+	$(PYTHON) scripts/build_dashboard_studies.py
 
 check-dashboard-data:
 	PYTHONPATH="$(PROJECT_PYTHONPATH)" $(PYTHON) scripts/update_dashboard_results.py --check
+	$(PYTHON) scripts/build_dashboard_studies.py --check
 
 .PHONY: export-plot-data
 export-plot-data:

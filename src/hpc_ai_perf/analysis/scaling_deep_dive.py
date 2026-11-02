@@ -16,6 +16,8 @@ import statistics
 from collections import Counter, defaultdict
 from typing import Any
 
+from scipy.special import stdtrit
+
 from hpc_ai_perf.config.scaling import DEEP_DIVE_STUDY_ID
 
 # Usable capacity observed by PyTorch on each platform (GiB), from the OOM records.
@@ -544,11 +546,10 @@ def _ci95(values) -> tuple[float | None, float | None]:
 
 
 def _t95(dof: float) -> float:
-    table = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 8: 2.306, 10: 2.228, 20: 2.086, 30: 2.042}
-    for limit in sorted(table):
-        if dof <= limit:
-            return table[limit]
-    return 1.96
+    """Two-sided 95% Student-t critical value, including fractional Welch df."""
+    if not math.isfinite(dof) or dof <= 0:
+        raise ValueError("Student-t degrees of freedom must be finite and positive")
+    return float(stdtrit(dof, 0.975))
 
 
 def _round(value: float | None, digits: int = 6) -> float | str:

@@ -42,7 +42,20 @@ results/plot_data/manifest.json
 
 # Local research work retained outside the public release.
 /dashboard3/
-/results/report_data/
+/results/report_data/*
+!/results/report_data/README.md
+!/results/report_data/h100_matched_precision_ladder.csv
+!/results/report_data/h100_tinyllama_serving_layouts.csv
+!/results/report_data/h100_core_scaling.csv
+!/results/report_data/h100_precision.csv
+!/results/report_data/h100_run_length_robustness.csv
+!/results/report_data/hardware_h100_vs_l40s.csv
+!/results/report_data/l40s_efficiency_vs_work_per_step.csv
+!/results/report_data/qwen7b_goodput_by_latency_slo.csv
+!/results/report_data/qwen7b_lowbit_vs_bf16.csv
+!/results/report_data/l40s_real_text_batching.csv
+!/results/report_data/l40s_fixed_effective_batch_microbatch.csv
+!/results/report_data/h100_strategy_tradeoff.csv
 /docs/private/
 .env
 .env.*

@@ -7,7 +7,17 @@ The current inference tables are regenerated from checksum-verified raw evidence
 older research-question cards retain their explicitly dated historical scope.
 Canaries are listed in the catalog but excluded from performance findings.
 
-Two self-contained pages (no build step, no dependencies), meant to be read in order:
+Three self-contained pages with embedded data (no browser dependencies):
+
+- **`studies.html` — Current findings & studies.** The recommended starting point for results:
+  17 generated study summaries with questions, findings, coverage, confidence intervals,
+  charts, searchable evidence and 18 downloadable CSV tables. It aggregates 409 conditions
+  and 1,474 unique completed trials in the current exports. Counts are generated; overlapping
+  studies never multiply the headline trial count. Platform results remain separate.
+  Detailed tables are collapsed so the main finding stays easy to read.
+- The catalog and narrative below remain available, with prominent links to the current studies.
+  The older narrative sections retain their dated scope; use current studies for the newer cohorts.
+
 
 1. **`index.html` — Part 1, Experiment Catalog.** The current full-matrix catalog,
    grouped by research theme and study, with filters and an automatic "held constant vs. varied"
@@ -357,3 +367,37 @@ The plain-language section also includes a study-lever table showing what each d
 changes, what it compares against, why the parameter could affect scaling, and whether evidence has
 been collected. It explicitly separates the completed S1 synchronization/work-allocation results
 from the still-pending S2-S8 levers.
+
+## Current study aggregation
+
+`make refresh-dashboard PYTHON=python3` now also runs
+`scripts/build_dashboard_studies.py`. `make check-dashboard-data PYTHON=python3`
+checks both the existing catalog/inference refresh and the generated studies.
+The publication artifact includes `studies.html` and `studies-data.json`.
+
+The generator adapts dashboard3's study structure and aggregation logic. It reads
+`results/plot_data/` for cohort-aware evidence and `results/report_data/` for the
+curated report aggregates. `make refresh-dashboard` now regenerates plot exports from verified raw evidence
+before rebuilding the dashboard. The report CSVs remain inputs: the dashboard refresh does
+not run the external dissertation R pipeline. Every study lists its input files,
+comparison design, experiment IDs and limitations. Missing telemetry stays missing.
+
+Run the focused checks with:
+
+```bash
+python3 -m pytest tests/test_dashboard_studies.py tests/test_dashboard_results.py tests/test_build_dashboard_site.py
+node dashboard/site.test.cjs
+```
+
+## Part 3 validation — 2 November 2026
+
+The detailed studies use 1,474 unique completed trials across 409 experiment IDs;
+a trial supporting multiple studies counts once in the headline. All 270 unique
+controlled effects have been independently reconciled with current trial data.
+Student-t quantiles now use SciPy and retain fractional Welch degrees of freedom.
+E404 → E589 on L40S is inconclusive (+5.10%, 95% CI −1.74% to +11.94%).
+Report-based chart intervals and request-SLO goodput are refreshed from the
+verified trial exports. Install dependencies with `python -m pip install -e ".[dev]"`
+before running the generators. See `docs/dashboard3-data-audit.md` for scope and
+reproduction details. The historical dashboard3 prototype is not the corrected
+publication artifact; use this directory's `studies.html`.
