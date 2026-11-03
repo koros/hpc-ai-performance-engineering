@@ -78,7 +78,9 @@ assert.match(findings, /87\.392%\*/);
 assert.match(findings, /82\.229%/);
 assert.match(findings, /checked-in derived deep-dive CSV\/report/);
 assert.match(findings, /Synchronization frequency/);
-assert.match(findings, /Designed as S8; results not collected yet/);
+assert.match(findings, /S8 collected on H100/);
+assert.match(findings, /dedicated L40S precision sweep remains uncollected/);
+assert.doesNotMatch(findings, /Designed as S[2-8]; results not collected yet/);
 assert.match(findings, /Fixed-batch efficiency fell to 82% at 8 GPUs/);
 for (let number = 277; number <= 286; number++) {
   const id = `E${number}`;
