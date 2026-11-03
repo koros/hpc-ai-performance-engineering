@@ -247,44 +247,12 @@ def build_catalog():
     return catalog, details
 
 
-def inference_section(catalog):
+def training_coverage_section(catalog):
     experiments = catalog["experiments"]
-    groups = defaultdict(list)
-    for eid, e in experiments.items():
-        if e.get("mode") != "inference" or int(eid[1:]) < 715 or "canary" in e["phase"] or e["status"] != "Completed":
-            continue
-        for platform, m in e["platforms"].items():
-            if m["coverage_status"] != "Completed":
-                continue
-            groups[
-                (
-                    e["model"],
-                    platform,
-                    e["prompt_length"],
-                    e["concurrent_requests"],
-                    m.get("serving_runtime_sha256"),
-                    e.get("model_revision"),
-                    e.get("comparison_scope"),
-                )
-            ].append((eid, e, m))
     parts = [
-        "<!-- LIVE_INFERENCE_START -->",
-        '<section id="inference-parallelization">',
-        '<p class="section-kicker">Latest measured studies</p>',
-        "<h2>Inference parallelization: speed, first-token delay and energy</h2>",
-        "<p>More GPUs per model is not always faster. These comparisons hold the node GPU budget fixed "
-        "and split it between model shards and independent serving replicas. TinyLlama favoured single-GPU replicas; "
-        "Qwen7B favoured TP2 throughput, with a demand-dependent energy trade-off.</p>",
-        "<p>TP2 × DP4 means four replicas, each spread over two GPUs. All results below use BF16, "
-        "128 fixed output tokens and the recorded serving runtime. Acceptance trials are excluded. "
-        "Values are means across independent trials; throughput ranges show minimum–maximum across trials. "
-        "p95 values are means of within-trial percentiles.</p>",
-        '<p><a href="index.html">Browse every condition and its platform status →</a></p>',
-        "<p><strong>Study design:</strong> the concurrency-two extension is a "
-        "<strong>follow-up motivated by observed results</strong>, planned on 21 October 2026 "
-        "after E763/E764 and E767/E768. It is distinct from the original experiment plan; "
-        "only collected performance trials appear below.</p>",
-        "<h3>New training and acceptance coverage</h3>",
+        "<!-- LIVE_TRAINING_COVERAGE_START -->",
+        '<div id="training-coverage" class="nerd-block">',
+        "<h3>Training study coverage</h3>",
         "<p>The catalog now includes every checked-in E-number condition. Completed means at least one "
         "platform has the required collected trials; it does not imply both platforms are complete. "
         "Acceptance is displayed separately from performance evidence.</p>",
@@ -310,11 +278,64 @@ def inference_section(catalog):
             f"<tr><td>{label}</td><td>{done}/{len(members)}</td><td>{count}</td><td>E{start}@l40s–E{end}@l40s</td></tr>"
         )
     parts.append("</tbody></table></div>")
+    parts.append("</div><!-- LIVE_TRAINING_COVERAGE_END -->")
+    return "\n".join(parts)
+
+
+def inference_section(catalog):
+    experiments = catalog["experiments"]
+    groups = defaultdict(list)
+    for eid, e in experiments.items():
+        if e.get("mode") != "inference" or int(eid[1:]) < 715 or "canary" in e["phase"] or e["status"] != "Completed":
+            continue
+        for platform, m in e["platforms"].items():
+            if m["coverage_status"] != "Completed":
+                continue
+            groups[
+                (
+                    e["model"],
+                    platform,
+                    e["prompt_length"],
+                    e["concurrent_requests"],
+                    m.get("serving_runtime_sha256"),
+                    e.get("model_revision"),
+                    e.get("comparison_scope"),
+                )
+            ].append((eid, e, m))
+    parts = [
+        "<!-- LIVE_INFERENCE_START -->",
+        '<section id="inference-parallelization">',
+        '<p class="section-kicker">Serving across several chips</p>',
+        "<h2>Should a serving model use more chips, or more replicas?</h2>",
+        '<p class="section-intro">Batching and compact formats change how one model serves requests. '
+        "The next question is how to share a fixed set of chips: split each model across several chips, "
+        "or run more independent copies? These comparisons hold the node GPU budget fixed "
+        "and split it between model shards and independent serving replicas. TinyLlama favoured single-GPU replicas; "
+        "Qwen7B favoured TP2 throughput, with a demand-dependent energy trade-off.</p>",
+        '<div class="finding-card"><p class="headline"><span class="tag">Finding</span> '
+        "The best serving layout depends on the model and demand</p>",
+        "<p>TinyLlama favoured single-GPU replicas. Qwen7B TP2 and TP4 had nearly equal throughput at "
+        "concurrency 1; TP2 used less energy per output token. At concurrency 8, TP2 led throughput "
+        "while TP4 used less energy per output token.</p></div>",
+        '<details class="nerd-block"><summary>Study design and measurement scope</summary>',
+        "<p>TP2 × DP4 means four replicas, each spread over two GPUs. All results below use BF16, "
+        "128 fixed output tokens and the recorded serving runtime. Acceptance trials are excluded. "
+        "Values are means across independent trials; throughput ranges show minimum–maximum across trials. "
+        "p95 values are means of within-trial percentiles.</p>",
+        '<p><a href="index.html">Browse every condition and its platform status →</a></p>',
+        "<p><strong>Study design:</strong> the concurrency-two extension is a "
+        "<strong>follow-up motivated by observed results</strong>, planned on 21 October 2026 "
+        "after E763/E764 and E767/E768. It is distinct from the original experiment plan; "
+        "only collected performance trials appear below.</p>",
+        "</details>",
+        '<p class="section-intro">Compare layouts within each model, platform, prompt length and demand level. '
+        "Open a condition below for throughput, first-token delay, energy and source runs.</p>",
+    ]
     for (model, platform, prompt, concurrency, *_cohort), rows in sorted(groups.items()):
         rows.sort(key=lambda row: int(row[1]["tensor_parallel_size"]))
         parts.append(
-            f"<h3>{escape(model.split('/')[-1])} · {platform.upper()} · "
-            f"prompt {prompt} · concurrency {concurrency}</h3>"
+            f'<details class="inference-condition"><summary>{escape(model.split("/")[-1])} · {platform.upper()} · '
+            f"prompt {prompt} · concurrency {concurrency}</summary>"
         )
         maximum = max(m["throughput_tokens_sec"] for _, _, m in rows)
         parts.append('<div class="live-chart" role="group" aria-label="Output throughput by layout">')
@@ -322,7 +343,7 @@ def inference_section(catalog):
             width = 100 * m["throughput_tokens_sec"] / maximum
             parts.append(
                 f'<div class="live-bar-row" data-layout="{escape(e["serving_layout"])}">'
-                f'<span>{escape(e["serving_layout"])}</span>'
+                f"<span>{escape(e['serving_layout'])}</span>"
                 f'<div class="live-bar-track"><div class="live-bar" style="width:{width:.2f}%"></div></div>'
                 f"<strong>{m['throughput_tokens_sec']:,.1f} tok/s</strong></div>"
             )
@@ -339,9 +360,9 @@ def inference_section(catalog):
                 f"<td>{m['time_per_output_token_p95_ms']:.2f}</td>"
                 f"<td>{energy:.2f}</td><td>{eid}@{platform}</td></tr>"
             )
-        parts.append("</tbody></table></div>")
+        parts.append("</tbody></table></div></details>")
     parts += [
-        "<h3>How to interpret these findings</h3>",
+        "<h3>What these comparisons can establish</h3>",
         "<p>Qwen7B TP2 and TP4 had nearly equal throughput at concurrency 1; TP2 used less energy per output "
         "token. At concurrency 8, TP2 led throughput while TP4 used less energy per output token. "
         "Only collected performance conditions appear here; configured follow-ups remain in the catalog.</p>",
@@ -367,7 +388,18 @@ def update():
     inner = replace_embedded(analysis.read_text(), "EXPERIMENT_DETAILS", compact(details))
     block = inference_section(catalog)
     inner = re.sub(r"<!-- LIVE_INFERENCE_START -->.*?<!-- LIVE_INFERENCE_END -->\n*", "", inner, flags=re.S)
-    inner = inner.replace('  <section id="scaling">', block + '\n\n  <section id="scaling">', 1)
+    inner = inner.replace('  <section id="recommendations">', block + '\n\n  <section id="recommendations">', 1)
+    inner = re.sub(
+        r"<!-- LIVE_TRAINING_COVERAGE_START -->.*?<!-- LIVE_TRAINING_COVERAGE_END -->\n*",
+        "",
+        inner,
+        flags=re.S,
+    )
+    inner = inner.replace(
+        '    <div class="coverage-overview">',
+        training_coverage_section(catalog) + '\n\n    <div class="coverage-overview">',
+        1,
+    )
     total, completed = catalog["meta"]["total"], catalog["meta"]["completed"]
     inner = re.sub(
         r"var total = \d+, completed = \d+, pct =", f"var total = {total}, completed = {completed}, pct =", inner
@@ -380,7 +412,7 @@ def update():
     )
     inner = inner.replace(
         "spanning two chip types and three AI models.",
-        "covering the checked-in experiment matrix; latest collected inference evidence is shown first.",
+        "covering the checked-in experiment matrix; findings are organised by research question and workload.",
     )
     for element, value in (
         ("coverageCompleted", completed),

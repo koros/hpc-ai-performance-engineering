@@ -66,3 +66,30 @@ def test_training_followups_are_not_rendered_as_inference_layouts():
     html = inference_section(catalog)
     assert "E779@l40s" not in html
     assert "E790@l40s" not in html
+
+
+def test_analysis_narrative_order_survives_refresh():
+    html = update()[Path("dashboard/analysis.html").resolve()]
+    section_ids = [
+        "glance",
+        "scaling",
+        "scaling-deep-dive",
+        "strategy",
+        "precision",
+        "communication",
+        "hardware",
+        "batching",
+        "power",
+        "lowbit",
+        "inference-parallelization",
+        "recommendations",
+        "nerds",
+    ]
+    positions = [html.index(f'<section id="{section_id}">') for section_id in section_ids]
+    assert positions == sorted(positions)
+    assert html.index('id="training-coverage"') > positions[-1]
+    inference = html[positions[-3] : positions[-2]]
+    assert "Training study coverage" not in inference
+    assert '<details class="inference-condition"><summary>' in inference
+    assert 'href="#inference-parallelization"' in html
+    assert "latest collected inference evidence is shown first" not in html
