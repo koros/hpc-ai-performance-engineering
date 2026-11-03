@@ -26,6 +26,8 @@
     --orange: #eb6834;
     --aqua: #1baf7a;
     --violet: #4a3aa7;
+    --gold: #eda100;
+    --pink: #e87ba4;
 
     --seq-1: #86b6ef;
     --seq-2: #5598e7;
@@ -50,6 +52,8 @@
       --orange: #d95926;
       --aqua: #199e70;
       --violet: #9085e9;
+      --gold: #c98500;
+      --pink: #d55181;
 
       --seq-1: #6da7ec;
       --seq-2: #3987e5;
@@ -208,22 +212,23 @@
 
   .chart-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
     gap: 16px;
     margin: 18px 0 22px;
   }
   .chart-panel {
-    background: var(--surface);
+    min-width: 0;
+    background: var(--page);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 18px 20px 14px;
+    border-radius: 12px;
+    padding: 12px 14px 10px;
   }
   .chart-panel .chart-title { font-size: 14px; font-weight: 700; margin: 0 0 2px; }
   .chart-panel .chart-sub { font-size: 12.5px; color: var(--text-muted); margin: 0 0 10px; }
   .chart-panel svg { width: 100%; height: auto; display: block; overflow: visible; }
   .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 12.5px; color: var(--text-secondary); }
   .legend .item { display: flex; align-items: center; gap: 6px; }
-  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+  .legend .swatch { width: 14px; height: 4px; border-radius: 2px; flex: 0 0 auto; }
 
   .bar-label { font-size: 11.5px; fill: var(--text-secondary); }
   .bar-value { font-size: 12.5px; font-weight: 700; fill: var(--text-primary); }
@@ -511,10 +516,14 @@
   .exp-note { grid-column: 1 / -1; color: var(--text-muted); font-style: italic; }
 
 /* Current inference evidence; offline charts use the same rows as the tables. */
-.live-chart { margin: 20px 0; display: grid; gap: 10px; }
+.live-chart { margin: 14px 0; display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--page); }
 .live-bar-row { display: grid; grid-template-columns: 90px minmax(60px,1fr) 110px; align-items: center; gap: 10px; font-size: .85rem; }
-.live-bar-track { background: var(--line, #e7e9ed); border-radius: 4px; overflow: hidden; }
-.live-bar { height: 18px; background: var(--accent, #5354d7); border-radius: 4px; }
+.live-bar-track { background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.live-bar { height: 18px; background: var(--blue); border-radius: 4px; }
+.live-bar-row[data-layout^="tp2"] .live-bar { background: var(--orange); }
+.live-bar-row[data-layout^="tp4"] .live-bar { background: var(--aqua); }
+.live-bar-row[data-layout^="tp8"] .live-bar { background: var(--violet); }
+.live-bar-row strong { font-variant-numeric: tabular-nums; }
 .table-wrap { overflow-x: auto; }
 @media (max-width: 520px) { .live-bar-row { grid-template-columns: 72px minmax(40px,1fr) 88px; font-size: .75rem; } }
 
@@ -639,9 +648,9 @@
 </tbody></table></div>
 <h3>Qwen2.5-7B-Instruct · L40S · prompt 128 · concurrency 8</h3>
 <div class="live-chart" role="group" aria-label="Output throughput by layout">
-<div class="live-bar-row"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:61.65%"></div></div><strong>376.2 tok/s</strong></div>
-<div class="live-bar-row"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>610.3 tok/s</strong></div>
-<div class="live-bar-row"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:96.16%"></div></div><strong>586.9 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp1_dp8"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:61.65%"></div></div><strong>376.2 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp2_dp4"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>610.3 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp4_dp2"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:96.16%"></div></div><strong>586.9 tok/s</strong></div>
 </div><div class="table-wrap"><table class="nerd-table"><thead><tr><th>Layout</th><th>Trials</th><th>Output tok/s</th><th>p95 TTFT (ms)</th><th>p95 time/token (ms)</th><th>J/output token</th><th>Source</th></tr></thead><tbody>
 <tr><td>tp1_dp8</td><td>3</td><td>376.2<br><small>376.2–376.3</small></td><td>29.0</td><td>21.20</td><td>5.60</td><td>E752@l40s</td></tr>
 <tr><td>tp2_dp4</td><td>3</td><td>610.3<br><small>609.5–610.7</small></td><td>24.5</td><td>13.02</td><td>2.83</td><td>E753@l40s</td></tr>
@@ -649,9 +658,9 @@
 </tbody></table></div>
 <h3>Qwen2.5-7B-Instruct · L40S · prompt 1280 · concurrency 1</h3>
 <div class="live-chart" role="group" aria-label="Output throughput by layout">
-<div class="live-bar-row"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:59.91%"></div></div><strong>46.0 tok/s</strong></div>
-<div class="live-bar-row"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>76.7 tok/s</strong></div>
-<div class="live-bar-row"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:99.45%"></div></div><strong>76.3 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp1_dp8"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:59.91%"></div></div><strong>46.0 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp2_dp4"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>76.7 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp4_dp2"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:99.45%"></div></div><strong>76.3 tok/s</strong></div>
 </div><div class="table-wrap"><table class="nerd-table"><thead><tr><th>Layout</th><th>Trials</th><th>Output tok/s</th><th>p95 TTFT (ms)</th><th>p95 time/token (ms)</th><th>J/output token</th><th>Source</th></tr></thead><tbody>
 <tr><td>tp1_dp8</td><td>3</td><td>46.0<br><small>46.0–46.0</small></td><td>91.8</td><td>21.28</td><td>17.75</td><td>E762@l40s</td></tr>
 <tr><td>tp2_dp4</td><td>3</td><td>76.7<br><small>76.7–76.8</small></td><td>71.8</td><td>12.60</td><td>12.07</td><td>E763@l40s</td></tr>
@@ -659,25 +668,25 @@
 </tbody></table></div>
 <h3>Qwen2.5-7B-Instruct · L40S · prompt 1280 · concurrency 2</h3>
 <div class="live-chart" role="group" aria-label="Output throughput by layout">
-<div class="live-bar-row"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:99.63%"></div></div><strong>153.4 tok/s</strong></div>
-<div class="live-bar-row"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>153.9 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp2_dp4"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:99.63%"></div></div><strong>153.4 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp4_dp2"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>153.9 tok/s</strong></div>
 </div><div class="table-wrap"><table class="nerd-table"><thead><tr><th>Layout</th><th>Trials</th><th>Output tok/s</th><th>p95 TTFT (ms)</th><th>p95 time/token (ms)</th><th>J/output token</th><th>Source</th></tr></thead><tbody>
 <tr><td>tp2_dp4</td><td>3</td><td>153.4<br><small>153.2–153.6</small></td><td>71.1</td><td>12.60</td><td>8.44</td><td>E771@l40s</td></tr>
 <tr><td>tp4_dp2</td><td>3</td><td>153.9<br><small>152.3–155.2</small></td><td>72.6</td><td>12.67</td><td>8.46</td><td>E772@l40s</td></tr>
 </tbody></table></div>
 <h3>Qwen2.5-7B-Instruct · L40S · prompt 1280 · concurrency 4</h3>
 <div class="live-chart" role="group" aria-label="Output throughput by layout">
-<div class="live-bar-row"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>306.5 tok/s</strong></div>
-<div class="live-bar-row"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:91.87%"></div></div><strong>281.6 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp2_dp4"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>306.5 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp4_dp2"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:91.87%"></div></div><strong>281.6 tok/s</strong></div>
 </div><div class="table-wrap"><table class="nerd-table"><thead><tr><th>Layout</th><th>Trials</th><th>Output tok/s</th><th>p95 TTFT (ms)</th><th>p95 time/token (ms)</th><th>J/output token</th><th>Source</th></tr></thead><tbody>
 <tr><td>tp2_dp4</td><td>3</td><td>306.5<br><small>306.0–307.1</small></td><td>71.7</td><td>12.60</td><td>6.10</td><td>E767@l40s</td></tr>
 <tr><td>tp4_dp2</td><td>3</td><td>281.6<br><small>281.5–281.8</small></td><td>142.1</td><td>13.87</td><td>4.38</td><td>E768@l40s</td></tr>
 </tbody></table></div>
 <h3>Qwen2.5-7B-Instruct · L40S · prompt 1280 · concurrency 8</h3>
 <div class="live-chart" role="group" aria-label="Output throughput by layout">
-<div class="live-bar-row"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:64.78%"></div></div><strong>366.8 tok/s</strong></div>
-<div class="live-bar-row"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>566.2 tok/s</strong></div>
-<div class="live-bar-row"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:92.26%"></div></div><strong>522.4 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp1_dp8"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:64.78%"></div></div><strong>366.8 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp2_dp4"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>566.2 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp4_dp2"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:92.26%"></div></div><strong>522.4 tok/s</strong></div>
 </div><div class="table-wrap"><table class="nerd-table"><thead><tr><th>Layout</th><th>Trials</th><th>Output tok/s</th><th>p95 TTFT (ms)</th><th>p95 time/token (ms)</th><th>J/output token</th><th>Source</th></tr></thead><tbody>
 <tr><td>tp1_dp8</td><td>3</td><td>366.8<br><small>366.6–366.9</small></td><td>92.4</td><td>21.26</td><td>5.85</td><td>E754@l40s</td></tr>
 <tr><td>tp2_dp4</td><td>3</td><td>566.2<br><small>565.6–567.1</small></td><td>142.1</td><td>13.66</td><td>3.14</td><td>E755@l40s</td></tr>
@@ -685,9 +694,9 @@
 </tbody></table></div>
 <h3>TinyLlama-1.1B-Chat-v1.0 · H100 · prompt 128 · concurrency 1</h3>
 <div class="live-chart" role="group" aria-label="Output throughput by layout">
-<div class="live-bar-row"><span>tp1_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>170.9 tok/s</strong></div>
-<div class="live-bar-row"><span>tp2_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:76.45%"></div></div><strong>130.7 tok/s</strong></div>
-<div class="live-bar-row"><span>tp4</span><div class="live-bar-track"><div class="live-bar" style="width:78.33%"></div></div><strong>133.9 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp1_dp4"><span>tp1_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>170.9 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp2_dp2"><span>tp2_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:76.45%"></div></div><strong>130.7 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp4"><span>tp4</span><div class="live-bar-track"><div class="live-bar" style="width:78.33%"></div></div><strong>133.9 tok/s</strong></div>
 </div><div class="table-wrap"><table class="nerd-table"><thead><tr><th>Layout</th><th>Trials</th><th>Output tok/s</th><th>p95 TTFT (ms)</th><th>p95 time/token (ms)</th><th>J/output token</th><th>Source</th></tr></thead><tbody>
 <tr><td>tp1_dp4</td><td>3</td><td>170.9<br><small>169.3–171.8</small></td><td>9.9</td><td>5.87</td><td>3.02</td><td>E738@h100</td></tr>
 <tr><td>tp2_dp2</td><td>3</td><td>130.7<br><small>129.1–131.6</small></td><td>11.8</td><td>7.73</td><td>3.98</td><td>E739@h100</td></tr>
@@ -695,9 +704,9 @@
 </tbody></table></div>
 <h3>TinyLlama-1.1B-Chat-v1.0 · H100 · prompt 128 · concurrency 8</h3>
 <div class="live-chart" role="group" aria-label="Output throughput by layout">
-<div class="live-bar-row"><span>tp1_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>1,171.5 tok/s</strong></div>
-<div class="live-bar-row"><span>tp2_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:82.44%"></div></div><strong>965.8 tok/s</strong></div>
-<div class="live-bar-row"><span>tp4</span><div class="live-bar-track"><div class="live-bar" style="width:80.26%"></div></div><strong>940.2 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp1_dp4"><span>tp1_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>1,171.5 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp2_dp2"><span>tp2_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:82.44%"></div></div><strong>965.8 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp4"><span>tp4</span><div class="live-bar-track"><div class="live-bar" style="width:80.26%"></div></div><strong>940.2 tok/s</strong></div>
 </div><div class="table-wrap"><table class="nerd-table"><thead><tr><th>Layout</th><th>Trials</th><th>Output tok/s</th><th>p95 TTFT (ms)</th><th>p95 time/token (ms)</th><th>J/output token</th><th>Source</th></tr></thead><tbody>
 <tr><td>tp1_dp4</td><td>3</td><td>1,171.5<br><small>1,165.5–1,176.4</small></td><td>9.8</td><td>6.82</td><td>0.56</td><td>E741@h100</td></tr>
 <tr><td>tp2_dp2</td><td>3</td><td>965.8<br><small>961.4–970.0</small></td><td>12.3</td><td>8.29</td><td>0.61</td><td>E742@h100</td></tr>
@@ -705,9 +714,9 @@
 </tbody></table></div>
 <h3>TinyLlama-1.1B-Chat-v1.0 · H100 · prompt 1280 · concurrency 1</h3>
 <div class="live-chart" role="group" aria-label="Output throughput by layout">
-<div class="live-bar-row"><span>tp1_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>167.2 tok/s</strong></div>
-<div class="live-bar-row"><span>tp2_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:77.29%"></div></div><strong>129.2 tok/s</strong></div>
-<div class="live-bar-row"><span>tp4</span><div class="live-bar-track"><div class="live-bar" style="width:79.06%"></div></div><strong>132.2 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp1_dp4"><span>tp1_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>167.2 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp2_dp2"><span>tp2_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:77.29%"></div></div><strong>129.2 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp4"><span>tp4</span><div class="live-bar-track"><div class="live-bar" style="width:79.06%"></div></div><strong>132.2 tok/s</strong></div>
 </div><div class="table-wrap"><table class="nerd-table"><thead><tr><th>Layout</th><th>Trials</th><th>Output tok/s</th><th>p95 TTFT (ms)</th><th>p95 time/token (ms)</th><th>J/output token</th><th>Source</th></tr></thead><tbody>
 <tr><td>tp1_dp4</td><td>3</td><td>167.2<br><small>166.8–168.1</small></td><td>10.3</td><td>6.01</td><td>3.11</td><td>E744@h100</td></tr>
 <tr><td>tp2_dp2</td><td>3</td><td>129.2<br><small>128.9–129.7</small></td><td>12.0</td><td>7.79</td><td>4.08</td><td>E745@h100</td></tr>
@@ -715,9 +724,9 @@
 </tbody></table></div>
 <h3>TinyLlama-1.1B-Chat-v1.0 · H100 · prompt 1280 · concurrency 8</h3>
 <div class="live-chart" role="group" aria-label="Output throughput by layout">
-<div class="live-bar-row"><span>tp1_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>1,132.4 tok/s</strong></div>
-<div class="live-bar-row"><span>tp2_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:81.34%"></div></div><strong>921.0 tok/s</strong></div>
-<div class="live-bar-row"><span>tp4</span><div class="live-bar-track"><div class="live-bar" style="width:76.96%"></div></div><strong>871.5 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp1_dp4"><span>tp1_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>1,132.4 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp2_dp2"><span>tp2_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:81.34%"></div></div><strong>921.0 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp4"><span>tp4</span><div class="live-bar-track"><div class="live-bar" style="width:76.96%"></div></div><strong>871.5 tok/s</strong></div>
 </div><div class="table-wrap"><table class="nerd-table"><thead><tr><th>Layout</th><th>Trials</th><th>Output tok/s</th><th>p95 TTFT (ms)</th><th>p95 time/token (ms)</th><th>J/output token</th><th>Source</th></tr></thead><tbody>
 <tr><td>tp1_dp4</td><td>3</td><td>1,132.4<br><small>1,122.9–1,141.2</small></td><td>18.4</td><td>7.05</td><td>0.61</td><td>E747@h100</td></tr>
 <tr><td>tp2_dp2</td><td>3</td><td>921.0<br><small>906.7–938.8</small></td><td>41.6</td><td>8.65</td><td>0.68</td><td>E748@h100</td></tr>
@@ -725,10 +734,10 @@
 </tbody></table></div>
 <h3>TinyLlama-1.1B-Chat-v1.0 · L40S · prompt 128 · concurrency 1</h3>
 <div class="live-chart" role="group" aria-label="Output throughput by layout">
-<div class="live-bar-row"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>194.4 tok/s</strong></div>
-<div class="live-bar-row"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:75.18%"></div></div><strong>146.2 tok/s</strong></div>
-<div class="live-bar-row"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:52.67%"></div></div><strong>102.4 tok/s</strong></div>
-<div class="live-bar-row"><span>tp8</span><div class="live-bar-track"><div class="live-bar" style="width:50.62%"></div></div><strong>98.4 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp1_dp8"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>194.4 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp2_dp4"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:75.18%"></div></div><strong>146.2 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp4_dp2"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:52.67%"></div></div><strong>102.4 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp8"><span>tp8</span><div class="live-bar-track"><div class="live-bar" style="width:50.62%"></div></div><strong>98.4 tok/s</strong></div>
 </div><div class="table-wrap"><table class="nerd-table"><thead><tr><th>Layout</th><th>Trials</th><th>Output tok/s</th><th>p95 TTFT (ms)</th><th>p95 time/token (ms)</th><th>J/output token</th><th>Source</th></tr></thead><tbody>
 <tr><td>tp1_dp8</td><td>3</td><td>194.4<br><small>194.1–194.7</small></td><td>24.4</td><td>5.21</td><td>3.94</td><td>E722@l40s</td></tr>
 <tr><td>tp2_dp4</td><td>3</td><td>146.2<br><small>145.4–146.9</small></td><td>11.1</td><td>6.91</td><td>5.10</td><td>E723@l40s</td></tr>
@@ -737,10 +746,10 @@
 </tbody></table></div>
 <h3>TinyLlama-1.1B-Chat-v1.0 · L40S · prompt 128 · concurrency 8</h3>
 <div class="live-chart" role="group" aria-label="Output throughput by layout">
-<div class="live-bar-row"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>1,529.7 tok/s</strong></div>
-<div class="live-bar-row"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:72.82%"></div></div><strong>1,113.9 tok/s</strong></div>
-<div class="live-bar-row"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:50.22%"></div></div><strong>768.1 tok/s</strong></div>
-<div class="live-bar-row"><span>tp8</span><div class="live-bar-track"><div class="live-bar" style="width:47.54%"></div></div><strong>727.2 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp1_dp8"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>1,529.7 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp2_dp4"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:72.82%"></div></div><strong>1,113.9 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp4_dp2"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:50.22%"></div></div><strong>768.1 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp8"><span>tp8</span><div class="live-bar-track"><div class="live-bar" style="width:47.54%"></div></div><strong>727.2 tok/s</strong></div>
 </div><div class="table-wrap"><table class="nerd-table"><thead><tr><th>Layout</th><th>Trials</th><th>Output tok/s</th><th>p95 TTFT (ms)</th><th>p95 time/token (ms)</th><th>J/output token</th><th>Source</th></tr></thead><tbody>
 <tr><td>tp1_dp8</td><td>3</td><td>1,529.7<br><small>1,519.7–1,541.3</small></td><td>7.6</td><td>5.21</td><td>1.00</td><td>E726@l40s</td></tr>
 <tr><td>tp2_dp4</td><td>3</td><td>1,113.9<br><small>1,110.5–1,120.1</small></td><td>10.4</td><td>7.18</td><td>0.87</td><td>E727@l40s</td></tr>
@@ -749,10 +758,10 @@
 </tbody></table></div>
 <h3>TinyLlama-1.1B-Chat-v1.0 · L40S · prompt 1280 · concurrency 1</h3>
 <div class="live-chart" role="group" aria-label="Output throughput by layout">
-<div class="live-bar-row"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>187.5 tok/s</strong></div>
-<div class="live-bar-row"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:75.69%"></div></div><strong>141.9 tok/s</strong></div>
-<div class="live-bar-row"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:53.60%"></div></div><strong>100.5 tok/s</strong></div>
-<div class="live-bar-row"><span>tp8</span><div class="live-bar-track"><div class="live-bar" style="width:51.79%"></div></div><strong>97.1 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp1_dp8"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>187.5 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp2_dp4"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:75.69%"></div></div><strong>141.9 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp4_dp2"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:53.60%"></div></div><strong>100.5 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp8"><span>tp8</span><div class="live-bar-track"><div class="live-bar" style="width:51.79%"></div></div><strong>97.1 tok/s</strong></div>
 </div><div class="table-wrap"><table class="nerd-table"><thead><tr><th>Layout</th><th>Trials</th><th>Output tok/s</th><th>p95 TTFT (ms)</th><th>p95 time/token (ms)</th><th>J/output token</th><th>Source</th></tr></thead><tbody>
 <tr><td>tp1_dp8</td><td>3</td><td>187.5<br><small>186.6–188.1</small></td><td>26.9</td><td>5.30</td><td>4.28</td><td>E730@l40s</td></tr>
 <tr><td>tp2_dp4</td><td>3</td><td>141.9<br><small>141.7–142.2</small></td><td>24.8</td><td>6.98</td><td>5.37</td><td>E731@l40s</td></tr>
@@ -761,10 +770,10 @@
 </tbody></table></div>
 <h3>TinyLlama-1.1B-Chat-v1.0 · L40S · prompt 1280 · concurrency 8</h3>
 <div class="live-chart" role="group" aria-label="Output throughput by layout">
-<div class="live-bar-row"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>1,474.1 tok/s</strong></div>
-<div class="live-bar-row"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:71.96%"></div></div><strong>1,060.7 tok/s</strong></div>
-<div class="live-bar-row"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:48.44%"></div></div><strong>714.1 tok/s</strong></div>
-<div class="live-bar-row"><span>tp8</span><div class="live-bar-track"><div class="live-bar" style="width:42.30%"></div></div><strong>623.5 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp1_dp8"><span>tp1_dp8</span><div class="live-bar-track"><div class="live-bar" style="width:100.00%"></div></div><strong>1,474.1 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp2_dp4"><span>tp2_dp4</span><div class="live-bar-track"><div class="live-bar" style="width:71.96%"></div></div><strong>1,060.7 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp4_dp2"><span>tp4_dp2</span><div class="live-bar-track"><div class="live-bar" style="width:48.44%"></div></div><strong>714.1 tok/s</strong></div>
+<div class="live-bar-row" data-layout="tp8"><span>tp8</span><div class="live-bar-track"><div class="live-bar" style="width:42.30%"></div></div><strong>623.5 tok/s</strong></div>
 </div><div class="table-wrap"><table class="nerd-table"><thead><tr><th>Layout</th><th>Trials</th><th>Output tok/s</th><th>p95 TTFT (ms)</th><th>p95 time/token (ms)</th><th>J/output token</th><th>Source</th></tr></thead><tbody>
 <tr><td>tp1_dp8</td><td>3</td><td>1,474.1<br><small>1,464.0–1,481.2</small></td><td>18.8</td><td>5.32</td><td>1.05</td><td>E734@l40s</td></tr>
 <tr><td>tp2_dp4</td><td>3</td><td>1,060.7<br><small>1,055.8–1,068.8</small></td><td>45.6</td><td>7.42</td><td>0.94</td><td>E735@l40s</td></tr>
@@ -1960,6 +1969,34 @@
     return Number(n).toLocaleString(undefined, { maximumFractionDigits: decimals, minimumFractionDigits: decimals });
   }
 
+  var BAR_HEIGHT = 18;
+  var chartLayouts = new Map();
+  var chartResize = new ResizeObserver(function (entries) {
+    entries.forEach(function (entry) {
+      var layout = chartLayouts.get(entry.target);
+      if (layout && Math.abs(entry.contentRect.width - layout.width) > 1) layout.draw();
+    });
+  });
+  function trackChart(el, draw) {
+    chartLayouts.set(el, { width: el.clientWidth, draw: draw });
+    chartResize.observe(el);
+  }
+  // Shared identities across throughput, memory and energy comparisons.
+  function categoryColor(label, index, palette) {
+    if (/BF16 \(control\)/.test(label)) return palette[0];
+    if (/AWQ/.test(label)) return palette[1];
+    if (/GPTQ/.test(label)) return palette[2];
+    if (/NF4/.test(label)) return palette[3];
+    if (/FP32/.test(label)) return palette[0];
+    if (/FP16/.test(label)) return palette[1];
+    if (/BF16/.test(label)) return palette[2];
+    if (/FP8/.test(label)) return palette[3];
+    if (/DDP/.test(label)) return palette[0];
+    if (/FSDP/.test(label)) return palette[1];
+    if (/DeepSpeed|ZeRO/.test(label)) return palette[2];
+    return palette[index % palette.length];
+  }
+
   // ---- Generic grouped bar chart renderer -------------------------------
   // series: [{ name, color, values: [..] }]
   // categories: [labels]
@@ -1973,10 +2010,25 @@
     var refLine = opts.refLine; // { value, label }
     var maxOverride = opts.max;
 
-    var W = 560, marginL = 8, marginR = 8, marginT = 18, marginB = 30;
+    trackChart(el, function () { renderBars(containerId, opts); });
+    var palette = ['--blue', '--orange', '--aqua', '--violet', '--gold', '--pink'].map(css);
+    var categoryColors = categories.map(function (label, i) { return categoryColor(label, i, palette); });
+    var W = el.clientWidth || 560, marginL = 8, marginR = 80, marginT = 28, marginB = 16;
     var groupCount = categories.length;
     var seriesCount = series.length;
-    var rowH = seriesCount > 1 ? 96 : 74;
+    var labelWidth = Math.max(16, Math.floor((W - 16) / 6.5));
+    var labels = categories.map(function (cat) {
+      var lines = [''];
+      cat.split(' ').forEach(function (word) {
+        var last = lines.length - 1;
+        if (lines[last] && (lines[last] + ' ' + word).length > labelWidth) lines.push(word);
+        else lines[last] += (lines[last] ? ' ' : '') + word;
+      });
+      return lines;
+    });
+    var labelLines = Math.max.apply(null, labels.map(function (lines) { return lines.length; }));
+    marginT += (labelLines - 1) * 14;
+    var rowH = 26 + (labelLines - 1) * 14 + seriesCount * (BAR_HEIGHT + 6);
     var H = marginT + marginB + groupCount * rowH;
 
     var allVals = [];
@@ -1998,12 +2050,12 @@
       svg.push('<line class="grid-line" x1="' + gx + '" y1="' + marginT + '" x2="' + gx + '" y2="' + (H - marginB + 4) + '" />');
     }
 
-    var barH = seriesCount > 1 ? 16 : 22;
+    var barH = BAR_HEIGHT;
     var barGap = 6;
 
     categories.forEach(function (cat, gi) {
       var groupTop = marginT + gi * rowH;
-      var label = '<text class="bar-label" x="' + plotX + '" y="' + (groupTop - 4) + '">' + cat + '</text>';
+      var label = '<text class="bar-label">' + labels[gi].map(function (line, i) { return '<tspan x="' + plotX + '" y="' + (groupTop - 8 - (labels[gi].length - 1 - i) * 14) + '">' + line + '</tspan>'; }).join('') + '</text>';
       svg.push(label);
 
       series.forEach(function (s, si) {
@@ -2011,7 +2063,7 @@
         var v = s.values[gi];
         var x2 = xScale(v);
         var w = Math.max(2, x2 - plotX);
-        svg.push('<rect x="' + plotX + '" y="' + y + '" width="' + w + '" height="' + barH + '" rx="4" ry="4" fill="' + s.color + '"></rect>');
+        svg.push('<rect x="' + plotX + '" y="' + y + '" width="' + w + '" height="' + barH + '" rx="4" ry="4" fill="' + (seriesCount === 1 ? categoryColors[gi] : s.color) + '"><title>' + cat + ' · ' + s.name + ': ' + valueFmt(v) + '</title></rect>');
         var labelX = x2 + 6;
         svg.push('<text class="bar-value" x="' + labelX + '" y="' + (y + barH - 5) + '">' + valueFmt(v) + (s.suffix || '') + '</text>');
       });
@@ -2024,7 +2076,7 @@
     if (refLine) {
       var rx = xScale(refLine.value);
       svg.push('<line class="ref-line" x1="' + rx + '" y1="' + (marginT - 10) + '" x2="' + rx + '" y2="' + (H - marginB + 6) + '" />');
-      svg.push('<text class="ref-label" x="' + (rx + 4) + '" y="' + (marginT - 12) + '">' + refLine.label + '</text>');
+      svg.push('<text class="ref-label" x="' + (W - marginR) + '" y="' + 12 + '" text-anchor="end">' + refLine.label + '</text>');
     }
 
     svg.push('</svg>');
@@ -2039,7 +2091,7 @@
         item.innerHTML = '<span class="swatch" style="background:' + s.color + '"></span>' + s.name;
         legend.appendChild(item);
       });
-      el.parentElement.appendChild(legend);
+      el.appendChild(legend);
     }
   }
 
@@ -2052,13 +2104,14 @@
     var posColor = opts.posColor, negColor = opts.negColor;
     var posLabel = opts.posLabel, negLabel = opts.negLabel;
 
-    var W = 620, marginT = 18, marginB = 30;
+    trackChart(el, function () { renderDiverging(containerId, opts); });
+    var W = el.clientWidth || 560, marginT = 28, marginB = 18;
     var rowH = 54;
     var H = marginT + marginB + categories.length * rowH;
 
     var maxAbs = Math.max.apply(null, values.map(function (v) { return Math.abs(Math.log2(v)); })) * 1.35;
     var centerX = W / 2;
-    var halfW = (W / 2) - 170;
+    var halfW = Math.max(24, W / 2 - 100);
 
     function xFor(v) {
       var logv = Math.log2(v);
@@ -2075,14 +2128,14 @@
       var v = values[i];
       var x = xFor(v);
       var barY = y + 14;
-      var barH = 18;
+      var barH = BAR_HEIGHT;
       var isPos = v >= 1;
       var color = isPos ? posColor : negColor;
       var x1 = Math.min(centerX, x), x2 = Math.max(centerX, x);
       var w = Math.max(2, x2 - x1);
       svg.push('<text class="bar-label" x="' + centerX + '" y="' + (y + 8) + '" text-anchor="middle">' + cat + '</text>');
       svg.push('<rect x="' + x1 + '" y="' + barY + '" width="' + w + '" height="' + barH + '" rx="4" ry="4" fill="' + color + '"></rect>');
-      var label = fmt(v, 2) + '× ' + (isPos ? posLabel : negLabel);
+      var label = fmt(v, 2) + '×';
       var labelX = isPos ? x2 + 8 : x1 - 8;
       var anchor = isPos ? 'start' : 'end';
       svg.push('<text class="bar-value" x="' + labelX + '" y="' + (barY + barH - 4) + '" text-anchor="' + anchor + '">' + label + '</text>');
@@ -2096,7 +2149,7 @@
     legend.innerHTML =
       '<span class="item"><span class="swatch" style="background:' + posColor + '"></span>' + posLabel + '</span>' +
       '<span class="item"><span class="swatch" style="background:' + negColor + '"></span>' + negLabel + '</span>';
-    el.parentElement.appendChild(legend);
+    el.appendChild(legend);
   }
 
   // ---- Meter list (coverage by test category) ---------------------------
@@ -2257,7 +2310,6 @@
 
   function ready() {
     var BLUE = css('--blue'), ORANGE = css('--orange'), AQUA = css('--aqua'), VIOLET = css('--violet');
-    var SEQ = [css('--seq-1'), css('--seq-2'), css('--seq-3'), css('--seq-4')];
 
     // --- Scaling (RQ1) ----------------------------------------------------
     renderBars('chartScaling1', {
@@ -2306,12 +2358,6 @@
       valueFmt: function (v) { return fmt(v, 2) + '×'; },
       max: 4.3
     });
-    // recolor precision bars sequentially after render
-    (function paintSequential(id) {
-      var svg = document.getElementById(id).querySelector('svg');
-      var rects = svg.querySelectorAll('rect');
-      rects.forEach(function (r, i) { r.setAttribute('fill', SEQ[i] || SEQ[SEQ.length - 1]); });
-    })('chartPrecisionGpt2');
 
     renderBars('chartPrecisionDistilbert', {
       categories: ['Most exact (FP32)', 'Standard-compact (FP16)', 'Standard-compact (BF16)', 'Most compact (FP8)'],
@@ -2319,11 +2365,6 @@
       valueFmt: function (v) { return fmt(v, 2) + '×'; },
       max: 6.2
     });
-    (function paintSequential(id) {
-      var svg = document.getElementById(id).querySelector('svg');
-      var rects = svg.querySelectorAll('rect');
-      rects.forEach(function (r, i) { r.setAttribute('fill', SEQ[i] || SEQ[SEQ.length - 1]); });
-    })('chartPrecisionDistilbert');
 
     // --- Communication (RQ4) -----------------------------------------------
     renderBars('chartComms', {
@@ -2368,11 +2409,6 @@
       valueFmt: function (v) { return fmt(v, 2) + '×'; },
       max: 6.8
     });
-    (function paintSequential(id) {
-      var svg = document.getElementById(id).querySelector('svg');
-      var rects = svg.querySelectorAll('rect');
-      rects.forEach(function (r, i) { r.setAttribute('fill', SEQ[i] || SEQ[SEQ.length - 1]); });
-    })('chartEnergyGpt2');
 
     renderBars('chartEnergyDistilbert', {
       categories: ['Most exact (FP32)', 'Standard-compact (FP16)', 'Standard-compact (BF16)', 'Most compact (FP8)'],
@@ -2380,11 +2416,6 @@
       valueFmt: function (v) { return fmt(v, 2) + '×'; },
       max: 20
     });
-    (function paintSequential(id) {
-      var svg = document.getElementById(id).querySelector('svg');
-      var rects = svg.querySelectorAll('rect');
-      rects.forEach(function (r, i) { r.setAttribute('fill', SEQ[i] || SEQ[SEQ.length - 1]); });
-    })('chartEnergyDistilbert');
 
     renderBars('chartPowerScaling', {
       categories: ['1 chip', '2 chips', '4 chips'],
@@ -2412,22 +2443,12 @@
       series: [{ name: 'Tokens processed / second', color: BLUE, values: [756.85, 817.30, 845.42, 264.15] }],
       valueFmt: function (v) { return fmt(v, 0) + '/s'; },
     });
-    (function paintSequential(id) {
-      var svg = document.getElementById(id).querySelector('svg');
-      var rects = svg.querySelectorAll('rect');
-      rects.forEach(function (r, i) { r.setAttribute('fill', SEQ[i] || SEQ[SEQ.length - 1]); });
-    })('chartLowbitSpeed');
 
     renderBars('chartLowbitMemory', {
       categories: ['BF16 (control)', 'AWQ (4-bit)', 'GPTQ (4-bit)', 'NF4 (4-bit)'],
       series: [{ name: 'Peak GB of chip memory used', color: ORANGE, values: [15.70, 6.66, 6.68, 7.06] }],
       valueFmt: function (v) { return fmt(v, 1) + ' GB'; },
     });
-    (function paintSequential(id) {
-      var svg = document.getElementById(id).querySelector('svg');
-      var rects = svg.querySelectorAll('rect');
-      rects.forEach(function (r, i) { r.setAttribute('fill', SEQ[i] || SEQ[SEQ.length - 1]); });
-    })('chartLowbitMemory');
 
     renderBars('chartLongContext', {
       categories: ['~4,096-token prompt', '~6,144-token prompt', '~8,192-token prompt'],
@@ -2460,7 +2481,7 @@
       yMax: 110,
       series: [
         { name: 'H100 · batch 8 per chip', color: BLUE, points: [{ x: 1, y: 100 }, { x: 2, y: 92.386 }, { x: 4, y: 92.150 }] },
-        { name: 'L40S · batch 2 per chip', color: VIOLET, points: [{ x: 1, y: 100 }, { x: 2, y: 7.065 }, { x: 4, y: 32.545 }, { x: 8, y: 40.009 }] }
+        { name: 'L40S · batch 2 per chip', color: ORANGE, points: [{ x: 1, y: 100 }, { x: 2, y: 7.065 }, { x: 4, y: 32.545 }, { x: 8, y: 40.009 }] }
       ]
     });
 

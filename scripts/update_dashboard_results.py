@@ -321,7 +321,7 @@ def inference_section(catalog):
         for _, e, m in rows:
             width = 100 * m["throughput_tokens_sec"] / maximum
             parts.append(
-                f'<div class="live-bar-row"><span>{escape(e["serving_layout"])}</span>'
+                f'<div class="live-bar-row" data-layout="{escape(e["serving_layout"])}"><span>{escape(e["serving_layout"])}</span>'
                 f'<div class="live-bar-track"><div class="live-bar" style="width:{width:.2f}%"></div></div>'
                 f"<strong>{m['throughput_tokens_sec']:,.1f} tok/s</strong></div>"
             )
